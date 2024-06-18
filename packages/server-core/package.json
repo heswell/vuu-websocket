@@ -1,0 +1,19 @@
+{
+  "name": "@heswell/server-core",
+  "version": "3.0.0",
+  "description": "Heswell websocket server",
+  "main": "dist/index.js",
+  "module": "src/server.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {},
+  "types": "src/index.ts",
+  "author": "heswell",
+  "license": "Apache-2.0",
+  "devDependencies": {},
+  "dependencies": {
+    "@vuu-ui/vuu-data-test": "0.8.63",
+    "@vuu-ui/vuu-utils": "0.8.63"
+  }
+}

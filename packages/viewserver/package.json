@@ -1,0 +1,26 @@
+{
+  "name": "@heswell/viewserver",
+  "version": "3.0.0",
+  "description": "Heswell Viewserver",
+  "main": "dist/src/index.js",
+  "module": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "etsc",
+    "build:vuu": "node ../../scripts/build.mjs"
+  },
+  "types": "src/index.ts",
+  "author": "heswell",
+  "license": "MIT",
+  "dependencies": {
+    "@heswell/data": "3.0.0",
+    "@heswell/server-core": "3.0.0",
+    "@vuu-ui/vuu-utils": "0.8.63"
+  },
+  "devDependencies": {
+    "@vuu-ui/data-types": "1.0.0",
+    "@heswell/server-types": "1.0.0"
+  }
+}

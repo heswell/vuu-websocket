@@ -1,0 +1,26 @@
+{
+  "name": "@heswell/data",
+  "version": "3.0.0",
+  "description": "Vuu data stores and views",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "etsc",
+    "build:vuu": "node ../../scripts/run-build.mjs"
+  },
+  "author": "heswell",
+  "license": "MIT",
+  "dependencies": {
+    "@vuu-ui/datagrid-parsers": "0.0.26",
+    "@vuu-ui/utils": "0.0.26"
+  },
+  "peerDependencies": {},
+  "devDependencies": {
+    "@heswell/server-types": "1.0.0",
+    "@vuu-ui/data-types": "1.0.0"
+  }
+}

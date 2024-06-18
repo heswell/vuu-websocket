@@ -1,51 +1,63 @@
 import { getFullRange } from "@vuu-ui/vuu-utils";
+import { IMessageQueue, RowMeta } from "@heswell/server-types";
 import {
-  MessageOut,
-  MessageTypeOut,
-  RowMeta,
-  UpdateMessage,
-} from "./serverTypes";
+  ServerToClientMessage,
+  ServerToClientTableRows,
+  VuuRange,
+} from "@vuu-ui/vuu-protocol-types";
+
+export interface ViewportMessage {
+  viewport: string;
+}
+
+export const MessageTypeOut = {
+  Rowset: "rowset",
+  Update: "update",
+};
+
+export interface RowsetMessage extends ViewportMessage {
+  type: typeof MessageTypeOut.Rowset;
+}
+export interface UpdateMessage extends ViewportMessage {
+  range: VuuRange;
+  type: typeof MessageTypeOut.Update;
+  updates: any[];
+}
+
+export type MessageOut = RowsetMessage | UpdateMessage;
 
 const EMPTY_ARRAY: MessageOut[] = [];
 const ROWSET = "rowset";
 const UPDATE = "update";
-const FILTER_DATA = "filterData";
 
-type MessageLike = {
-  type: string;
-};
-
-export class MessageQueue<T extends MessageLike = any> {
-  private _queue: T[];
+export class MessageQueue implements IMessageQueue {
+  #queue: ServerToClientMessage[];
 
   constructor() {
-    this._queue = [];
+    this.#queue = [];
   }
 
   get length() {
-    return this._queue.length;
+    return this.#queue.length;
   }
   set length(val) {
-    this._queue.length = val;
+    this.#queue.length = val;
   }
   get queue() {
-    const q = this._queue.slice();
-    this._queue.length = 0;
+    const q = this.#queue.slice();
+    this.#queue.length = 0;
     return q;
   }
 
-  push(message: T, rowMeta?: RowMeta) {
+  push(message: ServerToClientMessage, rowMeta?: RowMeta) {
     if (message.type === MessageTypeOut.Update) {
-      mergeAndPurgeUpdate<T>(this._queue, message);
+      mergeAndPurgeUpdate(this.#queue, message);
     } else if (message.type === MessageTypeOut.Rowset && rowMeta) {
-      // if (message.data.rows.length === 0 && typeof message.size === 'number' && message.size > 0) {
-      //   return;
-      // }
-      mergeAndPurgeRowset(this._queue, message, rowMeta);
+      mergeAndPurgeRowset(this.#queue, message, rowMeta);
     } else {
       //onsole.log(`MessageQueue ${type} `);
     }
-    this._queue.push(message);
+    this.#queue.push(message);
   }
 
   purgeViewport(viewport: string) {
@@ -63,17 +75,17 @@ export class MessageQueue<T extends MessageLike = any> {
   //     }
   // }
 
-  extract(test: (message: any) => boolean) {
-    if (this._queue.length === 0) {
+  extract(test: (message: ServerToClientMessage) => boolean) {
+    if (this.#queue.length === 0) {
       return EMPTY_ARRAY;
     } else {
-      return extractMessages(this._queue, test);
+      return extractMessages(this.#queue, test);
     }
   }
 
   extractAll() {
-    const messages = this._queue.slice();
-    this._queue.length = 0;
+    const messages = this.#queue.slice();
+    this.#queue.length = 0;
     return messages;
   }
 }
@@ -156,7 +168,10 @@ function mergeAndPurgeRowset(queue: any[], message: any, meta: RowMeta) {
 }
 
 // we need to know the current range in order to be able to merge rowsets which are still valid
-const mergeAndPurgeUpdate = <T extends MessageLike>(queue: T[], message: T) => {
+const mergeAndPurgeUpdate = (
+  queue: ServerToClientMessage[],
+  message: ServerToClientMessage
+) => {
   //onsole.log(`mergeAndPurge: update message ${JSON.stringify(message)}` );
   /*
   var {
@@ -187,7 +202,10 @@ const mergeAndPurgeUpdate = <T extends MessageLike>(queue: T[], message: T) => {
   */
 };
 
-function extractMessages(queue: any[], test: (message: any) => boolean) {
+function extractMessages(
+  queue: ServerToClientMessage[],
+  test: (message: ServerToClientMessage) => boolean
+) {
   var extract = [];
 
   for (var i = queue.length - 1; i >= 0; i--) {
@@ -200,7 +218,7 @@ function extractMessages(queue: any[], test: (message: any) => boolean) {
   return extract;
 }
 
-const formatMessage = (msg: any) => ` type: ${msg.type} 
-    rows: [${
-      msg.data && msg.data.rows && msg.data.rows.map((row: any[]) => row[7])
-    }]`;
+const formatMessage = (
+  msg: ServerToClientMessage<ServerToClientTableRows>
+) => ` type: ${msg.body.type} 
+    rows: [${msg.body.rows.map((row) => row[7])}]`;
