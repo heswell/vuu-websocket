@@ -1,5 +1,4 @@
 import { ServerWebSocket } from "bun";
-import { WebSocket } from "ws";
 
 export function updateLoop(
   name: string,
@@ -12,7 +11,7 @@ export function updateLoop(
   let _keepGoing = true;
   let _timer: Timer | null = null;
 
-  const tick: TimerHandler = () => {
+  const tick = () => {
     const queuedMessages = readQueue();
 
     if (Array.isArray(queuedMessages)) {

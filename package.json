@@ -3,19 +3,27 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "workspaces": [
+    "packages/**"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "bun ./start.ts",
+    "debug": "bun --inspect ./start.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typecheck": "tsc --noEmit --project tsconfig-typecheck.json"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@vuu-ui/vuu-protocol-types": "^0.8.10",
-    "bun-types": "^1.0.6"
+    "bun": "1.1.13",
+    "bun-types": "1.1.13"
   },
   "dependencies": {
     "@vuu-ui/vuu-utils": "^0.8.10-debug",
     "pure-uuid": "^1.8.1",
+    "typescript": "^5.5.3",
     "uWebSockets.js": "git+https://github.com/uNetworking/uWebSockets.js.git#semver:^20.32.0"
   }
 }
