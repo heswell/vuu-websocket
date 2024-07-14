@@ -6,19 +6,18 @@ import {
   VuuSort,
   VuuSortCol,
 } from "@vuu-ui/data-types";
-import {
-  ColumnMap,
-  buildColumnMap,
-  getFilterType,
-  toColumn,
-} from "./columnUtils.js";
-import { IN, NOT_IN, filterHasChanged, parseFilterQuery } from "./filter.js";
-import { Range, resetRange } from "./rangeUtils.js";
-import { GroupRowSet, RowSet } from "./rowset/index.js";
-import { sortHasChanged } from "./sortUtils.js";
-import { Table } from "./table.js";
-import { DataTypes } from "./types.js";
-import UpdateQueue from "./update-queue.js";
+import type { Filter } from "@vuu-ui/vuu-filter-types";
+import type { ColumnMap } from "@vuu-ui/vuu-utils";
+import { buildColumnMap, toColumn } from "./columnUtils.ts";
+import { IN, NOT_IN, filterHasChanged } from "./filter.ts";
+import { Range, resetRange } from "./rangeUtils.ts";
+import { DataResponse, GroupRowSet, RowSet } from "./rowset";
+import { sortHasChanged } from "./sortUtils.ts";
+import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
+import { DataTypes } from "./types.ts";
+import UpdateQueue from "./update-queue.ts";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 
 export interface DataViewProps {
   columns: (string | TableColumn)[];
@@ -35,7 +34,7 @@ export default class DataView {
   private _filter: Filter | undefined;
   private _groupBy: VuuGroupBy;
   private _table: Table | undefined;
-  private rowSet: RowSet | GroupRowSet | undefined;
+  private rowSet: RowSet | GroupRowSet;
   private _sortDefs: VuuSortCol[];
   private _updateQueue: UpdateQueue | undefined;
 
@@ -70,9 +69,6 @@ export default class DataView {
       this.rowSet.sort(this._sortDefs);
     }
 
-    this.rowUpdated = this.rowUpdated.bind(this);
-    this.rowInserted = this.rowInserted.bind(this);
-
     table.on("rowUpdated", this.rowUpdated);
     table.on("rowInserted", this.rowInserted);
   }
@@ -86,8 +82,8 @@ export default class DataView {
   destroy() {
     this._table?.removeListener("rowUpdated", this.rowUpdated);
     this._table?.removeListener("rowInserted", this.rowInserted);
+    this.rowSet.clear();
     this._table = undefined;
-    this.rowSet = undefined;
     this.filterRowSet = null;
     this._updateQueue = undefined;
   }
@@ -104,14 +100,14 @@ export default class DataView {
     let results = {
       updates: _updateQueue?.popAll(),
       range: {
-        lo: range.lo,
-        hi: range.hi,
+        lo: range.from,
+        hi: range.to,
       },
     };
     return results;
   }
 
-  rowInserted(event, idx, row) {
+  private rowInserted: RowInsertHandler = (idx, row) => {
     const { _updateQueue, rowSet } = this;
     const { size = null, replace, updates } = rowSet.insert(idx, row);
     if (size !== null) {
@@ -126,9 +122,9 @@ export default class DataView {
       });
     }
     // what about offset change only ?
-  }
+  };
 
-  rowUpdated(event, idx, updates) {
+  private rowUpdated: RowUpdateHandler = (idx, updates) => {
     const { rowSet, _updateQueue } = this;
     const result = rowSet.update(idx, updates);
 
@@ -141,7 +137,7 @@ export default class DataView {
         });
       }
     }
-  }
+  };
 
   getData() {
     return this.rowSet;
@@ -159,7 +155,7 @@ export default class DataView {
     };
   }
 
-  changeViewport(options: ClientToServerChangeViewPort) {
+  changeViewport(options: ClientToServerChangeViewPort): DataResponse {
     console.log(`change viewport`, {
       options: JSON.stringify(options, null, 2),
     });
@@ -178,7 +174,7 @@ export default class DataView {
   }
 
   //TODO we seem to get a setRange when we reverse sort order, is that correct ?
-  setRange(range: Range, useDelta = true) {
+  setRange(range: Range, useDelta = true): DataResponse {
     console.log(`DATAVIEW.setRange ${JSON.stringify(range)}`);
     return this.rowSet.setRange(range, useDelta);
   }
@@ -281,9 +277,9 @@ export default class DataView {
     }
   }
 
-  sort(sortDefs: VuuSortCol[]) {
+  sort(sortDefs: VuuSortCol[]): DataResponse {
     this._sortDefs = sortDefs;
-    this.rowSet?.sort(sortDefs);
+    this.rowSet.sort(sortDefs);
     // assuming the only time we would not useDelta is when we want to reset ?
     return this.setRange(resetRange(this.rowSet.range), false);
   }
@@ -292,40 +288,39 @@ export default class DataView {
   // appropriate, to any active filterSet(s). However, if the filterset has been changed, e.g. selection
   // within a set, then filter applied here in consequence must not attempt to reset the same filterSet
   // that originates the change.
-  filter(filterQuery: string) {
+  filter(filterQuery: string): DataResponse | undefined {
     console.log(`filter ${filterQuery}`);
-    const filter = parseFilterQuery(filterQuery);
+    if (filterQuery === "") {
+      if (this._filter) {
+        this.rowSet.clearFilter();
+        this._filter = undefined;
+        this._filterQuery = undefined;
+        this.filterRowSet = undefined;
+        return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+      }
+    } else {
+      const filter = parseFilter(filterQuery);
+      this._filterQuery = filterQuery;
+      this._filter = filter;
+      //   let filterResultset;
 
-    //   if (incremental) {
-    //     filter = addFilter(this._filterSpec, filter);
-    //   }
-    const { rowSet } = this;
-    const { range } = rowSet as RowSet;
-    this._filterQuery = filterQuery;
-    this._filter = filter;
-    //   let filterResultset;
+      //   if (filter === null && _filter) {
+      //     rowSet?.clearFilter();
+      //   } else if (filter) {
+      this.rowSet.filter(filter);
+      //   } else {
+      //     throw Error(`InMemoryView.filter setting null filter when we had no filter anyway`);
+      //   }
 
-    //   if (filter === null && _filter) {
-    //     rowSet?.clearFilter();
-    //   } else if (filter) {
-    this.rowSet?.filter(filter);
-    //   } else {
-    //     throw Error(`InMemoryView.filter setting null filter when we had no filter anyway`);
-    //   }
+      //   if (filterRowSet && !ignoreFilterRowset) {
+      //     if (filter) {
+      //       if (filterRowSet.type === DataTypes.FILTER_DATA) {
+      //         filterResultset = filterRowSet.setSelectedFromFilter(filter);
+      //       }
+      //     }
 
-    //   if (filterRowSet && !ignoreFilterRowset) {
-    //     if (filter) {
-    //       if (filterRowSet.type === DataTypes.FILTER_DATA) {
-    //         filterResultset = filterRowSet.setSelectedFromFilter(filter);
-    //       }
-    //     }
-
-    const resultSet = {
-      ...this.rowSet?.setRange(resetRange(range), false),
-      filter,
-    };
-
-    return [resultSet];
+      return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+    }
   }
 
   // //TODO merge with method above
@@ -400,8 +395,6 @@ export default class DataView {
     // to go back to the source, using a filter which excludes the one in place on the target column.
     const columnName = column.name;
     const colDef = this._columns.find((col) => col.name === columnName);
-    // No this should be decided beforehand (on client)
-    const type = getFilterType(colDef);
 
     if (!filterRowSet || filterRowSet.columnName !== column.name) {
       console.log(`create the filterRowset`);

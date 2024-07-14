@@ -10,19 +10,24 @@ const project_path = path.resolve(
 );
 
 const config: DataTableDefinition = {
-  name: "instruments",
   dataPath: `${project_path}/data-generator.ts`,
+  schema: {
+    columns: [
+      { name: "bbg", serverDataType: "string" },
+      { name: "currency", serverDataType: "string" },
+      { name: "description", serverDataType: "string" },
+      { name: "exchange", serverDataType: "string" },
+      { name: "ric", serverDataType: "string" },
+      { name: "isin", serverDataType: "string" },
+      { name: "lotSize", serverDataType: "int" },
+    ],
+    key: "ric",
+    table: {
+      module: "SIMUL",
+      table: "instruments",
+    },
+  },
   type: "vs",
-  primaryKey: "ric",
-  columns: [
-    { name: "bbg" },
-    { name: "currency" },
-    { name: "description" },
-    { name: "exchange" },
-    { name: "ric" },
-    { name: "isin" },
-    { name: "lotSize", type: "int" },
-  ],
 };
 
 export default config;

@@ -5,6 +5,7 @@ import {
   ServerToClientMessage,
   VuuColumnDataType,
 } from "@vuu-ui/vuu-protocol-types";
+import { TableSchema } from "@vuu-ui/vuu-data-types";
 
 export interface ServiceDefinition {
   name: string;
@@ -25,15 +26,14 @@ interface TableUpdateOptions {
   applyUpdates?: boolean;
   fields?: string[];
   insertInterval?: number;
+  updateInterval?: number;
 }
 
 export interface DataTableDefinition {
-  columns: TableColumn[];
+  schema: TableSchema;
   createPath?: string;
-  data?: VuuColumnDataType[];
+  data?: VuuDataRow[];
   dataPath?: string;
-  name: string;
-  primaryKey: string;
   type: string;
   updatePath?: string;
   updates?: TableUpdateOptions;

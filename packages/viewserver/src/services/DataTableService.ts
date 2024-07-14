@@ -8,19 +8,23 @@ import type {
 import {
   ClientToServerChangeViewPort,
   ClientToServerCreateViewPort,
-  ClientToServerMessage,
-  ClientToServerRpcCall,
   ClientToServerTableList,
   ClientToServerTableMeta,
   ClientToServerViewPortRange,
   ServerToClientTableRows,
-} from "@vuu-ui/data-types";
+  VuuClientToServerMessage,
+  VuuDataRow,
+} from "@vuu-ui/vuu-protocol-types";
+import {
+  ClientToServerViewportRpcCall,
+  VuuTable,
+} from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { Subscription } from "./Subscription.js";
 import { Table } from "./Table.js";
 
 type QueuedSubscription = {
-  message: ClientToServerMessage<ClientToServerCreateViewPort>;
+  message: VuuClientToServerMessage<ClientToServerCreateViewPort>;
   session: ISession;
 };
 
@@ -39,20 +43,21 @@ export const configure = (props: ServerConfig): Promise<Table[]> => {
   );
 };
 
+const asTableKey = ({ module, table }: VuuTable) => `${module}:${table}`;
+
 async function createTable({ dataPath, ...config }: DataTableDefinition) {
-  const { name: tablename } = config;
-  const table = (_tables[tablename] = new Table(config));
+  const table = new Table(config);
+  _tables[table.name] = table;
+  const { name } = table;
 
   if (dataPath) {
     await table.loadData(dataPath);
   }
 
-  const qs = _queuedSubscriptions[tablename];
+  const qs = _queuedSubscriptions[name];
   if (qs) {
-    console.log(
-      `Table ${tablename} created and we have queued Subscription(s)}`
-    );
-    _queuedSubscriptions[tablename] = undefined;
+    console.log(`Table ${name} created and we have queued Subscription(s)}`);
+    _queuedSubscriptions[name] = undefined;
     qs.forEach(({ message, session }) => {
       console.log(`Add Queued Subscription clientId:${message.sessionId}`);
       CREATE_VP(message, session);
@@ -62,19 +67,20 @@ async function createTable({ dataPath, ...config }: DataTableDefinition) {
   return table;
 }
 
+const tableNameToVuuTable = (tableName: string): VuuTable => {
+  const [module, table] = tableName.split(":");
+  return { module, table };
+};
+
 export const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
   message,
   session
 ) => {
   const tables = getTableNames();
-  console.log(
-    `received GET_TABLE_LIST request, requestId ${message.requestId} tables are ${tables}`
-  );
-
   // priority 1
   session.enqueue(message.requestId, {
     type: "TABLE_LIST_RESP",
-    tables: tables.map((table) => ({ table, module: "SIMUL" })),
+    tables: tables.map(tableNameToVuuTable),
   });
 };
 
@@ -82,11 +88,11 @@ export const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
   message,
   session
 ) => {
-  const table = getTable(message.body.table.table);
+  const table = getTable(message.body.table);
   // priority 1
   session.enqueue(message.requestId, {
     columns: table.columns.map((col) => col.name),
-    dataTypes: table.columns.map((col) => col.type ?? "string"),
+    dataTypes: table.columns.map((col) => col.serverDataType ?? "string"),
     key: table.primaryKey,
     type: "TABLE_META_RESP",
     table: message.body.table,
@@ -97,51 +103,52 @@ export const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
   message,
   session
 ) => {
-  const {
-    table: { table: tableName },
-  } = message.body;
-
-  const table = _tables[tableName];
-  if (table === undefined) {
-    throw Error(
-      `[DataTableService] request for unknown table '${tableName}', available tables are:\n${Object.keys(
-        _tables
-      )
-        .map((tableName) => `\t* ${tableName}`)
-        .join("\n")}`
-    );
-  }
-
-  if (table.status === "ready") {
-    const viewPortId = uuid();
-    const subscription = new Subscription(table, viewPortId, message, session);
-    _subscriptions[viewPortId] = subscription;
-
-    session.enqueue(message.requestId, {
-      ...message.body,
-      // missing from protocol definition
-      aggregations: [],
-      table: tableName,
-      type: "CREATE_VP_SUCCESS",
-      viewPortId,
-    });
-
-    if (subscription.view.status === "ready") {
-      const { rows, size } = subscription.view.setRange(message.body.range);
-      enqueueDataMessages(
-        rows,
-        size,
-        session,
+  try {
+    const table = getTable(message.body.table);
+    if (table.status === "ready") {
+      const viewPortId = uuid();
+      const subscription = new Subscription(
+        table,
         viewPortId,
-        subscription.metaData
+        message,
+        session
+      );
+      _subscriptions[viewPortId] = subscription;
+      session.enqueue(message.requestId, {
+        ...message.body,
+        // missing from protocol definition
+        aggregations: [],
+        table: table.schema.table.table,
+        type: "CREATE_VP_SUCCESS",
+        viewPortId,
+      });
+
+      if (subscription.view.status === "ready") {
+        const { rows, size } = subscription.view.setRange(message.body.range);
+        enqueueDataMessages(
+          rows,
+          size,
+          session,
+          viewPortId,
+          subscription.metaData
+        );
+      }
+    } else {
+      const key = asTableKey(message.body.table);
+      const queuedSubscription =
+        _queuedSubscriptions[key] || (_queuedSubscriptions[key] = []);
+      queuedSubscription.push({ message, session });
+      console.log(
+        `queued subscriptions for ${key} = ${queuedSubscription.length}`
       );
     }
-  } else {
-    const queuedSubscription =
-      _queuedSubscriptions[tableName] || (_queuedSubscriptions[tableName] = []);
-    queuedSubscription.push({ message, session });
-    console.log(
-      `queued subscriptions for ${tableName} = ${queuedSubscription.length}`
+  } catch (e) {
+    throw Error(
+      `[DataTableService] request for unknown table '${asTableKey(
+        message.body.table
+      )}', available tables are:\n${Object.keys(_tables)
+        .map((tableName) => `\t* ${tableName}`)
+        .join("\n")}`
     );
   }
 };
@@ -182,18 +189,18 @@ export const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
   enqueueDataMessages(rows, size, session, viewPortId, subscription.metaData);
 };
 
-export const RPC_CALL: VuuRequestHandler<ClientToServerRpcCall> = (
+export const RPC_CALL: VuuRequestHandler<ClientToServerViewportRpcCall> = (
   message,
   session
 ) => {
   console.log("what do we do with an RPC call");
-  switch (message.body.service) {
+  switch (message.body.rpcName) {
     case "TypeAheadRpcHandler":
-      console.log(`call to Typeahead service ${message.body.method}`);
+      console.log(`call to Typeahead service `);
       break;
 
     default:
-      console.log(`unsupported RPC service ${message.body.service}`);
+      console.log(`unsupported RPC service `);
   }
 };
 
@@ -292,11 +299,12 @@ export const RPC_CALL: VuuRequestHandler<ClientToServerRpcCall> = (
 //   console.warn(`InsertTableRow TODO send confirmation ${queue.length}`);
 // }
 
-function getTable(name: string): Table {
-  if (_tables[name]) {
-    return _tables[name];
+function getTable(table: VuuTable): Table {
+  const key = asTableKey(table);
+  if (_tables[key]) {
+    return _tables[key];
   } else {
-    throw Error(`DataTableService. no table definition for ${name}`);
+    throw Error(`DataTableService. no table definition for ${key}`);
   }
 }
 
@@ -305,7 +313,7 @@ function getTableNames() {
 }
 
 const enqueueDataMessages = (
-  rows: any[],
+  rows: VuuDataRow[],
   vpSize: number,
   session: ISession,
   viewPortId: string,
@@ -335,11 +343,11 @@ const enqueueDataMessages = (
     };
 
     for (let row of rows) {
-      const rowIndex = row[IDX];
+      const rowIndex = row[IDX] as number;
       messageBody.rows.push({
         rowIndex,
         data: row.slice(0, IDX),
-        rowKey: row[KEY],
+        rowKey: row[KEY] as string,
         sel: 0,
         ts,
         updateType: "U",

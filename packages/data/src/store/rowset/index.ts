@@ -2,3 +2,4 @@
 // to avoid circular dependency issues.
 export { RowSet, SetFilterRowSet } from "./rowSet.js";
 export { GroupRowSet } from "./group-rowset.js";
+export * from "./IRowSet.ts";

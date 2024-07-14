@@ -1,21 +1,20 @@
-import { VuuSortCol } from '@vuu-ui/data-types';
-import { ColumnMap } from './columnUtils.js';
-import { RowData } from './storeTypes.js';
-import { ASC } from './types.js';
+import { VuuSortCol } from "@vuu-ui/data-types";
+import { RowData } from "./storeTypes.js";
+import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
-type SortCriteria = [number, 'A' | 'D'][];
-
-const EMPTY_MAP = {};
-
-type Row = (string | number | boolean)[];
+type SortCriteria = [number, "A" | "D"][];
 
 export type SortItem = [number, ...RowData[]];
 export type SortSet = SortItem[];
 
+type SortComparator<T = SortItem> = (a: T, b: T) => 1 | 0 | -1;
+
 export const mapSortDefsToSortCriteria = (
   sortDefs: VuuSortCol[],
   columnMap: ColumnMap
-): SortCriteria => sortDefs.map(({ column, sortType }) => [columnMap[column], sortType]);
+): SortCriteria =>
+  sortDefs.map(({ column, sortType }) => [columnMap[column], sortType]);
 
 export function sortableFilterSet(filterSet) {
   if (filterSet.length === 0) {
@@ -29,7 +28,7 @@ export function sortableFilterSet(filterSet) {
 
 export function sortExtend(
   sortSet: SortSet,
-  rows: Row[],
+  rows: VuuDataRow[],
   sortDefs: VuuSortCol[],
   columnMap: ColumnMap
 ) {
@@ -40,24 +39,46 @@ export function sortExtend(
   }
 }
 
-type SortComparator = (item1: SortItem, item2: SortItem) => 0 | -1 | 1;
-const sort1A: SortComparator = ([, a1 = 0], [, b1 = 0]) => (a1 > b1 ? 1 : b1 > a1 ? -1 : 0);
-const sort1D: SortComparator = ([, a1 = 0], [, b1 = 0]) => (a1 > b1 ? -1 : b1 > a1 ? 1 : 0);
+const sort1A: SortComparator = ([, a1 = 0], [, b1 = 0]) =>
+  a1 > b1 ? 1 : b1 > a1 ? -1 : 0;
+const sort1D: SortComparator = ([, a1 = 0], [, b1 = 0]) =>
+  a1 > b1 ? -1 : b1 > a1 ? 1 : 0;
 const sort1A2A: SortComparator = ([, a1 = 0, a2 = 0], [, b1 = 0, b2 = 0]) =>
   a1 > b1 ? 1 : b1 > a1 ? -1 : a2 > b2 ? 1 : b2 > a2 ? -1 : 0;
-const sort1A2A3A: SortComparator = ([, a1 = 0, a2 = 0, a3 = 0], [, b1 = 0, b2 = 0, b3 = 0]) =>
-  a1 > b1 ? 1 : b1 > a1 ? -1 : a2 > b2 ? 1 : b2 > a2 ? -1 : a3 > b3 ? 1 : b3 > a3 ? -1 : 0;
+const sort1A2A3A: SortComparator = (
+  [, a1 = 0, a2 = 0, a3 = 0],
+  [, b1 = 0, b2 = 0, b3 = 0]
+) =>
+  a1 > b1
+    ? 1
+    : b1 > a1
+    ? -1
+    : a2 > b2
+    ? 1
+    : b2 > a2
+    ? -1
+    : a3 > b3
+    ? 1
+    : b3 > a3
+    ? -1
+    : 0;
 
-export function sort(sortSet: SortSet, rows: Row[], sortDefs: VuuSortCol[], columnMap: ColumnMap) {
+export function sort(
+  sortSet: SortSet,
+  rows: VuuDataRow[],
+  sortDefs: VuuSortCol[],
+  columnMap: ColumnMap
+) {
   const sortCriteria = mapSortDefsToSortCriteria(sortDefs, columnMap);
   const count = sortCriteria.length;
-  const sortFn = count === 1 ? sort1 : count === 2 ? sort2 : count === 3 ? sort3 : sortAll;
+  const sortFn =
+    count === 1 ? sort1 : count === 2 ? sort2 : count === 3 ? sort3 : sortAll;
   sortFn(sortSet, rows, sortCriteria);
 }
 
 function sort1ColPlus1(
   sortSet: SortSet,
-  rows: Row[],
+  rows: VuuDataRow[],
   sortDefs: VuuSortCol[],
   columnMap: ColumnMap
 ) {
@@ -72,7 +93,7 @@ function sort1ColPlus1(
 
 function sort2ColsPlus1(
   sortSet: SortSet,
-  rows: Row[],
+  rows: VuuDataRow[],
   sortDefs: VuuSortCol[],
   columnMap: ColumnMap
 ) {
@@ -85,20 +106,28 @@ function sort2ColsPlus1(
   sortSet.sort(sort1A2A3A);
 }
 
-function sort1(sortSet: SortSet, rows: Row[], [[colIdx, direction]]: SortCriteria) {
+function sort1(
+  sortSet: SortSet,
+  rows: VuuDataRow[],
+  [[colIdx, direction]]: SortCriteria
+) {
   const len = sortSet.length;
   for (let i = 0; i < len; i++) {
     const idx = sortSet[i][0];
     sortSet[i][1] = rows[idx][colIdx];
   }
-  if (direction === 'A') {
+  if (direction === "A") {
     sortSet.sort(sort1A);
   } else {
     sortSet.sort(sort1D);
   }
 }
 
-function sort2(sortSet: SortSet, rows: Row[], sortCriteria: SortCriteria) {
+function sort2(
+  sortSet: SortSet,
+  rows: VuuDataRow[],
+  sortCriteria: SortCriteria
+) {
   const len = rows.length;
   const [colIdx1] = sortCriteria[0];
   const [colIdx2] = sortCriteria[1];
@@ -111,13 +140,17 @@ function sort2(sortSet: SortSet, rows: Row[], sortCriteria: SortCriteria) {
 }
 
 function sort3(/*sortSet,rows,sortCriteria*/) {
-  console.log('sort 3 not yet supported');
+  console.log("sort 3 not yet supported");
 }
 function sortAll(/*sortSet,rows,sortCriteria*/) {
-  console.log('sort all not yet supported');
+  console.log("sort all not yet supported");
 }
 
-export function binarySearch(items, item, comparator) {
+export function binarySearch<T = VuuDataRow>(
+  items: T[],
+  item: T,
+  comparator: SortComparator<T>
+) {
   let l = 0;
   let h = items.length - 1;
   let m;
@@ -137,7 +170,11 @@ export function binarySearch(items, item, comparator) {
   return ~l;
 }
 
-export function binaryInsert(rows: Row[], row: Row[], comparator) {
+export function binaryInsert(
+  rows: VuuDataRow[],
+  row: VuuDataRow[],
+  comparator
+) {
   var i = binarySearch(rows, row, comparator);
   /* if the binarySearch return value was zero or positive, a matching object was found */
   /* if the return value was negative, the bitwise complement of the return value is the correct index for this object */
@@ -162,7 +199,12 @@ function processTail(tail, row, tailGateKeeper, n, compare) {
 }
 
 // this is always called with a single col sort
-export function sortedLowestAndHighest(rows: Row[], sortCriteria, offset, n = 1000) {
+export function sortedLowestAndHighest(
+  rows: VuuDataRow[],
+  sortCriteria,
+  offset,
+  n = 1000
+) {
   const s1 = new Date().getTime();
   const compare = sortBy(sortCriteria);
   const head = rows.slice(0, n).sort(compare);
@@ -176,7 +218,13 @@ export function sortedLowestAndHighest(rows: Row[], sortCriteria, offset, n = 10
     if (compare(rows[i], headGateKeeper) < 0) {
       binaryInsert(head, rows[i], compare);
       // We need to remove largest item from head, does it belong in tail ?
-      tailGateKeeper = processTail(tail, head.pop(), tailGateKeeper, n, compare);
+      tailGateKeeper = processTail(
+        tail,
+        head.pop(),
+        tailGateKeeper,
+        n,
+        compare
+      );
       headGateKeeper = head[n - 1];
     } else {
       tailGateKeeper = processTail(tail, rows[i], tailGateKeeper, n, compare);
@@ -196,15 +244,21 @@ export function sortedLowestAndHighest(rows: Row[], sortCriteria, offset, n = 10
   }
 
   const s2 = new Date().getTime();
-  console.log(`lowest ${n} took ${s2 - s1} ms , producing ${head.length} lowest `);
+  console.log(
+    `lowest ${n} took ${s2 - s1} ms , producing ${head.length} lowest `
+  );
 
   return [head, tail];
 }
 
 const isSameSortDef = (sortDef1: VuuSortCol, sortDef2: VuuSortCol) =>
-  sortDef1.column === sortDef2.column && sortDef1.sortType === sortDef2.sortType;
+  sortDef1.column === sortDef2.column &&
+  sortDef1.sortType === sortDef2.sortType;
 
-export function sortExtendsExistingSort(oldSortDefs: VuuSortCol[], newSortDefs: VuuSortCol[]) {
+export function sortExtendsExistingSort(
+  oldSortDefs: VuuSortCol[],
+  newSortDefs: VuuSortCol[]
+) {
   return (
     newSortDefs.length - oldSortDefs.length === 1 &&
     oldSortDefs.every((sortDef, i) => isSameSortDef(sortDef, newSortDefs[i]))
@@ -212,13 +266,18 @@ export function sortExtendsExistingSort(oldSortDefs: VuuSortCol[], newSortDefs: 
 }
 
 // TODO we need to capture SortAdded, SortRemoved, SortReversed, SortExtended
-export const sortHasChanged = (oldSortDefs: VuuSortCol[], newSortDefs: VuuSortCol[]) => {
+export const sortHasChanged = (
+  oldSortDefs: VuuSortCol[],
+  newSortDefs: VuuSortCol[]
+) => {
   if (oldSortDefs.length !== newSortDefs.length) {
     return true;
   } else if (oldSortDefs.length === 0) {
     return false;
   } else {
-    return oldSortDefs.some((sortDef: VuuSortCol, i) => !isSameSortDef(sortDef, newSortDefs[i]));
+    return oldSortDefs.some(
+      (sortDef: VuuSortCol, i) => !isSameSortDef(sortDef, newSortDefs[i])
+    );
   }
 };
 
@@ -245,8 +304,8 @@ export function GROUP_ROW_TEST(group, row, [colIdx, direction]) {
   if (group === row) {
     return 0;
   } else {
-    let a1 = direction === 'dsc' ? row[colIdx] : group[colIdx];
-    let b1 = direction === 'dsc' ? group[colIdx] : row[colIdx];
+    let a1 = direction === "dsc" ? row[colIdx] : group[colIdx];
+    let b1 = direction === "dsc" ? group[colIdx] : row[colIdx];
     if (b1 === null || a1 > b1) {
       return 1;
     } else if (a1 == null || a1 < b1) {
@@ -259,8 +318,8 @@ function ROW_SORT_TEST(a, b, [colIdx, direction]) {
   if (a === b) {
     return 0;
   } else {
-    let a1 = direction === 'dsc' ? b[colIdx] : a[colIdx];
-    let b1 = direction === 'dsc' ? a[colIdx] : b[colIdx];
+    let a1 = direction === "dsc" ? b[colIdx] : a[colIdx];
+    let b1 = direction === "dsc" ? a[colIdx] : b[colIdx];
     if (b1 === null || a1 > b1) {
       return 1;
     } else if (a1 == null || a1 < b1) {
@@ -285,21 +344,21 @@ export function sortBy(cols, test = ROW_SORT_TEST) {
 // where row would be positioned in this sorted array. Return the
 // last valid position.
 export function sortPosition(
-  rows: Row[],
+  rows: VuuDataRow[],
   sorter,
-  row: Row,
-  positionWithinRange = 'last-available'
+  row: VuuDataRow,
+  positionWithinRange = "last-available"
 ) {
   function selectFromRange(pos) {
     const len = rows.length;
     const matches = (p) => sorter(rows[p], row) === 0;
 
     //TODO this will depend on the sort direction
-    if (positionWithinRange === 'last-available') {
+    if (positionWithinRange === "last-available") {
       while (pos < len && matches(pos)) {
         pos += 1;
       }
-    } else if (positionWithinRange === 'first-available') {
+    } else if (positionWithinRange === "first-available") {
       while (pos > 0 && matches(pos - 1)) {
         pos -= 1;
       }

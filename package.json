@@ -8,7 +8,9 @@
   ],
   "scripts": {
     "start": "bun ./start.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "debug": "bun --inspect ./start.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typecheck": "tsc --noEmit --project tsconfig-typecheck.json"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +23,7 @@
   "dependencies": {
     "@vuu-ui/vuu-utils": "^0.8.10-debug",
     "pure-uuid": "^1.8.1",
+    "typescript": "^5.5.3",
     "uWebSockets.js": "git+https://github.com/uNetworking/uWebSockets.js.git#semver:^20.32.0"
   }
 }

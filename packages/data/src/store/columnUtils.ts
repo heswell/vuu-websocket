@@ -1,12 +1,12 @@
 import { TableColumn } from "@heswell/server-types";
-import { ColumnMap } from "@vuu-ui/utils";
+import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
+import { ColumnMap } from "@vuu-ui/vuu-utils";
 import {
   BIN_FILTER_DATA_COLUMNS,
   SET_FILTER_DATA_COLUMNS,
-  functor,
   overrideColName,
-} from "./filter.js";
-import { Row } from "./storeTypes.js";
+} from "./filter.ts";
+import { Row } from "./storeTypes.ts";
 
 type ColumnDescriptor = string | { name: string; key?: number };
 
@@ -73,60 +73,6 @@ export const projectColumns = (
       return out;
     };
 };
-
-export function projectColumnsFilter(
-  map: ColumnMap,
-  columns: TableColumn[],
-  meta: ColumnMetaData,
-  filter: any
-) {
-  const length = columns.length;
-  const { IDX, RENDER_IDX, DEPTH, COUNT, KEY, SELECTED } = meta;
-
-  // this is filterset specific where first col is always value
-  const fn = filter
-    ? functor(map, overrideColName(filter, "name"))
-    : () => true;
-  return (startIdx: number) => (row: any[], i: number) => {
-    const out = [];
-    for (let i = 0; i < length; i++) {
-      const colIdx = map[columns[i].name];
-      out[i] = row[colIdx];
-    }
-    // assume row[0] is key for now
-    // out.push(startIdx+i, 0, 0, row[0]);
-    out[IDX] = startIdx + i;
-    out[RENDER_IDX] = 0;
-    out[DEPTH] = 0;
-    out[COUNT] = 0;
-    out[KEY] = row[0];
-    out[SELECTED] = fn(row) ? 1 : 0;
-
-    return out;
-  };
-}
-
-export function getFilterType(column: TableColumn) {
-  return column.filter || getDataType(column);
-}
-
-// {name: 'Price', 'type': {name: 'price'}, 'aggregate': 'avg'},
-// {name: 'MarketCap', 'type': {name: 'number','format': 'currency'}, 'aggregate': 'sum'},
-
-export function getDataType({ type }: TableColumn) {
-  if (type === undefined) {
-    return "set";
-  } else if (typeof type === "string") {
-    return type;
-  } else {
-    switch (type.name) {
-      case "price":
-        return "number";
-      default:
-        return type.name;
-    }
-  }
-}
 
 export type ColumnMetaData = {
   IDX: number;

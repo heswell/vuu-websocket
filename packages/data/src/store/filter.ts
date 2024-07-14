@@ -1,6 +1,5 @@
 import { VuuFilter } from "@vuu-ui/data-types";
-import { extractFilter, parseFilter } from "@vuu-ui/datagrid-parsers";
-import { ColumnMap, Filter } from "@vuu-ui/utils";
+import type { Filter } from "@vuu-ui/vuu-filter-types";
 
 export const EQUALS = "EQ";
 export const GREATER_THAN = "GT";
@@ -26,111 +25,14 @@ export const BIN_FILTER_DATA_COLUMNS = [
   { name: "bin-lo" },
   { name: "bin-hi" },
 ];
-export default function filterRows(rows, columnMap, filter) {
-  return applyFilter(rows, functor(columnMap, filter));
-}
 
-export const parseFilterQuery = (filterQuery: string): Filter => {
-  const [text, result] = parseFilter(filterQuery);
-  const { filter } = extractFilter(result);
-  return filter;
-};
+export type FilterSet = number[];
 
 export const filterHasChanged = (oldFilter: VuuFilter, newFilter: VuuFilter) =>
   oldFilter !== newFilter;
 
 export function getFilterColumn(column) {
   return column.isGroup ? column.columns[0] : column;
-}
-export function functor(columnMap: ColumnMap, filter) {
-  //TODO convert filter to include colIdx ratherthan colName, so we don't have to pass cols
-  switch (filter.type) {
-    case IN:
-      return testInclude(columnMap, filter);
-    case NOT_IN:
-      return testExclude(columnMap, filter);
-    case EQUALS:
-      return testEQ(columnMap, filter);
-    case GREATER_THAN:
-      return testGT(columnMap, filter);
-    case GREATER_EQ:
-      return testGE(columnMap, filter);
-    case LESS_THAN:
-      return testLT(columnMap, filter);
-    case LESS_EQ:
-      return testLE(columnMap, filter);
-    case STARTS_WITH:
-      return testSW(columnMap, filter);
-    case NOT_STARTS_WITH:
-      return testSW(columnMap, filter, true);
-    case AND:
-      return testAND(columnMap, filter);
-    case OR:
-      return testOR(columnMap, filter);
-    default:
-      console.log(`unrecognized filter type ${filter.type}`);
-      return () => true;
-  }
-}
-
-function applyFilter(rows, filter) {
-  const results = [];
-  for (let i = 0; i < rows.length; i++) {
-    if (filter(rows[i])) {
-      results.push(rows[i]);
-    }
-  }
-  return results;
-}
-
-function testAND(cols, f) {
-  const filters = f.filters.map((f1) => functor(cols, f1));
-  return (row) => filters.every((fn) => fn(row));
-}
-
-function testOR(cols, f) {
-  const filters = f.filters.map((f1) => functor(cols, f1));
-  return (row) => filters.some((fn) => fn(row));
-}
-
-function testSW(cols, f, inversed = false) {
-  const value = f.value.toLowerCase();
-  return inversed
-    ? (row) => row[cols[f.colName]].toLowerCase().indexOf(value) !== 0
-    : (row) => row[cols[f.colName]].toLowerCase().indexOf(value) === 0;
-}
-
-function testGT(cols, f) {
-  return (row) => row[cols[f.colName]] > f.value;
-}
-
-function testGE(cols, f) {
-  return (row) => row[cols[f.colName]] >= f.value;
-}
-
-function testLT(cols, f) {
-  return (row) => row[cols[f.colName]] < f.value;
-}
-
-function testLE(cols, f) {
-  return (row) => row[cols[f.colName]] <= f.value;
-}
-
-function testInclude(cols, f) {
-  // eslint-disable-next-line eqeqeq
-  return (row) =>
-    f.values.findIndex((val) => val == row[cols[f.colName]]) !== -1;
-}
-
-// faster to convert values to a keyed map
-function testExclude(cols, f) {
-  // eslint-disable-next-line eqeqeq
-  return (row) =>
-    f.values.findIndex((val) => val == row[cols[f.colName]]) === -1;
-}
-
-function testEQ(cols, f) {
-  return (row) => row[cols[f.colName]] === f.value;
 }
 
 export function shouldShowFilter(filterColumnName, column) {
@@ -170,41 +72,42 @@ function includesAllValues(filter) {
   }
 }
 
-// does f2 only narrow the resultset from f1
-export function extendsFilter(f1 = null, f2 = null) {
+// does filter only narrow the resultset from existingFilter
+export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
   // ignore filters which are identical
   // include or exclude filters which add values
-  if (f2 === null) {
+  if (existingFilter === undefined) {
     return false;
-  } else if (f1 === null) {
-    return true;
   }
-  if (f1.colName && f1.colName === f2.colName) {
-    if (f1.type === f2.type) {
-      switch (f1.type) {
+  if (filter.colName && filter.colName === existingFilter.colName) {
+    if (filter.type === existingFilter.type) {
+      switch (filter.type) {
         case IN:
           return (
-            f2.values.length < f1.values.length &&
-            containsAll(f1.values, f2.values)
+            existingFilter.values.length < filter.values.length &&
+            containsAll(filter.values, existingFilter.values)
           );
         case NOT_IN:
           return (
-            f2.values.length > f1.values.length &&
-            containsAll(f2.values, f1.values)
+            existingFilter.values.length > filter.values.length &&
+            containsAll(existingFilter.values, filter.values)
           );
         case STARTS_WITH:
           return (
-            f2.value.length > f1.value.length &&
-            f2.value.indexOf(f1.value) === 0
+            existingFilter.value.length > filter.value.length &&
+            existingFilter.value.indexOf(filter.value) === 0
           );
         // more cases here such as GT,LT
         default:
       }
     }
-  } else if (f1.colname && f2.colName) {
+  } else if (filter.colname && existingFilter.colName) {
     // different columns,always false
     return false;
-  } else if (f2.type === AND && extendsFilters(f1, f2)) {
+  } else if (
+    existingFilter.type === AND &&
+    extendsFilters(filter, existingFilter)
+  ) {
     return true;
   }
 

@@ -2,19 +2,21 @@
  * Keep all except for groupRowset in this file to avoid circular reference warnings
  */
 import { TableColumn } from "@heswell/server-types";
-import { VuuSortCol } from "@vuu-ui/data-types";
-import { Filter } from "@vuu-ui/utils";
+import { Filter } from "@vuu-ui/vuu-filter-types";
+import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
+import { VuuDataRow, VuuSortCol } from "@vuu-ui/vuu-protocol-types";
+import { ColumnMap } from "@vuu-ui/vuu-utils";
 import {
-  ColumnMap,
   ColumnMetaData,
+  RowProjectorFactory,
   metaData,
   projectColumns,
 } from "../columnUtils.js";
 import {
+  FilterSet,
   SET_FILTER_DATA_COLUMNS,
-  extendsFilter,
+  extendsExistingFilter,
   extractFilterForColumn,
-  functor as filterPredicate,
   overrideColName,
   splitFilterOnColumn,
 } from "../filter.js";
@@ -39,7 +41,7 @@ import {
 } from "../sortUtils.js";
 import { Row } from "../storeTypes.js";
 import { Table } from "../table.js";
-import { DataTypes } from "../types.js";
+import { DataResponse, IRowSet } from "./IRowSet.js";
 
 const SINGLE_COLUMN = 1;
 
@@ -49,30 +51,34 @@ const NO_OPTIONS = {
 
 const NULL_SORTSET: SortSet = [[-1, -1, -1]];
 
-export abstract class BaseRowSet {
+type NavigationSet = [SortSet | FilterSet, number, number];
+
+export abstract class BaseRowSet implements IRowSet {
   public range: Range = NULL_RANGE;
 
   protected columnMap: ColumnMap;
+  protected currentFilter: Filter | undefined;
+  protected filterSet: FilterSet | undefined;
   protected meta: ColumnMetaData;
+  protected sortSet: SortSet = NULL_SORTSET;
+  protected offset = 0;
+  protected selectedRowsIDX: number[] = [];
   protected sortCols: VuuSortCol[] | undefined;
   protected sortReverse: boolean = false;
   protected sortRequired: boolean = false;
-  protected currentFilter: Filter | null = null;
-  protected filterSet: any = null;
-  protected sortSet: SortSet = NULL_SORTSET;
 
   private columns: TableColumn[];
-  private offset = 0;
   private selected: {
     rows: any[];
     focusedIdx: number;
     lastTouchIdx: number;
   } = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
-  private selectedRowsIDX: number[] = [];
   private selectionModel: SelectionModel;
   private table: Table;
 
   protected data: Row[];
+
+  project: RowProjectorFactory;
 
   constructor(table: Table, columns: TableColumn[]) {
     this.table = table;
@@ -81,11 +87,22 @@ export abstract class BaseRowSet {
     this.meta = metaData(columns);
     this.data = table.rows;
     this.selected = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
+    this.project = this.createProjectRowFactoryMethod(
+      this.columnMap,
+      this.columns,
+      this.meta
+    );
     /**
      * data IDX of selected rows
      */
     this.selectionModel = this.createSelectionModel();
   }
+
+  abstract createProjectRowFactoryMethod(
+    columnMap: ColumnMap,
+    solumns: TableColumn[],
+    meta: ColumnMetaData
+  ): RowProjectorFactory;
 
   createSelectionModel() {
     return new SelectionModel();
@@ -101,20 +118,6 @@ export abstract class BaseRowSet {
     }
   }
 
-  get stats() {
-    // TODO cache the stats and invalidate them in the event of any op that might change them
-    const { totalRowCount, filteredRowCount, selected, selectedRowsIDX } = this;
-    const totalSelected = selectedRowsIDX.length;
-    const filteredSelected = selected.rows.length;
-
-    return {
-      totalRowCount,
-      totalSelected,
-      filteredRowCount,
-      filteredSelected,
-    };
-  }
-
   get totalRowCount() {
     return this.data.length;
   }
@@ -127,30 +130,38 @@ export abstract class BaseRowSet {
     return this.selected.rows.length;
   }
 
-  // Must be implemented by sub class
-  slice(from: number, to: number): any;
+  get size(): number {
+    throw Error("not implemented");
+  }
 
-  setRange(range = this.range, useDelta = true, includeStats = false) {
+  abstract filter(filter: Filter): number;
+
+  abstract sort(sortDefs: VuuSortCol[]): void;
+
+  abstract slice(from: number, to: number): VuuDataRow[];
+
+  clear() {
+    console.log("clear rowset");
+  }
+
+  setRange(range = this.range, useDelta = true): DataResponse {
     const { from, to } = useDelta
       ? getDeltaRange(this.range, range)
       : getFullRange(range);
     const resultset = this.slice(from, to);
     this.range = range;
     return {
-      dataType: this.type,
       rows: resultset,
       range,
       size: this.size,
       offset: this.offset,
-      stats: includeStats ? this.stats : undefined,
     };
   }
 
-  currentRange() {
-    const { lo, hi } = this.range;
-    const resultset = this.slice(lo, hi);
+  currentRange(): DataResponse {
+    const { from, to } = this.range;
+    const resultset = this.slice(from, to);
     return {
-      dataType: this.type,
       rows: resultset,
       range: this.range,
       size: this.size,
@@ -281,11 +292,17 @@ export abstract class BaseRowSet {
     return updates;
   }
 
-  selectNavigationSet(useFilter) {
+  selectNavigationSet(useFilter: boolean): NavigationSet {
     const { COUNT, IDX_POINTER, FILTER_COUNT, NEXT_FILTER_IDX } = this.meta;
-    return useFilter
-      ? [this.filterSet, NEXT_FILTER_IDX, FILTER_COUNT]
-      : [this.sortSet, IDX_POINTER, COUNT];
+    if (useFilter) {
+      if (this.filterSet) {
+        return [this.filterSet, NEXT_FILTER_IDX, FILTER_COUNT];
+      } else {
+        throw Error("selectNavigationSet no filterset");
+      }
+    } else {
+      return [this.sortSet, IDX_POINTER, COUNT];
+    }
   }
 
   getDistinctValuesForColumn(column) {
@@ -352,16 +369,12 @@ export abstract class BaseRowSet {
 
 //TODO should range be baked into the concept of RowSet ?
 export class RowSet extends BaseRowSet {
-  /** deprecated */
-  private type: string;
-  private currentFilter: any;
-
   // TODO stream as above
-  static fromGroupRowSet({ table, columns, currentFilter: filter }) {
-    return new RowSet(table, columns, {
-      filter,
-    });
-  }
+  // static fromGroupRowSet({ table, columns, currentFilter: filter }) {
+  //   return new RowSet(table, columns, {
+  //     filter,
+  //   });
+  // }
   //TODO consolidate API of rowSet, groupRowset
   constructor(
     table: Table,
@@ -370,26 +383,39 @@ export class RowSet extends BaseRowSet {
     { filter = null } = NO_OPTIONS
   ) {
     super(table, columns);
-    this.type = DataTypes.ROW_DATA;
     this.project = projectColumns(table.columnMap, columns, this.meta);
     this.sortSet = this.buildSortSet();
-    this.filterSet = null;
     if (filter) {
       this.currentFilter = filter;
       this.filter(filter);
     }
   }
 
+  createProjectRowFactoryMethod(
+    columnMap: ColumnMap,
+    columns: TableColumn[],
+    meta: ColumnMetaData
+  ) {
+    return projectColumns(columnMap, columns, this.meta);
+  }
+
+  /**
+   *
+   * Initialise an empty sortset,
+   * allowing for two sort columns.
+   * We are only currently supporting one or two columns sorting.
+   * TODO mechanism for > 2 column sort
+   */
   buildSortSet() {
     const len = this.data.length;
     const arr: SortSet = [];
     for (let i = 0; i < len; i++) {
       arr[i] = [i, 0, 0];
     }
-    return arr as SortSet;
+    return arr;
   }
 
-  slice(lo, hi) {
+  slice(lo: number, hi: number) {
     const {
       data,
       selectedRowsIDX,
@@ -401,9 +427,9 @@ export class RowSet extends BaseRowSet {
     } = this;
     if (filterSet) {
       const filterMapper =
-        typeof filterSet[0] === "number"
-          ? (idx) => data[idx]
-          : ([idx]) => data[idx];
+        typeof filterSet?.[0] === "number"
+          ? (idx: number) => data[idx]
+          : ([idx]: [number]) => data[idx];
 
       const results = [];
       for (let i = lo, len = filterSet.length; i < len && i < hi; i++) {
@@ -430,7 +456,7 @@ export class RowSet extends BaseRowSet {
 
   // deprecated ?
   get size() {
-    return this.filterSet === null ? this.data.length : this.filterSet.length;
+    return this.data.length;
   }
 
   get first() {
@@ -477,21 +503,24 @@ export class RowSet extends BaseRowSet {
   }
 
   clearFilter() {
-    this.currentFilter = null;
-    this.filterSet = null;
-    if (this.sortRequired) {
+    this.currentFilter = undefined;
+    this.filterSet = undefined;
+    if (this.sortRequired && this.sortCols) {
       this.sort(this.sortCols);
     }
   }
 
   filter(filter: Filter) {
-    const extendsCurrentFilter = extendsFilter(this.currentFilter, filter);
-    const fn = filter && filterPredicate(this.columnMap, filter);
+    const extendsCurrentFilter = extendsExistingFilter(
+      filter,
+      this.currentFilter
+    );
+    const fn = filterPredicate(this.columnMap, filter);
     const { data: rows } = this;
     let [navSet] = this.selectNavigationSet(
-      extendsCurrentFilter && this.filterSet
+      extendsCurrentFilter === true && this.filterSet !== undefined
     );
-    const newFilterSet = [];
+    const newFilterSet: FilterSet = [];
 
     for (let i = 0; i < navSet.length; i++) {
       const rowIdx = navSet === this.filterSet ? navSet[i] : navSet[i][0];
@@ -502,24 +531,24 @@ export class RowSet extends BaseRowSet {
     }
 
     // recompute selected.rows from selectedRowIDX
-    if (this.selectedRowsIDX.length) {
-      const { selectedRowsIDX, selected } = this;
-      selected.rows.length = 0;
-      for (let i = 0; i < newFilterSet.length; i++) {
-        const rowIDX = newFilterSet[i];
-        if (selectedRowsIDX.includes(rowIDX)) {
-          selected.rows.push(i);
-        }
-      }
-    }
+    // if (this.selectedRowsIDX.length) {
+    //   const { selectedRowsIDX, selected } = this;
+    //   selected.rows.length = 0;
+    //   for (let i = 0; i < newFilterSet.length; i++) {
+    //     const rowIDX = newFilterSet[i];
+    //     if (selectedRowsIDX.includes(rowIDX)) {
+    //       selected.rows.push(i);
+    //     }
+    //   }
+    // }
 
     this.filterSet = newFilterSet;
     this.currentFilter = filter;
-    if (!extendsCurrentFilter && this.sortRequired) {
-      // TODO this might be very expensive for large dataset
-      // WHEN DO WE DO THIS - IS THIS CORRECT !!!!!
-      this.sort(this.sortCols);
-    }
+    // if (!extendsCurrentFilter && this.sortRequired && this.sortCols) {
+    //   // TODO this might be very expensive for large dataset
+    //   // WHEN DO WE DO THIS - IS THIS CORRECT !!!!!
+    //   this.sort(this.sortCols);
+    // }
     return newFilterSet.length;
   }
 
@@ -674,7 +703,6 @@ export class RowSet extends BaseRowSet {
 export class SetFilterRowSet extends RowSet {
   constructor(table, columns, columnName, dataRowAllFilters, dataRowTotal) {
     super(table, columns);
-    this.type = DataTypes.FILTER_DATA;
     this.columnName = columnName;
     this._searchText = null;
     this.dataRowFilter = null;
