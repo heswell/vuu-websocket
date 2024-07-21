@@ -1,8 +1,8 @@
 import {
   ClientToServerBody,
-  ClientToServerMessage,
   ServerToClientBody,
   ServerToClientMessage,
+  VuuClientToServerMessage,
   VuuColumnDataType,
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
@@ -34,7 +34,6 @@ export interface DataTableDefinition {
   createPath?: string;
   data?: VuuDataRow[];
   dataPath?: string;
-  type: string;
   updatePath?: string;
   updates?: TableUpdateOptions;
 }
@@ -60,7 +59,7 @@ export interface IMessageQueue {
 
 export type VuuRequestHandler<
   T extends ClientToServerBody = ClientToServerBody
-> = (message: ClientToServerMessage<T>, session: ISession) => void;
+> = (message: VuuClientToServerMessage<T>, session: ISession) => void;
 
 export interface ISession {
   enqueue: (requestId: string, messageBody: ServerToClientBody) => void;

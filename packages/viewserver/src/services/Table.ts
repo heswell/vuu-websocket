@@ -12,7 +12,10 @@ export class Table extends BaseTable {
     }
   }
 
-  async installDataGenerators({ createPath, updatePath }: TableGenerators) {
+  installDataGenerators = async ({
+    createPath,
+    updatePath,
+  }: TableGenerators) => {
     if (createPath) {
       const { default: createGenerator } = await import(`${createPath}`);
       this.createRow = createGenerator.default;
@@ -21,5 +24,5 @@ export class Table extends BaseTable {
       const { default: updateGenerator } = await import(`${updatePath}`);
       this.updateRow = updateGenerator.default;
     }
-  }
+  };
 }

@@ -1,4 +1,4 @@
-import { ClientToServerMessage } from "@vuu-ui/vuu-protocol-types";
+import { VuuClientToServerMessage } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
 import { getSession } from "./sessions";
 import { getHandlerForMessage } from "./requestHandlers";
@@ -9,7 +9,9 @@ export const webSocketMessageHandler = async (
 ) => {
   const session = getSession(ws);
   if (session) {
-    const vuuMessage = JSON.parse(message as string) as ClientToServerMessage;
+    const vuuMessage = JSON.parse(
+      message as string
+    ) as VuuClientToServerMessage;
     const { requestId } = vuuMessage;
     if (vuuMessage.body.type === "LOGIN") {
       return session.login(requestId, vuuMessage.body);

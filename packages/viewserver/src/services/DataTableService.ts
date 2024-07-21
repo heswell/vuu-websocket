@@ -8,6 +8,7 @@ import type {
 import {
   ClientToServerChangeViewPort,
   ClientToServerCreateViewPort,
+  ClientToServerSelection,
   ClientToServerTableList,
   ClientToServerTableMeta,
   ClientToServerViewPortRange,
@@ -204,6 +205,16 @@ export const RPC_CALL: VuuRequestHandler<ClientToServerViewportRpcCall> = (
   }
 };
 
+export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
+  message,
+  session
+) => {
+  const { selection, vpId } = message.body;
+  const subscription = _subscriptions[vpId];
+  const { rows, size } = subscription.view.select(selection);
+  enqueueDataMessages(rows, size, session, vpId, subscription.metaData);
+};
+
 // export function unsubscribeAll(sessionId: string, queue: MessageQueue) {
 //   // const subscriptions = _clientSubscriptions[clientId];
 //   // if (subscriptions && subscriptions.length) {
@@ -255,7 +266,7 @@ export const RPC_CALL: VuuRequestHandler<ClientToServerViewportRpcCall> = (
 //   queue
 // ) {
 //   _subscriptions[viewport].invoke(
-//     'select',
+//     "select",
 //     queue,
 //     DataType.Selected,
 //     idx,
@@ -317,7 +328,7 @@ const enqueueDataMessages = (
   vpSize: number,
   session: ISession,
   viewPortId: string,
-  { IDX, KEY }: ColumnMetaData
+  { IDX, KEY, SELECTED }: ColumnMetaData
 ) => {
   if (rows.length) {
     const ts = +new Date();
@@ -348,7 +359,7 @@ const enqueueDataMessages = (
         rowIndex,
         data: row.slice(0, IDX),
         rowKey: row[KEY] as string,
-        sel: 0,
+        sel: row[SELECTED] as 0 | 1,
         ts,
         updateType: "U",
         viewPortId,

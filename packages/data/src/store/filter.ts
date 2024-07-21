@@ -1,17 +1,5 @@
-import { VuuFilter } from "@vuu-ui/data-types";
-import type { Filter } from "@vuu-ui/vuu-filter-types";
-
-export const EQUALS = "EQ";
-export const GREATER_THAN = "GT";
-export const GREATER_EQ = "GE";
-export const LESS_THAN = "LT";
-export const LESS_EQ = "LE";
-export const AND = "AND";
-export const OR = "OR";
-export const STARTS_WITH = "SW";
-export const NOT_STARTS_WITH = "NOT_SW";
-export const IN = "IN";
-export const NOT_IN = "NOT_IN";
+import type { Filter, SingleValueFilterClause } from "@vuu-ui/vuu-filter-types";
+import { isInFilter } from "@vuu-ui/vuu-utils";
 
 export const SET_FILTER_DATA_COLUMNS = [
   { name: "name", key: 0 },
@@ -19,58 +7,9 @@ export const SET_FILTER_DATA_COLUMNS = [
   { name: "totalCount", key: 2, width: 40, type: "number" },
 ];
 
-export const BIN_FILTER_DATA_COLUMNS = [
-  { name: "bin" },
-  { name: "count" },
-  { name: "bin-lo" },
-  { name: "bin-hi" },
-];
-
-export type FilterSet = number[];
-
-export const filterHasChanged = (oldFilter: VuuFilter, newFilter: VuuFilter) =>
-  oldFilter !== newFilter;
-
-export function getFilterColumn(column) {
-  return column.isGroup ? column.columns[0] : column;
-}
-
-export function shouldShowFilter(filterColumnName, column) {
-  const filterColumn = getFilterColumn(column);
-  if (filterColumn.isGroup) {
-    return filterColumn.columns.some((col) => col.name === filterColumnName);
-  } else {
-    return filterColumnName === filterColumn.name;
-  }
-}
-
-export function includesNoValues(filter) {
-  // TODO make sure we catch all cases...
-  if (!filter) {
-    return false;
-  } else if (filter.type === IN && filter.values.length === 0) {
-    return true;
-  } else if (
-    filter.type === AND &&
-    filter.filters.some((f) => includesNoValues(f))
-  ) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-function includesAllValues(filter) {
-  if (!filter) {
-    return false;
-  } else if (filter.type === NOT_IN && filter.values.length === 0) {
-    return true;
-  } else if (filter.type === STARTS_WITH && filter.value === "") {
-    return true;
-  } else {
-    return false;
-  }
-}
+const isStartsClause = (
+  f?: Partial<Filter>
+): f is SingleValueFilterClause<string> => f?.op === "starts";
 
 // does filter only narrow the resultset from existingFilter
 export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
@@ -79,33 +18,24 @@ export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
   if (existingFilter === undefined) {
     return false;
   }
-  if (filter.colName && filter.colName === existingFilter.colName) {
-    if (filter.type === existingFilter.type) {
-      switch (filter.type) {
-        case IN:
-          return (
-            existingFilter.values.length < filter.values.length &&
-            containsAll(filter.values, existingFilter.values)
-          );
-        case NOT_IN:
-          return (
-            existingFilter.values.length > filter.values.length &&
-            containsAll(existingFilter.values, filter.values)
-          );
-        case STARTS_WITH:
-          return (
-            existingFilter.value.length > filter.value.length &&
-            existingFilter.value.indexOf(filter.value) === 0
-          );
-        // more cases here such as GT,LT
-        default:
-      }
+  if (filter.column && filter.column === existingFilter.column) {
+    if (isInFilter(existingFilter) && isInFilter(filter)) {
+      return (
+        existingFilter.values.length < filter.values.length &&
+        containsAll(filter.values, existingFilter.values)
+      );
     }
-  } else if (filter.colname && existingFilter.colName) {
+    if (isStartsClause(filter) && isStartsClause(existingFilter)) {
+      return (
+        existingFilter.value.length > filter.value.length &&
+        existingFilter.value.indexOf(filter.value) === 0
+      );
+    }
+  } else if (filter.column && existingFilter.column) {
     // different columns,always false
     return false;
   } else if (
-    existingFilter.type === AND &&
+    existingFilter.op === "and" &&
     extendsFilters(filter, existingFilter)
   ) {
     return true;
@@ -118,8 +48,8 @@ export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
 const byColName = (a, b) =>
   a.colName === b.colName ? 0 : a.colName < b.colName ? -1 : 1;
 
-function extendsFilters(f1, f2) {
-  if (f1.colName) {
+function extendsFilters(f1: Filter, f2: Filter) {
+  if (f1.column) {
     const matchingFilter = f2.filters.find((f) => f.colName === f1.colName);
     return filterEquals(matchingFilter, f1, true);
   } else if (f1.filters.length === f2.filters.length) {
@@ -139,170 +69,6 @@ function extendsFilters(f1, f2) {
       const filter2 = f2.filters.find((f) => f.colName === filter1.colName);
       return filterEquals(filter1, filter2, true); // could also allow f2 extends f1
     });
-  }
-}
-
-export function addFilter(existingFilter, filter) {
-  if (includesNoValues(filter)) {
-    const { colName } = filter;
-    existingFilter = removeFilterForColumn(existingFilter, { name: colName });
-  } else if (includesAllValues(filter)) {
-    // A filter that returns all values is a way to remove filtering for this column
-    return removeFilterForColumn(existingFilter, { name: filter.colName });
-  }
-
-  if (!existingFilter) {
-    return filter;
-  } else if (!filter) {
-    return existingFilter;
-  }
-
-  if (existingFilter.type === AND && filter.type === AND) {
-    return {
-      type: "AND",
-      filters: combine(existingFilter.filters, filter.filters),
-    };
-  } else if (existingFilter.type === "AND") {
-    const filters = replaceOrInsert(existingFilter.filters, filter);
-    return filters.length > 1 ? { type: "AND", filters } : filters[0];
-  } else if (filter.type === "AND") {
-    return { type: "AND", filters: filter.filters.concat(existingFilter) };
-  } else if (filterEquals(existingFilter, filter, true)) {
-    return filter;
-  } else if (sameColumn(existingFilter, filter)) {
-    return merge(existingFilter, filter);
-  } else {
-    return { type: "AND", filters: [existingFilter, filter] };
-  }
-}
-
-// If we add an IN filter and there is an existing NOT_IN, we would always expect the IN
-// values to exist in the NOT_IN set (as long as user interaction is driving the filtering)
-function replaceOrInsert(filters, filter) {
-  const { type, colName, values } = filter;
-  if (type === IN || type === NOT_IN) {
-    const otherType = type === IN ? NOT_IN : IN;
-    // see if we have an 'other' entry
-    let idx = filters.findIndex(
-      (f) => f.type === otherType && f.colName === colName
-    );
-    if (idx !== -1) {
-      const { values: existingValues } = filters[idx];
-      if (values.every((value) => existingValues.indexOf(value) !== -1)) {
-        if (values.length === existingValues.length) {
-          // we simply remove the existing 'other' filter ...
-          return filters.filter((f, i) => i !== idx);
-        } else {
-          // ... or strip the matching values from the 'other' filter values
-          let newValues = existingValues.filter(
-            (value) => !values.includes(value)
-          );
-          return filters.map((filter, i) =>
-            i === idx ? { ...filter, values: newValues } : filter
-          );
-        }
-      } else if (values.some((value) => existingValues.indexOf(value) !== -1)) {
-        console.log(`partial overlap between IN and NOT_IN`);
-      }
-    } else {
-      idx = filters.findIndex(
-        (f) => f.type === type && f.colName === filter.colName
-      );
-      if (idx !== -1) {
-        return filters.map((f, i) => (i === idx ? merge(f, filter) : f));
-      }
-    }
-  }
-
-  return filters.concat(filter);
-}
-
-function merge(f1, f2) {
-  const { type: t1 } = f1;
-  const { type: t2 } = f2;
-  const sameType = t1 === t2 ? t1 : "";
-
-  if (includesNoValues(f2)) {
-    return f2;
-  } else if ((t1 === IN && t2 === NOT_IN) || (t1 === NOT_IN && t2 === IN)) {
-    // do the two sets cancel each other out ?
-    if (
-      f1.values.length === f2.values.length &&
-      f1.values.every((v) => f2.values.includes(v))
-    ) {
-      if (t1 === IN && t2 === NOT_IN) {
-        return {
-          colName: f1.colName,
-          type: IN,
-          values: [],
-        };
-      } else {
-        return null;
-      }
-      return null;
-    } else if (f1.values.length > f2.values.length) {
-      if (f2.values.every((v) => f1.values.includes(v))) {
-        return {
-          ...f1,
-          values: f1.values.filter((v) => !f2.values.includes(v)),
-        };
-      }
-    }
-  } else if (sameType === IN || sameType === NOT_IN) {
-    return {
-      ...f1,
-      values: f1.values.concat(f2.values.filter((v) => !f1.values.includes(v))),
-    };
-  } else if (sameType === STARTS_WITH) {
-    return {
-      type: OR,
-      filters: [f1, f2],
-    };
-  } else if (sameType === NOT_STARTS_WITH) {
-    return {
-      type: AND,
-      filters: [f1, f2],
-    };
-  }
-
-  return f2;
-}
-
-function combine(existingFilters, replacementFilters) {
-  // TODO need a safer REGEX here
-  function equivalentType({ type: t1 }, { type: t2 }) {
-    return t1 === t2 || t1[0] === t2[0];
-  }
-
-  const replaces = (existingFilter, replacementFilter) => {
-    return (
-      existingFilter.colName === replacementFilter.colName &&
-      equivalentType(existingFilter, replacementFilter)
-    );
-  };
-
-  const stillApplicable = (existingFilter) =>
-    replacementFilters.some((replacementFilter) =>
-      replaces(existingFilter, replacementFilter)
-    ) === false;
-
-  return existingFilters.filter(stillApplicable).concat(replacementFilters);
-}
-
-export function removeFilter(sourceFilter, filterToRemove) {
-  if (filterEquals(sourceFilter, filterToRemove, true)) {
-    return null;
-  } else if (sourceFilter.type !== AND) {
-    throw Error(
-      `removeFilter cannot remove ${JSON.stringify(
-        filterToRemove
-      )} from ${JSON.stringify(sourceFilter)}`
-    );
-  } else {
-    const filters = sourceFilter.filters.filter(
-      (f) => !filterEquals(f, filterToRemove)
-    );
-    return filters.length > 0 ? { type: AND, filters } : null;
   }
 }
 

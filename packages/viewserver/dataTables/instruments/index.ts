@@ -27,7 +27,6 @@ const config: DataTableDefinition = {
       table: "instruments",
     },
   },
-  type: "vs",
 };
 
 export default config;
