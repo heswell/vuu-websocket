@@ -8,28 +8,27 @@ import { VuuDataRow, VuuSortCol } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import {
   ColumnMetaData,
-  RowProjectorFactory,
+  MultiRowProjectorFactory,
   metaData,
+  projectColumn,
   projectColumns,
-} from "../columnUtils.js";
+} from "../columnUtils.ts";
 import {
-  FilterSet,
   SET_FILTER_DATA_COLUMNS,
   extendsExistingFilter,
   extractFilterForColumn,
   overrideColName,
   splitFilterOnColumn,
-} from "../filter.js";
+} from "../filter.ts";
 import {
   NULL_RANGE,
   Range,
   getDeltaRange,
   getFullRange,
-} from "../rangeUtils.js";
-import { addRowsToIndex, arrayOfIndices } from "../rowUtils.js";
-import SelectionModel, { SelectionModelType } from "../selection-model.js";
+} from "../rangeUtils.ts";
+import { addRowsToIndex, arrayOfIndices } from "../rowUtils.ts";
 import {
-  SortSet,
+  SortSet as IndexSet,
   mapSortDefsToSortCriteria,
   sort,
   sortBy,
@@ -37,11 +36,12 @@ import {
   sortExtendsExistingSort,
   sortPosition,
   sortReversed,
-  sortableFilterSet,
-} from "../sortUtils.js";
-import { Row } from "../storeTypes.js";
-import { Table } from "../table.js";
-import { DataResponse, IRowSet } from "./IRowSet.js";
+} from "../sortUtils.ts";
+import { Row } from "../storeTypes.ts";
+import { Table } from "../table.ts";
+import { DataResponse, IRowSet } from "./IRowSet.ts";
+import { identifySelectionChanges } from "../selectionUtils.ts";
+import { DataSourceRow } from "@vuu-ui/vuu-data-types";
 
 const SINGLE_COLUMN = 1;
 
@@ -49,36 +49,29 @@ const NO_OPTIONS = {
   filter: null,
 };
 
-const NULL_SORTSET: SortSet = [[-1, -1, -1]];
-
-type NavigationSet = [SortSet | FilterSet, number, number];
+const NULL_SORTSET: IndexSet = [[-1, -1, -1]];
 
 export abstract class BaseRowSet implements IRowSet {
   public range: Range = NULL_RANGE;
 
   protected columnMap: ColumnMap;
   protected currentFilter: Filter | undefined;
-  protected filterSet: FilterSet | undefined;
+  protected filterSet: number[] | undefined;
   protected meta: ColumnMetaData;
-  protected sortSet: SortSet = NULL_SORTSET;
-  protected offset = 0;
-  protected selectedRowsIDX: number[] = [];
+  /** key values of selected rows   */
+  protected selected: string[] = [];
+  protected sortSet: IndexSet = NULL_SORTSET;
   protected sortCols: VuuSortCol[] | undefined;
-  protected sortReverse: boolean = false;
-  protected sortRequired: boolean = false;
+  protected data: Row[];
+  protected sortKeyMap: Map<string, number> = new Map();
+  protected filterKeyMap: Map<string, number> = new Map();
 
   private columns: TableColumn[];
-  private selected: {
-    rows: any[];
-    focusedIdx: number;
-    lastTouchIdx: number;
-  } = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
-  private selectionModel: SelectionModel;
   private table: Table;
 
-  protected data: Row[];
-
-  project: RowProjectorFactory;
+  project: MultiRowProjectorFactory = () => () => {
+    throw Error("project method must be implemented");
+  };
 
   constructor(table: Table, columns: TableColumn[]) {
     this.table = table;
@@ -86,27 +79,13 @@ export abstract class BaseRowSet implements IRowSet {
     this.columnMap = table.columnMap;
     this.meta = metaData(columns);
     this.data = table.rows;
-    this.selected = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
-    this.project = this.createProjectRowFactoryMethod(
-      this.columnMap,
-      this.columns,
-      this.meta
-    );
-    /**
-     * data IDX of selected rows
-     */
-    this.selectionModel = this.createSelectionModel();
   }
 
   abstract createProjectRowFactoryMethod(
     columnMap: ColumnMap,
     solumns: TableColumn[],
     meta: ColumnMetaData
-  ): RowProjectorFactory;
-
-  createSelectionModel() {
-    return new SelectionModel();
-  }
+  ): MultiRowProjectorFactory;
 
   // used by binned rowset
   get filteredData() {
@@ -118,16 +97,16 @@ export abstract class BaseRowSet implements IRowSet {
     }
   }
 
+  protected get keyMap() {
+    return this.filterSet ? this.filterKeyMap : this.sortKeyMap;
+  }
+
   get totalRowCount() {
     return this.data.length;
   }
 
-  get filteredRowCount() {
-    return this.filterSet === null ? this.data.length : this.filterSet.length;
-  }
-
   get selectedRowCount() {
-    return this.selected.rows.length;
+    return this.selected.length;
   }
 
   get size(): number {
@@ -152,9 +131,7 @@ export abstract class BaseRowSet implements IRowSet {
     this.range = range;
     return {
       rows: resultset,
-      range,
       size: this.size,
-      offset: this.offset,
     };
   }
 
@@ -163,146 +140,87 @@ export abstract class BaseRowSet implements IRowSet {
     const resultset = this.slice(from, to);
     return {
       rows: resultset,
-      range: this.range,
       size: this.size,
-      offset: this.offset,
     };
   }
 
-  select(idx, rangeSelect, keepExistingSelection) {
+  protected get indexOfKeyField() {
+    return this.table.columnMap[this.table.schema.key];
+  }
+
+  // selected are the index positions of rows as presented to the user. That
+  // means they refer to positions within the current indexSet. We will store
+  // them as positions within the underlying table, which never change.
+  // Note: deletions from the underlying table will have to be dealt with.
+
+  private selectedIndicesToKeyValues = (selectedIndices: number[]) => {
     const {
-      meta: { SELECTED },
-      selectionModel,
-      range: { lo, hi },
       filterSet,
       sortSet,
-      offset,
+      table: { columnMap, schema },
     } = this;
+    const indexOfKeyField = columnMap[schema.key];
+    if (filterSet) {
+      return selectedIndices.map((idx) => {
+        const sortSetIndex = filterSet[idx];
+        const [rowIndex] = sortSet[sortSetIndex];
+        return this.data[rowIndex][indexOfKeyField] as string;
+      });
+    } else {
+      return selectedIndices.map(
+        (idx) => this.data[sortSet[idx][0]][indexOfKeyField] as string
+      );
+    }
+  };
 
-    const { selected, deselected, ...selectionState } = selectionModel.select(
+  select(selected: number[]): DataResponse {
+    const { data, filterKeyMap, filterSet, range, size, sortKeyMap, sortSet } =
+      this;
+
+    const selectedKeyValues = this.selectedIndicesToKeyValues(selected);
+
+    const { from, to } = range;
+    const [newSelected, deselected] = identifySelectionChanges(
       this.selected,
-      idx,
-      rangeSelect,
-      keepExistingSelection
+      selectedKeyValues
+    );
+    this.selected = selectedKeyValues;
+    const keyMap = filterSet ? filterKeyMap : sortKeyMap;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const keyFieldIndex = this.columnMap[this.table.schema.key];
+
+    const updatedRows: VuuDataRow[] = [];
+    const projectRow = projectColumn(
+      this.columnMap,
+      this.columns,
+      this.meta,
+      keyFieldIndex,
+      selectedKeyValues
     );
 
-    this.selected = selectionState;
-
-    if (filterSet) {
-      if (selected.length) {
-        this.selectedRowsIDX.push(...selected.map((i) => filterSet[i]));
-      }
-      if (deselected.length) {
-        const deselectedRowIDX = deselected.map((i) => filterSet[i]);
-        this.selectedRowsIDX = this.selectedRowsIDX.filter(
-          (rowIdx) => !deselectedRowIDX.includes(rowIdx)
-        );
-      }
-    } else {
-      const idxToIDX = (idx) => sortSet[idx][0];
-      this.selectedRowsIDX = this.selected.rows.map(idxToIDX);
-    }
-
-    const updates = [];
-    for (let i = 0; i < selected.length; i++) {
-      const idx = selected[i];
-      if (idx >= lo && idx < hi) {
-        updates.push([idx + offset, SELECTED, 1]);
-      }
-    }
-    for (let i = 0; i < deselected.length; i++) {
-      const idx = deselected[i];
-      if (idx >= lo && idx < hi) {
-        updates.push([idx + offset, SELECTED, 0]);
+    for (const key of newSelected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(data[rowIndex], idx));
       }
     }
 
-    return updates;
-  }
-
-  selectAll() {
-    const {
-      data,
-      selected,
-      selectedRowsIDX,
-      meta: { SELECTED },
-      range: { lo, hi },
-      filterSet,
-      offset,
-    } = this;
-    const previouslySelectedRows = [...this.selected.rows];
-    if (filterSet) {
-      // selection of a filtered subset is added to existing selection
-      for (let i = 0; i < filterSet.length; i++) {
-        const rowIDX = filterSet[i];
-        if (!selectedRowsIDX.includes(rowIDX)) {
-          selected.rows.push(i); // does it matter if thes eend up out of sequence ?
-          selectedRowsIDX.push(rowIDX);
-        }
-      }
-    } else {
-      // Step 1: brute force approach, actually create list of selected indices
-      // need to replace this with a structure that tracks ranges
-      this.selected = {
-        rows: arrayOfIndices(data.length),
-        focusedIdx: -1,
-        lastTouchIdx: -1,
-      };
-      this.selectedRowsIDX = [...this.selected.rows];
-    }
-
-    const updates = [];
-    const max = Math.min(hi, (filterSet || data).length);
-    for (let i = lo; i < max; i++) {
-      if (
-        this.selected.rows.includes(i) &&
-        !previouslySelectedRows.includes(i)
-      ) {
-        updates.push([i + offset, SELECTED, 1]);
+    for (const key of deselected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(data[rowIndex], idx));
       }
     }
 
-    return updates;
-  }
-
-  selectNone() {
-    const {
-      meta: { SELECTED },
-      range: { lo, hi },
-      filterSet,
-      offset,
-    } = this;
-    const previouslySelectedRows = this.selectedRowsIDX;
-    if (filterSet) {
-      this.selected = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
-      this.selectedRowsIDX = this.selectedRowsIDX.filter(
-        (idx) => !filterSet.includes(idx)
-      );
-    } else {
-      this.selected = { rows: [], focusedIdx: -1, lastTouchIdx: -1 };
-      this.selectedRowsIDX = [];
-    }
-    const updates = [];
-    for (let i = lo; i < hi; i++) {
-      const idx = filterSet ? filterSet[i] : i;
-      if (previouslySelectedRows.includes(idx)) {
-        updates.push([i + offset, SELECTED, 0]);
-      }
-    }
-    return updates;
-  }
-
-  selectNavigationSet(useFilter: boolean): NavigationSet {
-    const { COUNT, IDX_POINTER, FILTER_COUNT, NEXT_FILTER_IDX } = this.meta;
-    if (useFilter) {
-      if (this.filterSet) {
-        return [this.filterSet, NEXT_FILTER_IDX, FILTER_COUNT];
-      } else {
-        throw Error("selectNavigationSet no filterset");
-      }
-    } else {
-      return [this.sortSet, IDX_POINTER, COUNT];
-    }
+    return {
+      rows: updatedRows,
+      size,
+    };
   }
 
   getDistinctValuesForColumn(column) {
@@ -379,24 +297,22 @@ export class RowSet extends BaseRowSet {
   constructor(
     table: Table,
     columns: TableColumn[],
-    offset = 0,
     { filter = null } = NO_OPTIONS
   ) {
     super(table, columns);
-    this.project = projectColumns(table.columnMap, columns, this.meta);
+    const keyFieldIndex = this.columnMap[table.schema.key];
+    this.project = projectColumns(
+      table.columnMap,
+      columns,
+      this.meta,
+      keyFieldIndex
+    );
     this.sortSet = this.buildSortSet();
+    this.setMapKeys(this.sortKeyMap, this.sortSet);
     if (filter) {
       this.currentFilter = filter;
       this.filter(filter);
     }
-  }
-
-  createProjectRowFactoryMethod(
-    columnMap: ColumnMap,
-    columns: TableColumn[],
-    meta: ColumnMetaData
-  ) {
-    return projectColumns(columnMap, columns, this.meta);
   }
 
   /**
@@ -405,53 +321,58 @@ export class RowSet extends BaseRowSet {
    * allowing for two sort columns.
    * We are only currently supporting one or two columns sorting.
    * TODO mechanism for > 2 column sort
+   * populate map of row key values to sortSet index positions
    */
   buildSortSet() {
-    const len = this.data.length;
-    const arr: SortSet = [];
-    for (let i = 0; i < len; i++) {
-      arr[i] = [i, 0, 0];
+    const { data } = this;
+    const sortSet: IndexSet = Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+      // this is the initial, unsorted state, where rowIndex value
+      // (first item of sortSet tuple) equals rowIndex value from data)
+      // and is same as natural array position. The latter will no longer
+      // be true once data is sorted.
+      sortSet[i] = [i, 0, 0];
     }
-    return arr;
+    return sortSet;
+  }
+
+  setMapKeys(
+    keyMap: Map<string, number>,
+    sortSet: IndexSet,
+    filterSet?: number[]
+  ) {
+    const { data, indexOfKeyField } = this;
+
+    if (filterSet) {
+      for (let i = 0; i < filterSet.length; i++) {
+        const sortSetIndexIndex = filterSet[i];
+        const [rowIndex] = sortSet[sortSetIndexIndex];
+        const keyValue = data[rowIndex][indexOfKeyField];
+        keyMap.set(keyValue.toString(), i);
+      }
+    } else {
+      for (let i = 0; i < sortSet.length; i++) {
+        const [rowIndex] = sortSet[i];
+        const keyValue = data[rowIndex][indexOfKeyField];
+        keyMap.set(keyValue.toString(), i);
+      }
+    }
   }
 
   slice(lo: number, hi: number) {
-    const {
-      data,
-      selectedRowsIDX,
-      filterSet,
-      offset,
-      sortCols,
-      sortSet,
-      sortReverse,
-    } = this;
-    if (filterSet) {
-      const filterMapper =
-        typeof filterSet?.[0] === "number"
-          ? (idx: number) => data[idx]
-          : ([idx]: [number]) => data[idx];
+    const { data, filterSet, selected, sortCols, sortSet } = this;
 
-      const results = [];
-      for (let i = lo, len = filterSet.length; i < len && i < hi; i++) {
-        const row = sortReverse
-          ? filterMapper(filterSet[len - i - 1])
-          : filterMapper(filterSet[i]);
-        results.push(row);
-      }
-      return results.map(this.project(lo, offset, selectedRowsIDX));
-    } else if (sortCols) {
-      const results = [];
-      for (let i = lo, len = data.length; i < len && i < hi; i++) {
-        const idx = sortReverse ? sortSet[len - i - 1][0] : sortSet[i][0];
-        const row = data[idx];
-        results.push(row);
-      }
-      return results.map(this.project(lo, offset, selectedRowsIDX));
-    } else {
-      return this.data
-        .slice(lo, hi)
-        .map(this.project(lo, offset, selectedRowsIDX));
+    const indexSet = filterSet ?? sortSet;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const results = [];
+    for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
+      const rowIndex = getRowIndex(i);
+      results.push(data[rowIndex]);
     }
+    return results.map(this.project(lo, selected));
   }
 
   // deprecated ?
@@ -479,90 +400,96 @@ export class RowSet extends BaseRowSet {
   }
 
   sort(sortDefs: VuuSortCol[]) {
-    const sortSet =
-      this.currentFilter == null
-        ? this.sortSet
-        : (this.filterSet = sortableFilterSet(this.filterSet));
-
-    this.sortRequired = this.currentFilter !== null;
+    const start = performance.now();
+    const { data, filterSet, sortSet } = this;
 
     if (sortReversed(this.sortCols, sortDefs, SINGLE_COLUMN)) {
-      this.sortReverse = !this.sortReverse;
+      sortSet.reverse();
+      this.setMapKeys(this.sortKeyMap, sortSet);
     } else if (
       this.sortCols &&
       sortExtendsExistingSort(this.sortCols, sortDefs)
     ) {
-      this.sortReverse = false;
       sortExtend(sortSet, this.data, sortDefs, this.columnMap);
     } else {
-      this.sortReverse = false;
       sort(sortSet, this.data, sortDefs, this.columnMap);
     }
 
     this.sortCols = sortDefs;
+    this.setMapKeys(this.sortKeyMap, sortSet);
+
+    if (filterSet && this.currentFilter) {
+      const fn = filterPredicate(this.columnMap, this.currentFilter);
+
+      const indexSet = sortSet;
+      const getRowIndex = (idx: number) => sortSet[idx][0];
+      const newFilterSet: number[] = [];
+
+      for (let i = 0; i < indexSet.length; i++) {
+        const rowIdx = getRowIndex(i);
+        const row = data[rowIdx];
+        if (fn(row as DataSourceRow)) {
+          newFilterSet.push(i);
+        }
+      }
+
+      this.setMapKeys(this.filterKeyMap, this.sortSet, newFilterSet);
+
+      this.filterSet = newFilterSet;
+    }
+    const end = performance.now();
+    console.log(`sort took ${end - start} ms`);
   }
 
   clearFilter() {
     this.currentFilter = undefined;
     this.filterSet = undefined;
-    if (this.sortRequired && this.sortCols) {
-      this.sort(this.sortCols);
-    }
   }
 
   filter(filter: Filter) {
+    const start = performance.now();
     const extendsCurrentFilter = extendsExistingFilter(
       filter,
       this.currentFilter
     );
     const fn = filterPredicate(this.columnMap, filter);
-    const { data: rows } = this;
-    let [navSet] = this.selectNavigationSet(
-      extendsCurrentFilter === true && this.filterSet !== undefined
-    );
-    const newFilterSet: FilterSet = [];
+    const { data, filterSet, sortSet } = this;
 
-    for (let i = 0; i < navSet.length; i++) {
-      const rowIdx = navSet === this.filterSet ? navSet[i] : navSet[i][0];
-      const row = rows[rowIdx];
-      if (fn(row)) {
-        newFilterSet.push(rowIdx);
+    const indexSet = filterSet ?? sortSet;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const newFilterSet: number[] = [];
+
+    for (let i = 0; i < indexSet.length; i++) {
+      const rowIdx = getRowIndex(i);
+      const row = data[rowIdx];
+      if (fn(row as DataSourceRow)) {
+        newFilterSet.push(i);
       }
     }
 
-    // recompute selected.rows from selectedRowIDX
-    // if (this.selectedRowsIDX.length) {
-    //   const { selectedRowsIDX, selected } = this;
-    //   selected.rows.length = 0;
-    //   for (let i = 0; i < newFilterSet.length; i++) {
-    //     const rowIDX = newFilterSet[i];
-    //     if (selectedRowsIDX.includes(rowIDX)) {
-    //       selected.rows.push(i);
-    //     }
-    //   }
-    // }
+    this.setMapKeys(this.filterKeyMap, this.sortSet, newFilterSet);
 
     this.filterSet = newFilterSet;
     this.currentFilter = filter;
-    // if (!extendsCurrentFilter && this.sortRequired && this.sortCols) {
-    //   // TODO this might be very expensive for large dataset
-    //   // WHEN DO WE DO THIS - IS THIS CORRECT !!!!!
-    //   this.sort(this.sortCols);
-    // }
-    return newFilterSet.length;
+
+    const end = performance.now();
+    console.log(`filter took ${end - start} ms`);
   }
 
   update(idx, updates) {
     if (this.currentFilter === null && this.sortCols === null) {
       if (idx >= this.range.lo && idx < this.range.hi) {
-        return [idx + this.offset, ...updates];
+        return [idx, ...updates];
       }
     } else if (this.currentFilter === null) {
       const { sortSet } = this;
       for (let i = this.range.lo; i < this.range.hi; i++) {
         const [rowIdx] = sortSet[i];
         if (rowIdx === idx) {
-          return [i + this.offset, ...updates];
+          return [i, ...updates];
         }
       }
     } else {
@@ -573,7 +500,7 @@ export class RowSet extends BaseRowSet {
           ? filterSet[i][0]
           : filterSet[i];
         if (rowIdx === idx) {
-          return [i + this.offset, ...updates];
+          return [i, ...updates];
         }
       }
     }
@@ -625,7 +552,6 @@ export class RowSet extends BaseRowSet {
       } else {
         return {
           size: this.size,
-          offset: this.offset - 1,
         };
       }
     } else if (this.sortCols === null) {
@@ -648,7 +574,6 @@ export class RowSet extends BaseRowSet {
         } else {
           return {
             size: this.size,
-            offset: this.offset - 1,
           };
         }
       } else {
@@ -689,7 +614,6 @@ export class RowSet extends BaseRowSet {
         } else {
           return {
             size: this.size,
-            offset: this.offset - 1,
           };
         }
       } else {
@@ -717,12 +641,8 @@ export class SetFilterRowSet extends RowSet {
     this.sort([{ column: "name", sortType: "A" }]);
   }
 
-  createSelectionModel() {
-    return new SelectionModel(SelectionModelType.Checkbox);
-  }
-
   clearRange() {
-    this.range = { lo: 0, hi: 0 };
+    this.range = { from: 0, to: 0 };
   }
 
   get values() {
@@ -778,7 +698,7 @@ export class SetFilterRowSet extends RowSet {
       }
 
       this.selected = { rows: selectedRows, focusedIdx: -1, lastTouchIdx: -1 };
-      this.selectedRowsIDX = selectedRowsIDX;
+      this.indexSetSelected = selectedRowsIDX;
     } else {
       this.selectAll();
     }

@@ -1,12 +1,8 @@
-import {
-  DataTableDefinition,
-  TableColumn,
-  TableUpdateOptions,
-} from "@heswell/server-types";
-import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
-import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
-import { buildColumnMap } from "./columnUtils.ts";
+import { DataTableDefinition, TableUpdateOptions } from "@heswell/server-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
+import { buildColumnMap } from "./columnUtils.ts";
 
 const defaultUpdateConfig: TableUpdateOptions = {
   applyUpdates: false,
@@ -35,6 +31,7 @@ export class Table extends EventEmitter<TableEvents> {
   #index: Map<string, number> = new Map();
   #keys: Record<string, number> = {};
 
+  public installDataGenerators?: (config: DataTableDefinition) => void;
   public columnMap: ColumnMap;
   public rows: VuuDataRow[] = [];
   public status: "ready" | null = null;
@@ -65,7 +62,7 @@ export class Table extends EventEmitter<TableEvents> {
       this.loadData(dataPath);
     }
 
-    this.installDataGenerators(config);
+    this.installDataGenerators?.(config);
   }
 
   get columns() {
@@ -207,10 +204,6 @@ export class Table extends EventEmitter<TableEvents> {
 
   updateRow(/*idx, row, columnMap*/) {
     return null;
-  }
-
-  async installDataGenerators(_config: TableGenerators) {
-    throw Error("Base Table does not implement installDataGenerators");
   }
 }
 

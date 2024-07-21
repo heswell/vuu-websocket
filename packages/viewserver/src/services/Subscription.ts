@@ -86,65 +86,65 @@ export class Subscription {
     // timeoutHandle = setTimeout(collectUpdates, 1000);
   }
 
-  invoke(method: string, queue: IMessageQueue, ...params) {
-    let data, filterData;
+  // invoke(method: string, queue: IMessageQueue, ...params) {
+  //   let data, filterData;
 
-    if (method === "filter") {
-      [data, ...filterData] = this.view[method](...params);
-    } else {
-      data = this.view[method](...params);
-    }
-    const meta = tableMeta;
+  //   if (method === "filter") {
+  //     [data, ...filterData] = this.view[method](...params);
+  //   } else {
+  //     data = this.view[method](...params);
+  //   }
+  //   const meta = tableMeta;
 
-    if (data) {
-      queue.push(
-        {
-          priority: 1,
-          viewport,
-          type,
-          data,
-        },
-        meta
-      );
-    }
+  //   if (data) {
+  //     queue.push(
+  //       {
+  //         priority: 1,
+  //         viewport,
+  //         type,
+  //         data,
+  //       },
+  //       meta
+  //     );
+  //   }
 
-    filterData &&
-      filterData.forEach((data) => {
-        queue.push(
-          {
-            priority: 1,
-            viewport,
-            type: DataTypes.FILTER_DATA,
-            data,
-          },
-          columnUtils.setFilterColumnMeta
-        );
-      });
-  }
+  //   filterData &&
+  //     filterData.forEach((data) => {
+  //       queue.push(
+  //         {
+  //           priority: 1,
+  //           viewport,
+  //           type: DataTypes.FILTER_DATA,
+  //           data,
+  //         },
+  //         columnUtils.setFilterColumnMeta
+  //       );
+  //     });
+  // }
 
   // A client update request is handled with a synchronous call to view.rows
-  update(options, queue) {
-    const { range, ...dataOptions } = options;
+  //   update(options, queue) {
+  //     const { range, ...dataOptions } = options;
 
-    queue.push({
-      priority: 1,
-      viewport: viewport,
-      type: "rowset",
-      tablename,
-      data: {
-        rows: view.rows(range, options),
-        size: view.size,
-        offset: view.offset,
-      },
-    });
-  }
+  //     queue.push({
+  //       priority: 1,
+  //       viewport: viewport,
+  //       type: "rowset",
+  //       tablename,
+  //       data: {
+  //         rows: view.rows(range, options),
+  //         size: view.size,
+  //         offset: view.offset,
+  //       },
+  //     });
+  //   }
 
-  cancel() {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-      timeoutHandle = null;
-    }
-    view.destroy();
-    view = null;
-  }
+  //   cancel() {
+  //     if (timeoutHandle) {
+  //       clearTimeout(timeoutHandle);
+  //       timeoutHandle = null;
+  //     }
+  //     view.destroy();
+  //     view = null;
+  //   }
 }
