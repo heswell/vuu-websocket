@@ -12,8 +12,8 @@
   "author": "heswell",
   "license": "Apache-2.0",
   "dependencies": {
-    "@vuu-ui/vuu-data-test": "0.8.67",
-    "@vuu-ui/vuu-utils": "0.8.67",
+    "@vuu-ui/vuu-data-test": "0.8.76",
+    "@vuu-ui/vuu-utils": "0.8.76",
     "bun": "1.1.13"
   }
 }

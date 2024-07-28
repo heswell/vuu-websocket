@@ -105,7 +105,8 @@ export const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
   session
 ) => {
   try {
-    const table = getTable(message.body.table);
+    const { table: vuuTable } = message.body;
+    const table = getTable(vuuTable);
     if (table.status === "ready") {
       const viewPortId = uuid();
       const subscription = new Subscription(
@@ -256,52 +257,8 @@ export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
 //   _subscriptions[request.viewport].update(request, queue);
 // }
 
-// export function filter(clientId, { viewport, filter, incremental, dataType }, queue) {
-//   _subscriptions[viewport].invoke('filter', queue, dataType, filter, dataType, incremental);
-// }
-
-// export function select(
-//   clientId,
-//   { viewport, idx, rangeSelect, keepExistingSelection, dataType },
-//   queue
-// ) {
-//   _subscriptions[viewport].invoke(
-//     "select",
-//     queue,
-//     DataType.Selected,
-//     idx,
-//     rangeSelect,
-//     keepExistingSelection,
-//     dataType
-//   );
-// }
-
-// export function selectAll(clientId, { viewport, dataType }, queue) {
-//   _subscriptions[viewport].invoke('selectAll', queue, DataType.Selected, dataType);
-// }
-
-// export function selectNone(clientId, { viewport, dataType }, queue) {
-//   _subscriptions[viewport].invoke('selectNone', queue, DataType.Selected, dataType);
-// }
-
-// export function groupBy(clientId, { viewport, groupBy }, queue) {
-//   _subscriptions[viewport].invoke('groupBy', queue, DataType.Snapshot, groupBy);
-// }
-
 // export function setGroupState(clientId, { viewport, groupState }, queue) {
 //   _subscriptions[viewport].invoke('setGroupState', queue, DataType.Rowset, groupState);
-// }
-
-// export function GetFilterData(clientId, { viewport, column, searchText, range }, queue) {
-//   // TODO what about range ?
-//   _subscriptions[viewport].invoke(
-//     'getFilterData',
-//     queue,
-//     DataType.FilterData,
-//     column,
-//     searchText,
-//     range
-//   );
 // }
 
 // export function InsertTableRow(clientId, request, queue) {

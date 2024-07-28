@@ -9,8 +9,8 @@
   "author": "heswell",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "0.8.72",
-    "@vuu-ui/vuu-protocol-types": "0.8.72"
+    "@vuu-ui/vuu-data-types": "0.8.76",
+    "@vuu-ui/vuu-protocol-types": "0.8.76"
   },
   "dependencies": {},
   "peerDependencies": {}

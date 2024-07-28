@@ -1,10 +1,5 @@
-import {
-  DataView as View,
-  DataTypes,
-  metaData,
-  ColumnMetaData,
-} from "@heswell/data";
-import { IMessageQueue, ISession } from "@heswell/server-types";
+import { DataView as View, metaData, ColumnMetaData } from "@heswell/data";
+import { ISession } from "@heswell/server-types";
 import {
   ClientToServerMessage,
   ClientToServerCreateViewPort,

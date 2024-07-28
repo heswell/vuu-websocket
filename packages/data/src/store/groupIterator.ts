@@ -1,18 +1,35 @@
-import { getCount } from './groupUtils.js';
+import { VuuRange } from "@vuu-ui/vuu-protocol-types";
+import { getCount } from "./groupUtils.js";
 import {
   compareRanges,
   getDeltaRange,
   getFullRange,
   NULL_RANGE,
-  RangeFlags
-} from './rangeUtils.js';
+  RangeFlags,
+} from "./rangeUtils.js";
+import { Row } from "./rowset/rowSet.js";
 
 const RANGE_POS_TUPLE_SIZE = 4;
 const NO_RESULT = [null, null, null];
 
-export const FORWARDS = 0;
-export const BACKWARDS = 1;
-export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, meta) {
+export interface IIterator {
+  direction: Direction;
+  rangePositions: any;
+  currentRange: () => [Row[], number];
+  setRange: (range: VuuRange, useDelta?: boolean) => [Row[], number];
+}
+
+type Direction = 0 | 1;
+export const FORWARDS: Direction = 0;
+export const BACKWARDS: Direction = 1;
+export function GroupIterator(
+  groups: Row[],
+  navSet: number[],
+  data: Row[],
+  NAV_IDX,
+  NAV_COUNT,
+  meta
+): IIterator {
   let _idx = 0;
   let _grpIdx = null;
   let _rowIdx = null;
@@ -35,7 +52,7 @@ export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, 
     getRangeIndexOfRow,
     setNavSet,
     refresh: currentRange,
-    clear
+    clear,
   };
 
   function getRangeIndexOfGroup(grpIdx) {
@@ -136,7 +153,7 @@ export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, 
     return [rows, startIdx + 1];
   }
 
-  function setRange(range, useDelta = true) {
+  function setRange(range: VuuRange, useDelta = true) {
     const rangeDiff = compareRanges(_range, range);
     const { lo: resultLo, hi: resultHi } = useDelta
       ? getDeltaRange(_range, range)
@@ -156,7 +173,9 @@ export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, 
       if (_direction === FORWARDS && rangeDiff & RangeFlags.BWD) {
         [_idx, _grpIdx, _rowIdx] = _range_positions;
       } else if (_direction === BACKWARDS && rangeDiff & RangeFlags.FWD) {
-        [_idx, _grpIdx, _rowIdx] = _range_positions.slice(-RANGE_POS_TUPLE_SIZE);
+        [_idx, _grpIdx, _rowIdx] = _range_positions.slice(
+          -RANGE_POS_TUPLE_SIZE
+        );
         _idx += 1;
       }
 
@@ -171,10 +190,14 @@ export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, 
       const loDiff = range.lo - _range.lo;
       const hiDiff = _range.hi - range.hi;
       // allow for a range that overshoots data
-      const missingQuota = _range.hi - _range.lo - _range_positions.length / RANGE_POS_TUPLE_SIZE;
+      const missingQuota =
+        _range.hi - _range.lo - _range_positions.length / RANGE_POS_TUPLE_SIZE;
 
       if (loDiff > 0) {
-        const removed = _range_positions.splice(0, loDiff * RANGE_POS_TUPLE_SIZE);
+        const removed = _range_positions.splice(
+          0,
+          loDiff * RANGE_POS_TUPLE_SIZE
+        );
         if (removed.length) {
           _range_position_lo = removed.slice(-RANGE_POS_TUPLE_SIZE);
 
@@ -292,7 +315,9 @@ export default function GroupIterator(groups, navSet, data, NAV_IDX, NAV_COUNT, 
       // the appropriate adjustment will be made nest time range is set
       if (rangeDiff & RangeFlags.FWD) {
         console.log(`adjust thye idx`);
-        [_idx, _grpIdx, _rowIdx] = _range_positions.slice(-RANGE_POS_TUPLE_SIZE);
+        [_idx, _grpIdx, _rowIdx] = _range_positions.slice(
+          -RANGE_POS_TUPLE_SIZE
+        );
         _idx += 1;
       } else {
         [_idx, _grpIdx, _rowIdx] = _range_positions;
@@ -342,7 +367,10 @@ function next(groups, rows, grpIdx, rowIdx, navSet, NAV_IDX, NAV_COUNT, meta) {
     grpIdx = -1;
     do {
       grpIdx += 1;
-    } while (grpIdx < groups.length && getCount(groups[grpIdx], NAV_COUNT) === 0);
+    } while (
+      grpIdx < groups.length &&
+      getCount(groups[grpIdx], NAV_COUNT) === 0
+    );
 
     if (grpIdx >= groups.length) {
       return NO_RESULT;
@@ -370,7 +398,10 @@ function next(groups, rows, grpIdx, rowIdx, navSet, NAV_IDX, NAV_COUNT, meta) {
     } else if (depth > 0) {
       do {
         grpIdx += 1;
-      } while (grpIdx < groups.length && getCount(groups[grpIdx], NAV_COUNT) === 0);
+      } while (
+        grpIdx < groups.length &&
+        getCount(groups[grpIdx], NAV_COUNT) === 0
+      );
       if (grpIdx >= groups.length) {
         return NO_RESULT;
       } else {
@@ -394,8 +425,21 @@ function next(groups, rows, grpIdx, rowIdx, navSet, NAV_IDX, NAV_COUNT, meta) {
   }
 }
 
-function previous(groups, data, grpIdx, rowIdx, navSet, NAV_IDX, NAV_COUNT, meta) {
-  if (grpIdx !== null && groups[grpIdx][meta.DEPTH] === 1 && typeof rowIdx === 'number') {
+function previous(
+  groups,
+  data,
+  grpIdx,
+  rowIdx,
+  navSet,
+  NAV_IDX,
+  NAV_COUNT,
+  meta
+) {
+  if (
+    grpIdx !== null &&
+    groups[grpIdx][meta.DEPTH] === 1 &&
+    typeof rowIdx === "number"
+  ) {
     let lastGroup = groups[grpIdx];
     if (rowIdx === 0) {
       return [lastGroup, grpIdx, null];

@@ -1,103 +1,108 @@
 import { TableColumn } from "@heswell/server-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
-import type { Filter } from "@vuu-ui/vuu-filter-types";
 import {
   ClientToServerChangeViewPort,
   VuuFilter,
   VuuGroupBy,
   VuuSort,
-  VuuSortCol,
 } from "@vuu-ui/vuu-protocol-types";
-import type { ColumnMap } from "@vuu-ui/vuu-utils";
+import {
+  isConfigChanged,
+  vanillaConfig,
+  type ColumnMap,
+} from "@vuu-ui/vuu-utils";
 import { buildColumnMap, toColumn } from "./columnUtils.ts";
 import { Range, resetRange } from "./rangeUtils.ts";
 import { DataResponse, GroupRowSet, RowSet } from "./rowset";
-import { sortHasChanged } from "./sortUtils.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
+import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
 
-export interface DataViewProps {
-  columns: (string | TableColumn)[];
-  sort: VuuSort;
-  groupBy: VuuGroupBy;
-  filterSpec: VuuFilter;
-}
+const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
 
 export default class DataView {
+  #config: WithFullConfig = vanillaConfig;
   #columnMap: ColumnMap;
-  private _columns: TableColumn[];
-  private _vuuFilter: VuuFilter;
-  private _filter: Filter | undefined;
-  private _groupBy: VuuGroupBy;
-  private _table: Table | undefined;
-  private rowSet: RowSet | GroupRowSet;
-  private _sortDefs: VuuSortCol[];
-  private _updateQueue: UpdateQueue | undefined;
+  #columns: TableColumn[];
+  #table: Table | undefined;
+  #updateQueue: UpdateQueue;
 
-  private filterRowSet: any;
+  private _vuuFilter: VuuFilter = EmptyFilter;
+  private rowSet: RowSet | GroupRowSet;
 
   constructor(
     table: Table,
-    props: DataViewProps,
+    config: DataSourceConfig,
     updateQueue = new UpdateQueue()
   ) {
-    const { columns, sort, groupBy, filterSpec = { filter: "" } } = props;
-    this._table = table;
-    this._vuuFilter = filterSpec;
-    this._groupBy = groupBy;
-    this._sortDefs = sort.sortDefs;
-    this._updateQueue = updateQueue;
+    this.#config = {
+      ...this.#config,
+      aggregations: config.aggregations || this.#config.aggregations,
+      columns: config.columns || this.#config.columns,
+      filterSpec: config.filterSpec || this.#config.filterSpec,
+      groupBy: config.groupBy || this.#config.groupBy,
+      sort: config.sort || this.#config.sort,
+      // visualLink: config.visualLink || this.#config.visualLink,
+    };
 
-    this._columns = columns.map(toColumn);
-    this.#columnMap = buildColumnMap(this._columns);
-    // column defs come from client, this is where we assign column keys
+    this.#table = table;
+    this.#updateQueue = updateQueue;
+    this.#columnMap = buildColumnMap(this.#config.columns);
+    this.#columns = this.#config.columns.map(toColumn);
 
     // TODO we should pass columns into the rowset as it will be needed for computed columns
-    this.rowSet = new RowSet(table, this._columns);
+    this.rowSet = new RowSet(table, this.columns);
     // Is one filterRowset enough, or should we manage one for each column ?
-    this.filterRowSet = null;
 
     // What if data is BOTH grouped and sorted ...
-    if (groupBy.length > 0) {
+    if (this.groupBy.length > 0) {
       // more efficient to compute this directly from the table projection
-      this.rowSet = new GroupRowSet(this.rowSet, this._columns, this._groupBy);
-    } else if (this._sortDefs.length > 0) {
-      this.rowSet.sort(this._sortDefs);
+      this.rowSet = new GroupRowSet(this.rowSet, this.columns, this.groupBy);
+    } else if (this.sortDefs.length > 0) {
+      this.rowSet.sort(this.sortDefs);
+    }
+
+    if (this.#config.filterSpec.filter) {
+      this.filter(this.#config.filterSpec);
     }
 
     table.on("rowUpdated", this.rowUpdated);
     table.on("rowInserted", this.rowInserted);
   }
 
-  // Set the columns from client
-  set columns(columns: string[]) {
-    this._columns = columns.map(toColumn);
-    this.#columnMap = buildColumnMap(this._columns);
+  destroy() {
+    this.#table?.removeListener("rowUpdated", this.rowUpdated);
+    this.#table?.removeListener("rowInserted", this.rowInserted);
+    this.rowSet.clear();
+    this.#table = undefined;
   }
 
-  destroy() {
-    this._table?.removeListener("rowUpdated", this.rowUpdated);
-    this._table?.removeListener("rowInserted", this.rowInserted);
-    this.rowSet.clear();
-    this._table = undefined;
-    this.filterRowSet = null;
-    this._updateQueue = undefined;
+  get columns() {
+    return this.#columns;
+  }
+  get hasFilter() {
+    return this.#config.filterSpec.filter !== "";
+  }
+  get groupBy() {
+    return this.#config.groupBy;
+  }
+  get sortDefs() {
+    return this.#config.sort.sortDefs;
   }
 
   get status() {
-    return this._table?.status;
+    return this.#table?.status;
   }
 
   get updates() {
     const {
-      _updateQueue,
       rowSet: { range },
     } = this;
     let results = {
-      updates: _updateQueue?.popAll(),
+      updates: this.#updateQueue.popAll(),
       range: {
-        lo: range.from,
-        hi: range.to,
+        from: range.from,
+        to: range.to,
       },
     };
     return results;
@@ -120,17 +125,17 @@ export default class DataView {
   };
 
   private rowUpdated: RowUpdateHandler = (idx, updates) => {
-    const { rowSet, _updateQueue } = this;
+    const { rowSet } = this;
     const result = rowSet.update(idx, updates);
 
     if (result) {
       if (rowSet instanceof RowSet) {
-        _updateQueue?.update(result);
-      } else {
+        this.#updateQueue.update(result);
+      } /* else {
         result.forEach((rowUpdate) => {
           _updateQueue?.update(rowUpdate);
         });
-      }
+      }*/
     }
   };
 
@@ -138,25 +143,21 @@ export default class DataView {
     return this.rowSet;
   }
 
-  private identifyViewportChanges(params: ClientToServerChangeViewPort) {
-    const { filterSpec, sort } = params;
-    const sortChanged = sortHasChanged(this._sortDefs, sort.sortDefs);
-    const filterChanged = this._vuuFilter.filter !== filterSpec.filter;
-
-    return {
-      filterChanged,
-      sortChanged,
-    };
-  }
-
   changeViewport(options: ClientToServerChangeViewPort): DataResponse {
-    const { sortChanged, filterChanged } =
-      this.identifyViewportChanges(options);
+    // console.log({ options, config: this.#config });
+    const { noChanges, ...otherChanges } = isConfigChanged(
+      this.#config,
+      options
+    );
 
-    if (sortChanged) {
-      return this.sort(options.sort.sortDefs);
-    } else if (filterChanged) {
+    console.log({ noChanges, otherChanges });
+
+    if (otherChanges.sortChanged) {
+      return this.sort(options.sort);
+    } else if (otherChanges.filterChanged) {
       return this.filter(options.filterSpec);
+    } else if (otherChanges.groupByChanged) {
+      this.group(options.groupBy);
     } else {
       return { rows: [], size: -1 };
     }
@@ -172,9 +173,12 @@ export default class DataView {
     return this.rowSet.select(selection);
   }
 
-  sort(sortDefs: VuuSortCol[]): DataResponse {
-    this._sortDefs = sortDefs;
-    this.rowSet.sort(sortDefs);
+  sort(sort: VuuSort): DataResponse {
+    this.#config = {
+      ...this.#config,
+      sort,
+    };
+    this.rowSet.sort(this.sortDefs);
     // assuming the only time we would not useDelta is when we want to reset ?
     return this.setRange(resetRange(this.rowSet.range), false);
   }
@@ -183,25 +187,26 @@ export default class DataView {
   // appropriate, to any active filterSet(s). However, if the filterset has been changed, e.g. selection
   // within a set, then filter applied here in consequence must not attempt to reset the same filterSet
   // that originates the change.
-  filter(vuuFilter: VuuFilter): DataResponse {
-    if (vuuFilter.filter === "") {
-      if (this._filter) {
+  filter(filterSpec: VuuFilter): DataResponse {
+    const { hasFilter } = this;
+    this.#config = {
+      ...this.#config,
+      filterSpec,
+    };
+
+    if (filterSpec.filter === "") {
+      if (hasFilter) {
         this.rowSet.clearFilter();
-        this._filter = undefined;
         this._vuuFilter = { filter: "" };
-        this.filterRowSet = undefined;
         return this.rowSet.setRange(resetRange(this.rowSet.range), false);
       }
     } else {
-      const filter = parseFilter(vuuFilter.filter);
-      this._vuuFilter = vuuFilter;
-      this._filter = filter;
+      const filterStruct = parseFilter(filterSpec.filter);
       //   let filterResultset;
-
       //   if (filter === null && _filter) {
       //     rowSet?.clearFilter();
       //   } else if (filter) {
-      this.rowSet.filter(filter);
+      this.rowSet.filter(filterStruct);
       //   } else {
       //     throw Error(`InMemoryView.filter setting null filter when we had no filter anyway`);
       //   }
@@ -242,16 +247,21 @@ export default class DataView {
 
   applyFilter() {}
 
-  groupBy(groupby: VuuGroupBy) {
-    // const {
-    //   rowSet,
-    //   _columns,
-    //   _groupState,
-    //   _sortDefs: _sortCriteria,
-    //   _groupBy,
-    // } = this;
+  group(groupby: VuuGroupBy) {
+    const {
+      rowSet,
+      // _columns,
+      // _groupState,
+      // _sortDefs: _sortCriteria,
+      // _groupBy,
+    } = this;
     // const { range: _range } = rowSet;
     // this._groupBy = groupby;
+
+    if (rowSet instanceof RowSet) {
+      this.rowSet = new GroupRowSet(rowSet, rowSet.columns, groupby);
+    }
+
     // if (groupby === null) {
     //   this.rowSet = RowSet.fromGroupRowSet(this.rowSet);
     // } else {
@@ -267,7 +277,7 @@ export default class DataView {
     //     (rowSet as GroupRowSet).groupBy(groupby);
     //   }
     // }
-    // return this.rowSet.setRange(_range, false);
+    return this.rowSet.setRange(resetRange(this.rowSet.range), false);
   }
 
   setGroupState() {

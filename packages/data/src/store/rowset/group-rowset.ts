@@ -1,7 +1,6 @@
-import { mapSortDefsToSortCriteria } from "../sortUtils.js";
+import { ASC, mapSortDefsToSortCriteria } from "../sortUtils.js";
 import { extendsExistingFilter } from "../filter.js";
-import { FilterPredicate } from "@vuu-ui/vuu-filter-parser";
-import GroupIterator from "../groupIterator.js";
+import { GroupIterator, IIterator } from "../groupIterator.js";
 import {
   adjustGroupIndices,
   adjustLeafIdxPointers,
@@ -18,61 +17,74 @@ import {
   groupbyExtendsExistingGroupby,
   groupbyReducesExistingGroupby,
   groupbySortReversed,
+  GroupedStruct,
   GroupIdxTracker,
   groupRows,
   incrementDepth,
   lowestIdxPointer,
+  mapGroupByToSortCriteria,
   SimpleTracker,
   splitGroupsAroundDoomedGroup,
 } from "../groupUtils.js";
 import { NULL_RANGE } from "../rangeUtils.js";
 import { sortBy, sortPosition } from "../sortUtils.js";
-import { ASC } from "../types.js";
-import { BaseRowSet } from "./rowSet.js";
+import { BaseRowSet, Row, RowSet } from "./rowSet.js";
+import { TableColumn } from "@heswell/server-types";
+import {
+  VuuAggregation,
+  VuuGroupBy,
+  VuuRange,
+} from "@vuu-ui/vuu-protocol-types";
+import { DataResponse } from "./IRowSet.js";
 
 const EMPTY_ARRAY = [];
 
 export class GroupRowSet extends BaseRowSet {
+  #groupBy: VuuGroupBy;
+  #aggregations: VuuAggregation[];
+  #currentLength = 0;
+  #groupRows: Row[];
+  #iter: IIterator;
+  // TODO do we really need this, what about SortSet
+  #groupSortSet: number[];
+  #rowParents: number[];
+
   constructor(
-    rowSet,
-    columns,
-    groupby,
-    sortCriteria = null,
+    rowSet: RowSet,
+    columns: TableColumn[],
+    groupBy: VuuGroupBy,
     filter = rowSet.currentFilter
   ) {
-    super(rowSet.table, columns, rowSet.baseOffset);
-    this.groupby = groupby;
-    this.groupState = groupState;
-    this.aggregations = [];
-    this.currentLength = 0; // TODO
-    this.groupRows = [];
+    super(rowSet.table, columns);
+    this.#groupBy = groupBy;
+    this.#aggregations = [];
+    this.#groupRows = [];
     this.aggregatedColumn = {};
+
+    this.range = rowSet.range;
 
     this.collapseChildGroups = this.collapseChildGroups.bind(this);
     this.countChildGroups = this.countChildGroups.bind(this);
 
-    columns.forEach((column) => {
-      if (column.aggregate) {
-        const key = rowSet.columnMap[column.name];
-        this.aggregations.push([key, column.aggregate]); // why ?
-        this.aggregatedColumn[key] = column.aggregate;
-      }
-    });
-    this.expandedByDefault = false;
-    this.sortCriteria =
-      Array.isArray(sortCriteria) && sortCriteria.length ? sortCriteria : null;
+    // columns.forEach((column) => {
+    //   if (column.aggregate) {
+    //     const key = rowSet.columnMap[column.name];
+    //     this.aggregations.push([key, column.aggregate]); // why ?
+    //     this.aggregatedColumn[key] = column.aggregate;
+    //   }
+    // });
 
     // can we lazily build the sortSet as we fetch data for the first time ?
-    this.sortSet = rowSet.data.map((d, i) => i);
+    this.#groupSortSet = rowSet.data.map((d, i) => i);
     // we will store an array of pointers to parent Groups.mirroring sequence of leaf rows
-    this.rowParents = Array(rowSet.data.length);
+    this.#rowParents = Array(rowSet.data.length);
 
-    this.applyGroupby(groupby);
+    this.applyGroupby(groupBy);
 
     const [navSet, IDX, COUNT] = this.selectNavigationSet(false);
-    // TODO roll the IDX and COUNT overrides into meta
-    this.iter = GroupIterator(
-      this.groupRows,
+    // // TODO roll the IDX and COUNT overrides into meta
+    this.#iter = GroupIterator(
+      this.#groupRows,
       navSet,
       this.data,
       IDX,
@@ -80,13 +92,20 @@ export class GroupRowSet extends BaseRowSet {
       this.meta
     );
 
-    if (filter) {
-      this.filter(filter);
-    }
+    // if (filter) {
+    //   this.filter(filter);
+    // }
+  }
+
+  selectNavigationSet(useFilter: boolean) {
+    const { COUNT, IDX_POINTER, FILTER_COUNT, NEXT_FILTER_IDX } = this.meta;
+    return useFilter
+      ? [this.filterSet, NEXT_FILTER_IDX, FILTER_COUNT]
+      : [this.#groupSortSet, IDX_POINTER, COUNT];
   }
 
   get length() {
-    return this.currentLength;
+    return this.#currentLength;
   }
   get first() {
     return this.data[0];
@@ -99,11 +118,11 @@ export class GroupRowSet extends BaseRowSet {
     return this.setRange(this.range, false);
   }
 
-  setRange(range, useDelta = true) {
+  setRange(range: VuuRange, useDelta = true): DataResponse {
     const [rowsInRange, idx] =
-      !useDelta && range.lo === this.range.lo && range.hi === this.range.hi
-        ? this.iter.currentRange()
-        : this.iter.setRange(range, useDelta);
+      !useDelta && range.from === this.range.from && range.to === this.range.to
+        ? this.#iter.currentRange()
+        : this.#iter.setRange(range, useDelta);
 
     const filterCount = this.filterSet && this.meta.FILTER_COUNT;
     const rows = rowsInRange.map((row, i) =>
@@ -112,10 +131,7 @@ export class GroupRowSet extends BaseRowSet {
     this.range = range;
     return {
       rows,
-      range,
       size: this.length,
-      offset: this.offset,
-      selectedIndices: this.selectedIndices,
     };
   }
 
@@ -134,25 +150,25 @@ export class GroupRowSet extends BaseRowSet {
     return dolly;
   }
 
-  applyGroupby(groupby, rows = this.data) {
+  applyGroupby(groupby: VuuGroupBy, rows = this.data) {
     const { columns } = this;
-    this.groupRows.length = 0;
-    const groupCols = mapSortDefsToSortCriteria(groupby, this.columnMap);
-    this.groupRows = groupRows(
+    this.#groupRows.length = 0;
+    const groupCols = mapGroupByToSortCriteria(groupby, this.columnMap);
+    this.#groupRows = groupRows(
       rows,
-      this.sortSet,
+      this.#groupSortSet,
       columns,
       this.columnMap,
       groupCols,
       {
-        groups: this.groupRows,
-        rowParents: this.rowParents,
+        groups: this.#groupRows,
+        rowParents: this.#rowParents,
       }
     );
-    this.currentLength = this.countVisibleRows(this.groupRows);
+    this.#currentLength = this.countVisibleRows(this.#groupRows);
   }
 
-  groupBy(groupby) {
+  groupBy(groupby: VuuGroupBy) {
     if (groupbySortReversed(groupby, this.groupby)) {
       this.sortGroupby(groupby);
     } else if (groupbyExtendsExistingGroupby(groupby, this.groupby)) {
@@ -651,22 +667,6 @@ export class GroupRowSet extends BaseRowSet {
     return -1;
   }
 
-  //TODO simple implementation first
-  toggleAll(isExpanded) {
-    const sign = isExpanded ? 1 : -1;
-    // iterate groupedRows and make every group row depth positive,
-    // Then visible rows is not going to be different from grouped rows
-    const { DEPTH } = this.meta;
-    const { groupRows: groups } = this;
-    this.expandedByDefault = isExpanded;
-    for (let i = 0, len = groups.length; i < len; i++) {
-      const depth = groups[i][DEPTH];
-      // if (depth !== 0) {
-      groups[i][DEPTH] = Math.abs(depth) * sign;
-      // }
-    }
-  }
-
   sortGroupby(groupby) {
     const { IDX, KEY, DEPTH, IDX_POINTER, PARENT_IDX } = this.meta;
     const { groupRows: groups } = this;
@@ -942,7 +942,7 @@ export class GroupRowSet extends BaseRowSet {
 
   // Note: this assumes no leaf rows visible. Is that always valid ?
   // NOt after removing a groupBy ! Not after a filter
-  countVisibleRows(groupRows, usingFilter = false) {
+  countVisibleRows(groupRows: Row[], usingFilter = false) {
     const { DEPTH, COUNT, FILTER_COUNT } = this.meta;
     let count = 0;
     for (let i = 0, len = groupRows.length; i < len; i++) {
@@ -950,13 +950,18 @@ export class GroupRowSet extends BaseRowSet {
       if (!zeroCount) {
         count += 1;
       }
-      const depth = groupRows[i][DEPTH];
+      const depth = groupRows[i][DEPTH] as number;
       if (depth < 0 || zeroCount) {
-        while (i < len - 1 && Math.abs(groupRows[i + 1][DEPTH]) < -depth) {
+        while (
+          i < len - 1 &&
+          Math.abs(groupRows[i + 1][DEPTH] as number) < -depth
+        ) {
           i += 1;
         }
       } else if (depth === 1) {
-        count += usingFilter ? groupRows[i][FILTER_COUNT] : groupRows[i][COUNT];
+        count += usingFilter
+          ? (groupRows[i][FILTER_COUNT] as number)
+          : (groupRows[i][COUNT] as number);
       }
     }
     return count;

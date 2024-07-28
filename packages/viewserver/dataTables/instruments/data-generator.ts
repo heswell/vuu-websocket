@@ -12,7 +12,7 @@ function random(min: number, max: number) {
 }
 
 // const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
-const chars = Array.from("ABCDEFGHIJKLM");
+const chars = Array.from("ABCDEFGHIJK");
 const suffixes = ["L", "N", "OQ", "AS", "PA", "MI", "FR", "AT"];
 const locations: Record<string, [string, string]> = {
   L: ["London PLC", "XLON/LSE-SETS"],

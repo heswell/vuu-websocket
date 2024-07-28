@@ -1,14 +1,33 @@
-import { metaData } from './columnUtils.js';
-import { GROUP_ROW_TEST, sortBy, sortPosition } from './sortUtils.js';
-import { ASC } from './types.js';
+import {
+  VuuDataRow,
+  VuuGroupBy,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
+import { metaData } from "./columnUtils.ts";
+import {
+  ASC,
+  GROUP_ROW_TEST,
+  sortBy,
+  SortCriteria,
+  sortPosition,
+  SortSet,
+} from "./sortUtils.ts";
+import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { Row } from "./rowset/rowSet.ts";
+import { TableColumn } from "@heswell/server-types";
 
 const LEAF_DEPTH = 0;
 const DEFAULT_OPTIONS = {
   startIdx: 0,
   rootIdx: null,
   rootExpanded: true,
-  baseGroupby: []
+  baseGroupby: [],
 };
+
+export const mapGroupByToSortCriteria = (
+  groupBy: VuuGroupBy,
+  columnMap: ColumnMap
+): SortCriteria => groupBy.map((column) => [columnMap[column], ASC]);
 
 export function lowestIdxPointer(groups, IDX, DEPTH, start, depth) {
   let result = Number.MAX_SAFE_INTEGER;
@@ -20,7 +39,7 @@ export function lowestIdxPointer(groups, IDX, DEPTH, start, depth) {
       break;
     } else if (absDepth === depth) {
       const idx = group[IDX];
-      if (typeof idx === 'number' && idx < result) {
+      if (typeof idx === "number" && idx < result) {
         result = idx;
       }
     }
@@ -30,23 +49,29 @@ export function lowestIdxPointer(groups, IDX, DEPTH, start, depth) {
 }
 
 export function getCount(groupRow, PRIMARY_COUNT, FALLBACK_COUNT) {
-  return typeof groupRow[PRIMARY_COUNT] === 'number'
+  return typeof groupRow[PRIMARY_COUNT] === "number"
     ? groupRow[PRIMARY_COUNT]
     : groupRow[FALLBACK_COUNT];
 }
 
+export type TrackedLevel = {
+  key: string | null;
+  pos: number | null;
+  pPos: number | null;
+};
 export class SimpleTracker {
-  constructor(levels) {
-    this.levels = Array(levels)
+  #levels: Record<number, TrackedLevel>;
+  constructor(levels: number) {
+    this.#levels = Array(levels)
       .fill(0)
       .reduce((acc, el, i) => {
         acc[i + 1] = { key: null, pos: null, pPos: null };
         return acc;
       }, {});
   }
-  set(depth, pos, groupKey) {
-    if (this.levels) {
-      const level = this.levels[Math.abs(depth)];
+  set(depth: number, pos: number, groupKey: string) {
+    if (this.#levels) {
+      const level = this.#levels[Math.abs(depth)];
       if (level && level.key !== groupKey) {
         if (level.key !== null) {
           level.pPos = level.pos;
@@ -57,28 +82,32 @@ export class SimpleTracker {
     }
   }
 
-  hasParentPos(level) {
-    return this.levels[level + 1] && this.levels[level + 1].pos !== null;
+  hasParentPos(level: number) {
+    return this.#levels[level + 1] && this.#levels[level + 1].pos !== null;
   }
 
-  parentPos(level) {
-    return this.levels[level + 1].pos;
+  parentPos(level: number) {
+    return this.#levels[level + 1].pos;
   }
 
-  hasPreviousPos(level) {
-    return this.levels[level] && this.levels[level].pPos !== null;
+  hasPreviousPos(level: number) {
+    return this.#levels[level] && this.#levels[level].pPos !== null;
   }
 
-  previousPos(level) {
-    return this.levels[level].pPos;
+  previousPos(level: number) {
+    return this.#levels[level].pPos;
   }
 }
 
 export class GroupIdxTracker {
-  constructor(levels) {
-    this.idxAdjustment = 0;
-    this.maxLevel = levels + 1;
-    this.levels =
+  #levels: Record<number, TrackedLevel>;
+  #idxAdjustment: number;
+  #maxLevel: number;
+
+  constructor(levels: number) {
+    this.#idxAdjustment = 0;
+    this.#maxLevel = levels + 1;
+    this.#levels =
       levels > 0
         ? Array(levels)
             .fill(0)
@@ -89,30 +118,32 @@ export class GroupIdxTracker {
         : null;
   }
 
-  increment(count) {
-    this.idxAdjustment += count;
-    if (this.levels) {
-      for (let i = 2; i < this.maxLevel + 1; i++) {
-        this.levels[i].current += count;
+  increment(count: number) {
+    this.#idxAdjustment += count;
+    if (this.#levels) {
+      for (let i = 2; i < this.#maxLevel + 1; i++) {
+        this.#levels[i].current += count;
       }
     }
   }
 
-  previous(level) {
-    return (this.levels && this.levels[level] && this.levels[level].previous) || 0;
+  previous(level: number) {
+    return (
+      (this.#levels && this.#levels[level] && this.#levels[level].previous) || 0
+    );
   }
 
-  hasPrevious(level) {
+  hasPrevious(level: number) {
     return this.previous(level) > 0;
   }
 
-  get(idx) {
-    return this.levels === null ? null : this.levels[idx];
+  get(idx: number) {
+    return this.#levels === null ? null : this.#levels[idx];
   }
 
-  set(depth, groupKey) {
-    if (this.levels) {
-      const level = this.levels[depth];
+  set(depth: number, groupKey: string) {
+    if (this.#levels) {
+      const level = this.#levels[depth];
       if (level && level.key !== groupKey) {
         if (level.key !== null) {
           level.previous += level.current;
@@ -127,8 +158,8 @@ export class GroupIdxTracker {
 const itemIsNumeric = (item) => !isNaN(parseInt(item, 10));
 const numerically = (a, b) => parseInt(a) - parseInt(b);
 
-function sortKeys(o) {
-  const keys = Object.keys(o);
+function sortKeys(groupedStruct: GroupedStruct) {
+  const keys = Object.keys(groupedStruct);
   if (keys.every(itemIsNumeric)) {
     return keys.sort(numerically);
   } else {
@@ -137,25 +168,27 @@ function sortKeys(o) {
 }
 
 export function fillNavSetsFromGroups(
-  groups,
-  sortSet,
+  groupedStruct: GroupedStruct,
+  sortSet: number[],
   sortIdx = 0,
-  filterSet = null,
-  filterIdx,
-  filterLen
+  filterSet: number[] | undefined | null = null,
+  filterIdx = -1,
+  filterLen = -1
 ) {
-  const keys = sortKeys(groups);
+  const keys = sortKeys(groupedStruct);
   const filtered = filterSet !== null;
-  const filterIndices = filtered ? filterSet.slice(filterIdx, filterLen) : null;
-  for (let i = 0; i < keys.length; i++) {
-    const groupedRows = groups[keys[i]];
+  const filterIndices = filtered
+    ? filterSet?.slice(filterIdx, filterLen)
+    : null;
+  for (const key of keys) {
+    const groupedRows = groupedStruct[key];
     if (Array.isArray(groupedRows)) {
-      for (let j = 0, len = groupedRows.length; j < len; j++) {
-        const rowIdx = groupedRows[j];
+      // we have leaf level rows
+      for (const rowIdx of groupedRows) {
         sortSet[sortIdx] = rowIdx;
         sortIdx += 1;
         // this could be prohibitively slow (the includes test) ...
-        if (filtered && filterIndices.includes(rowIdx)) {
+        if (filtered && filterIndices?.includes(rowIdx)) {
           filterSet[filterIdx] = rowIdx;
           filterIdx += 1;
         }
@@ -168,7 +201,14 @@ export function fillNavSetsFromGroups(
 }
 
 // WHY is param order different from groupLeafRows
-export function groupRows(rows, sortSet, columns, columnMap, groupby, options = DEFAULT_OPTIONS) {
+export function groupRows(
+  rows: Row[],
+  sortSet: number[],
+  columns: TableColumn[],
+  columnMap: ColumnMap,
+  groupby: SortCriteria,
+  options: any = DEFAULT_OPTIONS
+) {
   const {
     startIdx = 0,
     length = rows.length,
@@ -178,13 +218,26 @@ export function groupRows(rows, sortSet, columns, columnMap, groupby, options = 
     rowParents = null,
     filterLength,
     filterSet,
-    filterFn: filter
+    filterFn: filter,
   } = options;
   let { groupIdx = -1, filterIdx } = options;
 
   const aggregations = findAggregatedColumns(columns, columnMap, groupby);
-  const groupedLeafRows = groupLeafRows(sortSet, rows, groupby, startIdx, length);
-  fillNavSetsFromGroups(groupedLeafRows, sortSet, startIdx, filterSet, filterIdx, filterLength);
+  const groupedLeafRows = groupLeafRows(
+    sortSet,
+    rows as (string | number)[][],
+    groupby,
+    startIdx,
+    length
+  );
+  fillNavSetsFromGroups(
+    groupedLeafRows,
+    sortSet,
+    startIdx,
+    filterSet,
+    filterIdx,
+    filterLength
+  );
 
   const levels = groupby.length;
   const currentGroups = Array(levels).fill(null);
@@ -208,8 +261,21 @@ export function groupRows(rows, sortSet, columns, columnMap, groupby, options = 
           // as soon as we know we're regrouping, aggregate the open groups, in reverse order
           for (let ii = levels - 1; ii >= level; ii--) {
             const group = currentGroups[ii];
-            aggregate(group, groups, sortSet, rows, columns, aggregations, leafCount, filter);
-            if (filterSet && Math.abs(group[DEPTH]) === 1 && group[FILTER_COUNT] > 0) {
+            aggregate(
+              group,
+              groups,
+              sortSet,
+              rows,
+              columns,
+              aggregations,
+              leafCount,
+              filter
+            );
+            if (
+              filterSet &&
+              Math.abs(group[DEPTH]) === 1 &&
+              group[FILTER_COUNT] > 0
+            ) {
               group[NEXT_FILTER_IDX] = filterIdx;
               filterIdx += group[FILTER_COUNT];
             }
@@ -247,8 +313,21 @@ export function groupRows(rows, sortSet, columns, columnMap, groupby, options = 
   for (let i = levels - 1; i >= 0; i--) {
     if (currentGroups[i] !== null) {
       const group = currentGroups[i];
-      aggregate(group, groups, sortSet, rows, columns, aggregations, leafCount, filter);
-      if (filterSet && Math.abs(group[DEPTH]) === 1 && group[FILTER_COUNT] > 0) {
+      aggregate(
+        group,
+        groups,
+        sortSet,
+        rows,
+        columns,
+        aggregations,
+        leafCount,
+        filter
+      );
+      if (
+        filterSet &&
+        Math.abs(group[DEPTH]) === 1 &&
+        group[FILTER_COUNT] > 0
+      ) {
         group[NEXT_FILTER_IDX] = filterIdx;
       }
     }
@@ -313,7 +392,7 @@ const EMPTY = {};
 export function getGroupStateChanges(
   groupState,
   existingGroupState = null,
-  baseKey = '',
+  baseKey = "",
   groupIdx = 0
 ) {
   const results = [];
@@ -322,8 +401,17 @@ export function getGroupStateChanges(
   entries.forEach(([key, value]) => {
     if (value && (existingGroupState === null || !existingGroupState[key])) {
       results.push([baseKey + key, groupIdx, true]);
-      if (value !== null && typeof value === 'object' && Object.keys(value).length > 0) {
-        const diff = getGroupStateChanges(value, EMPTY, baseKey + key + '/', groupIdx + 1);
+      if (
+        value !== null &&
+        typeof value === "object" &&
+        Object.keys(value).length > 0
+      ) {
+        const diff = getGroupStateChanges(
+          value,
+          EMPTY,
+          baseKey + key + "/",
+          groupIdx + 1
+        );
         if (diff.length) {
           results.push(...diff);
         }
@@ -332,7 +420,7 @@ export function getGroupStateChanges(
       const diff = getGroupStateChanges(
         value,
         existingGroupState[key],
-        baseKey + key + '/',
+        baseKey + key + "/",
         groupIdx + 1
       );
       if (diff.length) {
@@ -341,7 +429,7 @@ export function getGroupStateChanges(
     }
   });
 
-  if (existingGroupState !== null && typeof existingGroupState === 'object') {
+  if (existingGroupState !== null && typeof existingGroupState === "object") {
     Object.entries(existingGroupState).forEach(([key, value]) => {
       if (value && !groupState[key]) {
         results.push([baseKey + key, groupIdx, false]);
@@ -359,7 +447,10 @@ export function getDirection(depth, groupby) {
 }
 
 // should be called toggleColumnInGroupBy
-export function updateGroupBy(existingGroupBy = null, column /*, replace = false*/) {
+export function updateGroupBy(
+  existingGroupBy = null,
+  column /*, replace = false*/
+) {
   console.log(``);
   if (existingGroupBy === null) {
     return [[column.name, ASC]];
@@ -501,7 +592,10 @@ export function adjustLeafIdxPointers(
   adjustment = 1
 ) {
   for (let i = 0; i < groups.length; i++) {
-    if (Math.abs(groups[i][DEPTH]) === 1 && groups[i][IDX_POINTER] >= insertionPoint) {
+    if (
+      Math.abs(groups[i][DEPTH]) === 1 &&
+      groups[i][IDX_POINTER] >= insertionPoint
+    ) {
       groups[i][IDX_POINTER] += adjustment;
     }
   }
@@ -512,7 +606,7 @@ export function findGroupPositions(groups, groupby, row) {
 
   out: for (let i = 0; i < groupby.length; i++) {
     const sorter = sortBy(groupby.slice(0, i + 1), GROUP_ROW_TEST);
-    const position = sortPosition(groups, sorter, row, 'first-available');
+    const position = sortPosition(groups, sorter, row, "first-available");
     const group = groups[position];
     // if all groups are missing and insert position is end of list ...
     if (group === undefined) {
@@ -547,25 +641,34 @@ export const expandRow = (groupCols, row, meta) => {
   return r;
 };
 
-function buildGroupKey(groupby, row) {
+function buildGroupKey(groupby: SortCriteria, row) {
   const extractKey = ([idx]) => row[idx];
-  return groupby.map(extractKey).join('/');
+  return groupby.map(extractKey).join("/");
 }
 
 // Do we have to take columnMap out again ?
 export function GroupRow(
-  row,
-  depth,
-  idx,
-  childIdx,
-  parentIdx,
-  groupby,
-  columns,
-  columnMap,
+  row: Row,
+  depth: number,
+  idx: number,
+  childIdx: number,
+  parentIdx: number,
+  groupby: SortCriteria,
+  columns: TableColumn[],
+  columnMap: ColumnMap,
   baseGroupby = []
 ) {
-  const { IDX, RENDER_IDX, DEPTH, COUNT, KEY, SELECTED, PARENT_IDX, IDX_POINTER, count } =
-    metaData(columns);
+  const {
+    IDX,
+    RENDER_IDX,
+    DEPTH,
+    COUNT,
+    KEY,
+    SELECTED,
+    PARENT_IDX,
+    IDX_POINTER,
+    count,
+  } = metaData(columns);
   const group = Array(count);
   const groupIdx = groupby.length - depth;
   let colIdx;
@@ -576,7 +679,10 @@ export function GroupRow(
     if (column.aggregate) {
       // implies we can't group on aggregate columns, does the UI know that ?
       group[key] = 0;
-    } else if ((colIdx = indexOfCol(key, groupby)) !== -1 && colIdx <= groupIdx) {
+    } else if (
+      (colIdx = indexOfCol(key, groupby)) !== -1 &&
+      colIdx <= groupIdx
+    ) {
       group[key] = row[key];
     } else {
       group[key] = null;
@@ -589,9 +695,9 @@ export function GroupRow(
   }
 
   const extractKey = ([idx]) => row[idx];
-  const buildKey = (groupby) => groupby.map(extractKey).join('/');
+  const buildKey = (groupby) => groupby.map(extractKey).join("/");
   //TODO build the composite key for the grouprow
-  const baseKey = baseGroupby.length > 0 ? buildKey(baseGroupby) + '/' : '';
+  const baseKey = baseGroupby.length > 0 ? buildKey(baseGroupby) + "/" : "";
   const groupKey = buildKey(groupby.slice(0, groupIdx + 1));
 
   group[IDX] = idx;
@@ -606,32 +712,56 @@ export function GroupRow(
   return group;
 }
 
-export function groupLeafRows(sortSet, leafRows, groupby, startIdx = 0, length = sortSet.length) {
-  const groups = {};
+type TreeNode<T> = {
+  value: T;
+  left?: TreeNode<T>;
+  right?: TreeNode<T>;
+};
+
+export type LeafEntry = number[];
+export type GroupEntry = GroupedStruct | LeafEntry;
+export type GroupedStruct = {
+  [key: string | number]: GroupEntry;
+};
+
+const isLeafLevelEntry = (
+  groupEntry: GroupEntry,
+  level: number,
+  leafLevel: number
+): groupEntry is LeafEntry => Array.isArray(groupEntry) && level === leafLevel;
+
+export function groupLeafRows(
+  sortSet: number[],
+  leafRows: Array<(number | string)[]>,
+  groupby: SortCriteria,
+  startIdx = 0,
+  length = sortSet.length
+) {
+  const groupedSet: GroupedStruct = {};
   const levels = groupby.length;
-  const lastLevel = levels - 1;
+  const leafLevel = levels - 1;
+  // for each row ...
   for (let i = startIdx, len = startIdx + length; i < len; i++) {
     const idx = sortSet[i];
     const leafRow = leafRows[idx];
-    let target = groups;
-    let targetKey;
-    let key;
+    let target = groupedSet;
+    let groupEntry: GroupEntry;
+    // ... and each level of grouping ...
     for (let level = 0; level < levels; level++) {
-      const [colIdx] = groupby[level];
-      key = leafRow[colIdx];
-      targetKey = target[key];
-      if (targetKey && level === lastLevel) {
-        targetKey.push(idx);
-      } else if (targetKey) {
-        target = targetKey;
-      } else if (!targetKey && level < lastLevel) {
-        target = target[key] = {};
-      } else if (!targetKey) {
-        target[key] = [idx];
+      const groupValue = leafRow[groupby[level][0]];
+      groupEntry = target[groupValue];
+      if (isLeafLevelEntry(groupEntry, level, leafLevel)) {
+        groupEntry.push(idx);
+      } else if (groupEntry) {
+        target = groupEntry;
+      } else if (!groupEntry && level < leafLevel) {
+        target = target[groupValue] = {};
+      } else if (!groupEntry) {
+        target[groupValue] = [idx];
       }
     }
   }
-  return groups;
+  return groupedSet;
 }
 
 export function splitGroupsAroundDoomedGroup(groupby, doomed) {
@@ -665,7 +795,7 @@ export function indexGroupedRows(groupedRows) {
   // TODO
   const Fields = {
     Depth: 1,
-    Key: 4
+    Key: 4,
   };
 
   const groupedIndex = {};
@@ -683,7 +813,10 @@ export function indexGroupedRows(groupedRows) {
       });
       groupedIndex[row[Fields.Key]] = index;
     } else {
-      while (levels.length && Math.abs(levels[levels.length - 1][0]) <= Math.abs(rowDepth)) {
+      while (
+        levels.length &&
+        Math.abs(levels[levels.length - 1][0]) <= Math.abs(rowDepth)
+      ) {
         levels.pop();
       }
       levels.push([rowDepth, idx]);
@@ -703,7 +836,14 @@ export function findAggregatedColumns(columns, columnMap, groupby) {
   }, []);
 }
 
-export function aggregateGroup(groups, grpIdx, sortSet, rows, columns, aggregations) {
+export function aggregateGroup(
+  groups,
+  grpIdx,
+  sortSet,
+  rows,
+  columns,
+  aggregations
+) {
   const { DEPTH, COUNT } = metaData(columns);
   const groupRow = groups[grpIdx];
   let depth = groupRow[DEPTH];
@@ -713,7 +853,10 @@ export function aggregateGroup(groups, grpIdx, sortSet, rows, columns, aggregati
 
   // find the last nested group and work back - first build aggregates for level 1 groups,
   // then use those to aggregate to level 2 etc.
-  while (idx < groups.length - 1 && Math.abs(groups[idx + 1][DEPTH]) < absDepth) {
+  while (
+    idx < groups.length - 1 &&
+    Math.abs(groups[idx + 1][DEPTH]) < absDepth
+  ) {
     idx += 1;
     count += 1;
   }
@@ -723,7 +866,15 @@ export function aggregateGroup(groups, grpIdx, sortSet, rows, columns, aggregati
       const [colIdx] = aggregations[aggIdx];
       groups[i][colIdx] = 0;
     }
-    aggregate(groups[i], groups, sortSet, rows, columns, aggregations, groups[i][COUNT]);
+    aggregate(
+      groups[i],
+      groups,
+      sortSet,
+      rows,
+      columns,
+      aggregations,
+      groups[i][COUNT]
+    );
   }
 }
 
@@ -776,7 +927,7 @@ function aggregate(
       } else if (absNestedRowDepth === absDepth - 1) {
         for (let aggIdx = 0; aggIdx < aggregations.length; aggIdx++) {
           const [colIdx, method] = aggregations[aggIdx];
-          if (method === 'avg') {
+          if (method === "avg") {
             groupRow[colIdx] += nestedGroupRow[colIdx] * nestedRowCount;
           } else {
             groupRow[colIdx] += nestedGroupRow[colIdx];
@@ -789,7 +940,7 @@ function aggregate(
 
   for (let aggIdx = 0; aggIdx < aggregations.length; aggIdx++) {
     const [colIdx, method] = aggregations[aggIdx];
-    if (method === 'avg') {
+    if (method === "avg") {
       groupRow[colIdx] = groupRow[colIdx] / count;
     }
   }

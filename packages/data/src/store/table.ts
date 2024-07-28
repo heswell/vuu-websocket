@@ -10,8 +10,12 @@ const defaultUpdateConfig: TableUpdateOptions = {
   updateInterval: 500,
 };
 
+export type UpdateTuples = VuuRowDataItemType[];
 export type RowInsertHandler = (rowIndex: number, row: unknown) => void;
-export type RowUpdateHandler = (rowIndex: number, results: unknown) => void;
+export type RowUpdateHandler = (
+  rowIndex: number,
+  results: UpdateTuples
+) => void;
 export type RowRemovedHandler = (tableName: string, key: string) => void;
 export type TableReadyHandler = () => void;
 

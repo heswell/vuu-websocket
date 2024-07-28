@@ -56,55 +56,71 @@ console.log(`${rows.length} rows of ${size}`);
 console.table(rows);
 
 console.log(
-  "%c--------- select row [4]    ---------",
+  "%c--------- group by currency     ---------",
   "color:green;font-weight:bold;font-size: large;"
 );
-({ rows, size } = view.select([4]));
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-
-console.log(
-  "%c--------- sort by lotSize    ---------",
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.sort([{ column: "lotSize", sortType: "A" }]));
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-
-console.log(
-  "%c--------- filter currency = USD    ---------",
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.filter({ filter: 'currency = "USD"' }));
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-
-console.log(
-  "%c--------- reverse sort ---------",
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.sort([{ column: "lotSize", sortType: "D" }]));
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-
-console.log(
-  "%c--------- select row [0] ---------",
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.select([0]));
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-
-console.log(
-  "%c--------- reverse sort again -------",
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.sort([{ column: "lotSize", sortType: "A" }]));
+({ rows, size } = view.group(["currency"]));
 console.log(`${rows.length} rows of ${size}`);
 console.table(rows);
 
 if (false) {
-  ({ rows, size } = view.sort([{ column: "lotSize", sortType: "A" }]));
+  console.log(
+    "%c--------- select row [4]    ---------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.select([4]));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  console.log(
+    "%c--------- sort by lotSize    ---------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.sort({
+    sortDefs: [{ column: "lotSize", sortType: "A" }],
+  }));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  console.log(
+    "%c--------- filter currency = USD    ---------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.filter({ filter: 'currency = "USD"' }));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  console.log(
+    "%c--------- reverse sort ---------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.sort({
+    sortDefs: [{ column: "lotSize", sortType: "D" }],
+  }));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  console.log(
+    "%c--------- select row [0] ---------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.select([0]));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  console.log(
+    "%c--------- reverse sort again -------",
+    "color:green;font-weight:bold;font-size: large;"
+  );
+  ({ rows, size } = view.sort({
+    sortDefs: [{ column: "lotSize", sortType: "A" }],
+  }));
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+
+  ({ rows, size } = view.sort({
+    sortDefs: [{ column: "lotSize", sortType: "A" }],
+  }));
   console.log(`${rows.length} rows of ${size}`);
   console.table(rows);
 
