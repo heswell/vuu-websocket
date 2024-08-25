@@ -4,12 +4,11 @@
 import { TableColumn } from "@heswell/server-types";
 import { Filter } from "@vuu-ui/vuu-filter-types";
 import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
-import {
+import type {
   VuuDataRow,
-  VuuRowDataItemType,
+  VuuRow,
   VuuSortCol,
 } from "@vuu-ui/vuu-protocol-types";
-import { ColumnMap } from "@vuu-ui/vuu-utils";
 import {
   ColumnMetaData,
   MultiRowProjectorFactory,
@@ -38,10 +37,9 @@ import {
   sortRemoved,
   sortReversed,
 } from "../sortUtils.ts";
-import { Table, UpdateTuples } from "../table.ts";
-import { DataResponse, IRowSet } from "./IRowSet.ts";
+import { Table, TableIndex, UpdateTuples } from "../table.ts";
+import { DataResponse } from "./IRowSet.ts";
 import { identifySelectionChanges } from "../selectionUtils.ts";
-import { DataSourceRow } from "@vuu-ui/vuu-data-types";
 
 const SINGLE_COLUMN = 1;
 
@@ -51,22 +49,20 @@ const NO_OPTIONS = {
 
 const NULL_SORTSET: SortSet = [[-1, -1, -1]];
 
-export type Row = VuuRowDataItemType[];
-
-export abstract class BaseRowSet implements IRowSet {
+export abstract class BaseRowSet {
+  protected viewportId: string;
+  protected _table: Table;
   public range: Range = NULL_RANGE;
   public currentFilter: Filter | undefined;
-  public table: Table;
-  public data: Row[];
 
-  protected columnMap: ColumnMap;
+  /** filterSet is an array of index positions into the sortSet */
   protected filterSet: number[] | undefined;
   protected meta: ColumnMetaData;
   /** key values of selected rows   */
   protected selected: string[] = [];
   protected sortSet: SortSet = NULL_SORTSET;
   protected sortCols: VuuSortCol[] | undefined;
-  protected sortKeyMap: Map<string, number> = new Map();
+  protected sortedIndex: TableIndex = new Map();
   protected filterKeyMap: Map<string, number> = new Map();
 
   public columns: TableColumn[];
@@ -75,30 +71,23 @@ export abstract class BaseRowSet implements IRowSet {
     throw Error("project method must be implemented");
   };
 
-  constructor(table: Table, columns: TableColumn[]) {
-    this.table = table;
+  constructor(viewportId: string, table: Table, columns: TableColumn[]) {
+    this.viewportId = viewportId;
+    this._table = table;
     this.columns = columns;
-    this.columnMap = table.columnMap;
     this.meta = metaData(columns);
-    this.data = table.rows;
   }
 
-  // used by binned rowset
-  get filteredData() {
-    if (this.filterSet) {
-      return this.filterSet;
-    } else {
-      const { IDX } = this.meta;
-      return this.data.map((row: Row) => row[IDX]);
-    }
+  get table() {
+    return this._table;
   }
 
   protected get keyMap() {
-    return this.filterSet ? this.filterKeyMap : this.sortKeyMap;
+    return this.filterSet ? this.filterKeyMap : this.sortedIndex;
   }
 
   get totalRowCount() {
-    return this.data.length;
+    return this.table.rows.length;
   }
 
   get selectedRowCount() {
@@ -113,10 +102,164 @@ export abstract class BaseRowSet implements IRowSet {
 
   abstract sort(sortDefs: VuuSortCol[]): void;
 
-  abstract slice(from: number, to: number): VuuDataRow[];
-
   clear() {
     console.log("clear rowset");
+  }
+
+  protected get indexOfKeyField() {
+    return this.table.columnMap[this.table.schema.key];
+  }
+
+  // selected are the index positions of rows as presented to the user. That
+  // means they refer to positions within the current indexSet. We will store
+  // them as positions within the underlying table, which never change.
+  // Note: deletions from the underlying table will have to be dealt with.
+
+  private selectedIndicesToKeyValues = (selectedIndices: number[]) => {
+    const {
+      filterSet,
+      sortSet,
+      table: { columnMap, rows, schema },
+    } = this;
+    const indexOfKeyField = columnMap[schema.key];
+    if (filterSet) {
+      return selectedIndices.map((idx) => {
+        const sortSetIndex = filterSet[idx];
+        const [rowIndex] = sortSet[sortSetIndex];
+        return rows[rowIndex][indexOfKeyField] as string;
+      });
+    } else {
+      return selectedIndices.map(
+        (idx) => rows[sortSet[idx][0]][indexOfKeyField] as string
+      );
+    }
+  };
+
+  select(selected: number[]): DataResponse {
+    const {
+      filterKeyMap,
+      filterSet,
+      range,
+      size,
+      sortedIndex: sortKeyMap,
+      sortSet,
+    } = this;
+    const { columnMap, rows } = this._table;
+
+    const selectedKeyValues = this.selectedIndicesToKeyValues(selected);
+
+    const { from, to } = range;
+    const [newSelected, deselected] = identifySelectionChanges(
+      this.selected,
+      selectedKeyValues
+    );
+    this.selected = selectedKeyValues;
+    const keyMap = filterSet ? filterKeyMap : sortKeyMap;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const keyFieldIndex = columnMap[this.table.schema.key];
+
+    const updatedRows: VuuRow[] = [];
+    const projectRow = projectColumn(
+      keyFieldIndex,
+      this.viewportId,
+      selectedKeyValues,
+      this.sortedIndex,
+      this.totalRowCount
+    );
+
+    for (const key of newSelected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(rows[rowIndex]));
+      }
+    }
+
+    for (const key of deselected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(rows[rowIndex]));
+      }
+    }
+
+    return {
+      rows: updatedRows,
+      size,
+    };
+  }
+}
+
+export class RowSet extends BaseRowSet {
+  // TODO stream as above
+  // static fromGroupRowSet({ table, columns, currentFilter: filter }) {
+  //   return new RowSet(table, columns, {
+  //     filter,
+  //   });
+  // }
+  //TODO consolidate API of rowSet, groupRowset
+  constructor(
+    viewportId: string,
+    table: Table,
+    columns: TableColumn[],
+    { filter = null } = NO_OPTIONS
+  ) {
+    super(viewportId, table, columns);
+    const keyFieldIndex = table.columnMap[table.schema.key];
+    this.project = projectColumns(keyFieldIndex, this.viewportId);
+    this.sortSet = this.buildSortSet();
+    this.setMapKeys(this.sortedIndex, this.sortSet);
+    if (filter) {
+      this.currentFilter = filter;
+      this.filter(filter);
+    }
+  }
+
+  /**
+   *
+   * Initialise an empty sortset,
+   * allowing for two sort columns.
+   * We are only currently supporting one or two columns sorting.
+   * TODO mechanism for > 2 column sort
+   * populate map of row key values to sortSet index positions
+   */
+  buildSortSet() {
+    const { rows } = this.table;
+    const sortSet: SortSet = Array(rows.length);
+    for (let i = 0; i < rows.length; i++) {
+      // this is the initial, unsorted state, where rowIndex value
+      // (first item of sortSet tuple) equals rowIndex value from data)
+      // and is same as natural array position. The latter will no longer
+      // be true once data is sorted.
+      sortSet[i] = [i, 0, 0];
+    }
+    return sortSet;
+  }
+
+  setMapKeys(
+    keyMap: Map<string, number>,
+    sortSet: SortSet,
+    filterSet?: number[]
+  ) {
+    const { table, indexOfKeyField } = this;
+
+    if (filterSet) {
+      for (let i = 0; i < filterSet.length; i++) {
+        const sortSetIndexIndex = filterSet[i];
+        const [rowIndex] = sortSet[sortSetIndexIndex];
+        const keyValue = table.rows[rowIndex][indexOfKeyField];
+        keyMap.set(keyValue.toString(), i);
+      }
+    } else {
+      for (let i = 0; i < sortSet.length; i++) {
+        const [rowIndex] = sortSet[i];
+        const keyValue = table.rows[rowIndex][indexOfKeyField];
+        keyMap.set(keyValue.toString(), i);
+      }
+    }
   }
 
   setRange(range = this.range, useDelta = true): DataResponse {
@@ -140,162 +283,8 @@ export abstract class BaseRowSet implements IRowSet {
     };
   }
 
-  protected get indexOfKeyField() {
-    return this.table.columnMap[this.table.schema.key];
-  }
-
-  // selected are the index positions of rows as presented to the user. That
-  // means they refer to positions within the current indexSet. We will store
-  // them as positions within the underlying table, which never change.
-  // Note: deletions from the underlying table will have to be dealt with.
-
-  private selectedIndicesToKeyValues = (selectedIndices: number[]) => {
-    const {
-      filterSet,
-      sortSet,
-      table: { columnMap, schema },
-    } = this;
-    const indexOfKeyField = columnMap[schema.key];
-    if (filterSet) {
-      return selectedIndices.map((idx) => {
-        const sortSetIndex = filterSet[idx];
-        const [rowIndex] = sortSet[sortSetIndex];
-        return this.data[rowIndex][indexOfKeyField] as string;
-      });
-    } else {
-      return selectedIndices.map(
-        (idx) => this.data[sortSet[idx][0]][indexOfKeyField] as string
-      );
-    }
-  };
-
-  select(selected: number[]): DataResponse {
-    const { data, filterKeyMap, filterSet, range, size, sortKeyMap, sortSet } =
-      this;
-
-    const selectedKeyValues = this.selectedIndicesToKeyValues(selected);
-
-    const { from, to } = range;
-    const [newSelected, deselected] = identifySelectionChanges(
-      this.selected,
-      selectedKeyValues
-    );
-    this.selected = selectedKeyValues;
-    const keyMap = filterSet ? filterKeyMap : sortKeyMap;
-    const getRowIndex = filterSet
-      ? (idx: number) => sortSet[filterSet[idx]][0]
-      : (idx: number) => sortSet[idx][0];
-
-    const keyFieldIndex = this.columnMap[this.table.schema.key];
-
-    const updatedRows: VuuDataRow[] = [];
-    const projectRow = projectColumn(
-      this.columnMap,
-      this.columns,
-      this.meta,
-      keyFieldIndex,
-      selectedKeyValues
-    );
-
-    for (const key of newSelected) {
-      const idx = keyMap.get(key) as number;
-      const rowIndex = getRowIndex(idx);
-      if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(data[rowIndex], idx));
-      }
-    }
-
-    for (const key of deselected) {
-      const idx = keyMap.get(key) as number;
-      const rowIndex = getRowIndex(idx);
-      if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(data[rowIndex], idx));
-      }
-    }
-
-    return {
-      rows: updatedRows,
-      size,
-    };
-  }
-}
-
-//TODO should range be baked into the concept of RowSet ?
-export class RowSet extends BaseRowSet {
-  // TODO stream as above
-  // static fromGroupRowSet({ table, columns, currentFilter: filter }) {
-  //   return new RowSet(table, columns, {
-  //     filter,
-  //   });
-  // }
-  //TODO consolidate API of rowSet, groupRowset
-  constructor(
-    table: Table,
-    columns: TableColumn[],
-    { filter = null } = NO_OPTIONS
-  ) {
-    super(table, columns);
-    const keyFieldIndex = this.columnMap[table.schema.key];
-    this.project = projectColumns(
-      table.columnMap,
-      columns,
-      this.meta,
-      keyFieldIndex
-    );
-    this.sortSet = this.buildSortSet();
-    this.setMapKeys(this.sortKeyMap, this.sortSet);
-    if (filter) {
-      this.currentFilter = filter;
-      this.filter(filter);
-    }
-  }
-
-  /**
-   *
-   * Initialise an empty sortset,
-   * allowing for two sort columns.
-   * We are only currently supporting one or two columns sorting.
-   * TODO mechanism for > 2 column sort
-   * populate map of row key values to sortSet index positions
-   */
-  buildSortSet() {
-    const { data } = this;
-    const sortSet: SortSet = Array(data.length);
-    for (let i = 0; i < data.length; i++) {
-      // this is the initial, unsorted state, where rowIndex value
-      // (first item of sortSet tuple) equals rowIndex value from data)
-      // and is same as natural array position. The latter will no longer
-      // be true once data is sorted.
-      sortSet[i] = [i, 0, 0];
-    }
-    return sortSet;
-  }
-
-  setMapKeys(
-    keyMap: Map<string, number>,
-    sortSet: SortSet,
-    filterSet?: number[]
-  ) {
-    const { data, indexOfKeyField } = this;
-
-    if (filterSet) {
-      for (let i = 0; i < filterSet.length; i++) {
-        const sortSetIndexIndex = filterSet[i];
-        const [rowIndex] = sortSet[sortSetIndexIndex];
-        const keyValue = data[rowIndex][indexOfKeyField];
-        keyMap.set(keyValue.toString(), i);
-      }
-    } else {
-      for (let i = 0; i < sortSet.length; i++) {
-        const [rowIndex] = sortSet[i];
-        const keyValue = data[rowIndex][indexOfKeyField];
-        keyMap.set(keyValue.toString(), i);
-      }
-    }
-  }
-
   slice(lo: number, hi: number) {
-    const { data, filterSet, selected, sortCols, sortSet } = this;
+    const { table, filterSet, selected, sortSet } = this;
 
     const indexSet = filterSet ?? sortSet;
     const getRowIndex = filterSet
@@ -305,9 +294,14 @@ export class RowSet extends BaseRowSet {
     const results = [];
     for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
       const rowIndex = getRowIndex(i);
-      results.push(data[rowIndex]);
+      results.push(table.rows[rowIndex]);
     }
-    return results.map(this.project(lo, selected));
+    const projectRow = this.project(
+      selected,
+      this.sortedIndex,
+      this.totalRowCount
+    );
+    return results.map(projectRow);
   }
 
   // deprecated ?
@@ -316,35 +310,36 @@ export class RowSet extends BaseRowSet {
   }
 
   get first() {
-    return this.data[0];
+    return this.table.rows[0];
   }
   get last() {
-    return this.data[this.data.length - 1];
+    return this.table.rows.at(-1);
   }
   get rawData() {
-    return this.data;
+    return this.table.rows;
   }
 
   sort(sortCols: VuuSortCol[]) {
     const start = performance.now();
-    const { data, filterSet, sortSet } = this;
+    const { table, filterSet, sortSet } = this;
+    const { columnMap } = this._table;
 
     if (sortRemoved(this.sortCols, sortCols)) {
       revertToIndexSort(sortSet);
     } else if (sortReversed(this.sortCols, sortCols, SINGLE_COLUMN)) {
       sortSet.reverse();
-      this.setMapKeys(this.sortKeyMap, sortSet);
+      this.setMapKeys(this.sortedIndex, sortSet);
     } else if (sortExtendsExistingSort(this.sortCols, sortCols)) {
-      sortExtend(sortSet, this.data, sortCols, this.columnMap);
+      sortExtend(sortSet, table.rows, sortCols, columnMap);
     } else {
-      sort(sortSet, this.data, sortCols, this.columnMap);
+      sort(sortSet, table.rows, sortCols, columnMap);
     }
 
     this.sortCols = sortCols;
-    this.setMapKeys(this.sortKeyMap, sortSet);
+    this.setMapKeys(this.sortedIndex, sortSet);
 
     if (filterSet && this.currentFilter) {
-      const fn = filterPredicate(this.columnMap, this.currentFilter);
+      const fn = filterPredicate(columnMap, this.currentFilter);
 
       const indexSet = sortSet;
       const getRowIndex = (idx: number) => sortSet[idx][0];
@@ -352,8 +347,8 @@ export class RowSet extends BaseRowSet {
 
       for (let i = 0; i < indexSet.length; i++) {
         const rowIdx = getRowIndex(i);
-        const row = data[rowIdx];
-        if (fn(row as DataSourceRow)) {
+        const row = table.rows[rowIdx];
+        if (fn(row)) {
           newFilterSet.push(i);
         }
       }
@@ -372,6 +367,8 @@ export class RowSet extends BaseRowSet {
   }
 
   filter(filter: Filter) {
+    const { columnMap } = this._table;
+
     const start = performance.now();
     const extendsCurrentFilter = extendsExistingFilter(
       filter,
@@ -380,8 +377,8 @@ export class RowSet extends BaseRowSet {
     if (extendsCurrentFilter) {
       console.log("extends current filter");
     }
-    const fn = filterPredicate(this.columnMap, filter);
-    const { data, filterSet, sortSet } = this;
+    const fn = filterPredicate(columnMap, filter);
+    const { table, filterSet, sortSet } = this;
 
     const indexSet = filterSet ?? sortSet;
     const getRowIndex = filterSet
@@ -392,8 +389,8 @@ export class RowSet extends BaseRowSet {
 
     for (let i = 0; i < indexSet.length; i++) {
       const rowIdx = getRowIndex(i);
-      const row = data[rowIdx];
-      if (fn(row as DataSourceRow)) {
+      const row = table.rows[rowIdx];
+      if (fn(row)) {
         newFilterSet.push(i);
       }
     }
@@ -433,8 +430,10 @@ export class RowSet extends BaseRowSet {
   }
 
   insert(rowIndex: number, row: VuuDataRow) {
+    const { columnMap } = this._table;
+
     // TODO multi colun sort sort DSC
-    if (this.sortCols === null && this.currentFilter === null) {
+    if (this.sortCols === null && this.currentFilter === undefined) {
       // simplest scenario, row will be at end of sortset ...
       this.sortSet.push([rowIndex, 0, 0]);
       if (rowIndex >= this.range.to) {
@@ -449,9 +448,12 @@ export class RowSet extends BaseRowSet {
           replace: true,
         };
       }
-    } else if (this.currentFilter === null) {
+    } else if (this.currentFilter === undefined) {
       // sort only - currently only support single column sorting
-      const sortCols = mapSortDefsToSortCriteria(this.sortCols, this.columnMap);
+      const sortCols = mapSortDefsToSortCriteria(
+        this.sortCols,
+        this._table.columnMap
+      );
       const [[colIdx]] = sortCols;
       const sortRow: SortItem = [rowIndex, row[colIdx], 0];
       const sorter = sortBy([[1, ASC]]); // the sortSet is always ascending
@@ -479,9 +481,9 @@ export class RowSet extends BaseRowSet {
           size: this.size,
         };
       }
-    } else if (this.sortCols === null) {
+    } else if (this.sortCols === undefined) {
       // filter only
-      const fn = filterPredicate(this.columnMap, this.currentFilter);
+      const fn = filterPredicate(columnMap, this.currentFilter);
       if (fn(row)) {
         const navIdx = this.filterSet.length;
         this.filterSet.push(rowIndex);
@@ -506,13 +508,13 @@ export class RowSet extends BaseRowSet {
       }
     } else {
       // sort AND filter
-      const fn = filterPredicate(this.columnMap, this.currentFilter);
+      const fn = filterPredicate(columnMap, this.currentFilter);
       if (fn(row)) {
         // TODO what about totalCOunt
 
         const sortCols = mapSortDefsToSortCriteria(
           this.sortCols,
-          this.columnMap
+          this.table.columnMap
         );
         const [[colIdx, direction]] = sortCols; // TODO multi-colun sort
         const sortRow = [rowIndex, row[colIdx]];

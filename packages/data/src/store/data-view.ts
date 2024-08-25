@@ -24,6 +24,7 @@ export default class DataView {
   #config: WithFullConfig = vanillaConfig;
   #columnMap: ColumnMap;
   #columns: TableColumn[];
+  #id: string;
   #table: Table | undefined;
   #updateQueue: UpdateQueue;
 
@@ -31,10 +32,12 @@ export default class DataView {
   private rowSet: RowSet | GroupRowSet;
 
   constructor(
+    id: string,
     table: Table,
     config: DataSourceConfig,
     updateQueue = new UpdateQueue()
   ) {
+    this.#id = id;
     this.#config = {
       ...this.#config,
       aggregations: config.aggregations || this.#config.aggregations,
@@ -51,7 +54,7 @@ export default class DataView {
     this.#columns = this.#config.columns.map(toColumn);
 
     // TODO we should pass columns into the rowset as it will be needed for computed columns
-    this.rowSet = new RowSet(table, this.columns);
+    this.rowSet = new RowSet(id, table, this.columns);
     // Is one filterRowset enough, or should we manage one for each column ?
 
     // What if data is BOTH grouped and sorted ...
@@ -157,7 +160,7 @@ export default class DataView {
     } else if (otherChanges.filterChanged) {
       return this.filter(options.filterSpec);
     } else if (otherChanges.groupByChanged) {
-      this.group(options.groupBy);
+      return this.group(options.groupBy);
     } else {
       return { rows: [], size: -1 };
     }

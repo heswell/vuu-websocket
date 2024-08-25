@@ -1,8 +1,14 @@
 import { Filter } from "@vuu-ui/vuu-filter-types";
-import { VuuDataRow, VuuRange, VuuSortCol } from "@vuu-ui/vuu-protocol-types";
+import {
+  VuuDataRow,
+  VuuRange,
+  VuuRow,
+  VuuSortCol,
+} from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRowWithMetaData } from "../columnUtils";
 
 export type DataResponse = {
-  rows: VuuDataRow[];
+  rows: VuuRow[];
   size: number;
 };
 

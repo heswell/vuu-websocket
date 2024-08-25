@@ -1,7 +1,12 @@
 import { TableColumn } from "@heswell/server-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { SET_FILTER_DATA_COLUMNS } from "./filter.ts";
-import { Row } from "./storeTypes.ts";
+import { TableIndex } from "./table.ts";
+import {
+  VuuDataRow,
+  VuuRow,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
 
 type ColumnDescriptor = string | { name: string; key?: number };
 
@@ -30,69 +35,69 @@ export function buildColumnMap(columns: ColumnDescriptor[]) {
   }, {});
 }
 
-export type RowProjector = (row: Row, index: number) => Row;
+export type VuuDataRowWithMetaData = [
+  ...VuuRowDataItemType[],
+  number, // IDX
+  number, // RENDER_IDX
+  number, // DEPTH
+  number, // COUNT
+  string, // KEY
+  number, // SELECTED
+  number, // PARENT_IDX
+  number, // IDX_POINTER
+  number, // FILTER_COUNT
+  number, // NEXT_FILTER_IDX
+  number // count
+];
+
+export type RowProjector = (row: VuuDataRow) => VuuRow;
 export type MultiRowProjectorFactory = (
-  startIdx: number,
-  selectedKeyValues: string[]
+  selectedKeyValues: string[],
+  index: TableIndex,
+  vpSize: number
 ) => RowProjector;
 
 export const projectColumns = (
-  map: ColumnMap,
-  columns: TableColumn[],
-  meta: ColumnMetaData,
-  keyFieldIndex: number
+  keyFieldIndex: number,
+  viewPortId: string
 ): MultiRowProjectorFactory => {
-  const length = columns.length;
-  const { IDX, RENDER_IDX, DEPTH, COUNT, KEY, SELECTED } = meta;
-  return (startIdx: number, selected: string[] = []) =>
-    (row: Row, i = 0) => {
-      const out = [];
-      for (let i = 0; i < length; i++) {
-        const colIdx = map[columns[i].name];
-        out[i] = row[colIdx];
-      }
-
-      out[IDX] = startIdx + i;
-      out[RENDER_IDX] = 0;
-      out[DEPTH] = 0;
-      out[COUNT] = 0;
-      // assume row[0] is key for now
-      out[KEY] = row[0] as string;
-      out[SELECTED] = selected.includes(out[keyFieldIndex] as string) ? 1 : 0;
-      return out;
+  return (selected: string[] = [], index: TableIndex, vpSize: number) =>
+    (data: VuuDataRow) => {
+      const rowKey = data[keyFieldIndex] as string;
+      return {
+        rowIndex: index.get(rowKey) as number,
+        rowKey,
+        sel: selected.includes(rowKey) ? 1 : 0,
+        ts: +new Date(),
+        updateType: "U",
+        viewPortId,
+        vpSize,
+        vpVersion: "",
+        data,
+      } as VuuRow;
     };
 };
 
 export const projectColumn = (
-  map: ColumnMap,
-  columns: TableColumn[],
-  meta: ColumnMetaData,
   keyFieldIndex: number,
-  selectedKeyValues: string[]
+  viewPortId: string,
+  selected: string[],
+  index: TableIndex,
+  vpSize: number
 ): RowProjector => {
-  const length = columns.length;
-  const { IDX, RENDER_IDX, DEPTH, COUNT, KEY, SELECTED } = meta;
-  return (row: Row, i = 0) => {
-    // selectedRows are indices of rows within underlying dataset (not sorted or filtered)
-    // row is the original row from this set, with original index in IDX pos, which might
-    // be overwritten with a different value below if rows are sorted/filtered
-
-    const out = [];
-    for (let i = 0; i < length; i++) {
-      const colIdx = map[columns[i].name];
-      out[i] = row[colIdx];
-    }
-
-    out[IDX] = i;
-    out[RENDER_IDX] = 0;
-    out[DEPTH] = 0;
-    out[COUNT] = 0;
-    // assume row[0] is key for now
-    out[KEY] = row[0] as string;
-    out[SELECTED] = selectedKeyValues.includes(out[keyFieldIndex] as string)
-      ? 1
-      : 0;
-    return out;
+  return (data: VuuDataRow) => {
+    const rowKey = data[keyFieldIndex] as string;
+    return {
+      rowIndex: index.get(rowKey) as number,
+      rowKey,
+      sel: selected.includes(rowKey) ? 1 : 0,
+      ts: +new Date(),
+      updateType: "U",
+      viewPortId,
+      vpSize,
+      vpVersion: "",
+      data,
+    } as VuuRow;
   };
 };
 

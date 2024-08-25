@@ -1,8 +1,8 @@
 import { DataTableDefinition, TableUpdateOptions } from "@heswell/server-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 import { buildColumnMap } from "./columnUtils.ts";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
 const defaultUpdateConfig: TableUpdateOptions = {
   applyUpdates: false,
@@ -10,7 +10,9 @@ const defaultUpdateConfig: TableUpdateOptions = {
   updateInterval: 500,
 };
 
-export type UpdateTuples = VuuRowDataItemType[];
+export type TableIndex = Map<string, number>;
+
+export type UpdateTuples = VuuDataRow[];
 export type RowInsertHandler = (rowIndex: number, row: unknown) => void;
 export type RowUpdateHandler = (
   rowIndex: number,
@@ -31,8 +33,10 @@ export interface TableGenerators {
   updatePath?: string;
 }
 
+export type TableRow = [VuuDataRow, ...VuuDataRow[], number, string];
+
 export class Table extends EventEmitter<TableEvents> {
-  #index: Map<string, number> = new Map();
+  #index: TableIndex = new Map<string, number>();
   #keys: Record<string, number> = {};
 
   public installDataGenerators?: (config: DataTableDefinition) => void;
@@ -82,12 +86,47 @@ export class Table extends EventEmitter<TableEvents> {
     return this.schema.key;
   }
 
+  get index() {
+    return this.#index;
+  }
+
+  getUniqueValuesForColumn(column: string, pattern?: string) {
+    const colIdx = this.columnMap[column];
+    const schemaColumn = this.schema.columns.find((col) => col.name === column);
+    if (schemaColumn) {
+      if (schemaColumn.serverDataType === "string") {
+        const set = new Set<string>();
+        if (pattern) {
+          const lowercasePattern = pattern.toLocaleLowerCase();
+          for (const row of this.rows) {
+            const value = row[colIdx] as string;
+            if (value.toLocaleLowerCase().startsWith(lowercasePattern)) {
+              set.add(value);
+            }
+          }
+        } else {
+          for (const row of this.rows) {
+            const value = row[colIdx] as string;
+            set.add(value);
+          }
+        }
+        return Array.from(set).sort();
+      } else {
+        throw Error(
+          `Table. getUniqueValuesForColumn only operates on string colmns, ${column} is a ${schemaColumn.serverDataType}`
+        );
+      }
+    } else {
+      throw Error(`Table. getUniqueValuesForColumn no column ${column}`);
+    }
+  }
+
   /**
    *
    * @param rowIdx
    * @param updates repeating tuple of updates [colIdx, value, colIdx, value ...]
    */
-  update(rowIdx: number, ...updates: VuuRowDataItemType[]) {
+  update(rowIdx: number, ...updates: VuuDataRow[]) {
     const results = [];
     let row = this.rows[rowIdx];
     for (let i = 0; i < updates.length; i += 2) {
@@ -99,11 +138,13 @@ export class Table extends EventEmitter<TableEvents> {
     this.emit("rowUpdated", rowIdx, results);
   }
 
-  insert(data: VuuRowDataItemType[]) {
-    const idx = this.rows.length;
-    let row = this.rowFromData(idx, data);
+  insert(row: VuuDataRow) {
+    const rowIdx = this.rows.length;
+    const indexOfKeyValue = this.columnMap[this.primaryKey];
+    const key = row[indexOfKeyValue];
+    this.#index.set(key.toString(), rowIdx);
     this.rows.push(row);
-    this.emit("rowInserted", idx, row);
+    this.emit("rowInserted", rowIdx, row);
   }
 
   remove(key: string) {
@@ -143,12 +184,12 @@ export class Table extends EventEmitter<TableEvents> {
       });
   }
 
-  parseData(data: VuuDataRow[]) {
-    console.log(`parseData ${data.length} rows`);
-    const rows = [];
-    for (let i = 0; i < data.length; i++) {
-      let row = this.rowFromData(i, data[i]);
-      rows.push(row);
+  parseData(rows: VuuDataRow[]) {
+    console.log(`parseData ${rows.length} rows`);
+    const indexOfKeyValue = this.columnMap[this.primaryKey];
+    for (let i = 0; i < rows.length; i++) {
+      const key = rows[i][indexOfKeyValue];
+      this.#index.set(key.toString(), i);
     }
     this.rows = rows;
 
@@ -165,14 +206,6 @@ export class Table extends EventEmitter<TableEvents> {
         this.applyInserts();
       }, 10000);
     }
-  }
-
-  rowFromData(idx: number, data: VuuDataRow) {
-    // 2 metadata items for each row, the idx and unique key
-    const { primaryKey, columnMap } = this;
-    const key = data[columnMap[primaryKey]] as string;
-    this.#index.set(key, idx);
-    return [...data, idx, key];
   }
 
   //TODO move all these methods into an external helper
@@ -209,8 +242,4 @@ export class Table extends EventEmitter<TableEvents> {
   updateRow(/*idx, row, columnMap*/) {
     return null;
   }
-}
-
-function getRandomInt(max: number) {
-  return Math.floor(Math.random() * Math.floor(max));
 }

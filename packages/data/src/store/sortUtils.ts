@@ -1,9 +1,11 @@
 import { VuuSortCol } from "@vuu-ui/data-types";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { VuuDataRow } from "./rowset/rowSet";
+import { TableRow } from "./table";
 
 type SortDirection = "A" | "D";
-type SortCriterium = [number, SortDirection];
+export type SortCriterium = [number, SortDirection];
 export type SortCriteria = SortCriterium[];
 
 export const ASC: SortDirection = "A";
@@ -64,6 +66,21 @@ const sort1A2A3A: SortComparator = (
 
 export const revertToIndexSort = (sortSet: SortSet) => sortSet.sort(sortIndex);
 
+const getSortFunctionOptimisedForSortCrirteria = (sortDefs: VuuSortCol[]) => {
+  switch (sortDefs.length) {
+    case 0:
+      throw Error("no sort criteria");
+    case 1:
+      return sort1;
+    case 2:
+      return sort2;
+    case 3:
+      return sort3;
+    default:
+      return sortAll;
+  }
+};
+
 export function sort(
   sortSet: SortSet,
   rows: VuuDataRow[],
@@ -71,9 +88,7 @@ export function sort(
   columnMap: ColumnMap
 ) {
   const sortCriteria = mapSortDefsToSortCriteria(sortDefs, columnMap);
-  const count = sortCriteria.length;
-  const sortFn =
-    count === 1 ? sort1 : count === 2 ? sort2 : count === 3 ? sort3 : sortAll;
+  const sortFn = getSortFunctionOptimisedForSortCrirteria(sortDefs);
   sortFn(sortSet, rows, sortCriteria);
 }
 
@@ -298,29 +313,34 @@ export function sortReversed(
   }
 }
 
-export function GROUP_ROW_TEST(
-  group,
-  row: VuuDataRow,
-  [colIdx, direction]: SortCriterium
-) {
-  if (group === row) {
+export const GROUP_ROW_TEST: RowSortTest = (
+  groupRow,
+  row,
+  [colIdx, direction]
+) => {
+  if (groupRow === row) {
     return 0;
   } else {
-    let a1 = direction === DSC ? row[colIdx] : group[colIdx];
-    let b1 = direction === DSC ? group[colIdx] : row[colIdx];
+    const a1 = direction === "D" ? row[colIdx] : groupRow[colIdx];
+    const b1 = direction === "D" ? groupRow[colIdx] : row[colIdx];
     if (b1 === null || a1 > b1) {
       return 1;
     } else if (a1 == null || a1 < b1) {
       return -1;
+    } else {
+      // can't happen, but keeps typescript happy
+      return 0;
     }
   }
-}
+};
 
-function ROW_SORT_TEST(
+type RowSortTest = (
   a: VuuDataRow,
   b: VuuDataRow,
-  [colIdx, direction]: SortCriterium
-): SortResult {
+  sortCriterium: SortCriterium
+) => SortResult;
+
+const ROW_SORT_TEST: RowSortTest = (a, b, [colIdx, direction]) => {
   if (a === b) {
     return 0;
   } else {
@@ -335,12 +355,12 @@ function ROW_SORT_TEST(
       return 0;
     }
   }
-}
+};
 
 // sort null as low. not high
-export function sortBy(
+export function sortBy<T = VuuDataRow>(
   sortCriteria: SortCriteria,
-  test = ROW_SORT_TEST
+  test: RowSortTest = ROW_SORT_TEST
 ): SortComparator<VuuDataRow> {
   return function (a: VuuDataRow, b: VuuDataRow): SortResult {
     for (

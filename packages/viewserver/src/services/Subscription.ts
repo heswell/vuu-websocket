@@ -1,5 +1,5 @@
 import { DataView as View, metaData, ColumnMetaData } from "@heswell/data";
-import { ISession } from "@heswell/server-types";
+import { ISession, TableColumn } from "@heswell/server-types";
 import {
   ClientToServerMessage,
   ClientToServerCreateViewPort,
@@ -25,9 +25,16 @@ export class Subscription {
     } = message.body;
     const { name: tablename, columns: availableColumns } = table;
     const columns =
-      requestedColumns.length > 0 ? requestedColumns : availableColumns;
+      requestedColumns.length > 0
+        ? requestedColumns
+        : availableColumns.map((c) => c.name);
 
-    this.view = new View(table, { columns, filterSpec, groupBy, sort });
+    this.view = new View(viewPortId, table, {
+      columns,
+      filterSpec,
+      groupBy,
+      sort,
+    });
 
     this.metaData = metaData(requestedColumns);
 

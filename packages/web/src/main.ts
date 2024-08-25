@@ -59,7 +59,7 @@ console.log(
   "%c--------- group by currency     ---------",
   "color:green;font-weight:bold;font-size: large;"
 );
-({ rows, size } = view.group(["currency"]));
+({ rows, size } = view.group(["currency", "ric"]));
 console.log(`${rows.length} rows of ${size}`);
 console.table(rows);
 

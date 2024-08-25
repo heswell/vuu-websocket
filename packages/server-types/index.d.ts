@@ -17,6 +17,7 @@ export type TableColumnType = {
 };
 
 export type TableColumn = {
+  aggregate?: "avg" | "sum";
   name: string;
   type?: VuuColumnDataType;
 };

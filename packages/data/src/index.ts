@@ -3,11 +3,9 @@ import { SET_FILTER_DATA_COLUMNS } from "./store/filter.ts";
 import {
   groupbyExtendsExistingGroupby,
   indexOfCol,
-  updateGroupBy,
 } from "./store/groupUtils.ts";
 
 export const groupHelpers = {
-  updateGroupBy,
   indexOfCol,
   groupbyExtendsExistingGroupby,
 };

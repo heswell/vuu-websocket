@@ -1,4 +1,3 @@
-import { ColumnMetaData } from "@heswell/data";
 import type {
   DataTableDefinition,
   ISession,
@@ -8,21 +7,24 @@ import type {
 import {
   ClientToServerChangeViewPort,
   ClientToServerCreateViewPort,
+  ClientToServerRpcRequest,
   ClientToServerSelection,
   ClientToServerTableList,
   ClientToServerTableMeta,
   ClientToServerViewPortRange,
+  ServerToClientRPC,
   ServerToClientTableRows,
   VuuClientToServerMessage,
-  VuuDataRow,
-} from "@vuu-ui/vuu-protocol-types";
-import {
-  ClientToServerViewportRpcCall,
+  VuuRow,
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { Subscription } from "./Subscription.js";
 import { Table } from "./Table.js";
+import {
+  isGetUniqueValues,
+  isGetUniqueValuesStartingWith,
+} from "./request-utils.js";
 
 type QueuedSubscription = {
   message: VuuClientToServerMessage<ClientToServerCreateViewPort>;
@@ -127,13 +129,7 @@ export const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
 
       if (subscription.view.status === "ready") {
         const { rows, size } = subscription.view.setRange(message.body.range);
-        enqueueDataMessages(
-          rows,
-          size,
-          session,
-          viewPortId,
-          subscription.metaData
-        );
+        enqueueDataMessages(rows, size, session, viewPortId);
       }
     } else {
       const key = asTableKey(message.body.table);
@@ -168,7 +164,7 @@ export const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
   const { viewPortId } = message.body;
   const subscription = _subscriptions[viewPortId];
   const { rows, size } = subscription.view.changeViewport(message.body);
-  enqueueDataMessages(rows, size, session, viewPortId, subscription.metaData);
+  enqueueDataMessages(rows, size, session, viewPortId);
 };
 
 export const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
@@ -188,17 +184,32 @@ export const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
   console.log(`[${now}] DataTableService: setRange ${from} - ${to}`);
   const subscription = _subscriptions[viewPortId];
   const { rows, size } = subscription.view.setRange({ from, to });
-  enqueueDataMessages(rows, size, session, viewPortId, subscription.metaData);
+  enqueueDataMessages(rows, size, session, viewPortId);
 };
 
-export const RPC_CALL: VuuRequestHandler<ClientToServerViewportRpcCall> = (
+export const RPC_CALL: VuuRequestHandler<ClientToServerRpcRequest> = (
   message,
   session
 ) => {
-  console.log("what do we do with an RPC call");
-  switch (message.body.rpcName) {
+  console.log(
+    `what do we do with an RPC call ${JSON.stringify(message, null, 2)}`
+  );
+  switch (message.body.service) {
     case "TypeAheadRpcHandler":
-      console.log(`call to Typeahead service `);
+      {
+        const { method } = message.body;
+
+        const start = performance.now();
+        const result = typeaheadService(message.body);
+        const end = performance.now();
+        console.log(`typeaheadService took ${end - start}ms`);
+
+        session.enqueue(message.requestId, {
+          method,
+          result,
+          type: "RPC_RESP",
+        });
+      }
       break;
 
     default:
@@ -213,7 +224,7 @@ export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
   const { selection, vpId } = message.body;
   const subscription = _subscriptions[vpId];
   const { rows, size } = subscription.view.select(selection);
-  enqueueDataMessages(rows, size, session, vpId, subscription.metaData);
+  enqueueDataMessages(rows, size, session, vpId);
 };
 
 // export function unsubscribeAll(sessionId: string, queue: MessageQueue) {
@@ -281,11 +292,10 @@ function getTableNames() {
 }
 
 const enqueueDataMessages = (
-  rows: VuuDataRow[],
+  rows: VuuRow[],
   vpSize: number,
   session: ISession,
-  viewPortId: string,
-  { IDX, KEY, SELECTED }: ColumnMetaData
+  viewPortId: string
 ) => {
   if (rows.length) {
     const ts = +new Date();
@@ -304,27 +314,42 @@ const enqueueDataMessages = (
           viewPortId,
           vpSize,
           vpVersion: "",
-        },
-      ],
+        } as VuuRow,
+      ].concat(rows),
       timeStamp: ts,
       type: "TABLE_ROW",
     };
 
-    for (let row of rows) {
-      const rowIndex = row[IDX] as number;
-      messageBody.rows.push({
-        rowIndex,
-        data: row.slice(0, IDX),
-        rowKey: row[KEY] as string,
-        sel: row[SELECTED] as 0 | 1,
-        ts,
-        updateType: "U",
-        viewPortId,
-        vpSize,
-        vpVersion: "",
-      });
-    }
-
     session.enqueue("", messageBody);
   }
 };
+
+function getTableColumnValues(
+  vuuTable: VuuTable,
+  column: string,
+  pattern?: string
+) {
+  const table = getTable(vuuTable);
+  if (table) {
+  } else {
+    throw Error(
+      `getTableColumnValues no table ${vuuTable.module}/${vuuTable.table}`
+    );
+  }
+
+  return table.getUniqueValuesForColumn(column, pattern).slice(0, 10);
+}
+
+function typeaheadService(message: ClientToServerRpcRequest) {
+  if (isGetUniqueValues(message)) {
+    const [table, column] = message.params;
+    return getTableColumnValues(table, column);
+  } else if (isGetUniqueValuesStartingWith(message)) {
+    const [table, column, pattern] = message.params;
+    return getTableColumnValues(table, column, pattern);
+  } else {
+    throw Error(
+      `Invalid message for typeahead service ${JSON.stringify(message)}`
+    );
+  }
+}
