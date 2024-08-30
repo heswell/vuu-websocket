@@ -1,7 +1,7 @@
 {
-  "name": "@heswell/viewserver",
-  "version": "3.0.0",
-  "description": "Heswell Viewserver",
+  "name": "@heswell/restserver",
+  "version": "1.0.0",
+  "description": "Heswell Rest server",
   "main": "dist/src/index.js",
   "module": "src/index.ts",
   "publishConfig": {

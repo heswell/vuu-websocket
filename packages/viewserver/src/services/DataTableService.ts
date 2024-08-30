@@ -12,7 +12,6 @@ import {
   ClientToServerTableList,
   ClientToServerTableMeta,
   ClientToServerViewPortRange,
-  ServerToClientRPC,
   ServerToClientTableRows,
   VuuClientToServerMessage,
   VuuRow,

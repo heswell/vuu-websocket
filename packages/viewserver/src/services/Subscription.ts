@@ -1,10 +1,10 @@
 import { DataView as View, metaData, ColumnMetaData } from "@heswell/data";
-import { ISession, TableColumn } from "@heswell/server-types";
-import {
-  ClientToServerMessage,
-  ClientToServerCreateViewPort,
-} from "@vuu-ui/data-types";
+import { ISession } from "@heswell/server-types";
 import { Table } from "./Table.js";
+import {
+  ClientToServerCreateViewPort,
+  VuuClientToServerMessage,
+} from "@vuu-ui/vuu-protocol-types";
 
 export class Subscription {
   public view: View;
@@ -13,7 +13,7 @@ export class Subscription {
   constructor(
     table: Table,
     viewPortId: string,
-    message: ClientToServerMessage<ClientToServerCreateViewPort>,
+    message: VuuClientToServerMessage<ClientToServerCreateViewPort>,
     session: ISession
   ) {
     const {
