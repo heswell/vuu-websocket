@@ -82,13 +82,12 @@ export const projectColumn = (
   keyFieldIndex: number,
   viewPortId: string,
   selected: string[],
-  index: TableIndex,
   vpSize: number
 ): RowProjector => {
-  return (data: VuuDataRow) => {
+  return (data: VuuDataRow, rowIndex: number) => {
     const rowKey = data[keyFieldIndex] as string;
     return {
-      rowIndex: index.get(rowKey) as number,
+      rowIndex,
       rowKey,
       sel: selected.includes(rowKey) ? 1 : 0,
       ts: +new Date(),

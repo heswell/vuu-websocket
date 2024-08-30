@@ -166,15 +166,14 @@ export abstract class BaseRowSet {
       keyFieldIndex,
       this.viewportId,
       selectedKeyValues,
-      this.sortedIndex,
-      this.totalRowCount
+      this.size
     );
 
     for (const key of newSelected) {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(rows[rowIndex]));
+        updatedRows.push(projectRow(rows[rowIndex], rowIndex));
       }
     }
 
@@ -182,7 +181,7 @@ export abstract class BaseRowSet {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(rows[rowIndex]));
+        updatedRows.push(projectRow(rows[rowIndex], rowIndex));
       }
     }
 
@@ -256,8 +255,11 @@ export class RowSet extends BaseRowSet {
     } else {
       for (let i = 0; i < sortSet.length; i++) {
         const [rowIndex] = sortSet[i];
-        const keyValue = table.rows[rowIndex][indexOfKeyField];
-        keyMap.set(keyValue.toString(), i);
+        const keyValue = table.rows[rowIndex][indexOfKeyField] as string;
+        if (keyMap.has(keyValue)) {
+          throw Error(`duplicate key value ${keyValue}`);
+        }
+        keyMap.set(keyValue, i);
       }
     }
   }
@@ -292,11 +294,7 @@ export class RowSet extends BaseRowSet {
       : (idx: number) => sortSet[idx][0];
 
     const results: VuuRow[] = [];
-    const projectRow = this.project(
-      selected,
-      this.sortedIndex,
-      this.totalRowCount
-    );
+    const projectRow = this.project(selected, this.sortedIndex, this.size);
 
     for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
       const rowIndex = getRowIndex(i);
@@ -306,7 +304,6 @@ export class RowSet extends BaseRowSet {
     return results;
   }
 
-  // deprecated ?
   get size() {
     return this.filterSet?.length ?? this.sortSet.length;
   }
@@ -382,9 +379,10 @@ export class RowSet extends BaseRowSet {
 
     // if we're extending the current filter, filterset cannot be undefined
     const indexSet = extendsCurrentFilter ? (filterSet as number[]) : sortSet;
-    const getRowIndex = filterSet
-      ? (idx: number) => sortSet[filterSet[idx]][0]
-      : (idx: number) => sortSet[idx][0];
+    const getRowIndex =
+      indexSet === filterSet
+        ? (idx: number) => sortSet[filterSet[idx]][0]
+        : (idx: number) => sortSet[idx][0];
 
     const newFilterSet: number[] = [];
 

@@ -44,11 +44,10 @@ export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
   } else if (filter.column && existingFilter.column) {
     // different columns,always false
     return false;
-  } else if (
-    existingFilter.op === "and" &&
-    extendsFilters(filter, existingFilter)
-  ) {
-    return true;
+  } else if (existingFilter.op === "and" && isFilterClause(filter)) {
+    return false;
+  } else if (existingFilter.op === "and" && filter.op === "and") {
+    return extendsFilters(existingFilter, filter);
   } else if (filter.op === "and" && extendsFilters(existingFilter, filter)) {
     return true;
   }

@@ -163,6 +163,8 @@ export const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
   const { viewPortId } = message.body;
   const subscription = _subscriptions[viewPortId];
   const { rows, size } = subscription.view.changeViewport(message.body);
+  console.log(`size = ${size}`);
+
   enqueueDataMessages(rows, size, session, viewPortId);
 };
 

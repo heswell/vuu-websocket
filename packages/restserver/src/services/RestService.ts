@@ -27,10 +27,10 @@ const dataSourceRowToEntity = (row: VuuDataRow, columnMap: ColumnMap) =>
   }, {} as Entity);
 
 export const configure = (props: ServerConfig): Promise<Table[]> => {
-  const { DataTables } = props;
-  return Promise.all(
-    DataTables.map(async (config) => await createTable(config))
-  );
+  // const { DataTables } = props;
+  // return Promise.all(
+  //   DataTables.map(async (config) => await createTable(config))
+  // );
 };
 
 export const restHandler: RestHandler = (request) => {
