@@ -291,17 +291,19 @@ export class RowSet extends BaseRowSet {
       ? (idx: number) => sortSet[filterSet[idx]][0]
       : (idx: number) => sortSet[idx][0];
 
-    const results = [];
-    for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
-      const rowIndex = getRowIndex(i);
-      results.push(table.rows[rowIndex]);
-    }
+    const results: VuuRow[] = [];
     const projectRow = this.project(
       selected,
       this.sortedIndex,
       this.totalRowCount
     );
-    return results.map(projectRow);
+
+    for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
+      const rowIndex = getRowIndex(i);
+      results.push(projectRow(table.rows[rowIndex], i));
+    }
+
+    return results;
   }
 
   // deprecated ?
@@ -374,13 +376,12 @@ export class RowSet extends BaseRowSet {
       filter,
       this.currentFilter
     );
-    if (extendsCurrentFilter) {
-      console.log("extends current filter");
-    }
+
     const fn = filterPredicate(columnMap, filter);
     const { table, filterSet, sortSet } = this;
 
-    const indexSet = filterSet ?? sortSet;
+    // if we're extending the current filter, filterset cannot be undefined
+    const indexSet = extendsCurrentFilter ? (filterSet as number[]) : sortSet;
     const getRowIndex = filterSet
       ? (idx: number) => sortSet[filterSet[idx]][0]
       : (idx: number) => sortSet[idx][0];
@@ -391,7 +392,7 @@ export class RowSet extends BaseRowSet {
       const rowIdx = getRowIndex(i);
       const row = table.rows[rowIdx];
       if (fn(row)) {
-        newFilterSet.push(i);
+        newFilterSet.push(rowIdx);
       }
     }
 
@@ -485,8 +486,8 @@ export class RowSet extends BaseRowSet {
       // filter only
       const fn = filterPredicate(columnMap, this.currentFilter);
       if (fn(row)) {
-        const navIdx = this.filterSet.length;
-        this.filterSet.push(rowIndex);
+        const navIdx = this.filterSet?.length;
+        this.filterSet?.push(rowIndex);
         if (navIdx >= this.range.to) {
           // ... row is beyond viewport
           return {

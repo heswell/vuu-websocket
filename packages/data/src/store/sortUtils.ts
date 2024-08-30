@@ -1,7 +1,9 @@
-import { VuuSortCol } from "@vuu-ui/data-types";
-import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import {
+  VuuDataRow,
+  VuuRowDataItemType,
+  VuuSortCol,
+} from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
-import { VuuDataRow } from "./rowset/rowSet";
 import { TableRow } from "./table";
 
 type SortDirection = "A" | "D";

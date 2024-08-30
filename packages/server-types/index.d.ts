@@ -58,6 +58,8 @@ export interface IMessageQueue {
   push(message: ServerToClientMessage, rowMeta?: RowMeta): void;
 }
 
+export type RestHandler = (request: Request) => Response;
+
 export type VuuRequestHandler<
   T extends ClientToServerBody = ClientToServerBody
 > = (message: VuuClientToServerMessage<T>, session: ISession) => void;

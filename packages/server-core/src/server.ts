@@ -1,6 +1,6 @@
 import { ServerConfig, ServerMessagingConfig } from "@heswell/server-types";
 import { websocketConnectionHandler } from "./websocket-connection-handler";
-import { configureRequestHandlers } from "./requestHandlers";
+import { configureRequestHandlers, getRestHandler } from "./requestHandlers";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
 const CLIENT_UPDATE_FREQUENCY = 50;
@@ -12,12 +12,25 @@ const msgConfig: ServerMessagingConfig = {
   PRIORITY_UPDATE_FREQUENCY,
 };
 
-export function start(config: ServerConfig) {
-  configureRequestHandlers({
-    ...config,
+export function start(...configs: ServerConfig[]) {
+  configs.forEach(configureRequestHandlers);
+
+  const restServer = Bun.serve<{ authToken: string }>({
+    // certFile: "./certs/myCA.pem",
+    // keyFile: "./certs/myCA.key",
+    // passphrase: "1234",
+    port: 8081,
+
+    fetch(req) {
+      const restHandler = getRestHandler("restHandler");
+      const url = new URL(req.url);
+      if (url.pathname === "/") return new Response("Home page");
+      if (url.pathname.startsWith("/api")) return restHandler(req);
+      return new Response("404");
+    },
   });
 
-  const server = Bun.serve<{ authToken: string }>({
+  const websocketServer = Bun.serve<{ authToken: string }>({
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",
@@ -37,5 +50,10 @@ export function start(config: ServerConfig) {
     websocket: websocketConnectionHandler(msgConfig),
   });
 
-  console.log(`Listening on ${server.hostname}:${server.port}`);
+  console.log(
+    `REST server listening on ${restServer.hostname}:${restServer.port}`
+  );
+  console.log(
+    `Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
+  );
 }

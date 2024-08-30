@@ -50,7 +50,7 @@ export type VuuDataRowWithMetaData = [
   number // count
 ];
 
-export type RowProjector = (row: VuuDataRow) => VuuRow;
+export type RowProjector = (row: VuuDataRow, rowIndex: number) => VuuRow;
 export type MultiRowProjectorFactory = (
   selectedKeyValues: string[],
   index: TableIndex,
@@ -62,10 +62,10 @@ export const projectColumns = (
   viewPortId: string
 ): MultiRowProjectorFactory => {
   return (selected: string[] = [], index: TableIndex, vpSize: number) =>
-    (data: VuuDataRow) => {
+    (data: VuuDataRow, rowIndex: number) => {
       const rowKey = data[keyFieldIndex] as string;
       return {
-        rowIndex: index.get(rowKey) as number,
+        rowIndex,
         rowKey,
         sel: selected.includes(rowKey) ? 1 : 0,
         ts: +new Date(),

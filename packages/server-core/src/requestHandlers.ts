@@ -1,4 +1,8 @@
-import { ServerConfig, VuuRequestHandler } from "@heswell/server-types";
+import {
+  RestHandler,
+  ServerConfig,
+  VuuRequestHandler,
+} from "@heswell/server-types";
 import { MessageQueue } from "./messageQueue";
 
 interface ConfiguredService {
@@ -6,8 +10,11 @@ interface ConfiguredService {
   unsubscribeAll?: (sessionId: string, queue: MessageQueue) => void;
 }
 
-type MessageType = string;
-type ServiceHandlers = Record<MessageType, VuuRequestHandler>;
+type HandlerIdentifier = string;
+type ServiceHandlers = Record<
+  HandlerIdentifier,
+  VuuRequestHandler | RestHandler
+>;
 
 type ServiceAPI = ConfiguredService & ServiceHandlers;
 
@@ -31,6 +38,16 @@ export function configureRequestHandlers(config: ServerConfig) {
 
     console.log(`supported message types `, _messageTypeToServiceNameMap);
   });
+}
+
+export function getRestHandler(handlerIdentifier: string): RestHandler {
+  const serviceName = _messageTypeToServiceNameMap[handlerIdentifier];
+  const service = _services[serviceName]?.[handlerIdentifier] as RestHandler;
+  if (service) {
+    return service;
+  } else {
+    throw Error(`no rest handler found for '${handlerIdentifier}'`);
+  }
 }
 
 export function getHandlerForMessage(messageType: string) {

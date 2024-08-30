@@ -49,6 +49,8 @@ export function extendsExistingFilter(filter: Filter, existingFilter?: Filter) {
     extendsFilters(filter, existingFilter)
   ) {
     return true;
+  } else if (filter.op === "and" && extendsFilters(existingFilter, filter)) {
+    return true;
   }
 
   // safe option is to assume false, causing filter to be re-applied to base data
@@ -98,12 +100,7 @@ export function filterEquals(f1: Filter, f2: Filter, strict = false) {
     if (!strict) {
       return isSameColumn;
     } else {
-      return (
-        isSameColumn &&
-        f1.op === f2.op &&
-        isSingleValueFilter() &&
-        sameValues(f1, f2)
-      );
+      return isSameColumn && f1.op === f2.op && sameValues(f1, f2);
     }
   }
   if (f1 && f1) {
