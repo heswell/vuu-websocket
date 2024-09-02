@@ -1,23 +1,13 @@
 import {
-  DataTableDefinition,
+  ConfiguredService,
+  DataTableAPI,
   RestHandler,
   ServerConfig,
 } from "@heswell/server-types";
-import { Table } from "@heswell/viewserver";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { getRestRange } from "./rest-utils";
-
-const _tables: { [key: string]: Table } = {};
-
-async function createTable({ dataPath, ...config }: DataTableDefinition) {
-  const table = new Table(config);
-  _tables[table.name] = table;
-  if (dataPath) {
-    await table.loadData(dataPath);
-  }
-  return table;
-}
+import { ServiceHandlers } from "@heswell/server-core/src/requestHandlers";
 
 type Entity = { [key: string]: VuuRowDataItemType };
 const dataSourceRowToEntity = (row: VuuDataRow, columnMap: ColumnMap) =>
@@ -26,22 +16,30 @@ const dataSourceRowToEntity = (row: VuuDataRow, columnMap: ColumnMap) =>
     return entity;
   }, {} as Entity);
 
-export const configure = (props: ServerConfig): Promise<Table[]> => {
-  // const { DataTables } = props;
-  // return Promise.all(
-  //   DataTables.map(async (config) => await createTable(config))
-  // );
+let dataTableAPI: DataTableAPI | undefined = undefined;
+
+const configure = async ({ TableService }: ServerConfig) => {
+  dataTableAPI = TableService;
 };
 
-export const restHandler: RestHandler = (request) => {
+const instruments = {
+  module: "SIMUL",
+  table: "instruments",
+};
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+};
+
+const restHandler: RestHandler = (request) => {
   const url = new URL(request.url);
   switch (url.pathname) {
     case "/api/instruments/summary": {
-      const { rows } = _tables["SIMUL:instruments"];
+      const { rows } = dataTableAPI?.getTable(instruments);
       return new Response(JSON.stringify({ recordCount: rows.length }), {
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+          ...CORS_HEADERS,
           "Content-Type": "application/json",
         },
       });
@@ -49,7 +47,7 @@ export const restHandler: RestHandler = (request) => {
     case "/api/instruments": {
       const { origin, limit } = getRestRange(url);
       console.log(`origin = ${origin} limit = ${limit}`);
-      const { columnMap, rows } = _tables["SIMUL:instruments"];
+      const { columnMap, rows } = dataTableAPI?.getTable(instruments);
       const start = performance.now();
       const data = rows
         .slice(origin, origin + limit)
@@ -60,8 +58,7 @@ export const restHandler: RestHandler = (request) => {
 
       return new Response(data, {
         headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+          ...CORS_HEADERS,
           // "Content-Type": "application/x-ndjson"
           "Content-Type": "text/plain",
         },
@@ -71,4 +68,12 @@ export const restHandler: RestHandler = (request) => {
     default:
       return new Response(`invalid /api path '${url.pathname}'`);
   }
+};
+
+export const messageAPI: ServiceHandlers = {
+  restHandler,
+};
+
+export const serviceAPI: ConfiguredService = {
+  configure,
 };

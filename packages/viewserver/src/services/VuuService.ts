@@ -1,5 +1,7 @@
+import { ServiceHandlers } from "@heswell/server-core/src/requestHandlers.js";
 import type {
-  DataTableDefinition,
+  ConfiguredService,
+  DataTableAPI,
   ISession,
   ServerConfig,
   VuuRequestHandler,
@@ -18,63 +20,53 @@ import {
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
-import { Subscription } from "./Subscription.js";
-import { Table } from "./Table.js";
 import {
   isGetUniqueValues,
   isGetUniqueValuesStartingWith,
 } from "./request-utils.js";
+import { Subscription } from "./Subscription.js";
 
 type QueuedSubscription = {
   message: VuuClientToServerMessage<ClientToServerCreateViewPort>;
   session: ISession;
 };
 
-const _tables: { [key: string]: Table } = {};
 var _subscriptions: { [viewportId: string]: Subscription } = {};
 const _queuedSubscriptions: {
   [tableName: string]: QueuedSubscription[] | undefined;
 } = {};
 
-// need an API call to expose tables so extension services can manipulate data
+let dataTableAPI: DataTableAPI | undefined = undefined;
 
-export const configure = (props: ServerConfig): Promise<Table[]> => {
-  const { DataTables } = props;
-  return Promise.all(
-    DataTables.map(async (config) => await createTable(config))
-  );
+const configure = async ({ TableService }: ServerConfig) => {
+  dataTableAPI = TableService;
 };
 
 const asTableKey = ({ module, table }: VuuTable) => `${module}:${table}`;
 
-async function createTable({ dataPath, ...config }: DataTableDefinition) {
-  const table = new Table(config);
-  _tables[table.name] = table;
-  const { name } = table;
+// async function createTable({ dataPath, ...config }: DataTableDefinition) {
+//   const table = new Table(config);
+//   _tables[table.name] = table;
+//   const { name } = table;
 
-  if (dataPath) {
-    await table.loadData(dataPath);
-  }
+//   if (dataPath) {
+//     await table.loadData(dataPath);
+//   }
 
-  const qs = _queuedSubscriptions[name];
-  if (qs) {
-    console.log(`Table ${name} created and we have queued Subscription(s)}`);
-    _queuedSubscriptions[name] = undefined;
-    qs.forEach(({ message, session }) => {
-      console.log(`Add Queued Subscription clientId:${message.sessionId}`);
-      CREATE_VP(message, session);
-    });
-  }
+//   const qs = _queuedSubscriptions[name];
+//   if (qs) {
+//     console.log(`Table ${name} created and we have queued Subscription(s)}`);
+//     _queuedSubscriptions[name] = undefined;
+//     qs.forEach(({ message, session }) => {
+//       console.log(`Add Queued Subscription clientId:${message.sessionId}`);
+//       CREATE_VP(message, session);
+//     });
+//   }
 
-  return table;
-}
+//   return table;
+// }
 
-const tableNameToVuuTable = (tableName: string): VuuTable => {
-  const [module, table] = tableName.split(":");
-  return { module, table };
-};
-
-export const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
+const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
   message,
   session
 ) => {
@@ -82,11 +74,11 @@ export const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
   // priority 1
   session.enqueue(message.requestId, {
     type: "TABLE_LIST_RESP",
-    tables: tables.map(tableNameToVuuTable),
+    tables: dataTableAPI?.getTableList(),
   });
 };
 
-export const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
+const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
   message,
   session
 ) => {
@@ -101,7 +93,7 @@ export const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
   });
 };
 
-export const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
+const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
   message,
   session
 ) => {
@@ -143,14 +135,14 @@ export const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
     throw Error(
       `[DataTableService] request for unknown table '${asTableKey(
         message.body.table
-      )}', available tables are:\n${Object.keys(_tables)
+      )}', available tables are:\n${[]
         .map((tableName) => `\t* ${tableName}`)
         .join("\n")}`
     );
   }
 };
 
-export const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
+const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
   message,
   session
 ) => {
@@ -168,7 +160,7 @@ export const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
   enqueueDataMessages(rows, size, session, viewPortId);
 };
 
-export const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
+const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
   message,
   session
 ) => {
@@ -188,7 +180,7 @@ export const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
   enqueueDataMessages(rows, size, session, viewPortId);
 };
 
-export const RPC_CALL: VuuRequestHandler<ClientToServerRpcRequest> = (
+const RPC_CALL: VuuRequestHandler<ClientToServerRpcRequest> = (
   message,
   session
 ) => {
@@ -218,7 +210,7 @@ export const RPC_CALL: VuuRequestHandler<ClientToServerRpcRequest> = (
   }
 };
 
-export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
+const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
   message,
   session
 ) => {
@@ -257,10 +249,6 @@ export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
 // // ResumeSUbscription
 // // TerminateAllSubscriptionsForClient
 
-// export function ModifySubscription(clientId, request, queue) {
-//   _subscriptions[request.viewport].update(request, queue);
-// }
-
 // export function ExpandGroup(clientId, request, queue) {
 //   _subscriptions[request.viewport].update(request, queue);
 // }
@@ -279,17 +267,16 @@ export const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
 //   console.warn(`InsertTableRow TODO send confirmation ${queue.length}`);
 // }
 
-function getTable(table: VuuTable): Table {
-  const key = asTableKey(table);
-  if (_tables[key]) {
-    return _tables[key];
+const getTable = (vuuTable: VuuTable) => {
+  if (dataTableAPI) {
+    return dataTableAPI.getTable(vuuTable);
   } else {
-    throw Error(`DataTableService. no table definition for ${key}`);
+    throw Error(`get Table: dataTableAPI has not been provided`);
   }
-}
+};
 
 function getTableNames() {
-  return Object.keys(_tables);
+  return [];
 }
 
 const enqueueDataMessages = (
@@ -354,3 +341,17 @@ function typeaheadService(message: ClientToServerRpcRequest) {
     );
   }
 }
+
+export const messageAPI: ServiceHandlers = {
+  GET_TABLE_LIST,
+  GET_TABLE_META,
+  CREATE_VP,
+  CHANGE_VP,
+  CHANGE_VP_RANGE,
+  RPC_CALL,
+  SET_SELECTION,
+};
+
+export const serviceAPI: ConfiguredService = {
+  configure,
+};

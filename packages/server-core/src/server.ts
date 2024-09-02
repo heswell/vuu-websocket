@@ -1,4 +1,8 @@
-import { ServerConfig, ServerMessagingConfig } from "@heswell/server-types";
+import {
+  DataTableAPI,
+  ServerConfig,
+  ServerMessagingConfig,
+} from "@heswell/server-types";
 import { websocketConnectionHandler } from "./websocket-connection-handler";
 import { configureRequestHandlers, getRestHandler } from "./requestHandlers";
 
@@ -12,8 +16,12 @@ const msgConfig: ServerMessagingConfig = {
   PRIORITY_UPDATE_FREQUENCY,
 };
 
-export function start(...configs: ServerConfig[]) {
-  configs.forEach(configureRequestHandlers);
+export async function start(...configs: ServerConfig[]) {
+  let tableService: DataTableAPI | undefined = undefined;
+  for (const config of configs) {
+    const result = await configureRequestHandlers(config, tableService);
+    tableService ??= result;
+  }
 
   const restServer = Bun.serve<{ authToken: string }>({
     // certFile: "./certs/myCA.pem",

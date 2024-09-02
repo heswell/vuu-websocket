@@ -2,7 +2,7 @@ import type { DataTableDefinition } from "@heswell/server-types";
 import fs from "fs";
 import path from "path";
 
-const path_root = "node_modules/@heswell/viewserver/dataTables";
+const path_root = "node_modules/@heswell/data-tables/dataTables";
 
 const project_path = path.resolve(
   fs.realpathSync("."),

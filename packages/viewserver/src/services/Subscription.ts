@@ -1,6 +1,6 @@
 import { DataView as View, metaData, ColumnMetaData } from "@heswell/data";
 import { ISession } from "@heswell/server-types";
-import { Table } from "./Table.js";
+import type { Table } from "@heswell/data-tables";
 import {
   ClientToServerCreateViewPort,
   VuuClientToServerMessage,

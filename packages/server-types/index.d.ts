@@ -40,14 +40,19 @@ export interface DataTableDefinition {
 }
 
 export interface ServerConfig {
-  services: ServiceDefinition[];
-  DataTables: DataTableDefinition[];
+  service: ServiceDefinition;
+  DataTables?: DataTableDefinition[];
+  TableService?: DataTableApi;
 }
 
 export interface ServerMessagingConfig {
   CLIENT_UPDATE_FREQUENCY?: number;
   HEARTBEAT_FREQUENCY?: number;
   PRIORITY_UPDATE_FREQUENCY?: number;
+}
+
+export interface ConfiguredService {
+  configure: (props: ServerConfig) => Promise<void>;
 }
 
 export declare type RowMeta = {
@@ -67,3 +72,9 @@ export type VuuRequestHandler<
 export interface ISession {
   enqueue: (requestId: string, messageBody: ServerToClientBody) => void;
 }
+
+export interface DataTableService extends ConfiguredService {
+  getTable: (vuuTable: VuuTable) => Table;
+  getTableList: () => VuuTable[];
+}
+export type DataTableAPI = Omit<DataTableService, keyof ConfiguredService>;

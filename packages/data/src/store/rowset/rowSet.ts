@@ -173,7 +173,7 @@ export abstract class BaseRowSet {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(rows[rowIndex], rowIndex));
+        updatedRows.push(projectRow(rows[rowIndex], idx));
       }
     }
 
@@ -181,7 +181,7 @@ export abstract class BaseRowSet {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
-        updatedRows.push(projectRow(rows[rowIndex], rowIndex));
+        updatedRows.push(projectRow(rows[rowIndex], idx));
       }
     }
 

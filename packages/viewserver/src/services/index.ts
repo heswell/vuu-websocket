@@ -1,2 +1,1 @@
-export * from "./DataTableService";
-export * from "./Table";
+export * from "./VuuService";
