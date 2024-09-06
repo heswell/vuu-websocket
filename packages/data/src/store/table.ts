@@ -1,8 +1,8 @@
 import { DataTableDefinition, TableUpdateOptions } from "@heswell/server-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 import { buildColumnMap } from "./columnUtils.ts";
-import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 
 const defaultUpdateConfig: TableUpdateOptions = {
   applyUpdates: false,

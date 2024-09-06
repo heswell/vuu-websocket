@@ -104,6 +104,8 @@ class Session implements ISession {
   #user: string | undefined;
   #token: string | undefined;
   #queue: MessageQueue;
+  #viewports: string[] = [];
+
   // #stopUpdates: () => void;
   constructor(ws: ServerWebSocket<{ authToken: string }>) {
     this.#id = uuid();
@@ -119,7 +121,6 @@ class Session implements ISession {
 
   clear() {
     this.#queue.length = 0;
-    // this.#stopUpdates();
   }
 
   get id() {
@@ -136,6 +137,21 @@ class Session implements ISession {
 
   set outgoingHeartbeat(hb: number) {
     this.#heartbeat = hb;
+  }
+
+  get viewports() {
+    return this.#viewports;
+  }
+
+  addViewport(viewportId: string) {
+    this.#viewports.push(viewportId);
+  }
+
+  removeViewport(viewportId: string) {
+    const index = this.#viewports.indexOf(viewportId);
+    if (index !== -1) {
+      this.#viewports.splice(index, 1);
+    }
   }
 
   enqueue(requestId: string, messageBody: ServerToClientBody) {

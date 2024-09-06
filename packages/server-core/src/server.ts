@@ -8,7 +8,7 @@ import { configureRequestHandlers, getRestHandler } from "./requestHandlers";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
 const CLIENT_UPDATE_FREQUENCY = 50;
-const HEARTBEAT_FREQUENCY = 5000;
+const HEARTBEAT_FREQUENCY = 6000;
 
 const msgConfig: ServerMessagingConfig = {
   CLIENT_UPDATE_FREQUENCY,

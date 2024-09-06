@@ -1,10 +1,12 @@
 import { TableColumn } from "@heswell/server-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import {
-  ClientToServerChangeViewPort,
   VuuFilter,
   VuuGroupBy,
+  VuuRange,
   VuuSort,
+  VuuSortCol,
+  VuuViewportChangeRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import {
   isConfigChanged,
@@ -17,8 +19,13 @@ import { DataResponse, GroupRowSet, RowSet } from "./rowset";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
+import { groupByExtendsExistingGroupBy } from "./rowset/group-utils.ts";
 
 const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
+
+export type DataViewConfig = DataSourceConfig & {
+  range: VuuRange;
+};
 
 export default class DataView {
   #config: WithFullConfig = vanillaConfig;
@@ -34,7 +41,7 @@ export default class DataView {
   constructor(
     id: string,
     table: Table,
-    config: DataSourceConfig,
+    { range, ...config }: DataViewConfig,
     updateQueue = new UpdateQueue()
   ) {
     this.#id = id;
@@ -53,15 +60,14 @@ export default class DataView {
     this.#columnMap = buildColumnMap(this.#config.columns);
     this.#columns = this.#config.columns.map(toColumn);
 
+    const rowSet = new RowSet(id, table, this.columns, { range });
     // TODO we should pass columns into the rowset as it will be needed for computed columns
-    this.rowSet = new RowSet(id, table, this.columns);
-    // Is one filterRowset enough, or should we manage one for each column ?
+    this.rowSet =
+      this.groupBy.length === 0
+        ? rowSet
+        : new GroupRowSet(rowSet, this.groupBy);
 
-    // What if data is BOTH grouped and sorted ...
-    if (this.groupBy.length > 0) {
-      // more efficient to compute this directly from the table projection
-      this.rowSet = new GroupRowSet(this.rowSet, this.columns, this.groupBy);
-    } else if (this.sortDefs.length > 0) {
+    if (this.sortDefs.length > 0) {
       this.rowSet.sort(this.sortDefs);
     }
 
@@ -74,6 +80,7 @@ export default class DataView {
   }
 
   destroy() {
+    console.log(`destroy view`);
     this.#table?.removeListener("rowUpdated", this.rowUpdated);
     this.#table?.removeListener("rowInserted", this.rowInserted);
     this.rowSet.clear();
@@ -86,10 +93,15 @@ export default class DataView {
   get hasFilter() {
     return this.#config.filterSpec.filter !== "";
   }
-  get groupBy() {
+
+  get hasGroupBy() {
+    return this.groupBy.length > 0;
+  }
+
+  get groupBy(): VuuGroupBy {
     return this.#config.groupBy;
   }
-  get sortDefs() {
+  get sortDefs(): VuuSortCol[] {
     return this.#config.sort.sortDefs;
   }
 
@@ -146,24 +158,26 @@ export default class DataView {
     return this.rowSet;
   }
 
-  changeViewport(options: ClientToServerChangeViewPort): DataResponse {
+  // this should be invoked by setting the options
+  changeViewport(options: VuuViewportChangeRequest): DataResponse | undefined {
     // console.log({ options, config: this.#config });
-    const { noChanges, ...otherChanges } = isConfigChanged(
-      this.#config,
-      options
-    );
+    const { noChanges, ...changes } = isConfigChanged(this.#config, options);
 
-    console.log({ noChanges, otherChanges });
+    console.log({ noChanges, otherChanges: changes });
 
-    if (otherChanges.sortChanged) {
+    if (changes.sortChanged) {
       return this.sort(options.sort);
-    } else if (otherChanges.filterChanged) {
+    } else if (changes.filterChanged) {
       return this.filter(options.filterSpec);
-    } else if (otherChanges.groupByChanged) {
+    } else if (changes.groupByChanged) {
       return this.group(options.groupBy);
     } else {
       return { rows: [], size: -1 };
     }
+  }
+
+  getDataForCurrentRange() {
+    return this.rowSet.currentRange();
   }
 
   //TODO we seem to get a setRange when we reverse sort order, is that correct ?
@@ -250,45 +264,55 @@ export default class DataView {
 
   applyFilter() {}
 
-  group(groupby: VuuGroupBy) {
-    const {
-      rowSet,
-      // _columns,
-      // _groupState,
-      // _sortDefs: _sortCriteria,
-      // _groupBy,
-    } = this;
-    // const { range: _range } = rowSet;
-    // this._groupBy = groupby;
+  group(groupBy: VuuGroupBy) {
+    const { rowSet } = this;
+    const { groupBy: existingGroupBy } = this.#config;
+    this.#config = {
+      ...this.#config,
+      groupBy,
+    };
 
-    if (rowSet instanceof RowSet) {
-      this.rowSet = new GroupRowSet(rowSet, rowSet.columns, groupby);
+    if (rowSet instanceof GroupRowSet) {
+      if (groupBy.length === 0) {
+        this.rowSet = rowSet.toRowSet();
+      } else {
+        rowSet.groupBy = groupBy;
+        if (
+          groupByExtendsExistingGroupBy(existingGroupBy, groupBy) &&
+          rowSet.expandedChildNodeCount === 0
+        ) {
+          // If all existing nodes are collapsed, there is no data to return
+          // to client and will not be until user opens a tree node ( or scrolls)
+          console.log(
+            `${groupBy.join(",")} extends ${existingGroupBy.join(
+              ","
+            )} and there are no expanded nodes`
+          );
+          return;
+        }
+      }
+    } else {
+      this.rowSet = new GroupRowSet(rowSet, groupBy);
     }
 
-    // if (groupby === null) {
-    //   this.rowSet = RowSet.fromGroupRowSet(this.rowSet);
-    // } else {
-    //   if (_groupBy.length === 0) {
-    //     this.rowSet = new GroupRowSet(
-    //       rowSet,
-    //       _columns,
-    //       groupby,
-    //       _groupState,
-    //       _sortCriteria
-    //     );
-    //   } else {
-    //     (rowSet as GroupRowSet).groupBy(groupby);
-    //   }
-    // }
     return this.rowSet.setRange(resetRange(this.rowSet.range), false);
   }
 
-  setGroupState() {
-    // this._groupState = groupState;
-    // const { rowSet } = this;
-    // rowSet.setGroupState(groupState);
-    // // TODO should we have setRange return the following directly, so IMV doesn't have to decide how to call setRange ?
-    // // should we reset the range ?
-    // return rowSet.setRange(rowSet.range, false);
+  openTreeNode(key: string) {
+    if (this.rowSet instanceof GroupRowSet) {
+      this.rowSet.openTreeNode(key);
+      return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+    } else {
+      throw Error(`openTreeNode called, data is not grouped`);
+    }
+  }
+
+  closeTreeNode(key: string) {
+    if (this.rowSet instanceof GroupRowSet) {
+      this.rowSet.closeTreeNode(key);
+      return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+    } else {
+      throw Error(`closeTreeNode called, data is not grouped`);
+    }
   }
 }

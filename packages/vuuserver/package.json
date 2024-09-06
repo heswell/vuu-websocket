@@ -1,7 +1,7 @@
 {
-  "name": "@heswell/viewserver",
+  "name": "@heswell/vuuserver",
   "version": "3.0.0",
-  "description": "Heswell Viewserver",
+  "description": "Heswell Vuu Server",
   "main": "dist/src/index.js",
   "module": "src/index.ts",
   "publishConfig": {
@@ -19,9 +19,10 @@
     "@heswell/data-tables": "3.0.0",
     "@heswell/server-core": "3.0.0",
     "@heswell/server-types": "3.0.0",
-    "@vuu-ui/vuu-utils": "0.8.84"
+    "@vuu-ui/vuu-utils": "0.8.93"
   },
   "devDependencies": {
+    "@vuu-ui/vuu-data-types": "0.8.93",
     "@heswell/server-types": "1.0.0"
   }
 }

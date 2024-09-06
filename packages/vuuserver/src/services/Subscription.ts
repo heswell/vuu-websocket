@@ -1,9 +1,13 @@
-import { DataView as View, metaData, ColumnMetaData } from "@heswell/data";
-import { ISession } from "@heswell/server-types";
-import type { Table } from "@heswell/data-tables";
 import {
-  ClientToServerCreateViewPort,
-  VuuClientToServerMessage,
+  DataView as View,
+  metaData,
+  ColumnMetaData,
+  Table,
+} from "@heswell/data";
+import { ISession } from "@heswell/server-types";
+import {
+  VuuClientMessage,
+  VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 
 export class Subscription {
@@ -13,7 +17,7 @@ export class Subscription {
   constructor(
     table: Table,
     viewPortId: string,
-    message: VuuClientToServerMessage<ClientToServerCreateViewPort>,
+    message: VuuClientMessage<VuuViewportCreateRequest>,
     session: ISession
   ) {
     const {
@@ -33,6 +37,7 @@ export class Subscription {
       columns,
       filterSpec,
       groupBy,
+      range,
       sort,
     });
 
@@ -86,6 +91,13 @@ export class Subscription {
     // }
 
     // timeoutHandle = setTimeout(collectUpdates, 1000);
+  }
+
+  clear() {
+    console.log(`clear subscription`);
+    this.view.destroy();
+    // @ts-ignore
+    this.view = undefined;
   }
 
   // invoke(method: string, queue: IMessageQueue, ...params) {

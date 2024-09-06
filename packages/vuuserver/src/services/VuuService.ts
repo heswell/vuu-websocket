@@ -1,4 +1,15 @@
+import { readdir } from "node:fs/promises";
 import { ServiceHandlers } from "@heswell/server-core/src/requestHandlers.js";
+import { resolve } from "path";
+import {
+  VuuClientMessage,
+  VuuRpcServiceRequest,
+  VuuTableListRequest,
+  VuuTableMetaRequest,
+  VuuViewportChangeRequest,
+  VuuViewportCreateRequest,
+} from "@vuu-ui/vuu-protocol-types";
+
 import type {
   ConfiguredService,
   DataTableAPI,
@@ -7,15 +18,12 @@ import type {
   VuuRequestHandler,
 } from "@heswell/server-types";
 import {
-  ClientToServerChangeViewPort,
-  ClientToServerCreateViewPort,
-  ClientToServerRpcRequest,
+  ClientToServerCloseTreeNode,
+  ClientToServerOpenTreeNode,
+  ClientToServerRemoveViewPort,
   ClientToServerSelection,
-  ClientToServerTableList,
-  ClientToServerTableMeta,
   ClientToServerViewPortRange,
   ServerToClientTableRows,
-  VuuClientToServerMessage,
   VuuRow,
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
@@ -25,48 +33,66 @@ import {
   isGetUniqueValuesStartingWith,
 } from "./request-utils.js";
 import { Subscription } from "./Subscription.js";
+import { VuuModuleBase } from "./VuuModuleBase.js";
+import { VuuModuleConstructorProps } from "../modules/SIMUL.js";
 
 type QueuedSubscription = {
-  message: VuuClientToServerMessage<ClientToServerCreateViewPort>;
+  message: VuuClientMessage<VuuViewportCreateRequest>;
   session: ISession;
 };
 
-var _subscriptions: { [viewportId: string]: Subscription } = {};
+const _subscriptions: Map<string, Subscription> = new Map();
+
 const _queuedSubscriptions: {
   [tableName: string]: QueuedSubscription[] | undefined;
 } = {};
 
+const vuuModules = new Map<string, VuuModuleBase>();
+
 let dataTableAPI: DataTableAPI | undefined = undefined;
 
-const configure = async ({ TableService }: ServerConfig) => {
+const loadModule = async (dataTableAPI: DataTableAPI, path: string) => {
+  const module = await import(path);
+  const Module = module.default as new (
+    props: VuuModuleConstructorProps
+  ) => VuuModuleBase;
+  return new Module({ dataTableAPI });
+};
+
+const createModules = async (
+  dataTableAPI: DataTableAPI,
+  modulePath?: string
+) => {
+  if (modulePath) {
+    const files = await readdir(modulePath);
+    files.forEach(async (fileName) => {
+      const module = await loadModule(
+        dataTableAPI,
+        resolve(modulePath, fileName)
+      );
+      vuuModules.set(module.name, module);
+    });
+  }
+};
+
+const configure = async ({ service, TableService }: ServerConfig) => {
   dataTableAPI = TableService;
+  // createModules(TableService, service.modules);
 };
 
 const asTableKey = ({ module, table }: VuuTable) => `${module}:${table}`;
 
-// async function createTable({ dataPath, ...config }: DataTableDefinition) {
-//   const table = new Table(config);
-//   _tables[table.name] = table;
-//   const { name } = table;
+export const purgeSubscriptions: VuuRequestHandler = ({}, session) => {
+  session.viewports.forEach((viewportId) => {
+    const subscription = _subscriptions.get(viewportId);
+    if (subscription) {
+      subscription.clear();
+      _subscriptions.delete(viewportId);
+    }
+  });
+};
 
-//   if (dataPath) {
-//     await table.loadData(dataPath);
-//   }
-
-//   const qs = _queuedSubscriptions[name];
-//   if (qs) {
-//     console.log(`Table ${name} created and we have queued Subscription(s)}`);
-//     _queuedSubscriptions[name] = undefined;
-//     qs.forEach(({ message, session }) => {
-//       console.log(`Add Queued Subscription clientId:${message.sessionId}`);
-//       CREATE_VP(message, session);
-//     });
-//   }
-
-//   return table;
-// }
-
-const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
+const GET_TABLE_LIST: VuuRequestHandler<VuuTableListRequest> = (
   message,
   session
 ) => {
@@ -78,7 +104,7 @@ const GET_TABLE_LIST: VuuRequestHandler<ClientToServerTableList> = (
   });
 };
 
-const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
+const GET_TABLE_META: VuuRequestHandler<VuuTableMetaRequest> = (
   message,
   session
 ) => {
@@ -93,7 +119,7 @@ const GET_TABLE_META: VuuRequestHandler<ClientToServerTableMeta> = (
   });
 };
 
-const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
+const CREATE_VP: VuuRequestHandler<VuuViewportCreateRequest> = (
   message,
   session
 ) => {
@@ -108,7 +134,12 @@ const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
         message,
         session
       );
-      _subscriptions[viewPortId] = subscription;
+
+      _subscriptions.set(viewPortId, subscription);
+      session.addViewport(viewPortId);
+
+      console.log(`we have ${_subscriptions.size} subscriptions`);
+
       session.enqueue(message.requestId, {
         ...message.body,
         // missing from protocol definition
@@ -119,7 +150,7 @@ const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
       });
 
       if (subscription.view.status === "ready") {
-        const { rows, size } = subscription.view.setRange(message.body.range);
+        const { rows, size } = subscription.view.getDataForCurrentRange();
         enqueueDataMessages(rows, size, session, viewPortId);
       }
     } else {
@@ -142,7 +173,28 @@ const CREATE_VP: VuuRequestHandler<ClientToServerCreateViewPort> = (
   }
 };
 
-const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
+const REMOVE_VP: VuuRequestHandler<ClientToServerRemoveViewPort> = (
+  message,
+  session
+) => {
+  const { viewPortId } = message.body;
+  // should be purge the queue of any pending updates outside the requested range ?
+
+  const subscription = _subscriptions.get(viewPortId);
+  if (subscription) {
+    subscription.view.destroy();
+    _subscriptions.delete(viewPortId);
+  } else {
+    throw Error(`unavle to remove Vp, subscription not found`);
+  }
+
+  session.enqueue(message.requestId, {
+    type: "REMOVE_VP_SUCCESS",
+    viewPortId,
+  });
+};
+
+const CHANGE_VP: VuuRequestHandler<VuuViewportChangeRequest> = (
   message,
   session
 ) => {
@@ -153,11 +205,14 @@ const CHANGE_VP: VuuRequestHandler<ClientToServerChangeViewPort> = (
   });
 
   const { viewPortId } = message.body;
-  const subscription = _subscriptions[viewPortId];
-  const { rows, size } = subscription.view.changeViewport(message.body);
-  console.log(`size = ${size}`);
-
-  enqueueDataMessages(rows, size, session, viewPortId);
+  const subscription = _subscriptions.get(viewPortId);
+  if (subscription) {
+    const dateResponse = subscription.view.changeViewport(message.body);
+    if (dateResponse) {
+      const { rows, size } = dateResponse;
+      enqueueDataMessages(rows, size, session, viewPortId);
+    }
+  }
 };
 
 const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
@@ -175,12 +230,14 @@ const CHANGE_VP_RANGE: VuuRequestHandler<ClientToServerViewPortRange> = (
 
   const now = new Date().getTime();
   console.log(`[${now}] DataTableService: setRange ${from} - ${to}`);
-  const subscription = _subscriptions[viewPortId];
-  const { rows, size } = subscription.view.setRange({ from, to });
-  enqueueDataMessages(rows, size, session, viewPortId);
+  const subscription = _subscriptions.get(viewPortId);
+  if (subscription) {
+    const { rows, size } = subscription.view.setRange({ from, to });
+    enqueueDataMessages(rows, size, session, viewPortId);
+  }
 };
 
-const RPC_CALL: VuuRequestHandler<ClientToServerRpcRequest> = (
+const RPC_CALL: VuuRequestHandler<VuuRpcServiceRequest> = (
   message,
   session
 ) => {
@@ -215,12 +272,39 @@ const SET_SELECTION: VuuRequestHandler<ClientToServerSelection> = (
   session
 ) => {
   const { selection, vpId } = message.body;
-  const subscription = _subscriptions[vpId];
-  const { rows, size } = subscription.view.select(selection);
-  enqueueDataMessages(rows, size, session, vpId);
+  const subscription = _subscriptions.get(vpId);
+  if (subscription) {
+    const { rows, size } = subscription.view.select(selection);
+    enqueueDataMessages(rows, size, session, vpId);
+  }
+};
+
+const OPEN_TREE_NODE: VuuRequestHandler<ClientToServerOpenTreeNode> = (
+  message,
+  session
+) => {
+  const { treeKey, vpId } = message.body;
+  const subscription = _subscriptions.get(vpId);
+  if (subscription) {
+    const { rows, size } = subscription.view.openTreeNode(treeKey);
+    enqueueDataMessages(rows, size, session, vpId);
+  }
+};
+
+const CLOSE_TREE_NODE: VuuRequestHandler<ClientToServerCloseTreeNode> = (
+  message,
+  session
+) => {
+  const { treeKey, vpId } = message.body;
+  const subscription = _subscriptions.get(vpId);
+  if (subscription) {
+    const { rows, size } = subscription.view.closeTreeNode(treeKey);
+    enqueueDataMessages(rows, size, session, vpId);
+  }
 };
 
 // export function unsubscribeAll(sessionId: string, queue: MessageQueue) {
+
 //   // const subscriptions = _clientSubscriptions[clientId];
 //   // if (subscriptions && subscriptions.length) {
 //   //   subscriptions.forEach((viewport) => {
@@ -328,7 +412,7 @@ function getTableColumnValues(
   return table.getUniqueValuesForColumn(column, pattern).slice(0, 10);
 }
 
-function typeaheadService(message: ClientToServerRpcRequest) {
+function typeaheadService(message: VuuRpcServiceRequest) {
   if (isGetUniqueValues(message)) {
     const [table, column] = message.params;
     return getTableColumnValues(table, column);
@@ -343,11 +427,15 @@ function typeaheadService(message: ClientToServerRpcRequest) {
 }
 
 export const messageAPI: ServiceHandlers = {
-  GET_TABLE_LIST,
-  GET_TABLE_META,
-  CREATE_VP,
+  purgeSubscriptions,
   CHANGE_VP,
   CHANGE_VP_RANGE,
+  CLOSE_TREE_NODE,
+  CREATE_VP,
+  REMOVE_VP,
+  GET_TABLE_LIST,
+  GET_TABLE_META,
+  OPEN_TREE_NODE,
   RPC_CALL,
   SET_SELECTION,
 };

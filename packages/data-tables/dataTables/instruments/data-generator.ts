@@ -1,8 +1,4 @@
-import {
-  VuuColumnDataType,
-  VuuDataRow,
-  VuuRowDataItemType,
-} from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
 function random(min: number, max: number) {
@@ -11,8 +7,8 @@ function random(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
-const chars = Array.from("ABCDEFGHIJK");
+const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
+// const chars = Array.from("ABCDEFGHIJK");
 const suffixes = ["L", "N", "OQ", "AS", "PA", "MI", "FR", "AT"];
 const locations: Record<string, [string, string]> = {
   L: ["London PLC", "XLON/LSE-SETS"],

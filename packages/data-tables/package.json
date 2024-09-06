@@ -17,7 +17,7 @@
   "dependencies": {
     "@heswell/data": "3.0.0",
     "@heswell/server-core": "3.0.0",
-    "@vuu-ui/vuu-utils": "0.8.84"
+    "@vuu-ui/vuu-utils": "0.8.93"
   },
   "devDependencies": {
     "@heswell/server-types": "1.0.0"

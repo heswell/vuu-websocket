@@ -1,67 +1,98 @@
 import { DataView, Table } from "@heswell/data";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
+import { data } from "./data";
+import { DataResponse } from "@heswell/data/src/store/rowset";
 
 const schema: TableSchema = {
   columns: [
-    { name: "id", serverDataType: "string" },
-    { name: "ric", serverDataType: "string" },
-    { name: "currency", serverDataType: "string" },
-    { name: "lotSize", serverDataType: "string" },
+    { name: "Symbol", serverDataType: "string" },
+    { name: "Name", serverDataType: "string" },
+    { name: "Price", serverDataType: "double" },
+    { name: "MarketCap", serverDataType: "long" },
+    { name: "IPO", serverDataType: "string" },
+    { name: "Sector", serverDataType: "string" },
+    { name: "Industry", serverDataType: "int" },
   ],
-  key: "id",
+  key: "Symbol",
   table: {
     module: "TEST",
     table: "instruments",
   },
 };
 
-const data = [
-  ["ID000000", "ABC.L", "USD", 1000],
-  ["ID000001", "BCD.L", "GBP", 500],
-  ["ID000002", "CDE.L", "USD", 200],
-  ["ID000003", "DEF.L", "EUR", 500],
-  ["ID000004", "EFG.L", "USD", 200],
-  ["ID000005", "FGH.L", "GBP", 500],
-  ["ID000006", "GHI.L", "GBP", 500],
-  ["ID000007", "HIJ.L", "CHF", 200],
-  ["ID000008", "IJK.L", "GBP", 500],
-  ["ID000009", "JKL.L", "GBP", 500],
-  ["ID000010", "KLM.L", "HKD", 150],
-  ["ID000011", "LMN.L", "GBP", 500],
-  ["ID000012", "MNO.L", "GBP", 100],
-  ["ID000013", "NOP.L", "USD", 500],
-  ["ID000014", "OPQ.L", "USD", 500],
-  ["ID000015", "PQR.L", "GBP", 200],
-  ["ID000016", "QRS.L", "GBP", 500],
-  ["ID000017", "RST.L", "GBP", 1000],
-  ["ID000018", "STU.L", "GBP", 500],
-  ["ID000019", "STU.L", "GBP", 500],
-];
-
 const table = new Table({ data, schema });
+console.log({ table });
 
-const view = new DataView(table, {
-  columns: ["id", "ric", "currency", "lotSize"],
+const id = "123";
+
+const view = new DataView(id, table, {
+  columns: schema.columns.map((c) => c.name),
   filterSpec: { filter: "" },
   groupBy: [],
+  range: { from: 0, to: 10 },
   sort: { sortDefs: [] },
 });
 
 console.log(
-  "%c--------- get initial data {from:0, to: 10 }    ---------",
+  "%c--------- get initial data {from:0, to: 50 }    ---------",
   "color:green;font-weight:bold;font-size: large;"
 );
-let { rows, size } = view.setRange({ from: 0, to: 10 });
+let { rows, size } = view.setRange({ from: 0, to: 50 });
 console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
+// console.table(rows);
 
+let groupBy = ["Sector"];
 console.log(
-  "%c--------- group by currency     ---------",
+  `%c--------- group by [${groupBy.join(",")}]     ---------`,
   "color:green;font-weight:bold;font-size: large;"
 );
-({ rows, size } = view.group(["currency", "ric"]));
+({ rows, size } = view.group(groupBy) as DataResponse);
 console.log(`${rows.length} rows of ${size}`);
 console.table(rows);
+console.table(rows.map((r) => r.data));
+
+console.log("expand node  Basic Industries");
+({ rows, size } = view.openTreeNode("$root|Basic Industries"));
+console.log({ size });
+console.table(rows);
+console.table(rows.map((r) => r.data));
+
+// groupBy = ["Sector", "Industry", "IPO"];
+// console.log(
+//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// const dataResponse = view.group(groupBy);
+// console.log({ dataResponse });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log("expand node Basic Industries");
+// ({ rows, size } = view.openTreeNode("$root|Basic Industries"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log("expand node Basic Industries, Aluminum");
+// ({ rows, size } = view.openTreeNode("$root|Basic Industries|Aluminum"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log("expand node  Major Chemicals");
+// ({ rows, size } = view.openTreeNode("$root|Basic Industries|Major Chemicals"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// ({ rows, size } = view.setRange({ from: 10, to: 20 }));
+// console.table(rows);
+
+// console.log("collapse node Basic Industries");
+// ({ rows, size } = view.closeTreeNode("$root|Basic Industries"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
 
 if (false) {
   console.log(

@@ -50,6 +50,10 @@ export type VuuDataRowWithMetaData = [
   number // count
 ];
 
+export type GroupRowProjector = (
+  row: VuuDataRowWithMetaData,
+  rowIndex: number
+) => VuuRow;
 export type RowProjector = (row: VuuDataRow, rowIndex: number) => VuuRow;
 export type MultiRowProjectorFactory = (
   selectedKeyValues: string[],
@@ -100,6 +104,28 @@ export const projectColumn = (
   };
 };
 
+export const projectGroupColumn = (
+  viewPortId: string,
+  columnMeta: ColumnMetaData,
+  selected: string[],
+  vpSize: number
+): GroupRowProjector => {
+  return (data: VuuDataRowWithMetaData, rowIndex: number) => {
+    const rowKey = data[columnMeta.KEY] as string;
+    return {
+      rowIndex,
+      rowKey,
+      sel: selected.includes(rowKey) ? 1 : 0,
+      ts: +new Date(),
+      updateType: "U",
+      viewPortId,
+      vpSize,
+      vpVersion: "",
+      data,
+    } as VuuRow;
+  };
+};
+
 export type ColumnMetaData = {
   IDX: number;
   RENDER_IDX: number;
@@ -111,6 +137,7 @@ export type ColumnMetaData = {
   IDX_POINTER: number;
   FILTER_COUNT: number;
   NEXT_FILTER_IDX: number;
+  columnCount: number;
   count: number;
 };
 
@@ -135,6 +162,7 @@ export function metaData(columns: any[]): ColumnMetaData {
     IDX_POINTER: start + 8,
     FILTER_COUNT: start + 9,
     NEXT_FILTER_IDX: start + 10,
+    columnCount: start + 1,
     count: start + 11,
   };
 }

@@ -6,17 +6,22 @@ import {
   VuuColumnDataType,
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
+import { Table } from "@heswell/data";
 
 export interface ServiceDefinition {
   name: string;
   module: string;
+  /**
+   * path to modules folder
+   */
+  modules?: string;
 }
 
-export type TableColumnType = {
+export declare type TableColumnType = {
   name: string;
 };
 
-export type TableColumn = {
+export declare type TableColumn = {
   aggregate?: "avg" | "sum";
   name: string;
   type?: VuuColumnDataType;
@@ -63,18 +68,24 @@ export interface IMessageQueue {
   push(message: ServerToClientMessage, rowMeta?: RowMeta): void;
 }
 
-export type RestHandler = (request: Request) => Response;
+export declare type RestHandler = (request: Request) => Response;
 
-export type VuuRequestHandler<
+export declare type VuuRequestHandler<
   T extends ClientToServerBody = ClientToServerBody
 > = (message: VuuClientToServerMessage<T>, session: ISession) => void;
 
 export interface ISession {
+  addViewport: (viewportId: string) => void;
   enqueue: (requestId: string, messageBody: ServerToClientBody) => void;
+  id: string;
+  readonly viewports: string[];
 }
 
 export interface DataTableService extends ConfiguredService {
   getTable: (vuuTable: VuuTable) => Table;
   getTableList: () => VuuTable[];
 }
-export type DataTableAPI = Omit<DataTableService, keyof ConfiguredService>;
+export declare type DataTableAPI = Omit<
+  DataTableService,
+  keyof ConfiguredService
+>;

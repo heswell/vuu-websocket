@@ -1,5 +1,5 @@
 // prettier-ignore
-module.exports = [
+const jsonData = [
   {"Symbol":"TFSC", 	 "Name": "1347 Capital Corp.", 	 "Price": 9.4345671, 	 "MarketCap": 56090000, 	 "IPO":"2014", 		 "Sector":"Finance", 	 "Industry":"Business Services"},
   {"Symbol":"PIH", 	   "Name": "1347 Property Insurance Holdings, Inc.", 	 "Price": 7.6400987, 	 "MarketCap": 48580000, 	 "IPO":"2014", 		 "Sector":"Finance", 	 "Industry":"Property-Casualty Insurers"},
   {"Symbol":"FLWS", 	 "Name": "1-800 FLOWERS.COM, Inc.", 	 "Price": 10.3300001, 	 "MarketCap": 668420000, 	 "IPO":"1999", 		 "Sector":"Consumer Services", 	 "Industry":"Other Specialty Stores"},
@@ -1248,3 +1248,15 @@ module.exports = [
   {"Symbol":"ZUMZ", 	 "Name": "Zumiez Inc.", 	 "Price": 38.84, 	 "MarketCap": 1140000000, 	 "IPO":"2005", 		 "Sector":"Consumer Services", 	 "Industry":"Clothing/Shoe/Accessory Stores"},
   {"Symbol":"ZNGA", 	 "Name": "Zynga Inc.", 	 "Price": 2.24, 	 "MarketCap": 2020000000, 	 "IPO":"2011", 		 "Sector":"Technology", 	 "Industry":"EDP Services"}
 ]
+
+export const data = jsonData.map(
+  ({ Symbol, Name, Price, MarketCap, IPO, Sector, Industry }) => [
+    Symbol,
+    Name,
+    Price,
+    MarketCap,
+    IPO,
+    Sector,
+    Industry,
+  ]
+);

@@ -1,9 +1,9 @@
 import { getFullRange } from "@vuu-ui/vuu-utils";
 import { IMessageQueue, RowMeta } from "@heswell/server-types";
 import {
-  ServerToClientTableRows,
   VuuRange,
-  VuuServerToClientMessage,
+  ServerToClientTableRows,
+  VuuClientMessage,
 } from "@vuu-ui/vuu-protocol-types";
 
 export interface ViewportMessage {
@@ -31,7 +31,7 @@ const ROWSET = "rowset";
 const UPDATE = "update";
 
 export class MessageQueue implements IMessageQueue {
-  #queue: VuuServerToClientMessage[];
+  #queue: VuuClientMessage[];
 
   constructor() {
     this.#queue = [];
@@ -49,7 +49,7 @@ export class MessageQueue implements IMessageQueue {
     return q;
   }
 
-  push(message: VuuServerToClientMessage, rowMeta?: RowMeta) {
+  push(message: VuuClientMessage, rowMeta?: RowMeta) {
     // if (message.type === MessageTypeOut.Update) {
     //   mergeAndPurgeUpdate(this.#queue, message);
     // } else if (message.type === MessageTypeOut.Rowset && rowMeta) {
@@ -75,7 +75,7 @@ export class MessageQueue implements IMessageQueue {
   //     }
   // }
 
-  extract(test: (message: VuuServerToClientMessage) => boolean) {
+  extract(test: (message: VuuClientMessage) => boolean) {
     if (this.#queue.length === 0) {
       return EMPTY_ARRAY;
     } else {
@@ -169,8 +169,8 @@ function mergeAndPurgeRowset(queue: any[], message: any, meta: RowMeta) {
 
 // we need to know the current range in order to be able to merge rowsets which are still valid
 const mergeAndPurgeUpdate = (
-  queue: VuuServerToClientMessage[],
-  message: VuuServerToClientMessage
+  queue: VuuClientMessage[],
+  message: VuuClientMessage
 ) => {
   //onsole.log(`mergeAndPurge: update message ${JSON.stringify(message)}` );
   /*
@@ -203,8 +203,8 @@ const mergeAndPurgeUpdate = (
 };
 
 function extractMessages(
-  queue: VuuServerToClientMessage[],
-  test: (message: VuuServerToClientMessage) => boolean
+  queue: VuuClientMessage[],
+  test: (message: VuuClientMessage) => boolean
 ) {
   var extract = [];
 
@@ -217,8 +217,3 @@ function extractMessages(
   extract.reverse();
   return extract;
 }
-
-const formatMessage = (
-  msg: VuuServerToClientMessage<ServerToClientTableRows>
-) => ` type: ${msg.body.type} 
-    rows: [${msg.body.rows.map((row) => row.data[7])}]`;

@@ -1,12 +1,12 @@
-import { ClientToServerRpcRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { VuuRpcServiceRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
 
-type UniqueValueRequest = Pick<ClientToServerRpcRequest, "type" | "service"> & {
+type UniqueValueRequest = Pick<VuuRpcServiceRequest, "type" | "service"> & {
   method: "getUniqueFieldValues";
   params: [VuuTable, string];
 };
 
 type UniqueValueStartsWithRequest = Pick<
-  ClientToServerRpcRequest,
+  VuuRpcServiceRequest,
   "type" | "service"
 > & {
   method: "getUniqueFieldValuesStartingWith";
@@ -14,12 +14,12 @@ type UniqueValueStartsWithRequest = Pick<
 };
 
 export const isGetUniqueValues = (
-  message: ClientToServerRpcRequest
+  message: VuuRpcServiceRequest
 ): message is UniqueValueRequest =>
   message.method === "getUniqueFieldValues" && message.params.length === 2;
 
 export const isGetUniqueValuesStartingWith = (
-  message: ClientToServerRpcRequest
+  message: VuuRpcServiceRequest
 ): message is UniqueValueStartsWithRequest =>
   message.method === "getUniqueFieldValuesStartingWith" &&
   message.params.length === 3;
