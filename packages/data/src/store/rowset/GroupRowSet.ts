@@ -1,5 +1,6 @@
 import { Filter } from "@vuu-ui/vuu-filter-types";
 import {
+  VuuAggregation,
   VuuGroupBy,
   VuuRange,
   VuuRow,
@@ -19,10 +20,16 @@ import {
 } from "./group-utils";
 import { UpdateTuples } from "../table";
 import { GroupIterator } from "./GroupIterator";
+import {
+  AggregationCriteria,
+  mapAggregationCriteria,
+} from "../aggregationUtils";
+import { GroupAggregator } from "./GroupAggregator";
 
 export type Groups = { [key: string]: GroupedStruct };
 
 export type GroupedStruct = {
+  aggregatedValues: Record<string, number>;
   childCount: number;
   childGroupKeys: string[];
   depth: number;
@@ -33,8 +40,10 @@ export type GroupedStruct = {
 };
 
 export class GroupRowSet extends BaseRowSet {
+  #aggregations: AggregationCriteria = [];
   #groupBy: VuuGroupBy;
   #groupedStruct: GroupedStruct = {
+    aggregatedValues: {},
     childCount: 0,
     childGroupKeys: [],
     depth: 0,
@@ -80,6 +89,13 @@ export class GroupRowSet extends BaseRowSet {
     return this.#size;
   }
 
+  set aggregations(aggregations: VuuAggregation[]) {
+    const { columnMap } = this.table;
+    this.#aggregations = mapAggregationCriteria(aggregations, columnMap);
+    // TODO determine what has changed and perform minumum possible calculation
+    this.applyAggregations();
+  }
+
   set groupBy(groupBy: VuuGroupBy) {
     console.log(`set groupBy ${groupBy.join(",")}`);
     this.#groupBy = groupBy;
@@ -109,10 +125,9 @@ export class GroupRowSet extends BaseRowSet {
     };
   }
 
-  // TODO merge with the above
   currentRange() {
     const { range, size, sortSet, table, viewportId } = this;
-    const iterator = new GroupIterator(this.#groupedStruct, range.from);
+    const iterator = new GroupIterator(this.#groupedStruct);
     const rows: VuuRow[] = [];
 
     const createRow = createGroupVuuRow(
@@ -135,11 +150,9 @@ export class GroupRowSet extends BaseRowSet {
     };
   }
 
-  // for now assumes top level node in single level grouping
   openTreeNode(key: string) {
     const groupStruct = findGroupedStructByKey(this.#groupedStruct, key);
 
-    // if we are not at leaf level of grouping, we may need to group this node
     if (groupStruct.expanded === false) {
       groupStruct.expanded = true;
       if (this.#groupBy.length > groupStruct.depth) {
@@ -159,8 +172,6 @@ export class GroupRowSet extends BaseRowSet {
 
         const expandedRows = countExpandedRows(groupStruct);
         this.#size += expandedRows;
-
-        console.log({ grpopups: this.#groupedStruct });
       } else {
         this.#size += groupStruct.leafCount;
       }
@@ -188,6 +199,20 @@ export class GroupRowSet extends BaseRowSet {
     throw new Error("Method 'update' not implemented in GroupRowSet.");
   }
 
+  private applyAggregations() {
+    const { rows } = this.table;
+    const groupAggregator = new GroupAggregator(
+      this.sortSet,
+      rows as number[][],
+      this.#groupedStruct,
+      this.#aggregations
+    );
+    const start = performance.now();
+    groupAggregator.aggregate();
+    const end = performance.now();
+    console.log(`aggregating ${rows.length} rows took ${end - start}ms`);
+  }
+
   private applyGroupBy(groupBy: VuuGroupBy) {
     console.log(`applyGroupBy ${JSON.stringify(groupBy)}`);
 
@@ -207,7 +232,7 @@ export class GroupRowSet extends BaseRowSet {
     const end = performance.now();
 
     console.log(`grouping ${rows.length} rows took ${end - start}ms`);
-    console.log({ groupedStruct: this.#groupedStruct });
+    // console.log({ groupedStruct: this.#groupedStruct });
   }
 }
 
@@ -223,6 +248,7 @@ export function buildTopLevelGroupedStruct(
     const groupValue = rows[rowIdx][groupbyColIdx];
     if (groups[groupValue] === undefined) {
       groups[groupValue] = {
+        aggregatedValues: {},
         childCount: 0,
         childGroupKeys: [],
         depth: depth + 1,
@@ -259,6 +285,7 @@ export function addNextLevelGroups(
     const groupValue = rows[rowIdx][groupbyColIdx];
     if (groups[groupValue] === undefined) {
       groups[groupValue] = {
+        aggregatedValues: {},
         childCount: -1,
         childGroupKeys: [],
         depth: depth + 1,

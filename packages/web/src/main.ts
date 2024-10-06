@@ -2,6 +2,7 @@ import { DataView, Table } from "@heswell/data";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { data } from "./data";
 import { DataResponse } from "@heswell/data/src/store/rowset";
+import { VuuAggregation } from "@vuu-ui/vuu-protocol-types";
 
 const schema: TableSchema = {
   columns: [
@@ -51,11 +52,20 @@ console.log(`${rows.length} rows of ${size}`);
 console.table(rows);
 console.table(rows.map((r) => r.data));
 
-console.log("expand node  Basic Industries");
-({ rows, size } = view.openTreeNode("$root|Basic Industries"));
-console.log({ size });
+let aggregations: VuuAggregation[] = [{ column: "MarketCap", aggType: 1 }];
+console.log(
+  `%c--------- aggregate  [${JSON.stringify(aggregations)}]     ---------`,
+  "color:green;font-weight:bold;font-size: large;"
+);
+({ rows, size } = view.aggregate(aggregations));
 console.table(rows);
 console.table(rows.map((r) => r.data));
+
+// console.log("expand node  Basic Industries");
+// ({ rows, size } = view.openTreeNode("$root|Basic Industries"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
 
 // groupBy = ["Sector", "Industry", "IPO"];
 // console.log(

@@ -1,6 +1,7 @@
 import { TableColumn } from "@heswell/server-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import {
+  VuuAggregation,
   VuuFilter,
   VuuGroupBy,
   VuuRange,
@@ -171,6 +172,8 @@ export default class DataView {
       return this.filter(options.filterSpec);
     } else if (changes.groupByChanged) {
       return this.group(options.groupBy);
+    } else if (changes.aggregationsChanged) {
+      this.aggregate(options.aggregations);
     } else {
       return { rows: [], size: -1 };
     }
@@ -188,6 +191,22 @@ export default class DataView {
 
   select(selection: number[]): DataResponse {
     return this.rowSet.select(selection);
+  }
+
+  aggregate(aggregations: VuuAggregation[]): DataResponse {
+    this.#config = {
+      ...this.#config,
+      aggregations,
+    };
+
+    if (this.rowSet instanceof GroupRowSet) {
+      this.rowSet.aggregations = aggregations;
+      return this.setRange(resetRange(this.rowSet.range), false);
+    } else {
+      throw Error(
+        "DataView aggregate cannot perform aggregation on a non grouped dataset"
+      );
+    }
   }
 
   sort(sort: VuuSort): DataResponse {
