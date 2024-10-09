@@ -173,7 +173,7 @@ export default class DataView {
     } else if (changes.groupByChanged) {
       return this.group(options.groupBy);
     } else if (changes.aggregationsChanged) {
-      this.aggregate(options.aggregations);
+      return this.aggregate(options.aggregations);
     } else {
       return { rows: [], size: -1 };
     }

@@ -31,19 +31,18 @@ function aggregateGroup(
   rows: number[][]
 ) {
   if (expanded) {
+    for (const [, , columnName] of aggregations) {
+      aggregatedValues[columnName] = 0;
+    }
     for (
       let childGroupIndex = 0;
       childGroupIndex < childCount;
       childGroupIndex++
     ) {
-      for (const [, , columnName] of aggregations) {
-        aggregatedValues[columnName] = 0;
-      }
-
       const groupValue = childGroupKeys[childGroupIndex];
       const childGroup = groups[groupValue];
       aggregateGroup(childGroup, aggregations, sortSet, rows);
-      for (const [columnIndex, , columnName] of aggregations) {
+      for (const [, , columnName] of aggregations) {
         aggregatedValues[columnName] += childGroup.aggregatedValues[columnName];
       }
     }

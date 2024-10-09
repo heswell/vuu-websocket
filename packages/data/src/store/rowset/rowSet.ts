@@ -6,7 +6,6 @@ import { Filter } from "@vuu-ui/vuu-filter-types";
 import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
 import type {
   VuuDataRow,
-  VuuFilter,
   VuuRange,
   VuuRow,
   VuuSortCol,

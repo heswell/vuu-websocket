@@ -68,7 +68,9 @@ const sort1A2A3A: SortComparator = (
 
 export const revertToIndexSort = (sortSet: SortSet) => sortSet.sort(sortIndex);
 
-const getSortFunctionOptimisedForSortCrirteria = (sortDefs: VuuSortCol[]) => {
+export const getSortFunctionOptimisedForSortCriteria = (
+  sortDefs: VuuSortCol[]
+) => {
   switch (sortDefs.length) {
     case 0:
       throw Error("no sort criteria");
@@ -90,7 +92,7 @@ export function sort(
   columnMap: ColumnMap
 ) {
   const sortCriteria = mapSortDefsToSortCriteria(sortDefs, columnMap);
-  const sortFn = getSortFunctionOptimisedForSortCrirteria(sortDefs);
+  const sortFn = getSortFunctionOptimisedForSortCriteria(sortDefs);
   sortFn(sortSet, rows, sortCriteria);
 }
 

@@ -168,6 +168,14 @@ export class GroupRowSet extends BaseRowSet {
             groupCriteria[groupStruct.depth][0],
             groupStruct
           );
+          if (this.#aggregations.length > 0) {
+            new GroupAggregator(
+              this.sortSet,
+              this.table.rows as number[][],
+              this.#groupedStruct,
+              this.#aggregations
+            ).aggregate(groupStruct);
+          }
         }
 
         const expandedRows = countExpandedRows(groupStruct);

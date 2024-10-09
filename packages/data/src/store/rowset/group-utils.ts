@@ -181,8 +181,7 @@ export const createGroupVuuRow = (
   const keyColIndex = columnMap[schema.key];
   const dataRowColumns = Object.entries(columnMap);
 
-  return ({ group, groupValue, index, key, leafIndex }: GroupedItem) => {
-    const [groupColumnIdx, childColumnIdx] = groupCriteria.map(([idx]) => idx);
+  return ({ group, index, key, leafIndex }: GroupedItem) => {
     const { columnCount, COUNT, DEPTH, EXPANDED, LEAF } = groupRowColumnMap;
 
     const data = Array(columnCount).fill("");
@@ -201,18 +200,7 @@ export const createGroupVuuRow = (
       for (const [columnName, rowIdx] of dataRowColumns) {
         data[groupRowColumnMap[columnName]] = leafRow[rowIdx];
       }
-    } /*else if (childGroupIndex !== -1) {
-      const childGroupKey = group.childGroupKeys[childGroupIndex];
-      const childGroup = group.groups[childGroupKey];
-      leafRowKey = `|${childGroupKey}`;
-
-      data[DEPTH] = childGroup.depth;
-      data[COUNT] = childGroup.leafCount;
-      data[LEAF] = false;
-      data[EXPANDED] = childGroup.expanded;
-      data[childColumnIdx] = childGroupKey;
-      data[groupColumnIdx] = groupValue;
-    }*/ else {
+    } else {
       data[DEPTH] = group.depth;
       data[COUNT] = group.leafCount;
       data[LEAF] = false;
@@ -222,6 +210,13 @@ export const createGroupVuuRow = (
       for (let i = 0; i < keyValues.length; i++) {
         const [groupColumnIdx] = groupCriteria[i];
         data[groupColumnIdx] = keyValues[i];
+      }
+
+      for (const [columnName, value] of Object.entries(
+        group.aggregatedValues
+      )) {
+        const columnIdx = groupRowColumnMap[columnName];
+        data[columnIdx] = value;
       }
     }
 
