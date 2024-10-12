@@ -1,6 +1,5 @@
 import {
   ConfiguredService,
-  DataTableAPI,
   RestHandler,
   ServerConfig,
 } from "@heswell/server-types";
@@ -8,6 +7,7 @@ import { filterPredicate, parseFilter } from "@vuu-ui/vuu-filter-parser";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { getQueryFields, getRestRange, getSortSet } from "./rest-utils";
+import ModuleService from "@heswell/vuu-module";
 
 import { ServiceHandlers } from "@heswell/server-core/src/requestHandlers";
 import { SortSet } from "@heswell/data";
@@ -19,11 +19,7 @@ const dataSourceRowToEntity = (row: VuuDataRow, columnMap: ColumnMap) =>
     return entity;
   }, {} as Entity);
 
-let dataTableAPI: DataTableAPI | undefined = undefined;
-
-const configure = async ({ TableService }: ServerConfig) => {
-  dataTableAPI = TableService;
-};
+const configure = async (config: ServerConfig) => {};
 
 const instruments = {
   module: "SIMUL",
@@ -39,7 +35,7 @@ const restHandler: RestHandler = (request) => {
   const url = new URL(request.url);
   switch (url.pathname) {
     case "/api/instruments/summary": {
-      const table = dataTableAPI?.getTable(instruments);
+      const table = ModuleService.getTable(instruments);
       if (table) {
         return new Response(
           JSON.stringify({ recordCount: table.rows.length }),
@@ -57,7 +53,7 @@ const restHandler: RestHandler = (request) => {
       const { origin, limit } = getRestRange(url);
       console.log(`origin = ${origin} limit = ${limit}`);
       const queryParams = getQueryFields(url);
-      const table = dataTableAPI?.getTable(instruments);
+      const table = ModuleService.getTable(instruments);
       if (table) {
         let { columnMap, rows } = table;
         const start = performance.now();

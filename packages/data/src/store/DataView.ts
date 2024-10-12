@@ -16,7 +16,7 @@ import {
 } from "@vuu-ui/vuu-utils";
 import { buildColumnMap, toColumn } from "./columnUtils.ts";
 import { Range, resetRange } from "./rangeUtils.ts";
-import { DataResponse, GroupRowSet, RowSet } from "./rowset";
+import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
@@ -104,10 +104,6 @@ export default class DataView {
   }
   get sortDefs(): VuuSortCol[] {
     return this.#config.sort.sortDefs;
-  }
-
-  get status() {
-    return this.#table?.status;
   }
 
   get updates() {

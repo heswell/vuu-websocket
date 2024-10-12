@@ -1,4 +1,4 @@
-import { DataTableDefinition, TableUpdateOptions } from "@heswell/server-types";
+import { DataTableDefinition } from "@heswell/server-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
@@ -10,7 +10,8 @@ const defaultUpdateConfig: TableUpdateOptions = {
   updateInterval: 500,
 };
 
-export type TableIndex = Map<string, number>;
+// export type TableIndex = Map<string, number>;
+export type TableIndex = Record<string, number>;
 
 export type UpdateTuples = VuuDataRow[];
 export type RowInsertHandler = (rowIndex: number, row: unknown) => void;
@@ -36,58 +37,40 @@ export interface TableGenerators {
 export type TableRow = [VuuDataRow, ...VuuDataRow[], number, string];
 
 export class Table extends EventEmitter<TableEvents> {
-  #index: TableIndex = new Map<string, number>();
+  // #index: TableIndex = new Map<string, number>();
+  #index: TableIndex = {};
   #keys: Record<string, number> = {};
 
-  public installDataGenerators?: (config: DataTableDefinition) => void;
   public columnMap: ColumnMap;
   public rows: VuuDataRow[] = [];
   public status: "ready" | null = null;
   public readonly schema: TableSchema;
 
-  updateOptions: TableUpdateOptions = defaultUpdateConfig;
-
-  constructor(config: DataTableDefinition) {
+  constructor({ schema }: DataTableDefinition) {
     super();
-    const { schema, dataPath, data, updates = {} } = config;
 
     this.schema = schema;
 
-    this.updateOptions = {
-      ...defaultUpdateConfig,
-      ...updates,
-    };
     this.columnMap = buildColumnMap(schema.columns);
-
-    // console.log(`Table
-    //     columns = ${JSON.stringify(columns,null,2)}
-    //     columnMap = ${JSON.stringify(this.columnMap,null,2)}
-    //     `)
-
-    if (data) {
-      this.parseData(data);
-    } else if (dataPath) {
-      this.loadData(dataPath);
-    }
-
-    this.installDataGenerators?.(config);
   }
 
   get columns() {
     return this.schema.columns;
   }
+  get index() {
+    return this.#index;
+  }
 
   get name() {
-    const { module, table } = this.schema.table;
-    return `${module}:${table}`;
+    return this.schema.table.table;
   }
 
   get primaryKey() {
     return this.schema.key;
   }
 
-  get index() {
-    return this.#index;
+  get rowCount() {
+    return this.rows.length;
   }
 
   getUniqueValuesForColumn(column: string, pattern?: string) {
@@ -138,13 +121,15 @@ export class Table extends EventEmitter<TableEvents> {
     this.emit("rowUpdated", rowIdx, results);
   }
 
-  insert(row: VuuDataRow) {
+  insert(row: VuuDataRow, emitEvent = true) {
     const rowIdx = this.rows.length;
     const indexOfKeyValue = this.columnMap[this.primaryKey];
     const key = row[indexOfKeyValue];
-    this.#index.set(key.toString(), rowIdx);
+    this.#index[key.toString()] = rowIdx;
     this.rows.push(row);
-    this.emit("rowInserted", rowIdx, row);
+    if (emitEvent) {
+      this.emit("rowInserted", rowIdx, row);
+    }
   }
 
   remove(key: string) {
@@ -167,46 +152,6 @@ export class Table extends EventEmitter<TableEvents> {
   }
 
   clear() {}
-
-  async loadData(url: string) {
-    fetch(url, {})
-      .then((data) => data.json())
-      .then((json) => {
-        if (Array.isArray(json)) {
-          console.log(`Table.loadData: got ${json.length} rows`);
-          this.parseData(json as VuuDataRow[]);
-        } else {
-          throw Error("data is expected to be array");
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  }
-
-  parseData(rows: VuuDataRow[]) {
-    console.log(`parseData ${rows.length} rows`);
-    const indexOfKeyValue = this.columnMap[this.primaryKey];
-    for (let i = 0; i < rows.length; i++) {
-      const key = rows[i][indexOfKeyValue];
-      this.#index.set(key.toString(), i);
-    }
-    this.rows = rows;
-
-    this.status = "ready";
-    this.emit("ready");
-    if (this.updateOptions && this.updateOptions.applyUpdates !== false) {
-      setTimeout(() => {
-        this.applyUpdates();
-      }, 1000);
-    }
-    // move this
-    if (this.updateOptions && this.updateOptions.applyInserts !== false) {
-      setTimeout(() => {
-        this.applyInserts();
-      }, 10000);
-    }
-  }
 
   //TODO move all these methods into an external helper
   applyInserts() {

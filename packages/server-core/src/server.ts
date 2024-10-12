@@ -1,8 +1,4 @@
-import {
-  DataTableAPI,
-  ServerConfig,
-  ServerMessagingConfig,
-} from "@heswell/server-types";
+import { ServerConfig, ServerMessagingConfig } from "@heswell/server-types";
 import { websocketConnectionHandler } from "./websocket-connection-handler";
 import { configureRequestHandlers, getRestHandler } from "./requestHandlers";
 
@@ -17,10 +13,8 @@ const msgConfig: ServerMessagingConfig = {
 };
 
 export async function start(...configs: ServerConfig[]) {
-  let tableService: DataTableAPI | undefined = undefined;
   for (const config of configs) {
-    const result = await configureRequestHandlers(config, tableService);
-    tableService ??= result;
+    await configureRequestHandlers(config);
   }
 
   const restServer = Bun.serve<{ authToken: string }>({

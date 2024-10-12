@@ -7,7 +7,6 @@ import {
   VuuRequestHandler,
 } from "@heswell/server-types";
 import { MessageQueue } from "./messageQueue";
-import { isDataTableService } from "@heswell/data-tables/src/services/data-service-utils";
 
 type HandlerIdentifier = string;
 export type ServiceHandlers = Record<
@@ -29,7 +28,7 @@ const _messageTypeToServiceNameMap: { [messageType: string]: string } = {};
 export async function configureRequestHandlers(
   config: ServerConfig,
   tableService?: DataTableAPI
-): Promise<DataTableAPI | undefined> {
+): Promise<undefined> {
   const {
     service: { name: serviceName, module },
   } = config;
@@ -47,11 +46,6 @@ export async function configureRequestHandlers(
     TableService: tableService,
   });
   _serviceAPI.push(serviceAPI);
-
-  if (isDataTableService(serviceAPI)) {
-    const { configure, ...dataTableAPI } = serviceAPI;
-    return dataTableAPI as DataTableAPI;
-  }
 }
 
 export function getRestHandler(handlerIdentifier: string): RestHandler {

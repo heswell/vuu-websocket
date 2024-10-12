@@ -27,21 +27,8 @@ export declare type TableColumn = {
   type?: VuuColumnDataType;
 };
 
-interface TableUpdateOptions {
-  applyInserts?: boolean;
-  applyUpdates?: boolean;
-  fields?: string[];
-  insertInterval?: number;
-  updateInterval?: number;
-}
-
 export interface DataTableDefinition {
   schema: TableSchema;
-  createPath?: string;
-  data?: VuuDataRow[];
-  dataPath?: string;
-  updatePath?: string;
-  updates?: TableUpdateOptions;
 }
 
 export interface ServerConfig {

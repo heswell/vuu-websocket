@@ -1,7 +1,7 @@
 {
-  "name": "@heswell/vuuserver",
-  "version": "3.0.0",
-  "description": "Heswell Vuu Server",
+  "name": "@heswell/vuu-module",
+  "version": "1.0.0",
+  "description": "Vuu Module Container",
   "main": "dist/src/index.js",
   "module": "src/index.ts",
   "publishConfig": {
@@ -19,7 +19,6 @@
     "@heswell/data-tables": "3.0.0",
     "@heswell/server-core": "3.0.0",
     "@heswell/server-types": "3.0.0",
-    "@heswell/vuu-module": "1.0.0",
     "@vuu-ui/vuu-utils": "0.8.93"
   },
   "devDependencies": {

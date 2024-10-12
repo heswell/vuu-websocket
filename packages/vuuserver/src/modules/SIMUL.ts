@@ -1,4 +1,4 @@
-import { VuuModuleBase } from "../services/VuuModuleBase";
+import { VuuModuleBase } from "../VuuModuleBase";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { DataTableAPI } from "@heswell/server-types";
 
