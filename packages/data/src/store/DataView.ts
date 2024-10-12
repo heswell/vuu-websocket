@@ -33,7 +33,7 @@ export default class DataView {
   #columnMap: ColumnMap;
   #columns: TableColumn[];
   #id: string;
-  #table: Table | undefined;
+  #table: Table;
   #updateQueue: UpdateQueue;
 
   private _vuuFilter: VuuFilter = EmptyFilter;
@@ -85,6 +85,7 @@ export default class DataView {
     this.#table?.removeListener("rowUpdated", this.rowUpdated);
     this.#table?.removeListener("rowInserted", this.rowInserted);
     this.rowSet.clear();
+    //@ts-ignore
     this.#table = undefined;
   }
 
@@ -102,8 +103,17 @@ export default class DataView {
   get groupBy(): VuuGroupBy {
     return this.#config.groupBy;
   }
+
+  get id() {
+    return this.#id;
+  }
+
   get sortDefs(): VuuSortCol[] {
     return this.#config.sort.sortDefs;
+  }
+
+  get table() {
+    return this.#table;
   }
 
   get updates() {

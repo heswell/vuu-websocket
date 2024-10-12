@@ -38,7 +38,7 @@ export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
       console.log(`WebSocket closed`);
       const session = getSession(ws);
       if (session) {
-        const teardownHandler = getHandlerForMessage("purgeSubscriptions");
+        const teardownHandler = getHandlerForMessage("onSessionClosed");
         if (teardownHandler) {
           teardownHandler?.({}, session);
         }

@@ -1,4 +1,4 @@
-import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { VuuLink, VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { Module } from "./Module";
 import { ProviderFactory } from "./Provider";
 import { tableDefToSchema } from "./tableDefToSchema";
@@ -10,9 +10,11 @@ export type Column = {
 };
 
 export interface TableDef {
-  name: string;
-  keyField: string;
   columns: Column[];
+  joinFields?: string | string[];
+  keyField: string;
+  name: string;
+  links?: VuuLink[];
 }
 
 export class ModuleFactory {
@@ -32,12 +34,18 @@ export class ModuleFactory {
 
   private tableBuilder(moduleName: string) {
     return {
-      addTable: (tableDef: TableDef, providerFactory: ProviderFactory) => {
+      addTable: (
+        { links, ...tableDef }: TableDef,
+        providerFactory: ProviderFactory
+      ) => {
         const module = this.getModule(moduleName);
         const table = new Table({
           schema: tableDefToSchema(moduleName, tableDef),
         });
         module.addTable(table, providerFactory(table));
+        if (links) {
+          module.addLinks(table, links);
+        }
         return this.tableBuilder(moduleName);
       },
       asModule: () => this.startModule(moduleName),
@@ -65,5 +73,9 @@ export class ModuleFactory {
 
   getTable({ module, table }: VuuTable) {
     return this.getModule(module).getTable(table);
+  }
+
+  getLinks({ module, table }: VuuTable) {
+    return this.getModule(module).getLinks(table);
   }
 }

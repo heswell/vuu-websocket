@@ -20,6 +20,10 @@ export class ModuleService {
     return this.#moduleFactory;
   }
 
+  getLinks(vuuTable: VuuTable) {
+    return this.moduleFactory.getLinks(vuuTable);
+  }
+
   getTablelist() {
     return this.moduleFactory.tableList;
   }

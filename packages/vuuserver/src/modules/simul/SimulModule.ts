@@ -18,6 +18,7 @@ ModuleService.moduleFactory
         { name: "isin", dataType: "string" },
         { name: "lotSize", dataType: "int" },
       ],
+      joinFields: "ric",
       keyField: "ric",
       name: "instruments",
     },
@@ -36,6 +37,11 @@ ModuleService.moduleFactory
         { name: "ric", dataType: "string" },
         { name: "side", dataType: "string" },
         { name: "trader", dataType: "string" },
+      ],
+      joinFields: "ric",
+      links: [
+        { toTable: "instruments", fromColumn: "ric", toColumn: "ric" },
+        { toTable: "prices", fromColumn: "ric", toColumn: "ric" },
       ],
       keyField: "orderId",
       name: "orders",
@@ -63,7 +69,17 @@ ModuleService.moduleFactory
         { name: "strategy", dataType: "string" },
         { name: "volLimit", dataType: "int" },
       ],
+      joinFields: "ric",
       keyField: "id",
+      links: [
+        { toTable: "instruments", fromColumn: "ric", toColumn: "ric" },
+        {
+          toTable: "parentOrders",
+          fromColumn: "parentOrderId",
+          toColumn: "id",
+        },
+        { toTable: "prices", fromColumn: "ric", toColumn: "ric" },
+      ],
       name: "childOrders",
     },
     (table) => new ChildOrdersProvider(table)
@@ -90,6 +106,11 @@ ModuleService.moduleFactory
         { name: "volLimit", dataType: "int" },
       ],
       keyField: "id",
+      links: [
+        { toTable: "instruments", fromColumn: "ric", toColumn: "ric" },
+        { toTable: "prices", fromColumn: "ric", toColumn: "ric" },
+      ],
+
       name: "parentOrders",
     },
     (table) => new ParentOrdersProvider(table)
@@ -108,6 +129,7 @@ ModuleService.moduleFactory
         { name: "ric", dataType: "string" },
         { name: "scenario", dataType: "string" },
       ],
+      joinFields: "ric",
       keyField: "ric",
       name: "prices",
     },

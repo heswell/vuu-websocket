@@ -1,6 +1,6 @@
 import { Table } from "@heswell/data";
 import { IProvider } from "./Provider";
-import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { VuuLink, VuuTable } from "@vuu-ui/vuu-protocol-types";
 
 export interface ModuleConstructorProps {
   name: string;
@@ -37,6 +37,7 @@ const loadProviders = (
 export class Module {
   #name: string;
   #providers = new Map<string, IProvider>();
+  #links = new Map<string, VuuLink[]>();
   #tables = new Map<string, Table>();
 
   constructor({ name }: ModuleConstructorProps) {
@@ -58,6 +59,10 @@ export class Module {
     this.#providers.set(tableName, provider);
     this.#tables.set(tableName, table);
     return table;
+  }
+
+  addLinks(table: Table, links: VuuLink[]) {
+    this.#links.set(table.name, links);
   }
 
   async start() {
@@ -84,5 +89,9 @@ export class Module {
     if (table) {
       return table;
     } else throw Error(`[${this.name}] no table found ${tableName}`);
+  }
+
+  getLinks(tableName: string) {
+    return this.#links.get(tableName);
   }
 }

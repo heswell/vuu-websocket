@@ -132,6 +132,7 @@ export class RowSet extends BaseRowSet {
 
   currentRange(): DataResponse {
     const { from, to } = this.range;
+    console.log(`currentRange ${from} - ${to}`);
     const resultset = this.slice(from, to);
     return {
       rows: resultset,
