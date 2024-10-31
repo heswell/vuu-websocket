@@ -37,7 +37,6 @@ export interface TableGenerators {
 export type TableRow = [VuuDataRow, ...VuuDataRow[], number, string];
 
 export class Table extends EventEmitter<TableEvents> {
-  // #index: TableIndex = new Map<string, number>();
   #index: TableIndex = {};
   #keys: Record<string, number> = {};
 

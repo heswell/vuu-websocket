@@ -57,7 +57,6 @@ export type GroupRowProjector = (
 export type RowProjector = (row: VuuDataRow, rowIndex: number) => VuuRow;
 export type MultiRowProjectorFactory = (
   selectedKeyValues: string[],
-  index: TableIndex,
   vpSize: number
 ) => RowProjector;
 
@@ -65,7 +64,7 @@ export const projectColumns = (
   keyFieldIndex: number,
   viewPortId: string
 ): MultiRowProjectorFactory => {
-  return (selected: string[] = [], index: TableIndex, vpSize: number) =>
+  return (selected: string[] = [], vpSize: number) =>
     (data: VuuDataRow, rowIndex: number) => {
       const rowKey = data[keyFieldIndex] as string;
       return {

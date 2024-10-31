@@ -20,7 +20,6 @@ import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
-import { groupByExtendsExistingGroupBy } from "./rowset/group-utils.ts";
 
 const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
 
@@ -170,8 +169,6 @@ export default class DataView {
     // console.log({ options, config: this.#config });
     const { noChanges, ...changes } = isConfigChanged(this.#config, options);
 
-    console.log({ noChanges, otherChanges: changes });
-
     if (changes.sortChanged) {
       return this.sort(options.sort);
     } else if (changes.filterChanged) {
@@ -301,18 +298,8 @@ export default class DataView {
       if (groupBy.length === 0) {
         this.rowSet = rowSet.toRowSet();
       } else {
-        rowSet.groupBy = groupBy;
-        if (
-          groupByExtendsExistingGroupBy(existingGroupBy, groupBy) &&
-          rowSet.expandedChildNodeCount === 0
-        ) {
-          // If all existing nodes are collapsed, there is no data to return
-          // to client and will not be until user opens a tree node ( or scrolls)
-          console.log(
-            `${groupBy.join(",")} extends ${existingGroupBy.join(
-              ","
-            )} and there are no expanded nodes`
-          );
+        const requiresRender = rowSet.setGroupBy(groupBy);
+        if (!requiresRender) {
           return;
         }
       }

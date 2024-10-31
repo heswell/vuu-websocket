@@ -1,6 +1,15 @@
-import { VuuGroupBy, VuuRow } from "@vuu-ui/vuu-protocol-types";
+import {
+  VuuDataRow,
+  VuuGroupBy,
+  VuuRange,
+  VuuRow,
+} from "@vuu-ui/vuu-protocol-types";
 import type { GroupedStruct, Groups } from "./GroupRowSet";
-import { ColumnMap } from "@vuu-ui/vuu-utils";
+import {
+  ColumnMap,
+  isValidNumber,
+  itemsOrOrderChanged,
+} from "@vuu-ui/vuu-utils";
 import { ASC, SortCriteria, SortSet } from "../sortUtils";
 import { Table } from "../table";
 
@@ -18,33 +27,37 @@ export type CursorPosition = {
   index: number;
 };
 
+export const getLeafRow = (groupItem: GroupedItem, rows: VuuDataRow[]) => {
+  const {
+    leafIndex,
+    group: { leafRows },
+  } = groupItem;
+  const rowIndex = leafRows[leafIndex];
+  return rows[rowIndex];
+};
+
+export const getRangeSet = ({ from, to }: VuuRange) =>
+  new Array(to - from).fill(0).map((_, i) => from + i);
+
+export const getRangeSetBounds = (rangeSet: number[]): [number, number] => {
+  const lowerBound = rangeSet[0];
+  const upperBound = rangeSet.at(-1);
+  if (isValidNumber(lowerBound) && isValidNumber(upperBound)) {
+    return [lowerBound, upperBound + 1];
+  } else {
+    throw Error(`invalid rangeSet [${rangeSet[0]} : ${rangeSet.at(-1)}]`);
+  }
+};
+
 export const NO_GROUPS: Groups = {} as const;
 
 export const extractKeyValues = (key: string) => key.split("|").slice(1);
-
-export function findGroupedStructAtIndex(
-  { childGroupKeys, groups }: GroupedStruct,
-  index: number[],
-  key = "$root"
-): [string, string, GroupedStruct] {
-  const [idx] = index;
-  const groupValue = childGroupKeys[idx];
-  const group = groups[groupValue];
-  const groupKey = `${key}|${groupValue}`;
-  if (index.length === 1) {
-    return [groupKey, groupValue, group];
-  } else {
-    return findGroupedStructAtIndex(group, index.slice(1), groupKey);
-  }
-}
 
 export function findGroupedStructByKey(
   { groups }: GroupedStruct,
   key: string | string[]
 ): GroupedStruct {
   const [root, ...keys] = Array.isArray(key) ? key : extractKeyValues(key);
-
-  console.log(`open Tree node [${[root].concat(keys).join("|")}]`);
 
   const groupedStruct = groups[root];
   if (groupedStruct) {
@@ -58,13 +71,49 @@ export function findGroupedStructByKey(
   }
 }
 
-export const groupByExtendsExistingGroupBy = (
+export type GroupByChangeType =
+  | { type: "extended"; depth: number }
+  | { type: "reduced"; depth: number }
+  | { type: "modified"; depth: number }
+  | { type: "no-change" };
+
+export const typeofGroupByChange = (
   currentGroupBy: VuuGroupBy,
   newGroupBy: VuuGroupBy
-) =>
-  currentGroupBy.length > 0 &&
-  newGroupBy.length > currentGroupBy.length &&
-  currentGroupBy.every((val, i) => newGroupBy[i] === val);
+): GroupByChangeType => {
+  if (!itemsOrOrderChanged(currentGroupBy, newGroupBy)) {
+    return { type: "no-change" };
+  } else if (currentGroupBy.length === newGroupBy.length) {
+    return {
+      type: "modified",
+      depth: depthOfFirstChange(currentGroupBy, newGroupBy),
+    };
+  } else if (currentGroupBy.length < newGroupBy.length) {
+    return {
+      type: "extended",
+      depth: depthOfFirstChange(currentGroupBy, newGroupBy),
+    };
+  } else {
+    return {
+      type: "reduced",
+      depth: depthOfFirstChange(currentGroupBy, newGroupBy),
+    };
+  }
+};
+
+export const depthOfFirstChange = (
+  groupBy1: VuuGroupBy,
+  groupBy2: VuuGroupBy
+) => {
+  const end = Math.min(groupBy1.length, groupBy2.length);
+  let i = 0;
+  for (; i < end; i++) {
+    if (groupBy1[i] !== groupBy2[i]) {
+      return i + 1;
+    }
+  }
+  return i + 1;
+};
 
 // doesn't care from which position col is removed, as long as it is not the first
 export const groupbyReducesExistingGroupby = (
@@ -107,7 +156,7 @@ export const countRows = ({
   groups,
   leafCount,
 }: GroupedStruct): number => {
-  if (childCount !== -1) {
+  if (childCount > 0) {
     return childGroupKeys.reduce((count, key) => {
       const group = groups[key];
       if (group.expanded) {
@@ -181,7 +230,10 @@ export const createGroupVuuRow = (
   const keyColIndex = columnMap[schema.key];
   const dataRowColumns = Object.entries(columnMap);
 
-  return ({ group, index, key, leafIndex }: GroupedItem) => {
+  return (
+    { group, index, key, leafIndex }: GroupedItem,
+    isSelected = false
+  ) => {
     const { columnCount, COUNT, DEPTH, EXPANDED, LEAF } = groupRowColumnMap;
 
     const data = Array(columnCount).fill("");
@@ -223,7 +275,7 @@ export const createGroupVuuRow = (
     return {
       rowIndex: index,
       rowKey: `${key}${leafRowKey}`,
-      sel: 0,
+      sel: isSelected ? 1 : 0,
       ts: +new Date(),
       updateType: "U",
       viewPortId,
@@ -233,13 +285,6 @@ export const createGroupVuuRow = (
     } as VuuRow;
   };
 };
-
-// export const incrementLastIndex = (index: number[]) => {
-//   let lastIndex = index.pop() as number;
-//   lastIndex += 1;
-//   index.push(lastIndex);
-//   return lastIndex;
-// };
 
 export const findCursorPosition = (
   { childGroupKeys, groups }: GroupedStruct,

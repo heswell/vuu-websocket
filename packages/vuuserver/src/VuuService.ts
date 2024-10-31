@@ -8,9 +8,9 @@ import {
   VuuViewportCreateRequest,
   VuuViewportVisualLinksRequest,
 } from "@vuu-ui/vuu-protocol-types";
-
 import ModuleService from "@heswell/vuu-module";
 import "./modules/simul/SimulModule.ts";
+import "./modules/test/TestModule.ts";
 
 import type {
   ConfiguredService,

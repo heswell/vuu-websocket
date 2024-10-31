@@ -16,22 +16,21 @@ import { identifySelectionChanges } from "../selectionUtils";
 const NULL_SORTSET: SortSet = [[-1, -1, -1]];
 
 export abstract class BaseRowSet {
-  public viewportId: string;
   protected _table: Table;
-  public range: VuuRange = NULL_RANGE;
-  public currentFilter: Filter | undefined;
-
-  /** filterSet is an array of index positions into the sortSet */
-  protected filterSet: number[] | undefined;
+  protected filterKeyMap: Map<string, number> = new Map();
   protected meta: ColumnMetaData;
   /** key values of selected rows   */
   protected selected: string[] = [];
-  public sortSet: SortSet = NULL_SORTSET;
   protected sortCols: VuuSortCol[] | undefined;
-  protected sortedIndex: TableIndex = new Map();
-  protected filterKeyMap: Map<string, number> = new Map();
+  protected sortedIndex = new Map<string, number>();
 
   public columns: TableColumn[];
+  public currentFilter: Filter | undefined;
+  /** filterSet is an array of index positions into the sortSet */
+  public filterSet: number[] | undefined;
+  public range: VuuRange = NULL_RANGE;
+  public sortSet: SortSet = NULL_SORTSET;
+  public viewportId: string;
 
   project: MultiRowProjectorFactory = () => () => {
     throw Error("project method must be implemented");

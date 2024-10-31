@@ -11,12 +11,15 @@ import { RowSet } from "./rowSet";
 import { DataResponse } from "./IRowSet";
 import { SortSet } from "../sortUtils";
 import {
-  countExpandedChildNodes,
   countExpandedRows,
   countRows,
   createGroupVuuRow,
   findGroupedStructByKey,
+  getLeafKey,
+  getLeafRow,
+  GroupedItem,
   mapGroupByToSortCriteria,
+  typeofGroupByChange,
 } from "./group-utils";
 import { UpdateTuples } from "../table";
 import { GroupIterator } from "./GroupIterator";
@@ -25,6 +28,7 @@ import {
   mapAggregationCriteria,
 } from "../aggregationUtils";
 import { GroupAggregator } from "./GroupAggregator";
+import { identifySelectionChanges } from "../selectionUtils";
 
 export type Groups = { [key: string]: GroupedStruct };
 
@@ -41,17 +45,20 @@ export type GroupedStruct = {
 
 export class GroupRowSet extends BaseRowSet {
   #aggregations: AggregationCriteria = [];
+  // group metaData
+  /**
+   * Keeps count of number of expanded groups at each level. Easy to track
+   * and allows us to efficiently determine whether an openTreeNode request
+   * requires us to apply grouping. This will yield some false positives -
+   * where a higher level node has been collapsed but descendant nodes were
+   * expanded, these cann still trigger  a rerender. Not worth the expense of
+   * detecting this though - a rerender isn't that expensive
+   */
+  #expandedGroupCount = new Map<number, number>();
+
   #groupBy: VuuGroupBy;
-  #groupedStruct: GroupedStruct = {
-    aggregatedValues: {},
-    childCount: 0,
-    childGroupKeys: [],
-    depth: 0,
-    leafCount: 0,
-    expanded: true,
-    groups: {},
-    leafRows: [],
-  };
+  #groupedStruct: GroupedStruct;
+  #maxGroupedLevel = 1;
   #size = 0;
 
   filter(filter: Filter): void {
@@ -67,15 +74,16 @@ export class GroupRowSet extends BaseRowSet {
   }
 
   constructor(
-    { columns, range, sortSet, table, viewportId }: RowSet,
+    { columns, filterSet, range, sortSet, table, viewportId }: RowSet,
     groupBy: VuuGroupBy
   ) {
     super(viewportId, table, columns);
+    this.filterSet = filterSet;
     this.#groupBy = groupBy;
     this.sortSet = sortSet;
     this.range = range;
 
-    this.applyGroupBy(groupBy);
+    this.#groupedStruct = this.applyGroupBy(groupBy);
   }
 
   toRowSet() {
@@ -96,16 +104,68 @@ export class GroupRowSet extends BaseRowSet {
     this.applyAggregations();
   }
 
-  set groupBy(groupBy: VuuGroupBy) {
-    console.log(`set groupBy ${groupBy.join(",")}`);
+  /**
+   * Some groupBy operations require nothing more than updating the
+   * groupBy columns. Only when user expands a node to reveal nested
+   * children do we need to lazily evaluate those child nodes.
+   * Return false if no rendering action required.
+   */
+  setGroupBy(groupBy: VuuGroupBy): boolean {
+    this.assertValidGroupBy(groupBy);
+
+    const existingGroupBy = this.#groupBy;
+    const change = typeofGroupByChange(this.#groupBy, groupBy);
+    const extendsExistingGroupBy =
+      change.type === "extended" && change.depth === existingGroupBy.length;
+
+    // If typeOfChange is 'modified', determine depth at which modification starts
+    // might still be a no-op if no nodes are actually visible
+
+    // ditto reduced
+
     this.#groupBy = groupBy;
+
+    if (extendsExistingGroupBy) {
+      const expandedGroupCount =
+        this.#expandedGroupCount.get(groupBy.length - 1) ?? 0;
+      if (expandedGroupCount === 0) {
+        return false;
+      }
+    } else if (change.type === "modified") {
+      this.#expandedGroupCount.clear();
+      if (existingGroupBy[0] !== groupBy[0]) {
+        this.#groupedStruct = this.applyGroupBy(groupBy);
+      } else {
+        if (this.#expandedGroupCount.get(1) === 0) {
+          return false;
+        }
+        // need to regroup lower level, unless no parent nodes expanded in which case,
+        // its another no-op
+      }
+    } else if (change.type === "reduced") {
+      if (this.#maxGroupedLevel < change.depth) {
+        return false;
+      } else {
+        this.#size += ungroup(this.#groupedStruct, change.depth - 1);
+        for (let i = 1; i < change.depth; i++) {
+          const expandedCount = this.#expandedGroupCount.get(i) ?? 0;
+          if (expandedCount > 0) {
+            return true;
+          }
+        }
+        return false;
+      }
+    }
+    return true;
   }
 
   setRange(range: VuuRange, useDelta?: boolean): DataResponse {
     const { size, sortSet, table, viewportId } = this;
     const iterator = new GroupIterator(this.#groupedStruct);
     const rows: VuuRow[] = [];
+    this.range = range;
 
+    // TODO what about filterSet
     const createRow = createGroupVuuRow(
       viewportId,
       table,
@@ -150,28 +210,110 @@ export class GroupRowSet extends BaseRowSet {
     };
   }
 
+  select(selected: number[]): DataResponse {
+    const { indexOfKeyField, range, size, sortSet, table, viewportId } = this;
+
+    const iterator = new GroupIterator(this.#groupedStruct);
+    const selectedGroupedItems = iterator.allByIndex(selected);
+    const keyMap: Record<string, GroupedItem> = {};
+    const selectedKeyValues = selectedGroupedItems.map((groupedItem) => {
+      if (groupedItem.leafIndex === -1) {
+        keyMap[groupedItem.key] = groupedItem;
+        return groupedItem.key;
+      } else {
+        const leafRow = getLeafRow(groupedItem, table.rows);
+        const leafKey = leafRow[indexOfKeyField] as string;
+        keyMap[leafKey] = groupedItem;
+        return leafKey;
+      }
+    });
+    const { from, to } = range;
+
+    const [newSelected, deselected] = identifySelectionChanges(
+      this.selected,
+      selectedKeyValues
+    );
+    this.selected = selectedKeyValues;
+
+    const updatedRows: VuuRow[] = [];
+
+    const createRow = createGroupVuuRow(
+      viewportId,
+      table,
+      this.#groupBy,
+      sortSet,
+      size
+    );
+
+    for (const key of newSelected) {
+      const groupedItem = keyMap[key];
+      if (groupedItem.index >= from && groupedItem.index < to) {
+        updatedRows.push(createRow(groupedItem, true));
+      }
+    }
+
+    for (const key of deselected) {
+      const groupedItem = keyMap[key];
+      if (groupedItem.index >= from && groupedItem.index < to) {
+        updatedRows.push(createRow(groupedItem));
+      }
+    }
+
+    return {
+      rows: updatedRows,
+      size,
+    };
+  }
+
+  private incrementGroupExpandedCount(depth: number) {
+    const count = this.#expandedGroupCount.get(depth) ?? 0;
+    this.#expandedGroupCount.set(depth, count + 1);
+    console.log(
+      `expanded group count at depth ${depth} ${this.#expandedGroupCount.get(
+        depth
+      )}`
+    );
+  }
+  private decrementGroupExpandedCount(depth: number) {
+    const count = this.#expandedGroupCount.get(depth) ?? 0;
+    if (count > 0) {
+      this.#expandedGroupCount.set(depth, count - 1);
+      console.log(
+        `expanded group count at depth ${depth} ${this.#expandedGroupCount.get(
+          depth
+        )}`
+      );
+    } else {
+      throw Error("attempt to set expandedGroupCount below zero");
+    }
+  }
+
   openTreeNode(key: string) {
     const groupStruct = findGroupedStructByKey(this.#groupedStruct, key);
-
-    if (groupStruct.expanded === false) {
+    const { depth, expanded } = groupStruct;
+    if (depth === this.#maxGroupedLevel) {
+      this.#maxGroupedLevel = depth + 1;
+      console.log(`max Grouped Level is now ${this.#maxGroupedLevel}`);
+    }
+    if (expanded === false) {
       groupStruct.expanded = true;
-      if (this.#groupBy.length > groupStruct.depth) {
-        const { columnMap, rows } = this.table;
-        const groupCriteria = mapGroupByToSortCriteria(
-          this.#groupBy,
-          columnMap
-        );
+      if (this.#groupBy.length > depth) {
+        const { table } = this;
         if (groupStruct.childCount === 0) {
+          const groupCriteria = mapGroupByToSortCriteria(
+            this.#groupBy,
+            table.columnMap
+          );
+
           addNextLevelGroups(
-            this.sortSet,
-            rows as string[][],
+            table.rows as string[][],
             groupCriteria[groupStruct.depth][0],
             groupStruct
           );
           if (this.#aggregations.length > 0) {
             new GroupAggregator(
               this.sortSet,
-              this.table.rows as number[][],
+              table.rows as number[][],
               this.#groupedStruct,
               this.#aggregations
             ).aggregate(groupStruct);
@@ -183,6 +325,8 @@ export class GroupRowSet extends BaseRowSet {
       } else {
         this.#size += groupStruct.leafCount;
       }
+
+      this.incrementGroupExpandedCount(depth);
     } else {
       throw Error(`openTreeNode, node ${key} is already expanded`);
     }
@@ -194,13 +338,10 @@ export class GroupRowSet extends BaseRowSet {
     if (groupStruct.expanded === true) {
       groupStruct.expanded = false;
       this.#size -= countRows(groupStruct);
+      this.decrementGroupExpandedCount(groupStruct.depth);
     } else {
       throw Error(`closeTreeNode, node ${key} is already collapsed`);
     }
-  }
-
-  get expandedChildNodeCount() {
-    return countExpandedChildNodes(this.#groupedStruct);
   }
 
   update(rowIndex: number, updates: UpdateTuples) {
@@ -222,37 +363,86 @@ export class GroupRowSet extends BaseRowSet {
   }
 
   private applyGroupBy(groupBy: VuuGroupBy) {
-    console.log(`applyGroupBy ${JSON.stringify(groupBy)}`);
+    this.assertValidGroupBy(groupBy);
+
+    const groupedStruct: GroupedStruct = {
+      aggregatedValues: {},
+      childCount: 0,
+      childGroupKeys: [],
+      depth: 0,
+      leafCount: 0,
+      expanded: true,
+      groups: {},
+      leafRows: [],
+    };
 
     const { columnMap, rows } = this.table;
     const groupCriteria = mapGroupByToSortCriteria(groupBy, columnMap);
 
     const start = performance.now();
     buildTopLevelGroupedStruct(
+      this.filterSet,
       this.sortSet,
       rows as string[][],
       groupCriteria[0][0],
-      this.#groupedStruct
+      groupedStruct
     );
-    this.#size = this.#groupedStruct.childCount;
+    this.#size = groupedStruct.childCount;
     console.log(`size = ${this.#size}`);
 
     const end = performance.now();
 
     console.log(`grouping ${rows.length} rows took ${end - start}ms`);
     // console.log({ groupedStruct: this.#groupedStruct });
+    return groupedStruct;
+  }
+
+  private assertValidGroupBy(groupBy: VuuGroupBy) {
+    const columnMissing = (n: string) =>
+      this.columns.find((c) => c.name === n) === undefined;
+
+    if (!Array.isArray(groupBy) || groupBy.some(columnMissing)) {
+      throw Error(`GroupBy contains invalid column(s) ${groupBy.join(",")}`);
+    }
   }
 }
 
+function ungroup(groupedStruct: GroupedStruct, depth: number): number {
+  let sizeDiff = 0;
+  if (groupedStruct.depth === depth) {
+    if (groupedStruct.childCount > 0) {
+      sizeDiff = groupedStruct.leafCount - groupedStruct.childCount;
+      groupedStruct.groups = {};
+      groupedStruct.childCount = 0;
+      groupedStruct.childGroupKeys.length = 0;
+    }
+  } else if (groupedStruct.depth < depth) {
+    for (const groupValue of groupedStruct.childGroupKeys) {
+      sizeDiff += ungroup(groupedStruct.groups[groupValue], depth);
+    }
+  } else {
+    throw Error("cannot ungroup a groupedStruct deeper than the ungroup level");
+  }
+
+  return sizeDiff;
+}
+
 export function buildTopLevelGroupedStruct(
+  filterSet: number[] | undefined,
   sortSet: SortSet,
   rows: Array<string[]>,
   groupbyColIdx: number,
   groupedStruct: GroupedStruct
 ) {
+  const getRowIndex = (i: number) => {
+    const sortItem = filterSet ? sortSet[filterSet[i]] : sortSet[i];
+    return sortItem[0];
+  };
+
+  const indexSet = filterSet ?? sortSet;
   const { depth, groups } = groupedStruct;
-  for (let i = 0; i < rows.length; i++) {
-    const rowIdx = sortSet[i][0];
+  for (let i = 0; i < indexSet.length; i++) {
+    const rowIdx = getRowIndex(i);
     const groupValue = rows[rowIdx][groupbyColIdx];
     if (groups[groupValue] === undefined) {
       groups[groupValue] = {
@@ -279,7 +469,6 @@ export function buildTopLevelGroupedStruct(
 }
 
 export function addNextLevelGroups(
-  sortSet: SortSet,
   rows: Array<string[]>,
   groupbyColIdx: number,
   groupedStruct: GroupedStruct
@@ -289,24 +478,23 @@ export function addNextLevelGroups(
 
   for (let i = 0; i < leafRows.length; i++) {
     const leafRowIdx = leafRows[i];
-    const rowIdx = sortSet[leafRowIdx][0];
-    const groupValue = rows[rowIdx][groupbyColIdx];
+    const groupValue = rows[leafRowIdx][groupbyColIdx];
     if (groups[groupValue] === undefined) {
       groups[groupValue] = {
         aggregatedValues: {},
-        childCount: -1,
+        childCount: 0,
         childGroupKeys: [],
         depth: depth + 1,
         leafCount: 1,
         expanded: false,
         groups: {},
-        leafRows: [rowIdx],
+        leafRows: [leafRowIdx],
       };
       groupedStruct.childGroupKeys.push(groupValue);
       groupedStruct.childCount += 1;
     } else {
       groups[groupValue].leafCount += 1;
-      groups[groupValue].leafRows.push(rowIdx);
+      groups[groupValue].leafRows.push(leafRowIdx);
     }
   }
 

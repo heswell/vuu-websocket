@@ -149,7 +149,7 @@ export class RowSet extends BaseRowSet {
       : (idx: number) => sortSet[idx][0];
 
     const results: VuuRow[] = [];
-    const projectRow = this.project(selected, this.sortedIndex, this.size);
+    const projectRow = this.project(selected, this.size);
 
     for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
       const rowIndex = getRowIndex(i);

@@ -1,6 +1,11 @@
 import { VuuRange } from "@vuu-ui/vuu-protocol-types";
 import { GroupedStruct } from "./GroupRowSet";
-import { CursorPosition, GroupedItem } from "./group-utils";
+import {
+  CursorPosition,
+  getRangeSet,
+  getRangeSetBounds,
+  GroupedItem,
+} from "./group-utils";
 
 export class GroupIterator {
   #groupedStruct: GroupedStruct;
@@ -9,7 +14,7 @@ export class GroupIterator {
     this.#groupedStruct = groupedStruct;
   }
 
-  next(range: VuuRange): GroupedItem[] {
+  allByIndex(rangeSet: number[]) {
     const groupedItems: GroupedItem[] = [];
 
     const cursor: CursorPosition = {
@@ -22,10 +27,14 @@ export class GroupIterator {
       cursor,
       this.#groupedStruct,
       "$root",
-      range
+      rangeSet
     );
 
     return groupedItems;
+  }
+
+  next(range: VuuRange): GroupedItem[] {
+    return this.allByIndex(getRangeSet(range));
   }
 }
 
@@ -34,12 +43,12 @@ const collectChildItems = (
   cursor: CursorPosition,
   group: GroupedStruct,
   rootKey: string,
-  range: VuuRange
+  rangeSet: number[]
 ) => {
-  const { from: startIndex, to: endIndex } = range;
+  const [startIndex, endIndex] = getRangeSetBounds(rangeSet);
   let { index, groupIndex: startGroupIndex } = cursor;
   const { childCount, childGroupKeys, groups } = group;
-  let [firstGroupIndex = 0, ...nextGroupIndex] = startGroupIndex;
+  let [firstGroupIndex = 0] = startGroupIndex;
 
   for (
     let childGroupIndex = firstGroupIndex;
@@ -51,7 +60,9 @@ const collectChildItems = (
 
     const key = `${rootKey}|${groupValue}`;
 
-    if (index >= startIndex) {
+    // The first test is not strictly needed, but faster than the second
+    if (index >= startIndex && rangeSet.includes(index)) {
+      // TODO should be remove this item from the rangeset here ?
       groupedItems.push({
         group: childGroup,
         groupValue,
@@ -70,7 +81,7 @@ const collectChildItems = (
           { ...cursor, index: index + 1 },
           childGroup,
           key,
-          range
+          rangeSet
         ));
         continue;
       } else if (childGroup.leafCount > 0) {
@@ -80,7 +91,7 @@ const collectChildItems = (
           childGroup,
           groupValue,
           key,
-          range
+          rangeSet
         ));
         continue;
       }
@@ -97,17 +108,16 @@ const collectLeafItems = (
   group: GroupedStruct,
   groupValue: string,
   key: string,
-  range: VuuRange
+  rangeSet: number[]
 ) => {
-  const { from: startIndex, to: endIndex } = range;
+  const [startIndex, endIndex] = getRangeSetBounds(rangeSet);
   let { index } = cursor;
-
   for (
     let leafIndex = 0;
     leafIndex < group.leafCount && index < endIndex;
     leafIndex++
   ) {
-    if (index >= startIndex) {
+    if (index >= startIndex && rangeSet.includes(index)) {
       groupedItems.push({
         group,
         groupValue,

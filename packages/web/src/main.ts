@@ -1,8 +1,7 @@
 import { DataView, Table } from "@heswell/data";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { data } from "./data";
 import { DataResponse } from "@heswell/data/src/store/rowset";
-import { VuuAggregation } from "@vuu-ui/vuu-protocol-types";
+import { getData } from "./data";
 
 const schema: TableSchema = {
   columns: [
@@ -21,8 +20,8 @@ const schema: TableSchema = {
   },
 };
 
-const table = new Table({ data, schema });
-console.log({ table });
+const table = new Table({ schema });
+getData(schema).forEach((row) => table.insert(row, false));
 
 const id = "123";
 
@@ -38,44 +37,65 @@ console.log(
   "%c--------- get initial data {from:0, to: 50 }    ---------",
   "color:green;font-weight:bold;font-size: large;"
 );
-let { rows, size } = view.setRange({ from: 0, to: 50 });
+let { rows, size } = view.setRange({ from: 0, to: 30 });
 console.log(`${rows.length} rows of ${size}`);
 // console.table(rows);
+
+// let aggregations: VuuAggregation[] = [{ column: "MarketCap", aggType: 1 }];
+// console.log(
+//   `%c--------- aggregate  [${JSON.stringify(aggregations)}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// ({ rows, size } = view.aggregate(aggregations));
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log(
+//   `%c--------- filter by Market Cap    ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// ({ rows, size } = view.filter({ filter: "MarketCap < 50000000" }));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
 
 let groupBy = ["Sector"];
 console.log(
   `%c--------- group by [${groupBy.join(",")}]     ---------`,
   "color:green;font-weight:bold;font-size: large;"
 );
-({ rows, size } = view.group(groupBy) as DataResponse);
-console.log(`${rows.length} rows of ${size}`);
-console.table(rows);
-console.table(rows.map((r) => r.data));
+let response = view.group(groupBy) as DataResponse;
+if (response) {
+  ({ rows, size } = response);
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+  console.table(rows.map((r) => r.data));
+}
 
-let aggregations: VuuAggregation[] = [{ column: "MarketCap", aggType: 1 }];
-console.log(
-  `%c--------- aggregate  [${JSON.stringify(aggregations)}]     ---------`,
-  "color:green;font-weight:bold;font-size: large;"
-);
-({ rows, size } = view.aggregate(aggregations));
-console.table(rows);
-console.table(rows.map((r) => r.data));
-
-// console.log("expand node  Basic Industries");
-// ({ rows, size } = view.openTreeNode("$root|Basic Industries"));
-// console.log({ size });
-// console.table(rows);
-// console.table(rows.map((r) => r.data));
-
-// groupBy = ["Sector", "Industry", "IPO"];
+// groupBy = ["Sector", "Industry"];
 // console.log(
 //   `%c--------- group by [${groupBy.join(",")}]     ---------`,
 //   "color:green;font-weight:bold;font-size: large;"
 // );
-// const dataResponse = view.group(groupBy);
-// console.log({ dataResponse });
-// console.table(rows);
-// console.table(rows.map((r) => r.data));
+// response = view.group(groupBy) as DataResponse;
+// if (response) {
+//   ({ rows, size } = response);
+//   console.log(`${rows.length} rows of ${size}`);
+//   console.table(rows);
+//   console.table(rows.map((r) => r.data));
+// }
+
+console.log("expand node Capital Goods");
+({ rows, size } = view.openTreeNode("$root|Capital Goods"));
+console.log({ size });
+console.table(rows);
+console.table(rows.map((r) => r.data));
+
+console.log("select row Capital Goods");
+({ rows, size } = view.select([1, 2]));
+console.log({ size });
+console.table(rows);
+console.table(rows.map((r) => r.data));
 
 // console.log("expand node Basic Industries");
 // ({ rows, size } = view.openTreeNode("$root|Basic Industries"));
