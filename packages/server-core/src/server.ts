@@ -32,7 +32,7 @@ export async function start(...configs: ServerConfig[]) {
     },
   });
 
-  const websocketServer = Bun.serve<{ authToken: string }>({
+  const websocketServer = Bun.serve({
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",

@@ -1,6 +1,7 @@
 import { TableColumn } from "@heswell/server-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import {
+  ServerMessageBody,
   VuuAggregation,
   VuuFilter,
   VuuGroupBy,
@@ -20,6 +21,7 @@ import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
+import { tableRowsMessageBody } from "./responseUtils.ts";
 
 const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
 
@@ -75,13 +77,13 @@ export default class DataView {
       this.filter(this.#config.filterSpec);
     }
 
-    table.on("rowUpdated", this.rowUpdated);
+    table.on("rowUpdated", this.handleTableUpdate);
     table.on("rowInserted", this.rowInserted);
   }
 
   destroy() {
     console.log(`destroy view`);
-    this.#table?.removeListener("rowUpdated", this.rowUpdated);
+    this.#table?.removeListener("rowUpdated", this.handleTableUpdate);
     this.#table?.removeListener("rowInserted", this.rowInserted);
     this.rowSet.clear();
     //@ts-ignore
@@ -115,20 +117,6 @@ export default class DataView {
     return this.#table;
   }
 
-  get updates() {
-    const {
-      rowSet: { range },
-    } = this;
-    let results = {
-      updates: this.#updateQueue.popAll(),
-      range: {
-        from: range.from,
-        to: range.to,
-      },
-    };
-    return results;
-  }
-
   private rowInserted: RowInsertHandler = (idx, row) => {
     // const { _updateQueue, rowSet } = this;
     // const { size = null, replace, updates } = rowSet.insert(idx, row);
@@ -145,13 +133,14 @@ export default class DataView {
     // }
   };
 
-  private rowUpdated: RowUpdateHandler = (idx, updates) => {
+  private handleTableUpdate: RowUpdateHandler = (idx, updates) => {
     const { rowSet } = this;
-    const result = rowSet.update(idx, updates);
+    const dataResponse = rowSet.update(idx, updates);
 
-    if (result) {
+    if (dataResponse) {
       if (rowSet instanceof RowSet) {
-        this.#updateQueue.update(result);
+        const { rows, size } = dataResponse;
+        this.enqueue(tableRowsMessageBody(rows, size, this.#id));
       } /* else {
         result.forEach((rowUpdate) => {
           _updateQueue?.update(rowUpdate);
@@ -194,6 +183,10 @@ export default class DataView {
 
   select(selection: number[]): DataResponse {
     return this.rowSet.select(selection);
+  }
+
+  get selectedKeys() {
+    return this.rowSet.selectedKeys;
   }
 
   aggregate(aggregations: VuuAggregation[]): DataResponse {
@@ -263,29 +256,6 @@ export default class DataView {
     return { rows: [], size: -1 };
   }
 
-  // //TODO merge with method above
-  // filterFilterData(filter) {
-  //   const { filterRowSet } = this;
-  //   if (filterRowSet) {
-  //     if (filter === null) {
-  //       filterRowSet.clearFilter();
-  //     } else if (filter) {
-  //       filterRowSet.filter(filter);
-  //     }
-
-  //     return filterRowSet.setRange(resetRange(filterRowSet.range), false, WITH_STATS);
-  //   } else {
-  //     console.error(`[InMemoryView] filterfilterRowSet no filterRowSet`);
-  //   }
-  // }
-
-  // applyFilterSetChangeToFilter(partialFilter) {
-  //   const [result] = this.filter(partialFilter, DataTypes.ROW_DATA, true, true);
-  //   this._updateQueue.replace(result);
-  // }
-
-  applyFilter() {}
-
   group(groupBy: VuuGroupBy) {
     const { rowSet } = this;
     const { groupBy: existingGroupBy } = this.#config;
@@ -326,5 +296,9 @@ export default class DataView {
     } else {
       throw Error(`closeTreeNode called, data is not grouped`);
     }
+  }
+
+  protected enqueue(_messageBody: ServerMessageBody) {
+    console.log(`DataView enqueue should be overridden`);
   }
 }

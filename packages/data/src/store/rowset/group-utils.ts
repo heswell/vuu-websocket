@@ -71,11 +71,31 @@ export function findGroupedStructByKey(
   }
 }
 
-export type GroupByChangeType =
-  | { type: "extended"; depth: number }
-  | { type: "reduced"; depth: number }
-  | { type: "modified"; depth: number }
-  | { type: "no-change" };
+export interface ChangeAtDepth {
+  depth: number;
+}
+
+export interface GroupExtended extends ChangeAtDepth {
+  type: "extended";
+}
+export interface GroupReduced extends ChangeAtDepth {
+  type: "reduced";
+}
+export interface GroupModified extends ChangeAtDepth {
+  type: "modified";
+}
+
+export type GroupChanged = GroupExtended | GroupReduced | GroupModified;
+
+export type GroupByChangeType = GroupChanged | { type: "no-change" };
+
+export const hasChanged = (change: GroupByChangeType): change is GroupChanged =>
+  change.type !== "no-change";
+
+export const extendsExistingGroupBy = (
+  change: GroupByChangeType,
+  groupBy: VuuGroupBy
+) => change.type === "extended" && change.depth === groupBy.length;
 
 export const typeofGroupByChange = (
   currentGroupBy: VuuGroupBy,

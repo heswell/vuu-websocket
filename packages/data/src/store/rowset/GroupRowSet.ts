@@ -14,14 +14,14 @@ import {
   countExpandedRows,
   countRows,
   createGroupVuuRow,
+  extendsExistingGroupBy,
   findGroupedStructByKey,
-  getLeafKey,
   getLeafRow,
   GroupedItem,
+  hasChanged,
   mapGroupByToSortCriteria,
   typeofGroupByChange,
 } from "./group-utils";
-import { UpdateTuples } from "../table";
 import { GroupIterator } from "./GroupIterator";
 import {
   AggregationCriteria,
@@ -59,6 +59,9 @@ export class GroupRowSet extends BaseRowSet {
   #groupBy: VuuGroupBy;
   #groupedStruct: GroupedStruct;
   #maxGroupedLevel = 1;
+  // TODO how do we deal with these indices in the event of a sort or filter operation ?
+  // we probably need to recompute them from the selected keys
+  #selectedIndexValues: number[] = [];
   #size = 0;
 
   filter(filter: Filter): void {
@@ -115,8 +118,6 @@ export class GroupRowSet extends BaseRowSet {
 
     const existingGroupBy = this.#groupBy;
     const change = typeofGroupByChange(this.#groupBy, groupBy);
-    const extendsExistingGroupBy =
-      change.type === "extended" && change.depth === existingGroupBy.length;
 
     // If typeOfChange is 'modified', determine depth at which modification starts
     // might still be a no-op if no nodes are actually visible
@@ -125,7 +126,9 @@ export class GroupRowSet extends BaseRowSet {
 
     this.#groupBy = groupBy;
 
-    if (extendsExistingGroupBy) {
+    if (hasChanged(change) && change.depth === 1) {
+      this.#groupedStruct = this.applyGroupBy(groupBy);
+    } else if (extendsExistingGroupBy(change, existingGroupBy)) {
       const expandedGroupCount =
         this.#expandedGroupCount.get(groupBy.length - 1) ?? 0;
       if (expandedGroupCount === 0) {
@@ -215,7 +218,11 @@ export class GroupRowSet extends BaseRowSet {
 
     const iterator = new GroupIterator(this.#groupedStruct);
     const selectedGroupedItems = iterator.allByIndex(selected);
+    const previouslySelectedGroupedItems = iterator.allByIndex(
+      this.#selectedIndexValues
+    );
     const keyMap: Record<string, GroupedItem> = {};
+
     const selectedKeyValues = selectedGroupedItems.map((groupedItem) => {
       if (groupedItem.leafIndex === -1) {
         keyMap[groupedItem.key] = groupedItem;
@@ -227,6 +234,20 @@ export class GroupRowSet extends BaseRowSet {
         return leafKey;
       }
     });
+    previouslySelectedGroupedItems.forEach((groupedItem) => {
+      if (groupedItem.leafIndex === -1) {
+        keyMap[groupedItem.key] = groupedItem;
+        return groupedItem.key;
+      } else {
+        const leafRow = getLeafRow(groupedItem, table.rows);
+        const leafKey = leafRow[indexOfKeyField] as string;
+        keyMap[leafKey] = groupedItem;
+        return leafKey;
+      }
+    });
+
+    // TODO need to find deselected values
+
     const { from, to } = range;
 
     const [newSelected, deselected] = identifySelectionChanges(
@@ -234,6 +255,7 @@ export class GroupRowSet extends BaseRowSet {
       selectedKeyValues
     );
     this.selected = selectedKeyValues;
+    this.#selectedIndexValues = selected;
 
     const updatedRows: VuuRow[] = [];
 
@@ -254,7 +276,9 @@ export class GroupRowSet extends BaseRowSet {
 
     for (const key of deselected) {
       const groupedItem = keyMap[key];
-      if (groupedItem.index >= from && groupedItem.index < to) {
+      // If this key is not in the map, it means a row that was previouskly selected
+      // is no longer in the rowset (likely because a group has been closed)
+      if (groupedItem?.index >= from && groupedItem?.index < to) {
         updatedRows.push(createRow(groupedItem));
       }
     }
@@ -268,21 +292,11 @@ export class GroupRowSet extends BaseRowSet {
   private incrementGroupExpandedCount(depth: number) {
     const count = this.#expandedGroupCount.get(depth) ?? 0;
     this.#expandedGroupCount.set(depth, count + 1);
-    console.log(
-      `expanded group count at depth ${depth} ${this.#expandedGroupCount.get(
-        depth
-      )}`
-    );
   }
   private decrementGroupExpandedCount(depth: number) {
     const count = this.#expandedGroupCount.get(depth) ?? 0;
     if (count > 0) {
       this.#expandedGroupCount.set(depth, count - 1);
-      console.log(
-        `expanded group count at depth ${depth} ${this.#expandedGroupCount.get(
-          depth
-        )}`
-      );
     } else {
       throw Error("attempt to set expandedGroupCount below zero");
     }

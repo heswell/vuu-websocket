@@ -17,6 +17,10 @@ export class GroupIterator {
   allByIndex(rangeSet: number[]) {
     const groupedItems: GroupedItem[] = [];
 
+    if (rangeSet.length === 0) {
+      return [];
+    }
+
     const cursor: CursorPosition = {
       groupIndex: [],
       index: 0,

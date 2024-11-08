@@ -19,7 +19,7 @@ export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
     // compression: config.compression,
     maxPayloadLength: 16 * 1024 * 1024,
     idleTimeout: 10,
-    open: (ws: ServerWebSocket<{ authToken: string }>) => {
+    open: (ws: ServerWebSocket) => {
       console.log(`new WebSocket, open a new Session`);
       const sessionCount = createSession(ws);
       if (sessionCount === 1) {
@@ -31,10 +31,10 @@ export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
       console.log(` =====>  object count ${objectCount.toLocaleString()}`);
     },
     message: webSocketMessageHandler,
-    drain: (ws: ServerWebSocket<{ authToken: string }>) => {
+    drain: (ws: ServerWebSocket) => {
       console.log("WebSocket backpressure: ");
     },
-    close: (ws: ServerWebSocket<{ authToken: string }>) => {
+    close: (ws: ServerWebSocket) => {
       console.log(`WebSocket closed`);
       const session = getSession(ws);
       if (session) {

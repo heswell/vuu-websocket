@@ -1,13 +1,13 @@
 import type { ISession } from "@heswell/server-types";
 import type {
   ClientToServerLogin,
-  ServerToClientBody,
+  ServerMessageBody,
 } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { ServerWebSocket } from "bun";
 import { MessageQueue } from "./messageQueue";
 
-const sessions = new Map<ServerWebSocket<{ authToken: string }>, Session>();
+const sessions = new Map<ServerWebSocket, Session>();
 
 export const startHeartbeats = (updateFrequency = 250) => {
   return heartbeatLoop(updateFrequency);
@@ -84,12 +84,12 @@ export function updateLoop(name: string, interval: number) {
   return stopper;
 }
 
-export const createSession = (ws: ServerWebSocket<{ authToken: string }>) => {
+export const createSession = (ws: ServerWebSocket) => {
   sessions.set(ws, new Session(ws));
   return sessions.size;
 };
 
-export const clearSession = (ws: ServerWebSocket<{ authToken: string }>) => {
+export const clearSession = (ws: ServerWebSocket) => {
   const session = sessions.get(ws);
   if (session) {
     session.clear();
@@ -107,7 +107,7 @@ class Session implements ISession {
   #viewports: string[] = [];
 
   // #stopUpdates: () => void;
-  constructor(ws: ServerWebSocket<{ authToken: string }>) {
+  constructor(ws: ServerWebSocket) {
     this.#id = uuid();
     this.#queue = new MessageQueue();
     // this.#stopUpdates = updateLoop(
@@ -154,7 +154,7 @@ class Session implements ISession {
     }
   }
 
-  enqueue(requestId: string, messageBody: ServerToClientBody) {
+  enqueue(requestId: string, messageBody: ServerMessageBody) {
     if (this.#token && this.#user) {
       this.#queue.push({
         module: "CORE",
@@ -190,6 +190,6 @@ class Session implements ISession {
   }
 }
 
-export const getSession = (ws: ServerWebSocket<{ authToken: string }>) => {
+export const getSession = (ws: ServerWebSocket) => {
   return sessions.get(ws);
 };

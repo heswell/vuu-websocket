@@ -4,7 +4,7 @@ import { getSession } from "./sessions";
 import { getHandlerForMessage } from "./requestHandlers";
 
 export const webSocketMessageHandler = async (
-  ws: ServerWebSocket<{ authToken: string }>,
+  ws: ServerWebSocket,
   message: string | ArrayBuffer | Uint8Array
 ) => {
   const session = getSession(ws);

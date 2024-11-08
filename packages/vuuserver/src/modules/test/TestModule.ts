@@ -1,8 +1,7 @@
-import ModuleService from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module";
 import { InstrumentProvider } from "./providers/InstrumentProvider";
 
-ModuleService.moduleFactory
-  .withNameSpace("TEST")
+ModuleContainer.withNameSpace("TEST")
   .addTable(
     {
       columns: [

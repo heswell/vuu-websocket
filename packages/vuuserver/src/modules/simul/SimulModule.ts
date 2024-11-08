@@ -1,12 +1,12 @@
-import ModuleService from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module";
 import { InstrumentProvider } from "./providers/InstrumentProvider";
 import { OrdersProvider } from "./providers/OrdersProvider";
 import { PricesProvider } from "./providers/PricesProvider";
 import { ChildOrdersProvider } from "./providers/ChildOrdersProvider";
 import { ParentOrdersProvider } from "./providers/ParentOrdersProvider";
+import { InstrumentService } from "./services/InstrumentService";
 
-ModuleService.moduleFactory
-  .withNameSpace("SIMUL")
+ModuleContainer.withNameSpace("SIMUL")
   .addTable(
     {
       columns: [
@@ -14,15 +14,16 @@ ModuleService.moduleFactory
         { name: "currency", dataType: "string" },
         { name: "description", dataType: "string" },
         { name: "exchange", dataType: "string" },
-        { name: "ric", dataType: "string" },
         { name: "isin", dataType: "string" },
         { name: "lotSize", dataType: "int" },
+        { name: "ric", dataType: "string" },
       ],
       joinFields: "ric",
       keyField: "ric",
       name: "instruments",
     },
-    (table) => new InstrumentProvider(table)
+    (table) => new InstrumentProvider(table),
+    (table) => new InstrumentService(table)
   )
   .addTable(
     {

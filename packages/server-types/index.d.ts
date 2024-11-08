@@ -1,8 +1,7 @@
 import {
-  ClientToServerBody,
-  ServerToClientBody,
-  ServerToClientMessage,
-  VuuClientToServerMessage,
+  ClientMessageBody,
+  ServerMessageBody,
+  VuuClientMessage,
   VuuColumnDataType,
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
@@ -57,13 +56,13 @@ export interface IMessageQueue {
 
 export declare type RestHandler = (request: Request) => Response;
 
-export declare type VuuRequestHandler<
-  T extends ClientToServerBody = ClientToServerBody
-> = (message: VuuClientToServerMessage<T>, session: ISession) => void;
+export declare type VuuProtocolHandler<
+  T extends ClientMessageBody = ClientMessageBody
+> = (message: VuuClientMessage<T>, session: ISession) => void;
 
 export interface ISession {
   addViewport: (viewportId: string) => void;
-  enqueue: (requestId: string, messageBody: ServerToClientBody) => void;
+  enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
   id: string;
   readonly viewports: string[];
 }

@@ -1,23 +1,28 @@
 import { DataTableDefinition } from "@heswell/server-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
-import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 
-const defaultUpdateConfig: TableUpdateOptions = {
-  applyUpdates: false,
-  applyInserts: false,
-  updateInterval: 500,
-};
-
 // export type TableIndex = Map<string, number>;
-export type TableIndex = Record<string, number>;
+export type TableIndex = Record<string, number | undefined>;
 
-export type UpdateTuples = VuuDataRow[];
+/**
+ * repeating tuple of pairs of update values [colIdx, value, colIdx, value ...]
+ */
+export type UpdateTuple = [] | [number, VuuRowDataItemType];
+
+/**
+ * repeating tuple of triples of updated values [colIdx, originalValue, updatedeValue, colIdx, value ...]
+ */
+export type UpdateResultTuple =
+  | []
+  | [number, VuuRowDataItemType, VuuRowDataItemType];
+
 export type RowInsertHandler = (rowIndex: number, row: unknown) => void;
 export type RowUpdateHandler = (
   rowIndex: number,
-  results: UpdateTuples
+  results: UpdateResultTuple
 ) => void;
 export type RowRemovedHandler = (tableName: string, key: string) => void;
 export type TableReadyHandler = () => void;
@@ -38,19 +43,22 @@ export type TableRow = [VuuDataRow, ...VuuDataRow[], number, string];
 
 export class Table extends EventEmitter<TableEvents> {
   #index: TableIndex = {};
-  #keys: Record<string, number> = {};
 
   public columnMap: ColumnMap;
   public rows: VuuDataRow[] = [];
   public status: "ready" | null = null;
   public readonly schema: TableSchema;
 
+  private readonly indexOfKeyField: number;
+
   constructor({ schema }: DataTableDefinition) {
     super();
 
-    this.schema = schema;
+    const columnMap = buildColumnMap(schema.columns);
 
-    this.columnMap = buildColumnMap(schema.columns);
+    this.schema = schema;
+    this.columnMap = columnMap;
+    this.indexOfKeyField = columnMap[schema.key];
   }
 
   get columns() {
@@ -103,44 +111,92 @@ export class Table extends EventEmitter<TableEvents> {
     }
   }
 
-  /**
-   *
-   * @param rowIdx
-   * @param updates repeating tuple of updates [colIdx, value, colIdx, value ...]
-   */
-  update(rowIdx: number, ...updates: VuuDataRow[]) {
-    const results = [];
+  update(rowIdx: number, updates: UpdateTuple, clientInitiated = false) {
+    const results = [] as UpdateResultTuple;
     let row = this.rows[rowIdx];
-    for (let i = 0; i < updates.length; i += 2) {
+    for (let i = 0, j = 0; i < updates.length; i += 2, j += 3) {
       const colIdx = updates[i] as number;
       const value = updates[i + 1];
-      results.push(colIdx, row[colIdx], value);
-      row[colIdx] = value;
+      results[j] = colIdx;
+      results[j + 1] = row[colIdx];
+      results[j + 2] = row[colIdx] = value;
     }
-    this.emit("rowUpdated", rowIdx, results);
+
+    if (clientInitiated) {
+      setTimeout(() => {
+        // we delay this so that confirmation is sent to client before row update
+        this.emit("rowUpdated", rowIdx, results);
+      }, 15);
+    } else {
+      this.emit("rowUpdated", rowIdx, results);
+    }
+    return true;
+  }
+
+  // assume for now both rows use same columnMap, otw we would
+  // have to pass in columnMap for newRow
+  upsert(newRow: VuuDataRow, emitEvent = true) {
+    const { indexOfKeyField } = this;
+    const key = newRow[indexOfKeyField] as string;
+    const rowIdx = this.rowIndexAtKey(key);
+    if (rowIdx !== -1) {
+      const row = this.rows[rowIdx];
+
+      const results = [] as UpdateResultTuple;
+      for (let i = 0, pos = 0; i < newRow.length; i++) {
+        if (i !== indexOfKeyField && newRow[i] !== row[i]) {
+          console.log(`update ${row[i]} to ${newRow[i]}`);
+          results[pos] = i;
+          results[pos + 1] = row[i];
+          results[pos + 2] = row[i] = newRow[i];
+          pos += 2;
+        }
+      }
+
+      if (emitEvent && results.length > 0) {
+        this.emit("rowUpdated", rowIdx, results);
+      }
+    }
+    const row = this.getRowAtKey(key, false);
+    if (row) {
+    } else {
+      console.log(`upsert, need to insert`);
+    }
   }
 
   insert(row: VuuDataRow, emitEvent = true) {
-    const rowIdx = this.rows.length;
     const indexOfKeyValue = this.columnMap[this.primaryKey];
     const key = row[indexOfKeyValue];
+    const rowIdx = this.rows.push(row) - 1;
     this.#index[key.toString()] = rowIdx;
-    this.rows.push(row);
     if (emitEvent) {
       this.emit("rowInserted", rowIdx, row);
     }
   }
 
+  rowIndexAtKey = (key: string) => this.#index[key] ?? -1;
+
+  getRowAtKey(key: string, throwIfMissing?: true): VuuDataRow;
+  getRowAtKey(key: string, throwIfMissing: false): VuuDataRow | undefined;
+  getRowAtKey(key: string, throwIfMissing = true) {
+    const row = this.rows[this.rowIndexAtKey(key)];
+    if (row) {
+      return row;
+    } else if (throwIfMissing) {
+      throw Error(`Table getRowAtKey, no row at key ${key}`);
+    }
+  }
+
   remove(key: string) {
-    if (this.#keys[key]) {
-      const index = this.#index.get(key);
-      if (typeof index === "number") {
-        delete this.#keys[key];
-        this.#index.delete(key);
+    if (this.#index[key]) {
+      const index = this.#index[key];
+      if (typeof index === "number" && index !== -1) {
+        this.#index[key] = undefined;
         this.rows.splice(index, 1);
-        for (const [key, value] of this.#index) {
-          if (value > index) {
-            this.#index.set(key, value - 1);
+        for (const key of Object.keys(this.#index)) {
+          const value = this.#index[key];
+          if (value !== undefined && value > index) {
+            this.#index[key] = value - 1;
           }
         }
         this.emit("rowRemoved", this.name, key);
@@ -151,33 +207,6 @@ export class Table extends EventEmitter<TableEvents> {
   }
 
   clear() {}
-
-  //TODO move all these methods into an external helper
-  applyInserts() {
-    const idx = this.rows.length;
-    this.insert(this.createRow(idx));
-
-    setTimeout(
-      () => this.applyInserts(),
-      this.updateOptions.insertInterval ?? 100
-    );
-  }
-
-  applyUpdates() {
-    const { rows, columnMap } = this;
-    // const count = Math.round(rows.length / 50);
-    const count = 100;
-
-    // for (let i = 0; i < count; i++) {
-    //   const rowIdx = getRandomInt(rows.length - 1);
-    //   const update = this.updateRow(rowIdx, rows[rowIdx], columnMap);
-    //   if (update) {
-    //     this.update(rowIdx, ...update);
-    //   }
-    // }
-
-    // setTimeout(() => this.applyUpdates(), this.updateOptions.interval);
-  }
 
   createRow(idx: number): VuuDataRow {
     throw Error(`createRow ${idx} must be implemented as a plugin`);

@@ -16,12 +16,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "0.8.93",
+    "@vuu-ui/vuu-protocol-types": "0.9.2",
     "bun": "1.1.13"
   },
   "dependencies": {
     "@types/bun": "^1.1.6",
-    "@vuu-ui/vuu-utils": "0.8.93",
+    "@vuu-ui/vuu-utils": "0.9.2",
     "pure-uuid": "^1.8.1",
     "typescript": "^5.5.3"
   }

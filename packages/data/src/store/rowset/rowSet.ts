@@ -2,20 +2,20 @@
  * Keep all except for groupRowset in this file to avoid circular reference warnings
  */
 import { TableColumn } from "@heswell/server-types";
-import { Filter } from "@vuu-ui/vuu-filter-types";
 import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
+import { Filter } from "@vuu-ui/vuu-filter-types";
 import type {
   VuuDataRow,
   VuuRange,
   VuuRow,
   VuuSortCol,
 } from "@vuu-ui/vuu-protocol-types";
-import { projectColumns } from "../columnUtils.ts";
+import { projectColumn, projectColumns } from "../columnUtils.ts";
 import { extendsExistingFilter } from "../filter.ts";
 import { getDeltaRange, getFullRange } from "../rangeUtils.ts";
+import { identifySelectionChanges } from "../selectionUtils";
 import {
   ASC,
-  SortSet,
   mapSortDefsToSortCriteria,
   revertToIndexSort,
   sort,
@@ -26,10 +26,11 @@ import {
   sortPosition,
   sortRemoved,
   sortReversed,
+  SortSet,
 } from "../sortUtils.ts";
-import { Table, UpdateTuples } from "../table.ts";
-import { DataResponse } from "./IRowSet.ts";
+import { Table, UpdateResultTuple } from "../table.ts";
 import { BaseRowSet } from "./BaseRowSet.ts";
+import { DataResponse } from "./IRowSet.ts";
 
 const SINGLE_COLUMN = 1;
 
@@ -173,12 +174,98 @@ export class RowSet extends BaseRowSet {
     return this.table.rows;
   }
 
+  // selected are the index positions of rows as presented to the user. That
+  // means they refer to positions within the current indexSet. We will store
+  // them as positions within the underlying table, which never change.
+  // Note: deletions from the underlying table will have to be dealt with.
+
+  private selectedIndicesToKeyValues = (selectedIndices: number[]) => {
+    const {
+      filterSet,
+      sortSet,
+      table: { columnMap, rows, schema },
+    } = this;
+    const indexOfKeyField = columnMap[schema.key];
+    if (filterSet) {
+      return selectedIndices.map((idx) => {
+        const sortSetIndex = filterSet[idx];
+        const [rowIndex] = sortSet[sortSetIndex];
+        return rows[rowIndex][indexOfKeyField] as string;
+      });
+    } else {
+      return selectedIndices.map(
+        (idx) => rows[sortSet[idx][0]][indexOfKeyField] as string
+      );
+    }
+  };
+
+  select(selected: number[]): DataResponse {
+    const {
+      filterKeyMap,
+      filterSet,
+      range,
+      size,
+      sortedIndex: sortKeyMap,
+      sortSet,
+    } = this;
+    const { columnMap, rows } = this._table;
+
+    const selectedKeyValues = this.selectedIndicesToKeyValues(selected);
+
+    const { from, to } = range;
+    const [newSelected, deselected] = identifySelectionChanges(
+      this.selected,
+      selectedKeyValues
+    );
+    this.selected = selectedKeyValues;
+    const keyMap = filterSet ? filterKeyMap : sortKeyMap;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const keyFieldIndex = columnMap[this.table.schema.key];
+
+    const updatedRows: VuuRow[] = [];
+    const projectRow = projectColumn(
+      keyFieldIndex,
+      this.viewportId,
+      selectedKeyValues,
+      this.size
+    );
+
+    for (const key of newSelected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(rows[rowIndex], idx));
+      }
+    }
+
+    for (const key of deselected) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(rows[rowIndex], idx));
+      }
+    }
+
+    return {
+      rows: updatedRows,
+      size,
+    };
+  }
+
+  get selectedRows() {
+    return this.selected.map((key) => {});
+  }
+
   sort(sortCols: VuuSortCol[]) {
     const start = performance.now();
     const { table, filterSet, sortSet } = this;
     const { columnMap } = this._table;
 
     if (sortRemoved(this.sortCols, sortCols)) {
+      // we don't need to do this, we just bypass the sortSet entirely
       revertToIndexSort(sortSet);
     } else if (sortReversed(this.sortCols, sortCols, SINGLE_COLUMN)) {
       sortSet.reverse();
@@ -189,7 +276,8 @@ export class RowSet extends BaseRowSet {
       sort(sortSet, table.rows, sortCols, columnMap);
     }
 
-    this.sortCols = sortCols;
+    this.sortCols = sortCols.length > 0 ? sortCols : undefined;
+
     this.setMapKeys(this.sortedIndex, sortSet);
 
     if (filterSet && this.currentFilter) {
@@ -258,28 +346,36 @@ export class RowSet extends BaseRowSet {
     console.log(`filter took ${end - start} ms`);
   }
 
-  update(rowIndex: number, updates: UpdateTuples) {
-    if (this.currentFilter === null && this.sortCols === null) {
+  update(
+    rowIndex: number,
+    updates: UpdateResultTuple
+  ): DataResponse | undefined {
+    // TODO is sortCols ever null ?
+    // if we've sorted the data we're going to have to search for the rowIndex
+    if (this.currentFilter === undefined && this.sortCols === undefined) {
       if (rowIndex >= this.range.from && rowIndex < this.range.to) {
-        return [rowIndex, ...updates];
+        return { rows: this.slice(rowIndex, rowIndex + 1), size: this.size };
       }
     } else if (this.currentFilter === null) {
-      const { sortSet } = this;
-      for (let i = this.range.from; i < this.range.to; i++) {
-        const [rowIdx] = sortSet[i];
-        if (rowIdx === rowIndex) {
-          return [i, ...updates];
-        }
-      }
+      throw Error("whoah");
+      // only need to update if values we actually have in the sort are affected
+      // const { sortSet } = this;
+      // for (let i = this.range.from; i < this.range.to; i++) {
+      //   const [rowIdx] = sortSet[i];
+      //   if (rowIdx === rowIndex) {
+      //     return [i, ...updates];
+      //   }
+      // }
     } else if (this.filterSet) {
+      throw Error("whoah");
       // sorted AND/OR filtered
-      for (let i = this.range.from; i < this.range.to; i++) {
-        //TODO this is an index into sortSet not directly into data
-        const rowIdx = this.filterSet[i];
-        if (rowIdx === rowIndex) {
-          return [i, ...updates];
-        }
-      }
+      // for (let i = this.range.from; i < this.range.to; i++) {
+      //   //TODO this is an index into sortSet not directly into data
+      //   const rowIdx = this.filterSet[i];
+      //   if (rowIdx === rowIndex) {
+      //     return [i, ...updates];
+      //   }
+      // }
     }
   }
 

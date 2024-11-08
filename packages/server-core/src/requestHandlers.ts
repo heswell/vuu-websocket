@@ -4,15 +4,14 @@ import {
   DataTableService,
   RestHandler,
   ServerConfig,
-  VuuRequestHandler,
+  VuuProtocolHandler,
 } from "@heswell/server-types";
 import { MessageQueue } from "./messageQueue";
 
 type HandlerIdentifier = string;
-export type ServiceHandlers = Record<
-  HandlerIdentifier,
-  VuuRequestHandler | RestHandler
->;
+export type ServiceHandlers<
+  H extends VuuProtocolHandler | RestHandler = VuuProtocolHandler | RestHandler
+> = Record<HandlerIdentifier, H>;
 
 type ServiceAPI = {
   messageAPI: ServiceHandlers;
@@ -27,6 +26,7 @@ const _messageTypeToServiceNameMap: { [messageType: string]: string } = {};
 
 export async function configureRequestHandlers(
   config: ServerConfig,
+  // TODO do we still need this ?
   tableService?: DataTableAPI
 ): Promise<undefined> {
   const {

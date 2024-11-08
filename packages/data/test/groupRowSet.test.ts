@@ -79,6 +79,24 @@ describe("GroupRowSet", () => {
         expect(leafRow.sel).toEqual(1);
       });
 
+      test("open single node, select group and leaf items, close node select none", () => {
+        const groupRowSet = new GroupRowSet(
+          new RowSet("test-1", table, schema.columns),
+          ["Sector"]
+        );
+        groupRowSet.openTreeNode("$root|Capital Goods");
+        groupRowSet.setRange({ from: 0, to: 20 }, false);
+        groupRowSet.select([1, 2]);
+        groupRowSet.closeTreeNode("$root|Capital Goods");
+        const { rows, size } = groupRowSet.select([]);
+
+        expect(rows.length).toEqual(1);
+        expect(size).toEqual(12);
+
+        const [groupRow] = rows;
+        expect(groupRow.sel).toEqual(0);
+      });
+
       test("open two nodes", () => {
         const groupRowSet = new GroupRowSet(
           new RowSet("test-1", table, schema.columns),
@@ -130,6 +148,18 @@ describe("GroupRowSet", () => {
         const { rows, size } = groupRowSet.setRange({ from: 0, to: 20 }, false);
         expect(rows.length).toEqual(20);
         expect(size).toEqual(91);
+      });
+
+      test("remove first group, whilst node expanded", () => {
+        const groupRowSet = new GroupRowSet(
+          new RowSet("test-1", table, schema.columns),
+          ["Sector", "Industry"]
+        );
+        groupRowSet.openTreeNode("$root|Capital Goods");
+        groupRowSet.setGroupBy(["Industry"]);
+        const { rows, size } = groupRowSet.setRange({ from: 0, to: 20 }, false);
+        expect(rows.length).toEqual(20);
+        expect(size).toEqual(109);
       });
 
       test("open first level group, select group", () => {

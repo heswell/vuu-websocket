@@ -7,9 +7,9 @@ import { filterPredicate, parseFilter } from "@vuu-ui/vuu-filter-parser";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { getQueryFields, getRestRange, getSortSet } from "./rest-utils";
-import ModuleService from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module";
 
-import { ServiceHandlers } from "@heswell/server-core/src/requestHandlers";
+import { ServiceHandlers } from "@heswell/server-core";
 import { SortSet } from "@heswell/data";
 
 type Entity = { [key: string]: VuuRowDataItemType };
@@ -29,13 +29,14 @@ const instruments = {
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
 };
 
 const restHandler: RestHandler = (request) => {
   const url = new URL(request.url);
   switch (url.pathname) {
     case "/api/instruments/summary": {
-      const table = ModuleService.getTable(instruments);
+      const table = ModuleContainer.getTable(instruments);
       if (table) {
         return new Response(
           JSON.stringify({ recordCount: table.rows.length }),
@@ -53,7 +54,7 @@ const restHandler: RestHandler = (request) => {
       const { origin, limit } = getRestRange(url);
       console.log(`origin = ${origin} limit = ${limit}`);
       const queryParams = getQueryFields(url);
-      const table = ModuleService.getTable(instruments);
+      const table = ModuleContainer.getTable(instruments);
       if (table) {
         let { columnMap, rows } = table;
         const start = performance.now();
@@ -106,7 +107,7 @@ const restHandler: RestHandler = (request) => {
   }
 };
 
-export const messageAPI: ServiceHandlers = {
+export const messageAPI: ServiceHandlers<RestHandler> = {
   restHandler,
 };
 

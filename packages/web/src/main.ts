@@ -37,8 +37,8 @@ console.log(
   "%c--------- get initial data {from:0, to: 50 }    ---------",
   "color:green;font-weight:bold;font-size: large;"
 );
-let { rows, size } = view.setRange({ from: 0, to: 30 });
-console.log(`${rows.length} rows of ${size}`);
+// let { rows, size } = view.setRange({ from: 0, to: 30 });
+// console.log(`${rows.length} rows of ${size}`);
 // console.table(rows);
 
 // let aggregations: VuuAggregation[] = [{ column: "MarketCap", aggType: 1 }];
@@ -59,11 +59,26 @@ console.log(`${rows.length} rows of ${size}`);
 // console.table(rows);
 // console.table(rows.map((r) => r.data));
 
-let groupBy = ["Sector"];
+// let groupBy = ["Sector"];
+// console.log(
+//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// let response = view.group(groupBy) as DataResponse;
+// if (response) {
+//   ({ rows, size } = response);
+//   console.log(`${rows.length} rows of ${size}`);
+//   console.table(rows);
+//   console.table(rows.map((r) => r.data));
+// }
+
+let groupBy = ["Sector", "Industry"];
 console.log(
   `%c--------- group by [${groupBy.join(",")}]     ---------`,
   "color:green;font-weight:bold;font-size: large;"
 );
+let { rows, size } = view.setRange({ from: 0, to: 20 });
+
 let response = view.group(groupBy) as DataResponse;
 if (response) {
   ({ rows, size } = response);
@@ -72,30 +87,55 @@ if (response) {
   console.table(rows.map((r) => r.data));
 }
 
-// groupBy = ["Sector", "Industry"];
-// console.log(
-//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
-//   "color:green;font-weight:bold;font-size: large;"
-// );
-// response = view.group(groupBy) as DataResponse;
-// if (response) {
-//   ({ rows, size } = response);
-//   console.log(`${rows.length} rows of ${size}`);
-//   console.table(rows);
-//   console.table(rows.map((r) => r.data));
-// }
-
 console.log("expand node Capital Goods");
 ({ rows, size } = view.openTreeNode("$root|Capital Goods"));
 console.log({ size });
 console.table(rows);
 console.table(rows.map((r) => r.data));
 
-console.log("select row Capital Goods");
-({ rows, size } = view.select([1, 2]));
-console.log({ size });
-console.table(rows);
-console.table(rows.map((r) => r.data));
+groupBy = ["Industry"];
+console.log(
+  `%c--------- group by [${groupBy.join(",")}]     ---------`,
+  "color:green;font-weight:bold;font-size: large;"
+);
+response = view.group(groupBy) as DataResponse;
+if (response) {
+  ({ rows, size } = response);
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+  console.table(rows.map((r) => r.data));
+}
+
+groupBy = [];
+console.log(
+  `%c--------- group by [${groupBy.join(",")}]     ---------`,
+  "color:green;font-weight:bold;font-size: large;"
+);
+response = view.group(groupBy) as DataResponse;
+if (response) {
+  ({ rows, size } = response);
+  console.log(`${rows.length} rows of ${size}`);
+  console.table(rows);
+  console.table(rows.map((r) => r.data));
+}
+
+// console.log("select row Capital Goods");
+// ({ rows, size } = view.select([1, 2]));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log("collapse node Capital Goods");
+// ({ rows, size } = view.closeTreeNode("$root|Capital Goods"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
+
+// console.log("deselect row Capital Goods");
+// ({ rows, size } = view.select([]));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
 
 // console.log("expand node Basic Industries");
 // ({ rows, size } = view.openTreeNode("$root|Basic Industries"));

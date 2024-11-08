@@ -1,26 +1,33 @@
 import { Table } from "@heswell/data";
 import type {
+  ServerMessageBody,
   VuuLink,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { DataView, type DataViewConfig } from "@heswell/data";
+import { ISession } from "@heswell/server-types";
 
-class Viewport extends DataView {
+export class Viewport extends DataView {
   #links?: VuuLink[];
-  #sessionId: string;
+  #session: ISession;
   constructor(
-    sessionId: string,
+    session: ISession,
     id: string,
     table: Table,
     config: DataViewConfig
   ) {
     super(id, table, config);
-    this.#sessionId = sessionId;
+    this.#session = session;
   }
 
   get sessionId() {
-    return this.#sessionId;
+    return this.#session.id;
+  }
+
+  protected enqueue(messageBody: ServerMessageBody) {
+    console.log(`viewport q message ${JSON.stringify(messageBody)}`);
+    this.#session.enqueue("NA", messageBody);
   }
 }
 
@@ -44,13 +51,12 @@ export class ViewportContainer {
   }
 
   createViewport(
-    sessionId: string,
+    session: ISession,
     table: Table,
     { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest
   ) {
     const id = uuid();
-    console.log(`VPContainer add viewport`);
-    const viewport = new Viewport(sessionId, id, table, {
+    const viewport = new Viewport(session, id, table, {
       columns,
       filterSpec,
       groupBy,
@@ -59,11 +65,11 @@ export class ViewportContainer {
     });
 
     this.#viewports.set(id, viewport);
-    const viewports = this.#sessionViewportMap.get(sessionId);
+    const viewports = this.#sessionViewportMap.get(session.id);
     if (viewports) {
       viewports.push(id);
     } else {
-      this.#sessionViewportMap.set(sessionId, [id]);
+      this.#sessionViewportMap.set(session.id, [id]);
     }
     return viewport;
   }
