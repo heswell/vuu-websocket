@@ -1,5 +1,6 @@
 import { Table } from "@heswell/data";
 import { Module } from "./Module";
+import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
 export interface IProvider {
   dependencies: string[];
@@ -42,4 +43,15 @@ export abstract class Provider implements IProvider {
   }
 
   abstract load(module: Module): Promise<void>;
+
+  protected insertRow(row: Record<string, VuuRowDataItemType>) {
+    const { schema } = this.table;
+    const columns = schema.columns.map((col) => col.name);
+    const colCount = columns.length;
+    const dataRow: VuuRowDataItemType[] = Array(colCount);
+    for (let i = 0; i < colCount; i++) {
+      dataRow[i] = row[columns[i]];
+    }
+    this.table.insert(dataRow, false);
+  }
 }

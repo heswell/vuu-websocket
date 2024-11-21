@@ -15,16 +15,14 @@ const locations: Record<string, [string, string]> = {
 const currencies = ["CAD", "GBX", "USD", "EUR", "GBP"];
 
 // const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
-// const chars = Array.from("ABCDEFGHIJK");
-const chars = Array.from("AB");
+const chars = Array.from("ABCDEFGHIJK");
+// const chars = Array.from("AB");
 
 export class InstrumentProvider extends Provider {
   async load() {
     console.log("[InstrumentProvider] load instruments");
 
     const { schema } = this.table;
-
-    const data: VuuDataRow[] = [];
 
     const columns = schema.columns.map((col) => col.name);
     const colCount = columns.length;

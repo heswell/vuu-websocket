@@ -112,7 +112,9 @@ export class RowSet extends BaseRowSet {
         const [rowIndex] = sortSet[i];
         const keyValue = table.rows[rowIndex][indexOfKeyField] as string;
         if (keyMap.has(keyValue)) {
-          throw Error(`duplicate key value ${keyValue}`);
+          throw Error(
+            `duplicate key value ${keyValue} (${this.table.schema.table.table})`
+          );
         }
         keyMap.set(keyValue, i);
       }

@@ -147,11 +147,16 @@ const CHANGE_VP_RANGE: VuuProtocolHandler = (message, session) => {
 const GET_VP_VISUAL_LINKS: VuuProtocolHandler = (message, session) => {
   const { vpId } = message.body as VuuViewportVisualLinksRequest;
   // Get the visualLinks from the viewportContainer
+  console.log(JSON.stringify(message));
   const viewport = ViewportContainer.getViewport(vpId);
-  const links = ModuleContainer.getLinks(viewport.table.schema.table);
-  console.log(`get visual links ${viewport.table.name}`, {
-    links,
-  });
+  const vuuLinks = ModuleContainer.getLinks(viewport.table.schema.table);
+  if (vuuLinks) {
+    const availableLinks = ViewportContainer.getVisualLinks(vpId, vuuLinks);
+    console.log(`get visual links ${viewport.table.name}`, {
+      vuuLinks,
+      availableLinks,
+    });
+  }
 };
 
 const CREATE_VISUAL_LINK: VuuProtocolHandler<VuuCreateVisualLink> = (

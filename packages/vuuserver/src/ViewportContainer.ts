@@ -108,11 +108,29 @@ export class ViewportContainer {
     console.log(`close all viewports for session ${sessionId}`);
   }
 
-  getVisualLinks(viewportId: string) {
+  getVisualLinks(viewportId: string, vuuLinks: VuuLink[]) {
+    const viewport = this.getViewport(viewportId);
+    const otherViewportsForSession = this.getViewportsBySessionId(
+      viewport.sessionId
+    );
+    const targetTables = vuuLinks.map(({ toTable }) => toTable);
+    for (const vp of otherViewportsForSession) {
+      if (targetTables.includes(vp.table.schema.table.table)) {
+        console.log(
+          `we have a potential visual link (${vp.table.schema.table.table})`
+        );
+      }
+    }
     // get visual link definitions from the table
     // find potential link targets, must be ...
     // - same sessionId
     // - status active, that mesna in the active layout
+  }
+
+  private getViewportsBySessionId(sessionId: string) {
+    return Array.from(this.#viewports.values()).filter(
+      ({ sessionId: id }) => id === sessionId
+    );
   }
 }
 

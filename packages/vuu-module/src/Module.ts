@@ -2,7 +2,6 @@ import { Table } from "@heswell/data";
 import { IProvider } from "./Provider";
 import {
   VuuLink,
-  VuuMenu,
   VuuRowDataItemType,
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
