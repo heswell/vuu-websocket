@@ -1,12 +1,16 @@
-import { Table } from "@heswell/data";
+import { Table, tableRowsMessageBody } from "@heswell/data";
 import type {
   ServerMessageBody,
+  VuuCreateVisualLink,
   VuuLink,
+  VuuLinkDescriptor,
+  VuuRow,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { DataView, type DataViewConfig } from "@heswell/data";
 import { ISession } from "@heswell/server-types";
+import { RuntimeVisualLink } from "./RuntimeVisualLink";
 
 export class Viewport extends DataView {
   #links?: VuuLink[];
@@ -25,9 +29,23 @@ export class Viewport extends DataView {
     return this.#session.id;
   }
 
+  select(selection: number[]) {
+    const response = super.select(selection);
+    setTimeout(() => {
+      this.emit("row-selection", []);
+    }, 0);
+    return response;
+  }
+
   protected enqueue(messageBody: ServerMessageBody) {
     console.log(`viewport q message ${JSON.stringify(messageBody)}`);
     this.#session.enqueue("NA", messageBody);
+  }
+
+  enqueueDataMessages(rows: VuuRow[], vpSize: number) {
+    if (rows.length) {
+      this.#session.enqueue("", tableRowsMessageBody(rows, vpSize, this.id));
+    }
   }
 }
 
@@ -43,6 +61,7 @@ export class ViewportContainer {
     console.log("create ViewportContainer");
   }
 
+  #runtimeVisualLinks = new Map<string, RuntimeVisualLink>();
   #sessionViewportMap = new Map<string, string[]>();
   #viewports = new Map<string, Viewport>();
 
@@ -108,23 +127,52 @@ export class ViewportContainer {
     console.log(`close all viewports for session ${sessionId}`);
   }
 
+  createVisualLink({
+    childColumnName,
+    childVpId,
+    parentColumnName,
+    parentVpId,
+  }: Omit<VuuCreateVisualLink, "type">) {
+    const childViewport = this.#viewports.get(childVpId);
+    const parentViewport = this.#viewports.get(parentVpId);
+    if (childViewport && parentViewport) {
+      const runtimeVisualLink = new RuntimeVisualLink(
+        childViewport,
+        parentViewport,
+        childColumnName,
+        parentColumnName
+      );
+      this.#runtimeVisualLinks.set(childVpId, runtimeVisualLink);
+    } else {
+      console.warn(`unable to create visual link, viewport not found`);
+    }
+  }
+
+  removeVisualLink(childVpId: string) {
+    const visualLink = this.#runtimeVisualLinks.get(childVpId);
+    if (visualLink) {
+      visualLink.remove();
+      this.#runtimeVisualLinks.delete(childVpId);
+    } else {
+      throw Error("unable to remove visual link childVpId not found");
+    }
+  }
+
   getVisualLinks(viewportId: string, vuuLinks: VuuLink[]) {
     const viewport = this.getViewport(viewportId);
     const otherViewportsForSession = this.getViewportsBySessionId(
       viewport.sessionId
     );
-    const targetTables = vuuLinks.map(({ toTable }) => toTable);
+    const availableLinks: VuuLinkDescriptor[] = [];
+    // TODO must be active (i.e. in same layout)
     for (const vp of otherViewportsForSession) {
-      if (targetTables.includes(vp.table.schema.table.table)) {
-        console.log(
-          `we have a potential visual link (${vp.table.schema.table.table})`
-        );
+      const link = getLinkToTable(vuuLinks, vp.table.schema.table.table);
+      if (link) {
+        availableLinks.push({ parentVpId: vp.id, link });
       }
     }
-    // get visual link definitions from the table
-    // find potential link targets, must be ...
-    // - same sessionId
-    // - status active, that mesna in the active layout
+
+    return availableLinks;
   }
 
   private getViewportsBySessionId(sessionId: string) {
@@ -135,3 +183,7 @@ export class ViewportContainer {
 }
 
 export default ViewportContainer.instance;
+
+const getLinkToTable = (vuuLinks: VuuLink[], tableName: string) => {
+  return vuuLinks.find(({ toTable }) => toTable === tableName);
+};

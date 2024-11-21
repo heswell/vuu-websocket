@@ -2,6 +2,7 @@ import { ServiceHandlers } from "@heswell/server-core";
 import {
   ClientToServerMenuSelectRPC,
   VuuCreateVisualLink,
+  VuuRemoveVisualLink,
   VuuRpcEditCellRequest,
   VuuRpcServiceRequest,
   VuuRpcViewportRequest,
@@ -40,11 +41,7 @@ import { tableRowsMessageBody } from "@heswell/data";
 
 const configure = async ({ service }: ServerConfig) => {};
 
-const GET_TABLE_LIST: VuuProtocolHandler<VuuTableListRequest> = (
-  message,
-  session
-) => {
-  // priority 1
+const GET_TABLE_LIST: VuuProtocolHandler = (message, session) => {
   session.enqueue(message.requestId, {
     type: "TABLE_LIST_RESP",
     tables: ModuleContainer.tableList,
@@ -54,7 +51,6 @@ const GET_TABLE_LIST: VuuProtocolHandler<VuuTableListRequest> = (
 const GET_TABLE_META: VuuProtocolHandler = (message, session) => {
   const { table } = message.body as VuuTableMetaRequest;
   const schema = ModuleContainer.getTableSchema(table);
-  // priority 1
   session.enqueue(message.requestId, {
     columns: schema.columns.map((col) => col.name),
     dataTypes: schema.columns.map((col) => col.serverDataType),
@@ -81,7 +77,6 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
   });
 
   const { rows, size } = viewport.getDataForCurrentRange();
-  console.log(`adter subscribe ${rows.length} rows, size=${size}`);
   enqueueDataMessages(rows, size, session, viewport.id);
   // } else {
   //   const key = asTableKey(message.body.table);
@@ -117,9 +112,9 @@ const CHANGE_VP: VuuProtocolHandler = (message, session) => {
   const { viewPortId } = body;
   const viewport = ViewportContainer.getViewport(viewPortId);
   if (viewport) {
-    const dateResponse = viewport.changeViewport(body);
-    if (dateResponse) {
-      const { rows, size } = dateResponse;
+    const dataResponse = viewport.changeViewport(body);
+    if (dataResponse) {
+      const { rows, size } = dataResponse;
       enqueueDataMessages(rows, size, session, viewPortId);
     }
   }
@@ -151,20 +146,30 @@ const GET_VP_VISUAL_LINKS: VuuProtocolHandler = (message, session) => {
   const viewport = ViewportContainer.getViewport(vpId);
   const vuuLinks = ModuleContainer.getLinks(viewport.table.schema.table);
   if (vuuLinks) {
-    const availableLinks = ViewportContainer.getVisualLinks(vpId, vuuLinks);
-    console.log(`get visual links ${viewport.table.name}`, {
-      vuuLinks,
-      availableLinks,
+    const links = ViewportContainer.getVisualLinks(vpId, vuuLinks);
+    session.enqueue(message.requestId, {
+      type: "VP_VISUAL_LINKS_RESP",
+      links,
+      vpId,
     });
   }
 };
 
-const CREATE_VISUAL_LINK: VuuProtocolHandler<VuuCreateVisualLink> = (
-  message,
-  session
-) => {
-  console.log("create a visual link", {
-    message,
+const CREATE_VISUAL_LINK: VuuProtocolHandler = (message, session) => {
+  const { type, ...linkOptions } = message.body as VuuCreateVisualLink;
+  ViewportContainer.createVisualLink(linkOptions);
+  session.enqueue(message.requestId, {
+    ...linkOptions,
+    type: "CREATE_VISUAL_LINK_SUCCESS",
+  });
+};
+
+const REMOVE_VISUAL_LINK: VuuProtocolHandler = (message, session) => {
+  const { childVpId } = message.body as VuuRemoveVisualLink;
+  ViewportContainer.removeVisualLink(childVpId);
+  session.enqueue(message.requestId, {
+    childVpId,
+    type: "REMOVE_VISUAL_LINK_SUCCESS",
   });
 };
 
@@ -361,6 +366,7 @@ export const messageAPI: ServiceHandlers<VuuProtocolHandler> = {
   GET_VIEW_PORT_MENUS,
   GET_VP_VISUAL_LINKS,
   OPEN_TREE_NODE,
+  REMOVE_VISUAL_LINK,
   REMOVE_VP,
   RPC_CALL,
   SET_SELECTION,

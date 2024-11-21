@@ -6,11 +6,13 @@ import {
   VuuFilter,
   VuuGroupBy,
   VuuRange,
+  VuuRow,
   VuuSort,
   VuuSortCol,
   VuuViewportChangeRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import {
+  EventEmitter,
   isConfigChanged,
   vanillaConfig,
   type ColumnMap,
@@ -29,7 +31,15 @@ export type DataViewConfig = DataSourceConfig & {
   range: VuuRange;
 };
 
-export default class DataView {
+export type SelectionEventHandler = () => void;
+export declare type DataViewEvents = {
+  "row-selection": SelectionEventHandler;
+};
+
+/**
+ * DataView does not actually emit any events but subclasses are welcome to
+ */
+export default class DataView extends EventEmitter<DataViewEvents> {
   #config: WithFullConfig = vanillaConfig;
   #columnMap: ColumnMap;
   #columns: TableColumn[];
@@ -46,6 +56,7 @@ export default class DataView {
     { range, ...config }: DataViewConfig,
     updateQueue = new UpdateQueue()
   ) {
+    super();
     this.#id = id;
     this.#config = {
       ...this.#config,
@@ -300,5 +311,12 @@ export default class DataView {
 
   protected enqueue(_messageBody: ServerMessageBody) {
     console.log(`DataView enqueue should be overridden`);
+  }
+  protected enqueueDataMessages(
+    _rows: VuuRow[],
+    _vpSize: number,
+    _viewPortId: string
+  ) {
+    console.log(`DataView enqueueDataMessages should be overridden`);
   }
 }
