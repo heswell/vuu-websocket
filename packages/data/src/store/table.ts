@@ -145,7 +145,6 @@ export class Table extends EventEmitter<TableEvents> {
       const results = [] as UpdateResultTuple;
       for (let i = 0, pos = 0; i < newRow.length; i++) {
         if (i !== indexOfKeyField && newRow[i] !== row[i]) {
-          console.log(`update ${row[i]} to ${newRow[i]}`);
           results[pos] = i;
           results[pos + 1] = row[i];
           results[pos + 2] = row[i] = newRow[i];

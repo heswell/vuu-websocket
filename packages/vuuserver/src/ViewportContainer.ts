@@ -32,13 +32,12 @@ export class Viewport extends DataView {
   select(selection: number[]) {
     const response = super.select(selection);
     setTimeout(() => {
-      this.emit("row-selection", []);
+      this.emit("row-selection");
     }, 0);
     return response;
   }
 
   protected enqueue(messageBody: ServerMessageBody) {
-    console.log(`viewport q message ${JSON.stringify(messageBody)}`);
     this.#session.enqueue("NA", messageBody);
   }
 

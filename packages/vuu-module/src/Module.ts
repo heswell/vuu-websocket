@@ -13,6 +13,11 @@ export interface ModuleConstructorProps {
   name: string;
 }
 
+/** 
+ Recursive function that loads providers respecting the declared
+ dependencies. Guarantees that dependencies are loaded before
+ dependents.
+*/
 const loadProviders = (
   providers: IProvider[],
   module: Module,

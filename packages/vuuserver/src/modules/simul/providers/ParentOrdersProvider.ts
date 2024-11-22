@@ -1,5 +1,5 @@
 import { Table } from "@heswell/data";
-import { Provider, random } from "@heswell/vuu-module";
+import { getRandom, Provider, random } from "@heswell/vuu-module";
 import { Module } from "@heswell/vuu-module";
 import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
@@ -20,7 +20,6 @@ export class ParentOrdersProvider extends Provider {
     const {
       columnMap: { currency, exchange, ric },
       rows: instruments,
-      rowCount: instrumentCount,
     } = module.getTable("instruments");
 
     const row: Record<string, VuuRowDataItemType> = {};
@@ -30,10 +29,10 @@ export class ParentOrdersProvider extends Provider {
     for (let i = 0; i < parentOrderCount; i++) {
       parentOrderId += 1;
 
-      const instrument = instruments[random(0, instrumentCount - 1)];
-      const account = accounts[random(0, accounts.length - 1)];
-      const algo = algos[random(0, algos.length - 1)];
-      const status = orderStatus[random(0, orderStatus.length - 1)];
+      const instrument = getRandom(instruments);
+      const account = getRandom(accounts);
+      const algo = getRandom(algos);
+      const status = getRandom(orderStatus);
       const quantity = 1000 * random(1, 100);
       const filledQty =
         status === "FILLED"
@@ -42,7 +41,7 @@ export class ParentOrdersProvider extends Provider {
           ? 0
           : quantity - random(100, quantity);
       const openQty = quantity - filledQty;
-      const side = sides[random(0, sides.length - 1)];
+      const side = getRandom(sides);
 
       const childCount = random(
         0,
