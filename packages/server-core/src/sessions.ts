@@ -3,37 +3,43 @@ import type {
   ClientToServerLogin,
   ServerMessageBody,
 } from "@vuu-ui/vuu-protocol-types";
-import { uuid } from "@vuu-ui/vuu-utils";
-import { ServerWebSocket } from "bun";
 import { MessageQueue } from "./messageQueue";
+import type { WebsocketData } from "./server";
+import { ServerWebSocket } from "bun";
+import { preProcessFile } from "typescript";
 
-const sessions = new Map<ServerWebSocket, Session>();
+const sessions = new Map<string, Session>();
 
-export const startHeartbeats = (updateFrequency = 250) => {
+export const startHeartbeats = (updateFrequency = 10000) => {
   return heartbeatLoop(updateFrequency);
 };
 
 export const startMainUpdateLoop = (updateFrequency = 250) => {
+  console.log(`update frequency ${updateFrequency}`);
   return updateLoop("Regular Updates", updateFrequency);
 };
 
 export function heartbeatLoop(interval: number) {
-  console.log(`starting heartbeat loop @  ${interval}`);
+  console.log(`===> starting heartbeat loop @  ${interval}`);
 
   let _keepGoing = true;
   let _timer: Timer | null = null;
 
   const tick = () => {
+    // console.log(`heartbeat tick (${sessions.size} sessions)`);
+    const start = performance.now();
     const ts = Date.now();
-    for (const [ws, session] of sessions) {
+    for (const session of sessions.values()) {
       session.outgoingHeartbeat = ts;
-      ws.send(
+      session.ws.send(
         `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`
       );
     }
     if (_keepGoing) {
       _timer = setTimeout(tick, interval);
     }
+    const end = performance.now();
+    console.log(`heartbeat tock took ${end - start} ms`);
   };
 
   tick();
@@ -50,25 +56,32 @@ export function heartbeatLoop(interval: number) {
 }
 
 export function updateLoop(name: string, interval: number) {
-  console.log(`starting update loop ${name} @  ${interval}`);
+  console.log(`===> starting update loop ${name} @  ${interval}`);
 
   let _keepGoing = true;
   let _timer: Timer | null = null;
 
   const tick = () => {
-    for (const [ws, session] of sessions) {
+    // console.log(`update loops tick (${sessions.size} sessions)`);
+    const start = performance.now();
+    for (const session of sessions.values()) {
       const queuedMessages = session.readQueue();
+      // console.log(
+      //   `${queuedMessages?.length ?? 0} messages for session ${session.id}`
+      // );
       if (Array.isArray(queuedMessages)) {
         for (const message of queuedMessages) {
-          ws.send(JSON.stringify(message));
+          session.ws.send(JSON.stringify(message));
         }
       } else if (typeof queuedMessages === "string") {
-        ws.send(queuedMessages);
-      }
-      if (_keepGoing) {
-        _timer = setTimeout(tick, interval);
+        session.ws.send(queuedMessages);
       }
     }
+    if (_keepGoing) {
+      _timer = setTimeout(tick, interval);
+    }
+    const end = performance.now();
+    console.log(`update tock took ${end - start} ms`);
   };
 
   tick();
@@ -84,16 +97,19 @@ export function updateLoop(name: string, interval: number) {
   return stopper;
 }
 
-export const createSession = (ws: ServerWebSocket) => {
-  sessions.set(ws, new Session(ws));
+export const createSession = (
+  sessionId: string,
+  ws: ServerWebSocket<WebsocketData>
+) => {
+  sessions.set(sessionId, new Session(sessionId, ws));
   return sessions.size;
 };
 
-export const clearSession = (ws: ServerWebSocket) => {
-  const session = sessions.get(ws);
+export const clearSession = (sessionId: string) => {
+  const session = sessions.get(sessionId);
   if (session) {
     session.clear();
-    sessions.delete(ws);
+    sessions.delete(sessionId);
   }
   return sessions.size;
 };
@@ -102,13 +118,15 @@ class Session implements ISession {
   #heartbeat = 0;
   #id: string;
   #user: string | undefined;
+  #ws: WebSocket;
   #token: string | undefined;
   #queue: MessageQueue;
   #viewports: string[] = [];
 
   // #stopUpdates: () => void;
-  constructor(ws: ServerWebSocket) {
-    this.#id = uuid();
+  constructor(sessionId: string, ws: WebSocket) {
+    this.#id = sessionId;
+    this.#ws = ws;
     this.#queue = new MessageQueue();
     // this.#stopUpdates = updateLoop(
     //   "Regular Updates",
@@ -132,7 +150,7 @@ class Session implements ISession {
 
   set incomingHeartbeat(hb: number) {
     const latency = hb - this.#heartbeat;
-    console.log(`latency ${latency}`);
+    console.log(`incoming HB, latency ${latency}`);
   }
 
   set outgoingHeartbeat(hb: number) {
@@ -141,6 +159,10 @@ class Session implements ISession {
 
   get viewports() {
     return this.#viewports;
+  }
+
+  get ws() {
+    return this.#ws;
   }
 
   addViewport(viewportId: string) {
@@ -190,6 +212,6 @@ class Session implements ISession {
   }
 }
 
-export const getSession = (ws: ServerWebSocket) => {
-  return sessions.get(ws);
+export const getSession = (sessionId: string) => {
+  return sessions.get(sessionId);
 };

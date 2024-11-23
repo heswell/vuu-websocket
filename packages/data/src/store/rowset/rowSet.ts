@@ -369,7 +369,19 @@ export class RowSet extends BaseRowSet {
       //   }
       // }
     } else if (this.filterSet) {
-      throw Error("whoah");
+      if (this.sortCols === undefined) {
+        const filterIdx = this.filterSet.findIndex((i) => i === rowIndex);
+        if (filterIdx !== -1) {
+          if (filterIdx >= this.range.from && filterIdx < this.range.to) {
+            return {
+              rows: this.slice(filterIdx, filterIdx + 1),
+              size: this.size,
+            };
+          }
+        }
+      } else {
+        throw Error("whoah, filter AND sort");
+      }
       // sorted AND/OR filtered
       // for (let i = this.range.from; i < this.range.to; i++) {
       //   //TODO this is an index into sortSet not directly into data

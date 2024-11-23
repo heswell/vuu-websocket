@@ -65,6 +65,7 @@ export interface ISession {
   enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
   id: string;
   readonly viewports: string[];
+  readonly ws: WebSocket;
 }
 
 export interface DataTableService extends ConfiguredService {

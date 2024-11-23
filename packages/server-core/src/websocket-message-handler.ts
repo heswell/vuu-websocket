@@ -2,16 +2,19 @@ import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
 import { getSession } from "./sessions";
 import { getHandlerForMessage } from "./requestHandlers";
+import { WebsocketData } from "./server";
 
 export const webSocketMessageHandler = async (
-  ws: ServerWebSocket,
+  ws: ServerWebSocket<WebsocketData>,
   message: string | ArrayBuffer | Uint8Array
 ) => {
-  const session = getSession(ws);
+  // console.log(`=====> ${message}`);
+  const session = getSession(ws.data.sessionId);
+  // console.log(`session id = ${session?.id}`);
   if (session) {
     const vuuMessage = JSON.parse(message as string) as VuuClientMessage;
     const { requestId } = vuuMessage;
-    console.log(`===> [${vuuMessage.body.type}]`);
+    // console.log(`===> [${vuuMessage.body.type}]`);
     if (vuuMessage.body.type === "LOGIN") {
       return session.login(requestId, vuuMessage.body);
     } else if (vuuMessage.body.type === "HB_RESP") {

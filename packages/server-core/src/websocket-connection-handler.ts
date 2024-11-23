@@ -10,6 +10,7 @@ import {
 } from "./sessions";
 import { webSocketMessageHandler } from "./websocket-message-handler";
 import { getHandlerForMessage } from "./requestHandlers";
+import { WebsocketData } from "./server";
 
 export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
   let stopHeartbeats: undefined | (() => void);
@@ -19,9 +20,9 @@ export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
     // compression: config.compression,
     maxPayloadLength: 16 * 1024 * 1024,
     idleTimeout: 10,
-    open: (ws: ServerWebSocket) => {
-      console.log(`new WebSocket, open a new Session`);
-      const sessionCount = createSession(ws);
+    open: (ws: ServerWebSocket<WebsocketData>) => {
+      console.log(`new WebSocket, open a new Session = ${ws.data.sessionId}`);
+      const sessionCount = createSession(ws.data.sessionId, ws);
       if (sessionCount === 1) {
         stopMainLoop = startMainUpdateLoop(config.CLIENT_UPDATE_FREQUENCY);
         stopHeartbeats = startHeartbeats(config.HEARTBEAT_FREQUENCY);
@@ -34,15 +35,15 @@ export const websocketConnectionHandler = (config: ServerMessagingConfig) => {
     drain: (ws: ServerWebSocket) => {
       console.log("WebSocket backpressure: ");
     },
-    close: (ws: ServerWebSocket) => {
+    close: (ws: ServerWebSocket<WebsocketData>) => {
       console.log(`WebSocket closed`);
-      const session = getSession(ws);
+      const session = getSession(ws.data.sessionId);
       if (session) {
         const teardownHandler = getHandlerForMessage("onSessionClosed");
         if (teardownHandler) {
           teardownHandler?.({}, session);
         }
-        const sessionCount = clearSession(ws);
+        const sessionCount = clearSession(ws.data.sessionId);
         if (sessionCount === 0) {
           stopHeartbeats?.();
           stopMainLoop?.();

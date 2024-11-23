@@ -65,9 +65,13 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
   const { table: vuuTable } = body;
   const table = ModuleContainer.getTable(vuuTable);
 
+  console.log(`session ${session.id} ${JSON.stringify(message)}`);
+  const start = performance.now();
   const viewport = ViewportContainer.createViewport(session, table, body);
   // why do we need this ?
   session.addViewport(viewport.id);
+
+  const end1 = performance.now();
 
   session.enqueue(message.requestId, {
     ...body,
@@ -78,6 +82,13 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
 
   const { rows, size } = viewport.getDataForCurrentRange();
   enqueueDataMessages(rows, size, session, viewport.id);
+
+  const end2 = performance.now();
+  console.log(
+    `[CREATE_VP_SUCCESS] create vp took ${
+      end1 - start
+    } ms , including response queing ${end2 - start} ms`
+  );
   // } else {
   //   const key = asTableKey(message.body.table);
   //   const queuedSubscription =

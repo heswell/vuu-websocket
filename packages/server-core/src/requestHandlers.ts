@@ -37,7 +37,7 @@ export async function configureRequestHandlers(
   Object.keys(messageAPI)
     .filter((name) => name !== "default")
     .forEach((name) => {
-      console.log(`register handler ${name} from service ${serviceName}`);
+      // console.log(`register handler ${name} from service ${serviceName}`);
       _messageTypeToServiceNameMap[name] = serviceName;
     });
   // do we have to wait ?
