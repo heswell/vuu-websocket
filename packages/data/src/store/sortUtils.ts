@@ -4,7 +4,6 @@ import {
   VuuSortCol,
 } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
-import { TableRow } from "./table";
 
 type SortDirection = "A" | "D";
 export type SortCriterium = [number, SortDirection];

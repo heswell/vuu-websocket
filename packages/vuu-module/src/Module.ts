@@ -7,7 +7,7 @@ import {
 } from "@vuu-ui/vuu-protocol-types";
 import { IService, ServiceMessage } from "./Service";
 import { Viewport } from "@heswell/vuuserver";
-import { isSessionTable, uuid } from "@vuu-ui/vuu-utils";
+import { uuid } from "@vuu-ui/vuu-utils";
 
 export interface ModuleConstructorProps {
   name: string;

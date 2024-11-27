@@ -6,7 +6,6 @@ import {
   VuuRpcEditCellRequest,
   VuuRpcServiceRequest,
   VuuRpcViewportRequest,
-  VuuTableListRequest,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
@@ -16,8 +15,10 @@ import {
   VuuViewportVisualLinksRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import ModuleContainer from "@heswell/vuu-module";
+// TODO how do we make this more dynamic
 import "./modules/simul/SimulModule.ts";
 import "./modules/test/TestModule.ts";
+import "./modules/system/SystemModule.ts";
 
 import type {
   ConfiguredService,

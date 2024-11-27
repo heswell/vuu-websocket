@@ -1,6 +1,7 @@
 import { Filter } from "@vuu-ui/vuu-filter-types";
 import {
   VuuAggregation,
+  VuuDataRow,
   VuuGroupBy,
   VuuRange,
   VuuRow,
@@ -29,6 +30,7 @@ import {
 } from "../aggregationUtils";
 import { GroupAggregator } from "./GroupAggregator";
 import { identifySelectionChanges } from "../selectionUtils";
+import { UpdateResultTuple } from "../table";
 
 export type Groups = { [key: string]: GroupedStruct };
 
@@ -358,8 +360,16 @@ export class GroupRowSet extends BaseRowSet {
     }
   }
 
-  update(rowIndex: number, updates: UpdateTuples) {
+  update(rowIndex: number, updates: UpdateResultTuple) {
     throw new Error("Method 'update' not implemented in GroupRowSet.");
+  }
+
+  insert(rowIndex: number, row: VuuDataRow): DataResponse {
+    throw new Error("Method 'insert' not implemented in GroupRowSet.");
+  }
+
+  delete(rowIndex: number, row: VuuDataRow): DataResponse {
+    throw new Error("Method 'delete' not implemented in GroupRowSet.");
   }
 
   private applyAggregations() {

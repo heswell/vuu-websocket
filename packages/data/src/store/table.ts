@@ -1,5 +1,5 @@
 import { DataTableDefinition } from "@heswell/server-types";
-import { TableSchema } from "@vuu-ui/vuu-data-types";
+import { DataSourceRow, TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
@@ -19,18 +19,18 @@ export type UpdateResultTuple =
   | []
   | [number, VuuRowDataItemType, VuuRowDataItemType];
 
-export type RowInsertHandler = (rowIndex: number, row: unknown) => void;
+export type RowInsertHandler = (rowIndex: number, row: VuuDataRow) => void;
 export type RowUpdateHandler = (
   rowIndex: number,
   results: UpdateResultTuple
 ) => void;
-export type RowRemovedHandler = (tableName: string, key: string) => void;
+export type RowDeletedHandler = (rowIndex: number, row: VuuDataRow) => void;
 export type TableReadyHandler = () => void;
 
 export type TableEvents = {
   ready: TableReadyHandler;
   rowInserted: RowInsertHandler;
-  rowRemoved: RowRemovedHandler;
+  rowDeleted: RowDeletedHandler;
   rowUpdated: RowUpdateHandler;
 };
 
@@ -186,19 +186,23 @@ export class Table extends EventEmitter<TableEvents> {
     }
   }
 
-  remove(key: string) {
+  // TODO what do we do about rowIndex values when we remove ?
+  delete(key: string) {
     if (this.#index[key]) {
-      const index = this.#index[key];
-      if (typeof index === "number" && index !== -1) {
+      const rowIdx = this.#index[key];
+      if (typeof rowIdx === "number" && rowIdx !== -1) {
         this.#index[key] = undefined;
-        this.rows.splice(index, 1);
+        const [row] = this.rows.splice(rowIdx, 1);
+        const start = performance.now();
         for (const key of Object.keys(this.#index)) {
           const value = this.#index[key];
-          if (value !== undefined && value > index) {
+          if (value !== undefined && value > rowIdx) {
             this.#index[key] = value - 1;
           }
         }
-        this.emit("rowRemoved", this.name, key);
+        const end = performance.now();
+        console.log(`updating index after delete took ${end - start} ms`);
+        this.emit("rowDeleted", rowIdx, row);
       } else {
         throw Error(`Table.remove key ${key} not found`);
       }

@@ -27,7 +27,6 @@ export function heartbeatLoop(interval: number) {
 
   const tick = () => {
     // console.log(`heartbeat tick (${sessions.size} sessions)`);
-    const start = performance.now();
     const ts = Date.now();
     for (const session of sessions.values()) {
       session.outgoingHeartbeat = ts;
@@ -38,8 +37,6 @@ export function heartbeatLoop(interval: number) {
     if (_keepGoing) {
       _timer = setTimeout(tick, interval);
     }
-    const end = performance.now();
-    console.log(`heartbeat tock took ${end - start} ms`);
   };
 
   tick();
@@ -56,8 +53,6 @@ export function heartbeatLoop(interval: number) {
 }
 
 export function updateLoop(name: string, interval: number) {
-  console.log(`===> starting update loop ${name} @  ${interval}`);
-
   let _keepGoing = true;
   let _timer: Timer | null = null;
 
@@ -80,8 +75,6 @@ export function updateLoop(name: string, interval: number) {
     if (_keepGoing) {
       _timer = setTimeout(tick, interval);
     }
-    const end = performance.now();
-    console.log(`update tock took ${end - start} ms`);
   };
 
   tick();

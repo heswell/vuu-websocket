@@ -32,6 +32,7 @@ export type DataViewConfig = DataSourceConfig & {
 };
 
 export type SelectionEventHandler = () => void;
+
 export declare type DataViewEvents = {
   "row-selection": SelectionEventHandler;
 };
@@ -88,14 +89,16 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       this.filter(this.#config.filterSpec);
     }
 
-    table.on("rowUpdated", this.handleTableUpdate);
+    table.on("rowUpdated", this.rowUpdated);
     table.on("rowInserted", this.rowInserted);
+    table.on("rowDeleted", this.rowDeleted);
   }
 
   destroy() {
     console.log(`destroy view`);
-    this.#table?.removeListener("rowUpdated", this.handleTableUpdate);
+    this.#table?.removeListener("rowUpdated", this.rowUpdated);
     this.#table?.removeListener("rowInserted", this.rowInserted);
+    this.#table?.removeListener("rowDeleted", this.rowDeleted);
     this.rowSet.clear();
     //@ts-ignore
     this.#table = undefined;
@@ -128,23 +131,17 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     return this.#table;
   }
 
-  private rowInserted: RowInsertHandler = (idx, row) => {
-    // const { _updateQueue, rowSet } = this;
-    // const { size = null, replace, updates } = rowSet.insert(idx, row);
-    // if (size !== null) {
-    //   _updateQueue?.resize(size);
-    // }
-    // if (replace) {
-    //   const { rows, size } = rowSet.currentRange();
-    //   _updateQueue?.replace({ rows, size });
-    // } else if (updates) {
-    //   updates.forEach((update) => {
-    //     _updateQueue?.update(update);
-    //   });
-    // }
+  private rowInserted: RowInsertHandler = (rowIdx, row) => {
+    const { rows, size } = this.rowSet.insert(rowIdx, row);
+    this.enqueue(tableRowsMessageBody(rows, size, this.#id));
   };
 
-  private handleTableUpdate: RowUpdateHandler = (idx, updates) => {
+  private rowDeleted: RowInsertHandler = (rowIdx, row) => {
+    const { rows, size } = this.rowSet.delete(rowIdx, row);
+    this.enqueue(tableRowsMessageBody(rows, size, this.#id));
+  };
+
+  private rowUpdated: RowUpdateHandler = (idx, updates) => {
     const { rowSet } = this;
     const dataResponse = rowSet.update(idx, updates);
 

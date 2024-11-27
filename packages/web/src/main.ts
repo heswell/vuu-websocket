@@ -33,6 +33,18 @@ const view = new DataView(id, table, {
   sort: { sortDefs: [] },
 });
 
+table.delete("ABAX");
+
+// table.insert([
+//   "ABCD",
+//   "ABC Industries",
+//   1000,
+//   100000000,
+//   "2024",
+//   "Basic Industries",
+//   "Major Chemicals",
+// ]);
+
 console.log(
   "%c--------- get initial data {from:0, to: 50 }    ---------",
   "color:green;font-weight:bold;font-size: large;"
@@ -72,52 +84,52 @@ console.log(
 //   console.table(rows.map((r) => r.data));
 // }
 
-let groupBy = ["Sector", "Industry"];
-console.log(
-  `%c--------- group by [${groupBy.join(",")}]     ---------`,
-  "color:green;font-weight:bold;font-size: large;"
-);
-let { rows, size } = view.setRange({ from: 0, to: 20 });
+// let groupBy = ["Sector", "Industry"];
+// console.log(
+//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// let { rows, size } = view.setRange({ from: 0, to: 20 });
 
-let response = view.group(groupBy) as DataResponse;
-if (response) {
-  ({ rows, size } = response);
-  console.log(`${rows.length} rows of ${size}`);
-  console.table(rows);
-  console.table(rows.map((r) => r.data));
-}
+// let response = view.group(groupBy) as DataResponse;
+// if (response) {
+//   ({ rows, size } = response);
+//   console.log(`${rows.length} rows of ${size}`);
+//   console.table(rows);
+//   console.table(rows.map((r) => r.data));
+// }
 
-console.log("expand node Capital Goods");
-({ rows, size } = view.openTreeNode("$root|Capital Goods"));
-console.log({ size });
-console.table(rows);
-console.table(rows.map((r) => r.data));
+// console.log("expand node Capital Goods");
+// ({ rows, size } = view.openTreeNode("$root|Capital Goods"));
+// console.log({ size });
+// console.table(rows);
+// console.table(rows.map((r) => r.data));
 
-groupBy = ["Industry"];
-console.log(
-  `%c--------- group by [${groupBy.join(",")}]     ---------`,
-  "color:green;font-weight:bold;font-size: large;"
-);
-response = view.group(groupBy) as DataResponse;
-if (response) {
-  ({ rows, size } = response);
-  console.log(`${rows.length} rows of ${size}`);
-  console.table(rows);
-  console.table(rows.map((r) => r.data));
-}
+// groupBy = ["Industry"];
+// console.log(
+//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// response = view.group(groupBy) as DataResponse;
+// if (response) {
+//   ({ rows, size } = response);
+//   console.log(`${rows.length} rows of ${size}`);
+//   console.table(rows);
+//   console.table(rows.map((r) => r.data));
+// }
 
-groupBy = [];
-console.log(
-  `%c--------- group by [${groupBy.join(",")}]     ---------`,
-  "color:green;font-weight:bold;font-size: large;"
-);
-response = view.group(groupBy) as DataResponse;
-if (response) {
-  ({ rows, size } = response);
-  console.log(`${rows.length} rows of ${size}`);
-  console.table(rows);
-  console.table(rows.map((r) => r.data));
-}
+// groupBy = [];
+// console.log(
+//   `%c--------- group by [${groupBy.join(",")}]     ---------`,
+//   "color:green;font-weight:bold;font-size: large;"
+// );
+// response = view.group(groupBy) as DataResponse;
+// if (response) {
+//   ({ rows, size } = response);
+//   console.log(`${rows.length} rows of ${size}`);
+//   console.table(rows);
+//   console.table(rows.map((r) => r.data));
+// }
 
 // console.log("select row Capital Goods");
 // ({ rows, size } = view.select([1, 2]));

@@ -15,15 +15,10 @@ import { extendsExistingFilter } from "../filter.ts";
 import { getDeltaRange, getFullRange } from "../rangeUtils.ts";
 import { identifySelectionChanges } from "../selectionUtils";
 import {
-  ASC,
-  mapSortDefsToSortCriteria,
   revertToIndexSort,
   sort,
-  sortBy,
   sortExtend,
   sortExtendsExistingSort,
-  SortItem,
-  sortPosition,
   sortRemoved,
   sortReversed,
   SortSet,
@@ -393,123 +388,155 @@ export class RowSet extends BaseRowSet {
     }
   }
 
-  insert(rowIndex: number, row: VuuDataRow) {
-    const { columnMap } = this._table;
+  delete(rowIndex: number, row: VuuDataRow): DataResponse {
+    const { sortSet } = this;
+    if (this.sortCols === undefined) {
+      // the sortSet is still in table order
+      sortSet.length -= 1;
 
-    // TODO multi colun sort sort DSC
-    if (this.sortCols === null && this.currentFilter === undefined) {
-      // simplest scenario, row will be at end of sortset ...
-      this.sortSet.push([rowIndex, 0, 0]);
       if (rowIndex >= this.range.to) {
         // ... row is beyond viewport
         return {
+          rows: [],
           size: this.size,
         };
       } else {
         // ... row is within viewport
         return {
-          size: this.size,
-          replace: true,
-        };
-      }
-    } else if (this.currentFilter === undefined) {
-      // sort only - currently only support single column sorting
-      const sortCols = mapSortDefsToSortCriteria(
-        this.sortCols,
-        this._table.columnMap
-      );
-      const [[colIdx]] = sortCols;
-      const sortRow: SortItem = [rowIndex, row[colIdx], 0];
-      const sorter = sortBy([[1, ASC]]); // the sortSet is always ascending
-      const sortPos = sortPosition(
-        this.sortSet,
-        sorter,
-        sortRow,
-        "last-available"
-      );
-      this.sortSet.splice(sortPos, 0, sortRow);
-
-      const viewportPos = sortPos;
-
-      if (viewportPos >= this.range.to) {
-        return {
+          rows: this.slice(Math.max(rowIndex, this.range.from), this.range.to),
           size: this.size,
         };
-      } else if (viewportPos >= this.range.from) {
-        return {
-          size: this.size,
-          replace: true,
-        };
-      } else {
-        return {
-          size: this.size,
-        };
-      }
-    } else if (this.sortCols === undefined) {
-      // filter only
-      const fn = filterPredicate(columnMap, this.currentFilter);
-      if (fn(row)) {
-        const navIdx = this.filterSet?.length;
-        this.filterSet?.push(rowIndex);
-        if (navIdx >= this.range.to) {
-          // ... row is beyond viewport
-          return {
-            size: this.size,
-          };
-        } else if (navIdx >= this.range.from) {
-          // ... row is within viewport
-          return {
-            size: this.size,
-            replace: true,
-          };
-        } else {
-          return {
-            size: this.size,
-          };
-        }
-      } else {
-        return {};
-      }
-    } else {
-      // sort AND filter
-      const fn = filterPredicate(columnMap, this.currentFilter);
-      if (fn(row)) {
-        // TODO what about totalCOunt
-
-        const sortCols = mapSortDefsToSortCriteria(
-          this.sortCols,
-          this.table.columnMap
-        );
-        const [[colIdx, direction]] = sortCols; // TODO multi-colun sort
-        const sortRow = [rowIndex, row[colIdx]];
-        const sorter = sortBy([[1, direction]]); // TODO DSC
-        const navIdx = sortPosition(
-          this.filterSet,
-          sorter,
-          sortRow,
-          "last-available"
-        );
-        this.filterSet.splice(navIdx, 0, sortRow);
-
-        if (navIdx >= this.range.to) {
-          // ... row is beyond viewport
-          return {
-            size: this.size,
-          };
-        } else if (navIdx >= this.range.from) {
-          // ... row is within viewport
-          return {
-            size: this.size,
-            replace: true,
-          };
-        } else {
-          return {
-            size: this.size,
-          };
-        }
-      } else {
-        return {};
       }
     }
+    return {
+      rows: [],
+      size: this.size,
+    };
+  }
+  insert(rowIndex: number, row: VuuDataRow): DataResponse {
+    const { columnMap } = this._table;
+
+    // TODO multi colun sort sort DSC
+    if (this.sortCols === undefined && this.currentFilter === undefined) {
+      // simplest scenario, row will be at end of sortset ...
+      this.sortSet.push([rowIndex, 0, 0]);
+      if (rowIndex >= this.range.to) {
+        // ... row is beyond viewport
+        return {
+          rows: [],
+          size: this.size,
+        };
+      } else {
+        // ... row is within viewport
+        return {
+          rows: this.slice(rowIndex, rowIndex + 1),
+          size: this.size,
+        };
+      }
+    } else {
+      throw Error(
+        "only support insert into no-sort, no-filter rowsets at the moment"
+      );
+    }
+
+    // else if (this.currentFilter === undefined) {
+    //   // sort only - currently only support single column sorting
+    //   const sortCols = mapSortDefsToSortCriteria(
+    //     this.sortCols,
+    //     this._table.columnMap
+    //   );
+    //   const [[colIdx]] = sortCols;
+    //   const sortRow: SortItem = [rowIndex, row[colIdx], 0];
+    //   const sorter = sortBy([[1, ASC]]); // the sortSet is always ascending
+    //   const sortPos = sortPosition(
+    //     this.sortSet,
+    //     sorter,
+    //     sortRow,
+    //     "last-available"
+    //   );
+    //   this.sortSet.splice(sortPos, 0, sortRow);
+
+    //   const viewportPos = sortPos;
+
+    //   if (viewportPos >= this.range.to) {
+    //     return {
+    //       size: this.size,
+    //     };
+    //   } else if (viewportPos >= this.range.from) {
+    //     return {
+    //       size: this.size,
+    //       replace: true,
+    //     };
+    //   } else {
+    //     return {
+    //       size: this.size,
+    //     };
+    //   }
+    // } else if (this.sortCols === undefined) {
+    //   // filter only
+    //   const fn = filterPredicate(columnMap, this.currentFilter);
+    //   if (fn(row)) {
+    //     const navIdx = this.filterSet?.length;
+    //     this.filterSet?.push(rowIndex);
+    //     if (navIdx >= this.range.to) {
+    //       // ... row is beyond viewport
+    //       return {
+    //         size: this.size,
+    //       };
+    //     } else if (navIdx >= this.range.from) {
+    //       // ... row is within viewport
+    //       return {
+    //         size: this.size,
+    //         replace: true,
+    //       };
+    //     } else {
+    //       return {
+    //         size: this.size,
+    //       };
+    //     }
+    //   } else {
+    //     return {};
+    //   }
+    // } else {
+    //   // sort AND filter
+    //   const fn = filterPredicate(columnMap, this.currentFilter);
+    //   if (fn(row)) {
+    //     // TODO what about totalCOunt
+
+    //     const sortCols = mapSortDefsToSortCriteria(
+    //       this.sortCols,
+    //       this.table.columnMap
+    //     );
+    //     const [[colIdx, direction]] = sortCols; // TODO multi-colun sort
+    //     const sortRow = [rowIndex, row[colIdx]];
+    //     const sorter = sortBy([[1, direction]]); // TODO DSC
+    //     const navIdx = sortPosition(
+    //       this.filterSet,
+    //       sorter,
+    //       sortRow,
+    //       "last-available"
+    //     );
+    //     this.filterSet.splice(navIdx, 0, sortRow);
+
+    //     if (navIdx >= this.range.to) {
+    //       // ... row is beyond viewport
+    //       return {
+    //         size: this.size,
+    //       };
+    //     } else if (navIdx >= this.range.from) {
+    //       // ... row is within viewport
+    //       return {
+    //         size: this.size,
+    //         replace: true,
+    //       };
+    //     } else {
+    //       return {
+    //         size: this.size,
+    //       };
+    //     }
+    //   } else {
+    //     return {};
+    //   }
+    // }
   }
 }

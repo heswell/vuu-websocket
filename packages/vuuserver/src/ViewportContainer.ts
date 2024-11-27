@@ -5,9 +5,10 @@ import type {
   VuuLink,
   VuuLinkDescriptor,
   VuuRow,
+  VuuTable,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
-import { uuid } from "@vuu-ui/vuu-utils";
+import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
 import { DataView, type DataViewConfig } from "@heswell/data";
 import { ISession } from "@heswell/server-types";
 import { RuntimeVisualLink } from "./RuntimeVisualLink";
@@ -48,7 +49,22 @@ export class Viewport extends DataView {
   }
 }
 
-export class ViewportContainer {
+export type ViewportCreationEvent = {
+  id: string;
+  table: VuuTable;
+  type: "viewport-created";
+};
+export type ViewportRemovedEvent = {
+  id: string;
+  type: "viewport-removed";
+};
+
+export type ViewportEvents = {
+  "viewport-created": (e: ViewportCreationEvent) => void;
+  "viewport-removed": (e: ViewportRemovedEvent) => void;
+};
+
+export class ViewportContainer extends EventEmitter<ViewportEvents> {
   static #instance: ViewportContainer;
   public static get instance(): ViewportContainer {
     if (!ViewportContainer.#instance) {
@@ -57,6 +73,7 @@ export class ViewportContainer {
     return ViewportContainer.#instance;
   }
   private constructor() {
+    super();
     console.log("create ViewportContainer");
   }
 
@@ -89,6 +106,11 @@ export class ViewportContainer {
     } else {
       this.#sessionViewportMap.set(session.id, [id]);
     }
+    this.emit("viewport-created", {
+      id: viewport.id,
+      table: table.schema.table,
+      type: "viewport-created",
+    });
     return viewport;
   }
 
@@ -115,6 +137,10 @@ export class ViewportContainer {
           viewports.splice(idx, 1);
         }
       }
+      this.emit("viewport-removed", {
+        id: viewport.id,
+        type: "viewport-removed",
+      });
     } else {
       throw Error(
         `[ViewportContainer] closeViewport, viewportId ${viewportId} not found in sessionMap`
