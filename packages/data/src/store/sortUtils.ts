@@ -24,7 +24,15 @@ export const mapSortDefsToSortCriteria = (
 ): SortCriteria =>
   sortDefs === undefined
     ? []
-    : sortDefs.map(({ column, sortType }) => [columnMap[column], sortType]);
+    : sortDefs.map(({ column, sortType }) => {
+        const colIdx = columnMap[column];
+        if (colIdx === undefined) {
+          throw Error(
+            `mapSortDefsToSortCriteria, column ${column} not in Column Map`
+          );
+        }
+        return [colIdx, sortType];
+      });
 
 export function sortExtend(
   sortSet: SortSet,

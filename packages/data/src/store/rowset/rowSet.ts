@@ -94,6 +94,7 @@ export class RowSet extends BaseRowSet {
     filterSet?: number[]
   ) {
     const { table, indexOfKeyField } = this;
+    keyMap.clear();
 
     if (filterSet) {
       for (let i = 0; i < filterSet.length; i++) {

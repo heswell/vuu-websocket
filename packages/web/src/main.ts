@@ -1,6 +1,5 @@
 import { DataView, Table } from "@heswell/data";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { DataResponse } from "@heswell/data/src/store/rowset";
 import { getData } from "./data";
 
 const schema: TableSchema = {
@@ -33,7 +32,11 @@ const view = new DataView(id, table, {
   sort: { sortDefs: [] },
 });
 
-table.delete("ABAX");
+const { rows, size } = view.sort({
+  sortDefs: [{ column: "Sector", sortType: "A" }],
+});
+console.log(`${rows.length} rows of ${size}`);
+console.table(rows.map(({ data }) => data));
 
 // table.insert([
 //   "ABCD",
@@ -45,10 +48,6 @@ table.delete("ABAX");
 //   "Major Chemicals",
 // ]);
 
-console.log(
-  "%c--------- get initial data {from:0, to: 50 }    ---------",
-  "color:green;font-weight:bold;font-size: large;"
-);
 // let { rows, size } = view.setRange({ from: 0, to: 30 });
 // console.log(`${rows.length} rows of ${size}`);
 // console.table(rows);
