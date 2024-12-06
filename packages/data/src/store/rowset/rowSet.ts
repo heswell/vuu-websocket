@@ -331,7 +331,7 @@ export class RowSet extends BaseRowSet {
       const rowIdx = getRowIndex(i);
       const row = table.rows[rowIdx];
       if (fn(row)) {
-        newFilterSet.push(rowIdx);
+        newFilterSet.push(i);
       }
     }
 

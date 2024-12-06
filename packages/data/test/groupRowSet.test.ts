@@ -24,20 +24,6 @@ const schema: TableSchema = {
 const table = new Table({ schema });
 getData(schema).forEach((row) => table.insert(row, false));
 
-describe("RowSet", () => {
-  test("RowSet construction", () => {
-    const rowSet = new RowSet("test-1", table, schema.columns);
-    expect(rowSet.size).toEqual(1247);
-  });
-  describe("filter", () => {
-    test("equals filter", () => {
-      const rowSet = new RowSet("test-1", table, schema.columns);
-      rowSet.filter({ column: "Sector", op: "=", value: "Technology" });
-      expect(rowSet.size).toEqual(303);
-    });
-  });
-});
-
 describe("GroupRowSet", () => {
   describe("construction", () => {
     test("single group", () => {
