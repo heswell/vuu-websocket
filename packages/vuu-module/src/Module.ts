@@ -33,6 +33,11 @@ const loadProviders = (
       );
     });
 
+    console.log(`loadProviders ${module.name} 
+      loaded ${loaded.join(",")}
+      readyToLoad ${readyToLoad.map((m) => m.table.name).join(",")}
+      `);
+
     const loadingProviders: Array<Promise<void>> = [];
     for (const provider of readyToLoad) {
       loadingProviders.push(provider.load(module));

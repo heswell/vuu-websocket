@@ -6,7 +6,7 @@ import { WebsocketData } from "./server";
 
 export const webSocketMessageHandler = async (
   ws: ServerWebSocket<WebsocketData>,
-  message: string | ArrayBuffer | Uint8Array
+  message: string | Buffer
 ) => {
   // console.log(`=====> ${message}`);
   const session = getSession(ws.data.sessionId);

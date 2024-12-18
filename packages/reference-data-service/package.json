@@ -1,0 +1,14 @@
+{
+  "name": "reference-data-service",
+  "version": "1.0.0",
+  "scripts": {
+    "refdata-client": "bun ./src/mock-client/mock-refdata-client.ts",
+    "refdata-service": "bun ./src/reference-data-server/reference-data-server.ts",
+    "test": "bun --watch ./test.ts"
+  },
+  "author": "heswell",
+  "type": "module",
+  "dependencies": {
+    "pino": "^9.5.0"
+  }
+}

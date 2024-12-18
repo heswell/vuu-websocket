@@ -1,0 +1,9 @@
+{
+  "name": "price-service",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "bun ./price-server.ts"
+  },
+  "author": "heswell",
+  "type": "module"
+}

@@ -6,7 +6,6 @@ import type {
 import { MessageQueue } from "./messageQueue";
 import type { WebsocketData } from "./server";
 import { ServerWebSocket } from "bun";
-import { preProcessFile } from "typescript";
 
 const sessions = new Map<string, Session>();
 
@@ -111,13 +110,13 @@ class Session implements ISession {
   #heartbeat = 0;
   #id: string;
   #user: string | undefined;
-  #ws: WebSocket;
+  #ws: ServerWebSocket;
   #token: string | undefined;
   #queue: MessageQueue;
   #viewports: string[] = [];
 
   // #stopUpdates: () => void;
-  constructor(sessionId: string, ws: WebSocket) {
+  constructor(sessionId: string, ws: ServerWebSocket) {
     this.#id = sessionId;
     this.#ws = ws;
     this.#queue = new MessageQueue();
