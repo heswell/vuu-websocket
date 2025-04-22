@@ -16,7 +16,6 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/data": "3.0.0",
-    "@heswell/data-tables": "3.0.0",
     "@heswell/server-core": "3.0.0",
     "@heswell/server-types": "3.0.0",
     "@vuu-ui/vuu-utils": "0.9.2"
