@@ -1,7 +1,7 @@
-import { ServerWebSocket } from "bun";
-import { WebsocketData } from "./server";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { ServerWebSocket } from "bun";
 import logger from "../logger";
+import { WebsocketData } from "./server";
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(() => resolve(undefined), ms));
@@ -22,7 +22,7 @@ export class WebSocketSink<D = WebsocketData, MSG = VuuDataRow> {
   }
   write(message: MSG) {
     WebSocketSink.#messageCount += 1;
-    logger.trace({ sessionId: this.sessionId, instrument: message });
+    logger.trace({ sessionId: this.sessionId, parentOrder: message });
     this.ws.send(JSON.stringify(message));
     return sleep(0);
   }

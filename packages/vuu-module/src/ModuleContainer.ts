@@ -5,19 +5,7 @@ import { ProviderFactory } from "./Provider";
 import { tableDefToSchema } from "./tableDefToSchema";
 import { Table } from "@heswell/data";
 import { ServiceFactory, ServiceMessage } from "./Service";
-
-export type Column = {
-  name: string;
-  dataType: "string" | "double" | "int" | "long" | "boolean";
-};
-
-export interface TableDef {
-  columns: Column[];
-  joinFields?: string | string[];
-  keyField: string;
-  name: string;
-  links?: VuuLink[];
-}
+import { TableDef } from "./TableDef";
 
 export class ModuleContainer {
   static #instance: ModuleContainer;
@@ -107,5 +95,9 @@ export class ModuleContainer {
     return this.getModule(module).invokeService(table, message);
   }
 }
+
+export const startModulerContainer = () => {
+  return ModuleContainer.instance;
+};
 
 export default ModuleContainer.instance;

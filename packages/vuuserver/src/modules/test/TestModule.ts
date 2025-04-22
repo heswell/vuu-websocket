@@ -1,4 +1,4 @@
-import ModuleContainer from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module/src/ModuleContainer";
 import { InstrumentProvider } from "./providers/InstrumentProvider";
 
 ModuleContainer.withNameSpace("TEST")

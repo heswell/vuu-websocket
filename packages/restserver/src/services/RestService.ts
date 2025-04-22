@@ -7,7 +7,7 @@ import { filterPredicate, parseFilter } from "@vuu-ui/vuu-filter-parser";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { getQueryFields, getRestRange, getSortSet } from "./rest-utils";
-import ModuleContainer from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module/src/ModuleContainer";
 
 import { ServiceHandlers } from "@heswell/server-core";
 import { SortSet } from "@heswell/data";

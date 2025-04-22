@@ -13,6 +13,8 @@ const msgConfig: ServerMessagingConfig = {
   PRIORITY_UPDATE_FREQUENCY,
 };
 
+const WS_PORT = 8090;
+
 export interface WebsocketData {
   sessionId: string;
 }
@@ -41,7 +43,7 @@ export async function start(...configs: ServerConfig[]) {
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",
-    port: 8090,
+    port: WS_PORT,
 
     fetch(req, server) {
       const sessionId = uuid();

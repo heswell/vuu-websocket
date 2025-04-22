@@ -1,5 +1,5 @@
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { TableDef } from "./ModuleFactory";
+import { TableDef } from "./TableDef";
 
 export const tableDefToSchema = (
   moduleName: string,

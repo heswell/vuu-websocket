@@ -1,7 +1,7 @@
 import { ServerWebSocket, WebSocketHandler } from "bun";
 import { WebsocketData } from "./server";
 import { WebSocketSink } from "./WebSocketSink";
-import { instruments } from "./InstrumentStore";
+import { parentOrders, childOrders, fills } from "./ParentOrdersStore";
 import { ArrayDataStreamSource } from "./ArrayDataStreamSource";
 import logger from "../logger";
 
@@ -17,7 +17,7 @@ export class WebSocketConnectionHandler
 
   open = (ws: ServerWebSocket<WebsocketData>) => {
     logger.info(
-      `[ReferenceDataService] new WebSocket, open a new Session = ${ws.data.sessionId}`
+      `[OrderService] new WebSocket, open a new Session = ${ws.data.sessionId}`
     );
     const { sessionId } = ws.data;
     this.#sessions.set(sessionId, {
@@ -43,13 +43,11 @@ export class WebSocketConnectionHandler
     logger.info({ sessionId, type });
 
     switch (type) {
-      case "instruments":
+      case "parentOrders":
         {
-          console.log(
-            `[WebsocketConnectionHandler] request received for instruments`
-          );
+          `[OrdersServer WebSocketConnectionHandler] request received for parentOrders`;
           const readStream = new ReadableStream(
-            new ArrayDataStreamSource(sessionId, instruments, 50)
+            new ArrayDataStreamSource(sessionId, parentOrders, 50)
           );
           readStream.pipeTo(wsStream);
         }
@@ -64,7 +62,7 @@ export class WebSocketConnectionHandler
   };
 
   drain = (ws: ServerWebSocket<WebsocketData>) => {
-    logger.warn("[ReferenceDataService] WebSocket backpressure: ");
+    logger.warn("[OrderService] WebSocket backpressure: ");
   };
 
   close = (ws: ServerWebSocket<WebsocketData>) => {
@@ -73,11 +71,11 @@ export class WebSocketConnectionHandler
     if (session) {
       this.#sessions.delete(session.id);
       logger.info(
-        `[ReferenceDataService] WebSocket closed, remove session ${sessionId}`
+        `[OrderService] WebSocket closed, remove session ${sessionId}`
       );
     } else {
       logger.warn(
-        `[ReferenceDataService] WebSocket closed, no session ${sessionId} not found`
+        `[OrderService] WebSocket closed, no session ${sessionId} not found`
       );
     }
   };

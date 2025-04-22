@@ -14,11 +14,13 @@ import {
   VuuViewportRemoveRequest,
   VuuViewportVisualLinksRequest,
 } from "@vuu-ui/vuu-protocol-types";
-import ModuleContainer from "@heswell/vuu-module";
+import ModuleContainer from "@heswell/vuu-module/src/ModuleContainer";
 // TODO how do we make this more dynamic
 import "./modules/simul/SimulModule.ts";
 import "./modules/test/TestModule.ts";
 import "./modules/system/SystemModule.ts";
+import "./modules/orders/OrdersModule.ts";
+import logger from "./logger";
 
 import type {
   ConfiguredService,
@@ -66,6 +68,7 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
   const { table: vuuTable } = body;
   const table = ModuleContainer.getTable(vuuTable);
 
+  logger.info({ session: session.id, vuuTable }, "CREATE_VP");
   console.log(`session ${session.id} ${JSON.stringify(message)}`);
   const start = performance.now();
   const viewport = ViewportContainer.createViewport(session, table, body);
@@ -82,6 +85,14 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
   });
 
   const { rows, size } = viewport.getDataForCurrentRange();
+  logger.info(
+    { session: session.id, vuuTable },
+    `CREATE_VP ${rows.length} rows of ${size} (range ${body.range.from}:${
+      body.range.to
+    }) keys: #${rows[0]?.rowKey} - ${rows.at(-1)?.rowKey}, indices [${
+      rows[0]?.rowIndex
+    }] = [${rows.at(-1)?.rowIndex}]`
+  );
   enqueueDataMessages(rows, size, session, viewport.id);
 
   const end2 = performance.now();
@@ -147,6 +158,14 @@ const CHANGE_VP_RANGE: VuuProtocolHandler = (message, session) => {
   const viewport = ViewportContainer.getViewport(viewPortId);
   if (viewport) {
     const { rows, size } = viewport.setRange({ from, to });
+    logger.info(
+      { session: session.id, viewport: viewPortId },
+      `CHANGE_VP_RANGE ${from}:${to}, ${rows.length} rows of ${size}, keys: #${
+        rows[0]?.rowKey
+      } - ${rows.at(-1)?.rowKey}, indices [${rows[0]?.rowIndex}] = [${
+        rows.at(-1)?.rowIndex
+      }]`
+    );
     enqueueDataMessages(rows, size, session, viewPortId);
   }
 };

@@ -1,39 +1,37 @@
 import { Provider, random } from "@heswell/vuu-module";
 
-const refDataServiceUrl = `ws://localhost:${process.env.REFDATA_URL}`;
+const ordersServiceUrl = `ws://localhost:${process.env.ORDERS_URL}`;
 
-export class InstrumentProvider extends Provider {
+export class ParentOrdersProvider extends Provider {
   #loadPromise: Promise<void> | undefined;
   async load() {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
         console.log(
-          `[SIMUL InstrumentProvider] load instruments, subscribing to ref data service on ${refDataServiceUrl}`
+          `[ParentOrdersProvider] load parent orders, subscribing to orders service on ${ordersServiceUrl}`
         );
 
         try {
-          const socket = new WebSocket(refDataServiceUrl);
+          const socket = new WebSocket(ordersServiceUrl);
 
           socket.addEventListener("message", (evt) => {
             const message = JSON.parse(evt.data as string);
-            if (message.count) {
+            if (typeof message.count === "number") {
               // all done
-              console.log("[InstrumentProvider] loaded");
+              console.log(`[ParentOrdersProvider] ${message.count} loaded`);
               this.loaded = true;
               resolve();
             } else {
-              for (const instrument of message.instruments) {
-                this.table.insert(instrument);
+              for (const order of message.parentOrders) {
+                this.table.insert(order);
               }
             }
           });
 
           // socket opened
           socket.addEventListener("open", (event) => {
-            console.log(
-              `[SIMUL InstrumentProvider] websocket to RefData service open`
-            );
-            socket.send(JSON.stringify({ type: "instruments" }));
+            console.log(`[ParentOrdersProvider] websocket open`);
+            socket.send(JSON.stringify({ type: "parentOrders" }));
           });
         } catch (err) {
           reject(err);
@@ -42,7 +40,7 @@ export class InstrumentProvider extends Provider {
 
       return this.#loadPromise;
     } else {
-      throw Error("[InstrumentProvider] load has already been called");
+      throw Error("[ParentOrdersProvider] load has already been called");
     }
   }
 }

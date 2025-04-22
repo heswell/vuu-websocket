@@ -1,15 +1,16 @@
 {
-  "name": "@heswell/reference-data-service",
+  "name": "reference-data-duckdb",
   "version": "1.0.0",
-  "module": "src/index.ts",
   "scripts": {
     "refdata-client": "bun ./src/mock-client/mock-refdata-client.ts",
-    "refdata-service": "bun ./src/reference-data-server/reference-data-server.ts",
-    "test": "bun --watch ./test.ts"
+    "refdata-service": "node --experimental-strip-types --env-file-if-exists=.env ./server.ts"
   },
   "author": "heswell",
   "type": "module",
   "dependencies": {
     "pino": "9.6.0"
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^1.1.3-alpha.8"
   }
 }

@@ -1,9 +1,9 @@
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import logger from "../logger";
-import type { ReferenceData, RowCount } from "./reference-data-types";
+import type { OrdersData, RowCount } from "./order-service-types";
 
 export class ArrayDataStreamSource
-  implements UnderlyingDefaultSource<ReferenceData | RowCount>
+  implements UnderlyingDefaultSource<OrdersData | RowCount>
 {
   index = 0;
   constructor(
@@ -14,19 +14,18 @@ export class ArrayDataStreamSource
   start() {
     logger.info({ sessionId: this.sessionId }, "[ArrayStreamDataSource] start");
   }
-  pull(controller: ReadableStreamDefaultController<ReferenceData | RowCount>) {
+  pull(controller: ReadableStreamDefaultController<OrdersData | RowCount>) {
     const { data, index } = this;
     const count = data.length;
 
     if (index === count) {
       controller.enqueue({ count });
       controller.close();
-      console.log(`[ArrayStreamDataSource] streaming complete`);
     } else {
       const end = Math.min(index + this.batchSize, count);
       const batchSize = end - index;
-      const message: ReferenceData = {
-        instruments: data.slice(index, end),
+      const message: OrdersData = {
+        parentOrders: data.slice(index, end),
       };
       controller.enqueue(message);
       this.index += batchSize;
