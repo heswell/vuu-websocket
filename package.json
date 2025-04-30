@@ -7,9 +7,11 @@
     "packages/**"
   ],
   "scripts": {
-    "start": "bun ./start.ts",
-    "start:orders": "bun ./start-orders.ts",
-    "start:refdata": "bun ./start-refdata.ts",
+    "start:all": "bun ./scripts/start-all.ts",
+    "start": "npm start:all",
+    "start:demo": "bun ./scripts/start-demo.ts",
+    "start:orders": "bun ./scripts/start-orders.ts",
+    "start:refdata": "bun ./scripts/start-refdata.ts",
     "debug": "bun --inspect ./start.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc --noEmit --project tsconfig-typecheck.json"
