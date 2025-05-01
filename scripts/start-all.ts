@@ -8,6 +8,7 @@ procRefData = Bun.spawn(["bun", "./scripts/start-refdata.ts"], {
 });
 
 setTimeout(() => {
+  // TODO fix vuu server so that wait for ref data is not required
   console.log(`spawn a process for the Vuu Server`);
   procVuuServer = Bun.spawn(["bun", "./scripts/start-demo.ts"], {
     stdout: "inherit",
