@@ -6,8 +6,9 @@ import {
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
 import { IService, ServiceMessage } from "./Service";
-import { Viewport } from "@heswell/vuuserver";
 import { uuid } from "@vuu-ui/vuu-utils";
+import { Viewport } from "./ViewportContainer";
+import { RpcHandler, RpcRegistry } from "./RpcRegistry";
 
 export interface ModuleConstructorProps {
   name: string;
@@ -55,6 +56,7 @@ export class Module {
   #name: string;
   #providers = new Map<string, IProvider>();
   #links = new Map<string, VuuLink[]>();
+  #rpcRegistry = new RpcRegistry();
   #services = new Map<string, IService>();
   #tables = new Map<string, Table>();
   #sessionTableMap = new Map<string, string>();
@@ -66,6 +68,18 @@ export class Module {
 
   get name() {
     return this.#name;
+  }
+
+  addRpcHandler(rpcHandler: RpcHandler) {
+    console.log(`[Module] #${this.#name} addRpcHandler`, {
+      rpcHandler,
+    });
+
+    const { serviceName, methods } = rpcHandler;
+    this.#rpcRegistry.register(serviceName, rpcHandler, methods);
+  }
+  getRpcHandler(serviceName: string, method: string) {
+    return this.#rpcRegistry.getHandler(serviceName, method);
   }
 
   addTable(table: Table, provider: IProvider, service?: IService) {

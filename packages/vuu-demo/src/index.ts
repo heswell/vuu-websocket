@@ -4,11 +4,11 @@ import {
   VuuServerConfig,
   VuuServer,
   HttpServerOptions,
+  TypeAheadModule,
   WebSocketOptions,
 } from "@heswell/vuu-server";
 import { PriceModule } from "./modules/prices";
 import { SimulationModule } from "./modules/simul";
-// import { TypeAheadModule } from "./modules/typeahead";
 // import { EditableModule } from "./modules/editable";
 // import { PermissionModule } from "./modules/permission";
 // import { BasketModule } from "./modules/baskets";
@@ -23,8 +23,8 @@ export default function start() {
     webSocketOptions(defaultConfig)
   )
     // .withModule(PriceModule())
-    .withModule(SimulationModule());
-  // .withModule(TypeAheadModule())
+    .withModule(SimulationModule())
+    .withModule(TypeAheadModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())
   // .withModule(BasketModule());

@@ -1,4 +1,3 @@
-import { ServiceHandlers } from "@heswell/server-core";
 import {
   ClientToServerMenuSelectRPC,
   VuuCreateVisualLink,
@@ -22,12 +21,7 @@ import {
   ClientToServerOpenTreeNode,
   ClientToServerSelection,
   VuuRow,
-  VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
-import {
-  isGetUniqueValues,
-  isGetUniqueValuesStartingWith,
-} from "./request-utils.ts";
 import ViewportContainer from "./ViewportContainer.ts";
 import { tableRowsMessageBody } from "@heswell/data";
 import ModuleContainer from "./ModuleContainer.ts";
@@ -227,27 +221,32 @@ const VIEW_PORT_MENUS_SELECT_RPC: VuuProtocolHandler = (message, session) => {
   }
 };
 
-const RPC_CALL: VuuProtocolHandler = (message, session) => {
-  const messageBody = message.body as VuuRpcServiceRequest;
+const RPC_CALL: VuuProtocolHandler<VuuRpcServiceRequest> = (
+  message,
+  session
+) => {
+  const { body, module } = message;
+  const messageBody = body as VuuRpcServiceRequest;
   const { method, service } = messageBody;
-  switch (service) {
-    case "TypeAheadRpcHandler":
-      {
-        const start = performance.now();
-        const result = typeaheadService(messageBody);
-        const end = performance.now();
-        console.log(`typeaheadService took ${end - start}ms`);
-
-        session.enqueue(message.requestId, {
-          method,
-          result,
-          type: "RPC_RESP",
-        });
-      }
-      break;
-
-    default:
-      console.log(`unsupported RPC service `);
+  console.log(
+    `[VuuProtocolHandler] RPC_CALL <${module}> get handler for ${service} ${JSON.stringify(
+      message,
+      null,
+      2
+    )}`
+  );
+  const rpcHandler = ModuleContainer.getRpcHandler(module, service, method);
+  if (rpcHandler) {
+    // TODO should it be async ?
+    const start = performance.now();
+    const result = rpcHandler.handleRpcCall(messageBody);
+    const end = performance.now();
+    console.log(`typeaheadService took ${end - start}ms`);
+    session.enqueue(message.requestId, {
+      method,
+      result,
+      type: "RPC_RESP",
+    });
   }
 };
 
@@ -346,32 +345,13 @@ const enqueueDataMessages = (
   }
 };
 
-function getTableColumnValues(
-  vuuTable: VuuTable,
-  column: string,
-  pattern?: string
-) {
-  const table = ModuleContainer.getTable(vuuTable);
-  return table.getUniqueValuesForColumn(column, pattern).slice(0, 10);
-}
-
-function typeaheadService(message: VuuRpcServiceRequest) {
-  if (isGetUniqueValues(message)) {
-    const [table, column] = message.params;
-    return getTableColumnValues(table, column);
-  } else if (isGetUniqueValuesStartingWith(message)) {
-    const [table, column, pattern] = message.params;
-    return getTableColumnValues(table, column, pattern);
-  } else {
-    throw Error(
-      `Invalid message for typeahead service ${JSON.stringify(message)}`
-    );
-  }
-}
-
 const onSessionClosed: VuuProtocolHandler = (_, session) => {
   ViewportContainer.closeViewportsForSession(session.id);
 };
+
+type HandlerIdentifier = string;
+export type ServiceHandlers<H extends VuuProtocolHandler = VuuProtocolHandler> =
+  Record<HandlerIdentifier, H>;
 
 export const messageAPI: ServiceHandlers<VuuProtocolHandler> = {
   onSessionClosed,

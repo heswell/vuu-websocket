@@ -1,14 +1,20 @@
-import { VuuLink, VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { VuuRpcServiceRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { Module } from "./Module";
-import { Viewport } from "@heswell/vuuserver";
 import { ProviderFactory } from "./Provider";
 import { tableDefToSchema } from "./tableDefToSchema";
 import { Table } from "@heswell/data";
 import { ServiceFactory, ServiceMessage } from "./Service";
 import { TableDef } from "./TableDef";
+import { Viewport } from "./ViewportContainer";
+import { RpcHandlerFactory } from "./RpcRegistry";
 
-export class ModuleContainer {
+export interface TableContainer {
+  getTable: ({ module, table }: VuuTable) => Table;
+}
+
+export class ModuleContainer implements TableContainer {
   static #instance: ModuleContainer;
+
   public static get instance(): ModuleContainer {
     if (!ModuleContainer.#instance) {
       ModuleContainer.#instance = new ModuleContainer();
@@ -24,6 +30,13 @@ export class ModuleContainer {
 
   private tableBuilder(moduleName: string) {
     return {
+      addRpcHandler: (rpcFactory: RpcHandlerFactory) => {
+        console.log(`addRpcHandler ${moduleName}`);
+        const module = this.getModule(moduleName);
+        module.addRpcHandler(rpcFactory(ModuleContainer.instance));
+        console.log({ module });
+        return this.tableBuilder(moduleName);
+      },
       addTable: (
         { links, ...tableDef }: TableDef,
         providerFactory: ProviderFactory,
@@ -90,6 +103,12 @@ export class ModuleContainer {
 
   getMenu({ module, table }: VuuTable) {
     return this.getModule(module).getMenu(table);
+  }
+
+  getRpcHandler(module: string, service: string, method: string) {
+    console.log(`[ModuleContainer] getRpcHandler ${module} ${service}`);
+    // TODO what about module ?
+    return this.getModule(module).getRpcHandler(service, method);
   }
 
   invokeService({ module, table }: VuuTable, message: ServiceMessage) {

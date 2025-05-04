@@ -3,6 +3,8 @@ import {
   ServerMessageBody,
   VuuClientMessage,
   VuuColumnDataType,
+  VuuServerMessage,
+  VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { Table } from "@heswell/data";
@@ -33,7 +35,7 @@ export interface DataTableDefinition {
 export interface ServerConfig {
   service: ServiceDefinition;
   DataTables?: DataTableDefinition[];
-  TableService?: DataTableApi;
+  TableService?: DataTableAPI;
 }
 
 export interface ServerMessagingConfig {
@@ -51,7 +53,7 @@ export declare type RowMeta = {
 };
 
 export interface IMessageQueue {
-  push(message: ServerToClientMessage, rowMeta?: RowMeta): void;
+  push(message: VuuServerMessage, rowMeta?: RowMeta): void;
 }
 
 export declare type RestHandler = (request: Request) => Response;

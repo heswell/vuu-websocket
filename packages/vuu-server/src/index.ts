@@ -1,8 +1,10 @@
+export { Module } from "./Module";
+export { default as ModuleContainer } from "./ModuleContainer";
+export { TypeAheadModule } from "./modules/typeahead/TypeAheadModule";
+export { Provider } from "./Provider";
+export type { TableColumnType } from "./server-types";
+export { Service } from "./Service";
+export type { TableDef } from "./TableDef";
+export { default as ViewportContainer } from "./ViewportContainer";
 export * from "./VuuServer";
 export * from "./VuuServerConfig";
-export { Module } from "./Module";
-export { Provider } from "./Provider";
-export { Service } from "./Service";
-export { default as ModuleContainer } from "./ModuleContainer";
-export { default as ViewportContainer } from "./ViewportContainer";
-export { type TableDef } from "./TableDef";
