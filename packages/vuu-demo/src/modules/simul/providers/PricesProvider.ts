@@ -1,6 +1,6 @@
 import { Table, UpdateTuple } from "@heswell/data";
 import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
-import { scenarios } from "./reference-data/scenarios";
+import { scenarios } from "../../../reference-data/scenarios";
 import { Module, Provider } from "@heswell/vuu-server";
 import {
   random,

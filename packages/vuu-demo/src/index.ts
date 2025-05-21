@@ -8,6 +8,7 @@ import {
   WebSocketOptions,
 } from "@heswell/vuu-server";
 import { PriceModule } from "./modules/prices";
+import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
 // import { EditableModule } from "./modules/editable";
 // import { PermissionModule } from "./modules/permission";
@@ -24,6 +25,7 @@ export default function start() {
   )
     // .withModule(PriceModule())
     .withModule(SimulationModule())
+    .withModule(OrdersModule())
     .withModule(TypeAheadModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())

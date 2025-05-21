@@ -1,6 +1,6 @@
-import { type TableDef } from "@heswell/vuu-server";
+import { TableDef } from "@heswell/vuu-server";
 
-export const instruments: TableDef = {
+export const instruments = TableDef({
   columns: [
     { name: "bbg", dataType: "string" },
     { name: "currency", dataType: "string" },
@@ -13,9 +13,9 @@ export const instruments: TableDef = {
   joinFields: "ric",
   keyField: "ric",
   name: "instruments",
-};
+});
 
-export const orders: TableDef = {
+export const orders = TableDef({
   columns: [
     { name: "status", dataType: "string" },
     { name: "ccy", dataType: "string" },
@@ -35,9 +35,9 @@ export const orders: TableDef = {
   ],
   keyField: "orderId",
   name: "orders",
-};
+});
 
-export const childOrders: TableDef = {
+export const childOrders = TableDef({
   columns: [
     { name: "account", dataType: "string" },
     { name: "averagePrice", dataType: "double" },
@@ -69,9 +69,9 @@ export const childOrders: TableDef = {
     { toTable: "prices", fromColumn: "ric", toColumn: "ric" },
   ],
   name: "childOrders",
-};
+});
 
-export const parentOrders: TableDef = {
+export const parentOrders = TableDef({
   columns: [
     { name: "account", dataType: "string" },
     { name: "algo", dataType: "string" },
@@ -98,9 +98,9 @@ export const parentOrders: TableDef = {
   ],
 
   name: "parentOrders",
-};
+});
 
-export const prices: TableDef = {
+export const prices = TableDef({
   columns: [
     { name: "ask", dataType: "double" },
     { name: "askSize", dataType: "double" }, // type: "int"
@@ -116,4 +116,4 @@ export const prices: TableDef = {
   joinFields: "ric",
   keyField: "ric",
   name: "prices",
-};
+});

@@ -2,10 +2,10 @@ import { Table } from "@heswell/data";
 import { Module, Provider } from "@heswell/vuu-server";
 import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { getRandom, random } from "../../../utils";
-import { accounts } from "./reference-data/accounts";
-import { algos } from "./reference-data/algos";
-import { orderStatus } from "./reference-data/orderStatus";
-import { sides } from "./reference-data/sides";
+import { accounts } from "../../../reference-data/accounts";
+import { algos } from "../../../reference-data/algos";
+import { orderStatus } from "../../../reference-data/orderStatus";
+import { sides } from "../../../reference-data/sides";
 
 const parentOrderCount = 10000;
 const averageChildPerOrder = 5;

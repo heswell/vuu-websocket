@@ -52,6 +52,9 @@ export class ModuleContainer implements TableContainer {
         }
         return this.tableBuilder(moduleName);
       },
+      // addJoinTable: (tableJoinFactory) => {
+
+      // },
       // asModule: () => this.startModule(moduleName),
       asModule: () => this.getModule(moduleName),
     };

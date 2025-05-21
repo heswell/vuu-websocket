@@ -75,7 +75,8 @@ const CREATE_VP: VuuProtocolHandler = (message, session) => {
       rows[0]?.rowIndex
     }] = [${rows.at(-1)?.rowIndex}]`
   );
-  enqueueDataMessages(rows, size, session, viewport.id);
+
+  enqueueDataMessages(rows, size, session, viewport.id, true);
 
   const end2 = performance.now();
   console.log(
@@ -338,10 +339,14 @@ const enqueueDataMessages = (
   rows: VuuRow[],
   vpSize: number,
   session: ISession,
-  viewPortId: string
+  viewPortId: string,
+  includeSize = false
 ) => {
-  if (rows.length) {
-    session.enqueue("", tableRowsMessageBody(rows, vpSize, viewPortId));
+  if (rows.length || includeSize) {
+    session.enqueue(
+      "",
+      tableRowsMessageBody(rows, vpSize, viewPortId, includeSize)
+    );
   }
 };
 

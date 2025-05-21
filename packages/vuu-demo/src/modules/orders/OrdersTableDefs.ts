@@ -1,6 +1,6 @@
 import { type TableDef } from "@heswell/vuu-server";
 
-export const parentOrders: TableDef = {
+export const orders: TableDef = {
   columns: [
     { name: "id", dataType: "string" },
     { name: "side", dataType: "string" },
@@ -14,55 +14,35 @@ export const parentOrders: TableDef = {
     { name: "trader", dataType: "string" },
     { name: "created", dataType: "long" },
     { name: "lastUpdated", dataType: "long" },
-  ],
-  joinFields: "ric",
-  keyField: "id",
-  name: "parentOrders",
-};
-
-export const childOrders: TableDef = {
-  columns: [
-    { name: "id", dataType: "string" },
-    { name: "parentOrderId", dataType: "string" },
-    { name: "side", dataType: "string" },
-    { name: "status", dataType: "string" },
-    { name: "ric", dataType: "string" },
-    { name: "orderType", dataType: "string" },
-    { name: "exchange", dataType: "string" },
-    { name: "ccy", dataType: "string" },
-    { name: "quantity", dataType: "double" },
-    { name: "filledQuantity", dataType: "double" },
-    { name: "averagePrice", dataType: "double" },
-    { name: "created", dataType: "long" },
-    { name: "lastUpdated", dataType: "long" },
-  ],
-  joinFields: "ric",
-  links: [
-    { toTable: "parentOrders", fromColumn: "parentOrderId", toColumn: "id" },
-  ],
-  keyField: "id",
-  name: "childOrders",
-};
-
-export const fills: TableDef = {
-  columns: [
-    { name: "id", dataType: "string" },
-    { name: "childOrderId", dataType: "string" },
-    { name: "parentOrderId", dataType: "string" },
-    { name: "price", dataType: "double" },
-    { name: "ccy", dataType: "string" },
-    { name: "exchange", dataType: "string" },
-    { name: "quantity", dataType: "double" },
-    { name: "created", dataType: "long" },
+    { name: "column13", dataType: "double" },
+    { name: "column14", dataType: "double" },
+    { name: "column15", dataType: "double" },
+    { name: "column16", dataType: "double" },
+    { name: "column17", dataType: "double" },
+    { name: "column18", dataType: "double" },
+    { name: "column19", dataType: "double" },
+    { name: "column20", dataType: "double" },
+    { name: "column21", dataType: "double" },
+    { name: "column22", dataType: "double" },
+    { name: "column23", dataType: "double" },
+    { name: "column24", dataType: "double" },
+    { name: "column25", dataType: "double" },
+    { name: "column26", dataType: "double" },
+    { name: "column27", dataType: "double" },
+    { name: "column28", dataType: "double" },
+    { name: "column29", dataType: "double" },
+    { name: "column30", dataType: "double" },
+    { name: "column31", dataType: "double" },
+    { name: "column32", dataType: "double" },
+    { name: "column33", dataType: "double" },
+    { name: "column34", dataType: "double" },
+    { name: "column35", dataType: "double" },
+    { name: "column36", dataType: "double" },
+    { name: "column37", dataType: "double" },
+    { name: "column38", dataType: "double" },
+    { name: "column39", dataType: "double" },
+    { name: "column40", dataType: "double" },
   ],
   keyField: "id",
-  links: [
-    { toTable: "childOrders", fromColumn: "childOrderId", toColumn: "id" },
-    {
-      toTable: "parentOrders",
-      fromColumn: "parentOrderId",
-      toColumn: "id",
-    },
-  ],
-  name: "fills",
+  name: "orders",
 };

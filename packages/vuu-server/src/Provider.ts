@@ -1,6 +1,6 @@
 import { Table } from "@heswell/data";
 import { Module } from "./Module";
-import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
 export interface IProvider {
   dependencies: string[];
@@ -76,7 +76,7 @@ export abstract class Provider implements IProvider {
 
   abstract load(module: Module): Promise<void>;
 
-  protected insertRow(row: Record<string, VuuRowDataItemType>) {
+  protected insertRow(row: VuuDataRowDto) {
     const { schema } = this.table;
     const columns = schema.columns.map((col) => col.name);
     const colCount = columns.length;
