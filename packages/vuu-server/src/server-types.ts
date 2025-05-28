@@ -65,6 +65,7 @@ export declare type VuuProtocolHandler<
 export interface ISession {
   addViewport: (viewportId: string) => void;
   enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
+  kill: () => void;
   id: string;
   readonly viewports: string[];
   readonly ws: WebSocket;

@@ -6,8 +6,9 @@ import type {
 import { MessageQueue } from "./messageQueue";
 import type { WebsocketData } from "./server";
 import { ServerWebSocket } from "bun";
+import ViewportContainer from "./ViewportContainer.ts";
 
-const sessions = new Map<string, Session>();
+const sessions = new Map<string, ISession>();
 
 export const startHeartbeats = (updateFrequency = 10000) => {
   return heartbeatLoop(updateFrequency);
@@ -25,14 +26,28 @@ export function heartbeatLoop(interval: number) {
   let _timer: Timer | null = null;
 
   const tick = () => {
-    // console.log(`heartbeat tick (${sessions.size} sessions)`);
+    console.log(`[heartbeatLoop] tick (${sessions.size} sessions)`);
     const ts = Date.now();
+    const expiredSessions: ISession[] = [];
     for (const session of sessions.values()) {
-      session.outgoingHeartbeat = ts;
-      session.ws.send(
-        `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`
-      );
+      if (session.clientUnresponsive) {
+        console.log(
+          `[heartbeatLoop] session #${session.id} received no heartbeat response from client`
+        );
+        expiredSessions.push(session);
+      } else {
+        session.outgoingHeartbeat = ts;
+        session.ws.send(
+          `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`
+        );
+      }
     }
+
+    expiredSessions.forEach((session) => {
+      session.kill();
+      clearSession(session.id);
+    });
+
     if (_keepGoing) {
       _timer = setTimeout(tick, interval);
     }
@@ -108,6 +123,7 @@ export const clearSession = (sessionId: string) => {
 
 class Session implements ISession {
   #heartbeat = 0;
+  #heatbeatResponseReceived = true;
   #id: string;
   #user: string | undefined;
   #ws: ServerWebSocket;
@@ -142,11 +158,20 @@ class Session implements ISession {
 
   set incomingHeartbeat(hb: number) {
     const latency = hb - this.#heartbeat;
+    this.#heatbeatResponseReceived = true;
     console.log(`incoming HB, latency ${latency}`);
   }
 
   set outgoingHeartbeat(hb: number) {
     this.#heartbeat = hb;
+    this.#heatbeatResponseReceived = false;
+  }
+
+  /**
+   * No HeartBeat response from client. This will be called just before the next outgoing heartbeat is sent.
+   */
+  get clientUnresponsive() {
+    return this.#heatbeatResponseReceived === false;
   }
 
   get viewports() {
@@ -201,6 +226,14 @@ class Session implements ISession {
       type: "LOGIN_SUCCESS",
       token,
     });
+  }
+
+  kill() {
+    console.log(`[Session] #${this.id} KILL`);
+    this.#viewports.forEach((viewportId) =>
+      ViewportContainer.closeViewport(viewportId)
+    );
+    this.#ws.close();
   }
 }
 
