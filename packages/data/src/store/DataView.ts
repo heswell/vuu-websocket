@@ -179,6 +179,8 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     }
   }
 
+  getSizeRecord() {}
+
   getDataForCurrentRange() {
     return this.rowSet.currentRange();
   }

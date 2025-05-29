@@ -4,8 +4,8 @@ export interface RowCount {
   count: number;
 }
 
-export interface ParentOrders {
-  parentOrders: VuuDataRow[];
+export interface orders {
+  orders: VuuDataRow[];
 }
 
-export type OrdersData = ParentOrders;
+export type OrdersData = orders;
