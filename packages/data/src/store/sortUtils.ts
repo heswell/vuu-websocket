@@ -4,6 +4,7 @@ import {
   VuuSortCol,
 } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { Table } from "./table";
 
 type SortDirection = "A" | "D";
 export type SortCriterium = [number, SortDirection];
@@ -435,3 +436,27 @@ export function sortPosition(
     return find(0, rows.length);
   }
 }
+
+export type SortSetInsertPosition = number | "start" | "end";
+
+export const getSortSetInsertionPosition = (
+  sortSet: SortSet,
+  sortValue: VuuRowDataItemType
+): SortSetInsertPosition => {
+  const [, firstSortValue] = sortSet.at(0) as SortItem;
+  const [, lastSortValue] = sortSet.at(-1) as SortItem;
+
+  const reverseSort = parseInt(firstSortValue) > parseInt(lastSortValue);
+
+  if (reverseSort && parseInt(sortValue) > parseInt(firstSortValue)) {
+    return "start";
+  } else if (reverseSort && parseInt(sortValue) < parseInt(lastSortValue)) {
+    return "end";
+  } else if (!reverseSort && parseInt(sortValue) > parseInt(lastSortValue)) {
+    return "end";
+  } else if (!reverseSort && parseInt(sortValue) < parseInt(firstSortValue)) {
+    return "start";
+  }
+
+  return -1;
+};

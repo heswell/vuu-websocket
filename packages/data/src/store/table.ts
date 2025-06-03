@@ -139,7 +139,9 @@ export class Table extends EventEmitter<TableEvents> {
     const { indexOfKeyField } = this;
     const key = newRow[indexOfKeyField] as string;
     const rowIdx = this.rowIndexAtKey(key);
-    if (rowIdx !== -1) {
+    if (rowIdx === -1) {
+      this.insert(newRow, emitEvent);
+    } else {
       const row = this.rows[rowIdx];
 
       const results = [] as UpdateResultTuple;

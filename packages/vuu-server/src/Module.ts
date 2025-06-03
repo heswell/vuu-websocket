@@ -71,9 +71,9 @@ export class Module {
   }
 
   addRpcHandler(rpcHandler: RpcHandler) {
-    console.log(`[Module] #${this.#name} addRpcHandler`, {
-      rpcHandler,
-    });
+    // console.log(`[Module] #${this.#name} addRpcHandler`, {
+    //   rpcHandler,
+    // });
 
     const { serviceName, methods } = rpcHandler;
     this.#rpcRegistry.register(serviceName, rpcHandler, methods);

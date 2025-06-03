@@ -10,6 +10,7 @@ import { VuuDataRowWithMetaData } from "../columnUtils";
 export type DataResponse = {
   rows: VuuRow[];
   size: number;
+  sizeMessageRequired?: boolean;
 };
 
 export interface IRowSet {

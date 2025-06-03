@@ -164,7 +164,7 @@ export class GroupRowSet extends BaseRowSet {
     return true;
   }
 
-  setRange(range: VuuRange, useDelta?: boolean): DataResponse {
+  setRange(range: VuuRange, _: boolean): DataResponse {
     const { size, sortSet, table, viewportId } = this;
     const iterator = new GroupIterator(this.#groupedStruct);
     const rows: VuuRow[] = [];

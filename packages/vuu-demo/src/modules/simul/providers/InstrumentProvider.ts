@@ -8,7 +8,7 @@ export class InstrumentProvider extends Provider {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
         console.log(
-          `[SIMUL InstrumentProvider] load instruments, subscribing to ref data service on ${refDataServiceUrl}`
+          `[SIMUL:module:InstrumentProvider] load instruments, subscribing to ref data service on ${refDataServiceUrl}`
         );
 
         try {

@@ -7,7 +7,7 @@ export interface WebsocketData {
 }
 
 export async function start() {
-  console.log(`[orders server start]`);
+  console.log(`[ORDERS:service:server] start`);
   const websocketServer = Bun.serve<WebsocketData>({
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",
@@ -32,6 +32,6 @@ export async function start() {
   });
 
   console.log(
-    `[OrdersService] websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
+    `[ORDERS:service:server] websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
   );
 }

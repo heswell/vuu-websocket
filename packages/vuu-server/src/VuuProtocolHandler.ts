@@ -120,8 +120,8 @@ const CHANGE_VP: VuuProtocolHandler = (message, session) => {
   if (viewport) {
     const dataResponse = viewport.changeViewport(body);
     if (dataResponse) {
-      const { rows, size } = dataResponse;
-      enqueueDataMessages(rows, size, session, viewPortId);
+      const { rows, size, sizeMessageRequired } = dataResponse;
+      enqueueDataMessages(rows, size, session, viewPortId, sizeMessageRequired);
     }
   }
 };

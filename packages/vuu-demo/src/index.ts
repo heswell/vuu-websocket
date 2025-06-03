@@ -7,7 +7,7 @@ import {
   TypeAheadModule,
   WebSocketOptions,
 } from "@heswell/vuu-server";
-import { PriceModule } from "./modules/prices";
+// import { PriceModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
 // import { EditableModule } from "./modules/editable";
@@ -32,8 +32,6 @@ export default function start() {
   // .withModule(BasketModule());
 
   const vuuServer = new VuuServer(config);
-
-  console.info("[VUU] Ready.");
 
   vuuServer.start();
 }

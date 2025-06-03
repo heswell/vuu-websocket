@@ -34,7 +34,7 @@ export class ModuleContainer implements TableContainer {
         console.log(`addRpcHandler ${moduleName}`);
         const module = this.getModule(moduleName);
         module.addRpcHandler(rpcFactory(ModuleContainer.instance));
-        console.log({ module });
+        // console.log({ module });
         return this.tableBuilder(moduleName);
       },
       addTable: (

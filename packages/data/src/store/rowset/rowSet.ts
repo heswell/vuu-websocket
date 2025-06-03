@@ -1,7 +1,6 @@
 /**
  * Keep all except for groupRowset in this file to avoid circular reference warnings
  */
-import { TableColumn } from "@heswell/server-types";
 import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
 import { Filter } from "@vuu-ui/vuu-filter-types";
 import type {
@@ -15,6 +14,7 @@ import { extendsExistingFilter } from "../filter.ts";
 import { getDeltaRange, getFullRange } from "../rangeUtils.ts";
 import { identifySelectionChanges } from "../selectionUtils";
 import {
+  getSortSetInsertionPosition,
   revertToIndexSort,
   sort,
   sortExtend,
@@ -26,6 +26,7 @@ import {
 import { Table, UpdateResultTuple } from "../table.ts";
 import { BaseRowSet } from "./BaseRowSet.ts";
 import { DataResponse } from "./IRowSet.ts";
+import { TableColumnType } from "@heswell/vuu-server";
 
 const SINGLE_COLUMN = 1;
 
@@ -48,7 +49,7 @@ export class RowSet extends BaseRowSet {
   constructor(
     viewportId: string,
     table: Table,
-    columns: TableColumn[],
+    columns: TableColumnType[],
     { filter, range, sortSet }: RowSetConstructorOptions = NO_OPTIONS
   ) {
     super(viewportId, table, columns);
@@ -131,7 +132,6 @@ export class RowSet extends BaseRowSet {
 
   currentRange(): DataResponse {
     const { from, to } = this.range;
-    console.log(`currentRange ${from} - ${to}`);
     const resultset = this.slice(from, to);
     return {
       rows: resultset,
@@ -434,10 +434,49 @@ export class RowSet extends BaseRowSet {
           size: this.size,
         };
       }
-    } else {
-      throw Error(
-        "only support insert into no-sort, no-filter rowsets at the moment"
+    } else if (
+      this.sortCols !== undefined &&
+      this.currentFilter === undefined
+    ) {
+      // data is sorted
+      // 1) get the values from new row for the sorted columns
+
+      const [sortCol] = this.sortCols;
+      const sortColKey = columnMap[sortCol.column];
+      const sortValue = row[sortColKey];
+
+      const insertPosition = getSortSetInsertionPosition(
+        this.sortSet,
+        sortValue
       );
+
+      if (insertPosition === "start") {
+        this.sortSet.unshift([rowIndex, sortValue, 0]);
+
+        if (this.range.from === 0) {
+          return this.currentRange();
+        } else {
+          return {
+            rows: [],
+            size: this.size,
+          };
+        }
+      } else if (insertPosition === "end") {
+        this.sortSet.push([rowIndex, sortValue, 0]);
+        // TODO work out if within viewport
+        return {
+          rows: [],
+          size: this.size,
+        };
+      } else {
+        // for now
+        return {
+          rows: [],
+          size: this.size,
+        };
+      }
+    } else {
+      throw Error("only support insert into no-filter rowsets at the moment");
     }
 
     // else if (this.currentFilter === undefined) {

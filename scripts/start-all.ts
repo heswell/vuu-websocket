@@ -6,6 +6,9 @@ let procVuuServer: Subprocess | null = null;
 procRefData = Bun.spawn(["bun", "./scripts/start-refdata.ts"], {
   stdout: "inherit",
 });
+procRefData = Bun.spawn(["bun", "./scripts/start-orders.ts"], {
+  stdout: "inherit",
+});
 
 setTimeout(() => {
   // TODO fix vuu server so that wait for ref data is not required

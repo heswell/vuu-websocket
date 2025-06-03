@@ -133,12 +133,12 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.insert(rowIdx, row);
-    this.enqueue(tableRowsMessageBody(rows, size, this.#id));
+    this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
   private rowDeleted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.delete(rowIdx, row);
-    this.enqueue(tableRowsMessageBody(rows, size, this.#id));
+    this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
   private rowUpdated: RowUpdateHandler = (idx, updates) => {
@@ -148,7 +148,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     if (dataResponse) {
       if (rowSet instanceof RowSet) {
         const { rows, size } = dataResponse;
-        this.enqueue(tableRowsMessageBody(rows, size, this.#id));
+        this.enqueue(tableRowsMessageBody(rows, size, this.#id, false));
       } /* else {
         result.forEach((rowUpdate) => {
           _updateQueue?.update(rowUpdate);
@@ -236,11 +236,20 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       filterSpec,
     };
 
+    const previousSize = this.rowSet.size;
+
     if (filterSpec.filter === "") {
       if (hasFilter) {
         this.rowSet.clearFilter();
         this._vuuFilter = { filter: "" };
-        return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+        const dataResponse = this.rowSet.setRange(
+          resetRange(this.rowSet.range),
+          false
+        );
+        return {
+          ...dataResponse,
+          sizeMessageRequired: this.rowSet.size !== previousSize,
+        };
       }
     } else {
       const filterStruct = parseFilter(filterSpec.filter);
@@ -260,7 +269,14 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       //       }
       //     }
 
-      return this.rowSet.setRange(resetRange(this.rowSet.range), false);
+      const dataResponse = this.rowSet.setRange(
+        resetRange(this.rowSet.range),
+        false
+      );
+      return {
+        ...dataResponse,
+        sizeMessageRequired: this.rowSet.size !== previousSize,
+      };
     }
 
     return { rows: [], size: -1 };

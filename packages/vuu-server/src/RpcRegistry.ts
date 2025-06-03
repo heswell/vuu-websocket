@@ -11,9 +11,9 @@ export type RpcHandlerFactory = (container: TableContainer) => RpcHandler;
 export class RpcRegistry {
   #handlers = new Map<string, RpcHandler>();
   register(serviceName: string, handler: RpcHandler, methods: string[]) {
-    console.log(
-      `register handler for rpc call ${serviceName}, ${methods.join(",")}`
-    );
+    // console.log(
+    //   `register handler for rpc call ${serviceName}, ${methods.join(",")}`
+    // );
     methods.forEach((method) =>
       this.#handlers.set(`${serviceName}|${method}`, handler)
     );

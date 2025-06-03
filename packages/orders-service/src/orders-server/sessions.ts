@@ -1,18 +1,29 @@
-import type { ISession } from "./server-types";
-import type {
-  ClientToServerLogin,
-  ServerMessageBody,
-} from "@vuu-ui/vuu-protocol-types";
-import { MessageQueue } from "./messageQueue";
-import type { WebsocketData } from "./server";
+import type { ServerMessageBody } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
-import ViewportContainer from "./ViewportContainer.ts";
+import { MessageQueue } from "./MessageQueue";
+import { OrdersServiceMessage } from "./order-service-types";
+import OrderStore from "./OrderStore";
+import type { WebsocketData } from "./server";
+import { WebSocketSink } from "./WebSocketSink";
+import { ArrayDataStreamSource } from "./ArrayDataStreamSource";
 
-const sessions = new Map<string, ISession>();
+export interface ISession<T extends object> {
+  addViewport: (viewportId: string) => void;
+  enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
+  kill: () => void;
+  readQueue: () => null | T[];
+  sendHeartBeat: () => void;
+  readonly id: string;
+  readonly clientUnresponsive?: boolean;
+  readonly outgoingHeartbeat?: number;
+  readonly viewports: string[];
+  readonly stream: WritableStream;
+  readonly ws: WebSocket;
+}
 
-let messageCountPerSecond = 0;
+const sessions = new Map<string, ISession<OrdersServiceMessage>>();
 
-export const startHeartbeats = (updateFrequency = 10000) => {
+export const startHeartbeats = (updateFrequency = 60_000) => {
   return heartbeatLoop(updateFrequency);
 };
 
@@ -29,8 +40,7 @@ export function heartbeatLoop(interval: number) {
 
   const tick = () => {
     console.log(`[heartbeatLoop] tick (${sessions.size} sessions)`);
-    const ts = Date.now();
-    const expiredSessions: ISession[] = [];
+    const expiredSessions: ISession<OrdersServiceMessage>[] = [];
     for (const session of sessions.values()) {
       if (session.clientUnresponsive) {
         console.log(
@@ -38,10 +48,7 @@ export function heartbeatLoop(interval: number) {
         );
         expiredSessions.push(session);
       } else {
-        session.outgoingHeartbeat = ts;
-        session.ws.send(
-          `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`
-        );
+        session.sendHeartBeat();
       }
     }
 
@@ -75,21 +82,30 @@ export function updateLoop(name: string, interval: number) {
   const tick = () => {
     // console.log(`update loops tick (${sessions.size} sessions)`);
     const start = performance.now();
-    for (const session of sessions.values()) {
-      const queuedMessages = session.readQueue();
-      // console.log(
-      //   `${queuedMessages?.length ?? 0} messages for session ${session.id}`
-      // );
-      if (Array.isArray(queuedMessages)) {
-        for (const message of queuedMessages) {
-          session.ws.send(JSON.stringify(message));
-          messageCountPerSecond += 1;
-        }
-      } else if (typeof queuedMessages === "string") {
-        session.ws.send(queuedMessages);
-        messageCountPerSecond += 1;
+    if (OrderStore.hasUpdates) {
+      const messages = OrderStore.queuedMessages;
+
+      for (const session of sessions.values()) {
+        // const readStream = new ReadableStream(
+        //   new ArrayDataStreamSource(session.id, messages, {
+        //     type: "insert",
+        //     tableName: "parentOrders",
+        //   })
+        // );
+        // readStream.pipeTo(session.stream);
+        // for (const message of messages) {
+        session.ws.send(JSON.stringify(messages));
+        // }
       }
+
+      const end = performance.now();
+      console.log(
+        `[ORDERS:service:sessions] ${messages.length} queued messages took ${
+          end - start
+        }ms`
+      );
     }
+
     if (_keepGoing) {
       _timer = setTimeout(tick, interval);
     }
@@ -112,7 +128,7 @@ export const createSession = (
   sessionId: string,
   ws: ServerWebSocket<WebsocketData>
 ) => {
-  sessions.set(sessionId, new Session(sessionId, ws));
+  sessions.set(sessionId, new Session<OrdersServiceMessage>(sessionId, ws));
   return sessions.size;
 };
 
@@ -125,14 +141,15 @@ export const clearSession = (sessionId: string) => {
   return sessions.size;
 };
 
-class Session implements ISession {
+class Session<T extends object> implements ISession<T> {
   #heartbeat = 0;
   #heatbeatResponseReceived = true;
   #id: string;
   #user: string | undefined;
   #ws: ServerWebSocket;
+  #stream: WritableStream;
   #token: string | undefined;
-  #queue: MessageQueue;
+  #queue: MessageQueue<T>;
   #viewports: string[] = [];
 
   // #stopUpdates: () => void;
@@ -140,6 +157,8 @@ class Session implements ISession {
     this.#id = sessionId;
     this.#ws = ws;
     this.#queue = new MessageQueue();
+    this.#stream = new WritableStream(new WebSocketSink(sessionId, ws));
+
     // this.#stopUpdates = updateLoop(
     //   "Regular Updates",
     //   ws,
@@ -160,10 +179,15 @@ class Session implements ISession {
     return this.#queue;
   }
 
+  get stream() {
+    // TODO create lazily
+    return this.#stream;
+  }
+
   set incomingHeartbeat(hb: number) {
     const latency = hb - this.#heartbeat;
     this.#heatbeatResponseReceived = true;
-    console.log(`[VUU:core:Session] incoming HB, latency ${latency}`);
+    console.log(`[ORDERS:service:Session] incoming HB, latency ${latency}`);
   }
 
   set outgoingHeartbeat(hb: number) {
@@ -221,65 +245,31 @@ class Session implements ISession {
     }
   };
 
-  login(requestId: string, message: ClientToServerLogin) {
-    console.log({ requestId, login: message });
-    const { token, user } = message;
-    this.#user = user;
-    this.#token = token;
-    this.enqueue(requestId, {
-      type: "LOGIN_SUCCESS",
-      token,
-    });
+  sendHeartBeat() {
+    const ts = Date.now();
+    this.outgoingHeartbeat = ts;
+    this.#ws.send(`{"type":"HB", "ts": ${ts} }`);
   }
 
   kill() {
     console.log(`[Session] #${this.id} KILL`);
-    this.#viewports.forEach((viewportId) =>
-      ViewportContainer.closeViewport(viewportId)
-    );
     this.#ws.close();
   }
 }
 
-export const getSession = (sessionId: string) => {
-  return sessions.get(sessionId);
-};
-
-export const accurateTimer = (fn: Function, time = 1000) => {
-  // nextAt is the value for the next time the timer should fire.
-  // timeout holds the timeoutID so the timer can be stopped.
-  let nextAt: number;
-  let timeout: Timer;
-  // Initialzes nextAt as now + the time in milliseconds you pass
-  // to accurateTimer.
-  nextAt = new Date().getTime() + time;
-
-  // This function schedules the next function call.
-  const wrapper = () => {
-    // The next function call is always calculated from when the
-    // timer started.
-    nextAt += time;
-    // this is where the next setTimeout is adjusted to keep the
-    //time accurate.
-    timeout = setTimeout(wrapper, nextAt - new Date().getTime());
-    // the function passed to accurateTimer is called.
-    fn();
-  };
-
-  // this function stops the timer.
-  const cancel = () => clearTimeout(timeout);
-
-  // the first function call is scheduled.
-  timeout = setTimeout(wrapper, nextAt - new Date().getTime());
-
-  // the cancel function is returned so it can be called outside
-  // accurateTimer.
-  return { cancel };
-};
-
-accurateTimer(() => {
-  console.log(
-    `[VUU:core:sessions] messages sent per second ${messageCountPerSecond}`
-  );
-  messageCountPerSecond = 0;
-}, 1000);
+export function getSession<T extends object>(
+  sessionId: string,
+  throwIfUndefined: true
+): ISession<T>;
+export function getSession<T extends object>(
+  sessionId: string,
+  throwIfUndefined?: false
+): ISession<T> | undefined;
+export function getSession(sessionId: string, throwIfUndefined?: boolean) {
+  const session = sessions.get(sessionId);
+  if (session) {
+    return session;
+  } else if (throwIfUndefined) {
+    throw Error(`[ORDERS:service:sessions] session not found #${sessionId}`);
+  }
+}
