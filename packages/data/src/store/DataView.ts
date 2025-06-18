@@ -1,4 +1,3 @@
-import { TableColumn } from "@heswell/server-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import {
   ServerMessageBody,
@@ -17,6 +16,7 @@ import {
   vanillaConfig,
   type ColumnMap,
 } from "@vuu-ui/vuu-utils";
+import { TableColumn } from "@heswell/vuu-server";
 import { buildColumnMap, toColumn } from "./columnUtils.ts";
 import { Range, resetRange } from "./rangeUtils.ts";
 import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
@@ -24,6 +24,7 @@ import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
 import { tableRowsMessageBody } from "./responseUtils.ts";
+import logger from "../logger.ts";
 
 const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
 
@@ -133,6 +134,11 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.insert(rowIdx, row);
+    logger.info(
+      `[DataView:${this.#table.schema.table.table}] rowInserted ${
+        rows.length
+      } to be returned (rowSet range ${JSON.stringify(this.rowSet.range)})`
+    );
     this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
@@ -182,12 +188,21 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   getSizeRecord() {}
 
   getDataForCurrentRange() {
+    logger.info(
+      `[DataView] getDataForCurrentRange rowSet range ${JSON.stringify(
+        this.rowSet.range
+      )}`
+    );
     return this.rowSet.currentRange();
   }
 
   //TODO we seem to get a setRange when we reverse sort order, is that correct ?
   setRange(range: Range, useDelta = true): DataResponse {
-    console.log(`DATAVIEW.setRange ${JSON.stringify(range)}`);
+    logger.info(
+      `[DATAVIEW] setRange ${JSON.stringify(range)}, table ${JSON.stringify(
+        this.table.schema.table
+      )} contains ${this.table.rowCount} rows`
+    );
     return this.rowSet.setRange(range, useDelta);
   }
 

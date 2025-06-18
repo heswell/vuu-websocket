@@ -1,10 +1,14 @@
+import {
+  ServerToClientTableRows,
+  VuuRange,
+  VuuServerMessage,
+} from "@vuu-ui/vuu-protocol-types";
 import { getFullRange } from "@vuu-ui/vuu-utils";
 import { IMessageQueue, RowMeta } from "./server-types";
 import {
-  VuuRange,
-  ServerToClientTableRows,
-  VuuClientMessage,
-} from "@vuu-ui/vuu-protocol-types";
+  tableMessageViewport,
+  tableMessageWithData,
+} from "./vuu-message-utils";
 
 export interface ViewportMessage {
   viewport: string;
@@ -31,7 +35,7 @@ const ROWSET = "rowset";
 const UPDATE = "update";
 
 export class MessageQueue implements IMessageQueue {
-  #queue: VuuClientMessage[];
+  #queue: VuuServerMessage[];
 
   constructor() {
     this.#queue = [];
@@ -49,7 +53,7 @@ export class MessageQueue implements IMessageQueue {
     return q;
   }
 
-  push(message: VuuClientMessage, rowMeta?: RowMeta) {
+  push(message: VuuServerMessage, rowMeta?: RowMeta) {
     // if (message.type === MessageTypeOut.Update) {
     //   mergeAndPurgeUpdate(this.#queue, message);
     // } else if (message.type === MessageTypeOut.Rowset && rowMeta) {
@@ -58,6 +62,16 @@ export class MessageQueue implements IMessageQueue {
     //   //onsole.log(`MessageQueue ${type} `);
     // }
     this.#queue.push(message);
+  }
+
+  find(vpId: string): VuuServerMessage<ServerToClientTableRows> | undefined {
+    const message = this.#queue.find((message) => {
+      return (
+        tableMessageWithData(message.body) &&
+        tableMessageViewport(message.body) === vpId
+      );
+    });
+    return message as VuuServerMessage<ServerToClientTableRows>;
   }
 
   purgeViewport(viewport: string) {
@@ -75,7 +89,7 @@ export class MessageQueue implements IMessageQueue {
   //     }
   // }
 
-  extract(test: (message: VuuClientMessage) => boolean) {
+  extract(test: (message: VuuServerMessage) => boolean) {
     if (this.#queue.length === 0) {
       return EMPTY_ARRAY;
     } else {
@@ -83,7 +97,7 @@ export class MessageQueue implements IMessageQueue {
     }
   }
 
-  extractAll() {
+  dequeueAllMessages() {
     const messages = this.#queue.slice();
     this.#queue.length = 0;
     return messages;
@@ -169,8 +183,8 @@ function mergeAndPurgeRowset(queue: any[], message: any, meta: RowMeta) {
 
 // we need to know the current range in order to be able to merge rowsets which are still valid
 const mergeAndPurgeUpdate = (
-  queue: VuuClientMessage[],
-  message: VuuClientMessage
+  queue: VuuServerMessage[],
+  message: VuuServerMessage
 ) => {
   //onsole.log(`mergeAndPurge: update message ${JSON.stringify(message)}` );
   /*
@@ -203,8 +217,8 @@ const mergeAndPurgeUpdate = (
 };
 
 function extractMessages(
-  queue: VuuClientMessage[],
-  test: (message: VuuClientMessage) => boolean
+  queue: VuuServerMessage[],
+  test: (message: VuuServerMessage) => boolean
 ) {
   var extract = [];
 

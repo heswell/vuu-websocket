@@ -4,6 +4,9 @@ export interface IMessageQueue<T extends object> {
 
 const EMPTY_ARRAY = [] as const;
 
+/**
+ * Manages a queue of messages of type T
+ */
 export class MessageQueue<T extends object> implements IMessageQueue<T> {
   #queue: T[];
 
@@ -17,7 +20,7 @@ export class MessageQueue<T extends object> implements IMessageQueue<T> {
   set length(val) {
     this.#queue.length = val;
   }
-  get queue() {
+  dequeueAll() {
     const q = this.#queue.slice();
     this.#queue.length = 0;
     return q;

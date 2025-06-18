@@ -1,6 +1,4 @@
 import {
-  httpServerOptions,
-  webSocketOptions,
   VuuServerConfig,
   VuuServer,
   HttpServerOptions,
@@ -15,18 +13,16 @@ import { SimulationModule } from "./modules/simul";
 // import { BasketModule } from "./modules/baskets";
 
 export default function start() {
-  const defaultConfig: HttpServerOptions & WebSocketOptions = {
-    websocketPort: process.env.WEBSOCKET_PORT ?? 8091,
+  const httpServerOptions = {};
+  const webSocketOptions = {
+    webSocketPort: process.env.WEBSOCKET_PORT ?? 8091,
   };
 
-  const config = VuuServerConfig(
-    httpServerOptions(defaultConfig),
-    webSocketOptions(defaultConfig)
-  )
+  const config = VuuServerConfig(httpServerOptions, webSocketOptions)
     // .withModule(PriceModule())
     .withModule(SimulationModule())
-    .withModule(OrdersModule())
-    .withModule(TypeAheadModule());
+    .withModule(OrdersModule());
+  // .withModule(TypeAheadModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())
   // .withModule(BasketModule());

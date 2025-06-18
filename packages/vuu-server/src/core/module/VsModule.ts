@@ -1,17 +1,22 @@
 import { Table } from "@heswell/data";
-import { IProvider } from "./Provider";
+import { IProvider, Provider, ProviderFactory } from "../../Provider";
 import {
   VuuLink,
   VuuRowDataItemType,
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
-import { IService, ServiceMessage } from "./Service";
+import { IService, ServiceMessage } from "../../Service";
 import { uuid } from "@vuu-ui/vuu-utils";
-import { Viewport } from "./ViewportContainer";
-import { RpcHandler, RpcRegistry } from "./RpcRegistry";
+import { Viewport } from "../../ViewportContainer";
+import { RpcHandler, RpcRegistry } from "../../RpcRegistry";
+import { TableDef } from "../../api/TableDef";
+import { VuuServer } from "../VuuServer";
+import { TableDefTuple } from "./ModuleFactory";
 
 export interface ModuleConstructorProps {
   name: string;
+  // this differs from VScala uuServer
+  tableDefsAndProviders: TableDefTuple[];
 }
 
 /** 
@@ -21,7 +26,7 @@ export interface ModuleConstructorProps {
 */
 const loadProviders = (
   providers: IProvider[],
-  module: Module,
+  module: ViewServerModule,
   loaded: string[] = []
 ): Promise<string[]> =>
   new Promise(async (resolve, reject) => {
@@ -34,7 +39,7 @@ const loadProviders = (
       );
     });
 
-    console.log(`loadProviders ${module.name} 
+    console.log(`[ViewServerModule] loadProviders ${module.name} 
       loaded ${loaded.join(",")}
       readyToLoad ${readyToLoad.map((m) => m.table.name).join(",")}
       `);
@@ -52,18 +57,21 @@ const loadProviders = (
     }
   });
 
-export class Module {
+export class ViewServerModule {
   #name: string;
-  #providers = new Map<string, IProvider>();
+  #tableDefs: TableDef[];
+  #providerFactories = new Map<string, ProviderFactory>();
   #links = new Map<string, VuuLink[]>();
   #rpcRegistry = new RpcRegistry();
   #services = new Map<string, IService>();
-  #tables = new Map<string, Table>();
   #sessionTableMap = new Map<string, string>();
 
-  constructor({ name }: ModuleConstructorProps) {
+  constructor({ name, tableDefsAndProviders }: ModuleConstructorProps) {
     this.#name = name;
-    console.log(`create Module ${name}`);
+    this.#tableDefs = tableDefsAndProviders.map(([tableDef]) => tableDef);
+    tableDefsAndProviders.forEach(([tableDef, providerFactory]) => {
+      this.#providerFactories.set(tableDef.name, providerFactory);
+    });
   }
 
   get name() {
@@ -82,47 +90,41 @@ export class Module {
     return this.#rpcRegistry.getHandler(serviceName, method);
   }
 
-  addTable(table: Table, provider: IProvider, service?: IService) {
-    const { table: tableName } = table.schema.table;
-    if (this.#tables.has(tableName)) {
-      throw Error(
-        `[${this.name}] table ${table.schema.table} has already been created`
-      );
+  private getTableDef(tableName: string) {
+    const tableDef = this.#tableDefs.find((td) => td.name === tableName);
+    if (tableDef) {
+      return tableDef;
+    } else {
+      throw Error(`[ViewServerModule] getTableDef, no tableDef ${tableName}`);
     }
-    this.#providers.set(tableName, provider);
-    if (service) {
-      this.#services.set(tableName, service);
-    }
-    this.#tables.set(tableName, table);
-    return table;
   }
 
-  createSessionTableFromSelectedRows(viewport: Viewport) {
-    const { table } = viewport;
-    const { schema } = table;
-    const { module, table: tableName } = schema.table;
-    const rows = viewport.selectedKeys.map((key) => table.getRowAtKey(key));
-    const sessionTableName = `session:${tableName}:${uuid()}`;
-    const sessionSchema = {
-      ...schema,
-      table: {
-        module,
-        table: sessionTableName,
-      },
-    };
-    const sessionTable = new Table({ schema: sessionSchema });
-    rows.forEach((row) => {
-      // TODO if we don't slice, updates mutate the row, shared with base table
-      // we could save on this cost if we had a way to mark which rows have been edited
-      // then just clone them on first edit
-      sessionTable.insert(row.slice());
-    });
+  // createSessionTableFromSelectedRows(viewport: Viewport) {
+  //   const { table } = viewport;
+  //   const { schema } = table;
+  //   const { module, table: tableName } = schema.table;
+  //   const rows = viewport.selectedKeys.map((key) => table.getRowAtKey(key));
+  //   const sessionTableName = `session:${tableName}:${uuid()}`;
+  //   const sessionSchema = {
+  //     ...schema,
+  //     table: {
+  //       module,
+  //       table: sessionTableName,
+  //     },
+  //   };
+  //   const sessionTable = new Table({ schema: sessionSchema });
+  //   rows.forEach((row) => {
+  //     // TODO if we don't slice, updates mutate the row, shared with base table
+  //     // we could save on this cost if we had a way to mark which rows have been edited
+  //     // then just clone them on first edit
+  //     sessionTable.insert(row.slice());
+  //   });
 
-    this.#tables.set(sessionTableName, sessionTable);
-    this.#sessionTableMap.set(sessionTableName, tableName);
+  //   this.#tables.set(sessionTableName, sessionTable);
+  //   this.#sessionTableMap.set(sessionTableName, tableName);
 
-    return sessionSchema.table;
-  }
+  //   return sessionSchema.table;
+  // }
 
   getSessionAndBaseTable(sessionTableName: string): [Table, Table] {
     const sessionTable = this.getTable(sessionTableName);
@@ -142,29 +144,34 @@ export class Module {
 
   async start() {
     console.log(`[Module] start #${this.#name}`);
-    let providers = Array.from(this.#providers.values());
+    // let providers = Array.from(this.#providers.values());
 
-    await loadProviders(providers, this);
+    // await loadProviders(providers, this);
 
-    console.log(`[${this.name}] all tables loaded`);
+    // console.log(`[${this.name}] all tables loaded`);
+  }
+
+  get tableDefs() {
+    return this.#tableDefs;
   }
 
   getTableList() {
-    return Array.from(this.#tables.values())
-      .map(({ schema }) => schema.table)
-      .filter(({ session }) => session === undefined)
-      .map<VuuTable>(({ session, ...table }) => table);
+    return this.#tableDefs.map((tableDef) => tableDef.asVuuTable);
   }
 
   getTableSchema(tableName: string) {
-    return this.getTable(tableName).schema;
+    return this.getTableDef(tableName).schema;
   }
 
-  getTable(tableName: string) {
-    const table = this.#tables.get(tableName);
-    if (table) {
-      return table;
-    } else throw Error(`[${this.name}] no table found ${tableName}`);
+  getProviderForTable(table: Table, vuuServer: VuuServer): IProvider {
+    const provider = this.#providerFactories.get(table.name);
+    if (provider) {
+      return provider(table);
+    } else {
+      throw Error(
+        `[ViewServerModule] no providerFactory found for ${table.name}`
+      );
+    }
   }
 
   getLinks(tableName: string) {
@@ -208,5 +215,11 @@ export class Module {
       default:
         return this.#services.get(tableName)?.invokeService(service);
     }
+  }
+}
+
+export class RealizedViewServerModule extends ViewServerModule {
+  constructor(props: ModuleConstructorProps) {
+    super(props);
   }
 }

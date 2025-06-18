@@ -1,5 +1,5 @@
 import { VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
-import { TableContainer } from "./ModuleContainer";
+import { TableContainer } from "./core/module/ModuleContainer";
 
 export type RpcHandler = {
   handleRpcCall: (rpcMessage: VuuRpcServiceRequest) => unknown;

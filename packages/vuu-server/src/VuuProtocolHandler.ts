@@ -24,7 +24,8 @@ import {
 } from "@vuu-ui/vuu-protocol-types";
 import ViewportContainer from "./ViewportContainer.ts";
 import { tableRowsMessageBody } from "@heswell/data";
-import ModuleContainer from "./ModuleContainer.ts";
+import ModuleContainer from "./core/module/ModuleContainer.ts";
+import tableContainer from "./core/table/TableContainer.ts";
 
 const GET_TABLE_LIST: VuuProtocolHandler = (message, session) => {
   session.enqueue(message.requestId, {
@@ -48,10 +49,9 @@ const GET_TABLE_META: VuuProtocolHandler = (message, session) => {
 const CREATE_VP: VuuProtocolHandler = (message, session) => {
   const body = message.body as VuuViewportCreateRequest;
   const { table: vuuTable } = body;
-  const table = ModuleContainer.getTable(vuuTable);
+  const table = tableContainer.getTable(vuuTable.table);
 
   logger.info({ session: session.id, vuuTable }, "CREATE_VP");
-  console.log(`session ${session.id} ${JSON.stringify(message)}`);
   const start = performance.now();
   const viewport = ViewportContainer.createViewport(session, table, body);
   // why do we need this ?
@@ -136,20 +136,20 @@ const CHANGE_VP_RANGE: VuuProtocolHandler = (message, session) => {
     viewPortId,
   });
 
-  const now = new Date().getTime();
-  console.log(`[${now}] DataTableService: setRange ${from} - ${to}`);
   const viewport = ViewportContainer.getViewport(viewPortId);
   if (viewport) {
     const { rows, size } = viewport.setRange({ from, to });
     logger.info(
       { session: session.id, viewport: viewPortId },
-      `CHANGE_VP_RANGE ${from}:${to}, ${rows.length} rows of ${size}, keys: #${
-        rows[0]?.rowKey
-      } - ${rows.at(-1)?.rowKey}, indices [${rows[0]?.rowIndex}] = [${
-        rows.at(-1)?.rowIndex
-      }]`
+      `[VuuProtocolHandler] CHANGE_VP_RANGE ${from}:${to}, ${
+        rows.length
+      } rows of ${size}, keys: #${rows[0]?.rowKey} - ${
+        rows.at(-1)?.rowKey
+      }, indices [${rows[0]?.rowIndex}] = [${rows.at(-1)?.rowIndex}]`
     );
     enqueueDataMessages(rows, size, session, viewPortId);
+  } else {
+    throw Error(`[VuuProtocolHandler] no viewport for id #${viewPortId}`);
   }
 };
 

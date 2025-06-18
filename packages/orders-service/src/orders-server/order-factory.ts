@@ -9,6 +9,7 @@ let lastTime = Clock.baseTime;
 let lastOrderId = "";
 
 const initialParentOrderCount = 10_000;
+// const initialParentOrderCount = 10;
 // const averageChildPerOrder = 5;
 // const childMaxMultiple = 10;
 
@@ -154,9 +155,10 @@ function createOrder(
 
 function createInitialOrders() {
   const start = performance.now();
+  const created = Date.now();
 
   for (let i = 0; i < initialParentOrderCount; i++) {
-    OrderStore.addParentOrder(createOrder());
+    OrderStore.addParentOrder(createOrder(created));
     lastTime += 10;
   }
 
@@ -170,29 +172,104 @@ function createInitialOrders() {
 
 const MAX_ORDERS = 500_000;
 
+const NewOrderCreationParams = {
+  ORDERS_PER_BATCH: 2,
+  NEW_ORDER_LOOP_INTERVAL: 1000,
+};
+
+let newOrderCreationRunning = false;
+let currentNewOrderTimer: number | Timer | null = null;
+
 function createNewOrders() {
   // TODO can we have sub-ms times ?
-  const time = Clock.currentTime;
-  for (let i = 0; i < 50 && count <= MAX_ORDERS; i++) {
-    OrderStore.addParentOrder(createOrder(time, "NEW"), true);
+  // const time = Clock.currentTime;
+  const created = Date.now();
+
+  const { NEW_ORDER_LOOP_INTERVAL, ORDERS_PER_BATCH } = NewOrderCreationParams;
+
+  console.log(
+    `[ORDERS:service:order-factory] per loop  (${NEW_ORDER_LOOP_INTERVAL}ms) create ${ORDERS_PER_BATCH} new orders)`
+  );
+
+  for (let i = 0; i < ORDERS_PER_BATCH && count <= MAX_ORDERS; i++) {
+    OrderStore.addParentOrder(createOrder(created, "NEW"), true);
   }
-  ordersPerSecondCount += 50;
+  ordersPerSecondCount += ORDERS_PER_BATCH;
   lastOrderId = "";
 
-  if (count <= MAX_ORDERS) {
-    setTimeout(createNewOrders, 20);
+  if (count <= MAX_ORDERS && newOrderCreationRunning) {
+    currentNewOrderTimer = setTimeout(createNewOrders, NEW_ORDER_LOOP_INTERVAL);
   }
 }
 
 function logOrderCreationRate() {
-  console.log(
-    `generating ${ordersPerSecondCount} orders / second, last id: ${`${parentOrderId}`}`
-  );
+  if (ordersPerSecondCount > 0) {
+    console.log(
+      `generated ${ordersPerSecondCount} orders / second, last id: ${`${parentOrderId}`}`
+    );
+  }
   ordersPerSecondCount = 0;
 }
 
 createInitialOrders();
+startNewOrderCreation({ newOrdersPerSecond: 5 });
+
+export function startNewOrderCreation({
+  newOrdersPerSecond = 1,
+}: {
+  newOrdersPerSecond?: number;
+}) {
+  logger.info(`[ORDERS:service:order-factory] START new order creation`);
+  console.log(`[ORDERS:service:order-factory] START new order creation`);
+  newOrderCreationRunning = true;
+
+  const { newOrderInterval, newOrdersPerBatch } =
+    calculateOrderFrequency(newOrdersPerSecond);
+
+  NewOrderCreationParams.NEW_ORDER_LOOP_INTERVAL = newOrderInterval;
+  NewOrderCreationParams.ORDERS_PER_BATCH = newOrdersPerBatch;
+
+  createNewOrders();
+}
+
+export function stopNewOrderCreation() {
+  logger.info(`[ORDERS:service:order-factory] STOP new order creation`);
+  console.log(`[ORDERS:service:order-factory] STOP new order creation`);
+  newOrderCreationRunning = false;
+  if (currentNewOrderTimer) {
+    clearTimeout(currentNewOrderTimer);
+    currentNewOrderTimer = null;
+  }
+}
 
 setTimeout(createNewOrders, 10);
 
 accurateTimer(logOrderCreationRate, 1000);
+
+function calculateOrderFrequency(ordersPerSecond: number) {
+  if (ordersPerSecond > 10000) {
+    throw Error(
+      `[ORDERS:service:order-factory] cannot generate > 10,000 orders per second`
+    );
+  } else if (ordersPerSecond > 1000) {
+    return {
+      newOrderInterval: 100,
+      newOrdersPerBatch: Math.ceil(ordersPerSecond / 10),
+    };
+  } else if (ordersPerSecond > 100) {
+    return {
+      newOrderInterval: 250,
+      newOrdersPerBatch: Math.ceil(ordersPerSecond / 4),
+    };
+  } else if (ordersPerSecond > 10) {
+    return {
+      newOrderInterval: 1000,
+      newOrdersPerBatch: ordersPerSecond,
+    };
+  } else {
+    return {
+      newOrderInterval: 1000,
+      newOrdersPerBatch: ordersPerSecond,
+    };
+  }
+}

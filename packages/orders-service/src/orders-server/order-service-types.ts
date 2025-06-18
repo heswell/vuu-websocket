@@ -1,21 +1,32 @@
 import { VuuDataRow, VuuDataRowDto } from "@vuu-ui/vuu-protocol-types";
 
-export interface RowCount {
-  count: number;
-}
-
 export interface HBMessage {
   ts: number;
   type: "HB";
 }
 
 export interface OrdersServiceDataMessage {
-  data: VuuDataRow[] | VuuDataRow;
+  data: VuuDataRow;
   tableName: "parentOrders";
   type: "insert" | "update";
 }
 
-export type OrdersServiceMessage = OrdersServiceDataMessage | HBMessage;
+export interface OrdersServiceBulkDataMessage {
+  data: VuuDataRow[];
+  tableName: "parentOrders";
+  type: "bulk-insert";
+}
+export interface OrdersServiceBulkDataCompleteMessage {
+  count: number;
+  tableName: "parentOrders";
+  type: "bulk-insert-complete";
+}
+
+export type OrdersServiceMessage =
+  | OrdersServiceDataMessage
+  | OrdersServiceBulkDataMessage
+  | OrdersServiceBulkDataCompleteMessage
+  | HBMessage;
 
 export interface ParentOrderDto {
   id: string;

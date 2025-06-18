@@ -7,6 +7,7 @@ function random(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// const suffixes = ["L"];
 const suffixes = ["L", "N", "OQ", "AS", "PA", "MI", "FR", "AT"];
 const locations: Record<string, [string, string]> = {
   L: ["London PLC", "XLON/LSE-SETS"],
@@ -38,6 +39,7 @@ const schema = {
 
 // const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
 const chars = Array.from("ABCDEFGHIJKLM");
+// const chars = Array.from("ABCD");
 // const chars = Array.from("ABC");
 
 function createInstruments() {

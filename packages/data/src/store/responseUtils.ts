@@ -8,7 +8,8 @@ export const tableRowsMessageBody = (
   viewPortId: string,
   includeSize: boolean
 ) => {
-  const ts = +new Date();
+  const ts = Date.now();
+
   const sizeMessage = includeSize
     ? [
         {

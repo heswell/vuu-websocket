@@ -56,7 +56,7 @@ export class WebSocketConnectionHandler
           `[ORDERS:service:WebsocketConnectionHandler] request received for parentOrders`;
           const readStream = new ReadableStream(
             new ArrayDataStreamSource(sessionId, OrderStore.parentOrders, {
-              type: "insert",
+              type: "bulk-insert",
               tableName: "parentOrders",
             })
           );

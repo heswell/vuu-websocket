@@ -4,6 +4,7 @@ import { loadInstruments } from "./instrument-loader";
 import { MessageQueue } from "./MessageQueue";
 import { OrdersServiceMessage, ParentOrderDto } from "./order-service-types";
 import { instrumentsSchema, parentOrdersSchema } from "./tableSchemas";
+import logger from "../logger";
 
 export class OrderStore {
   static #instance: OrderStore;
@@ -41,14 +42,22 @@ export class OrderStore {
   }
 
   get hasUpdates() {
+    console.log(
+      `[ORDERS:service:OrderStore] hasUpdates ? ququq length = ${
+        this.#queue.length
+      }`
+    );
     return this.#queue.length > 0;
   }
 
-  get queuedMessages() {
-    return this.#queue.queue;
+  dequeueAllMessages() {
+    return this.#queue.dequeueAll();
   }
 
   addParentOrder(order: ParentOrderDto, publishMessage = false) {
+    logger.info(
+      `[OrderStore] addParentOrder (publish ${publishMessage}),  id: ${order.id} created: ${order.created}`
+    );
     const columns = this.#parentOrdersColumns;
     const colCount = columns.length;
     const dataRow: VuuDataRow = Array(colCount);
