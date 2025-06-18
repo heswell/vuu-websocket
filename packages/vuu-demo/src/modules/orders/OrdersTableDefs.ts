@@ -1,6 +1,6 @@
-import { type TableDef } from "@heswell/vuu-server";
+import { TableDef } from "@heswell/vuu-server";
 
-export const orders: TableDef = {
+export const parentOrders = TableDef({
   columns: [
     { name: "id", dataType: "string" },
     { name: "side", dataType: "string" },
@@ -44,5 +44,5 @@ export const orders: TableDef = {
     { name: "column40", dataType: "double" },
   ],
   keyField: "id",
-  name: "orders",
-};
+  name: "parentOrders",
+});

@@ -1,12 +1,18 @@
-import type { ISession } from "./server-types";
 import type {
   ClientToServerLogin,
   ServerMessageBody,
+  ServerToClientTableRows,
 } from "@vuu-ui/vuu-protocol-types";
-import { MessageQueue } from "./messageQueue";
-import type { WebsocketData } from "./server";
 import { ServerWebSocket } from "bun";
 import ViewportContainer from "./ViewportContainer.ts";
+import logger from "./logger.ts";
+import { MessageQueue } from "./messageQueue";
+import type { WebsocketData } from "./server";
+import type { ISession } from "./server-types";
+import {
+  tableMessageViewport,
+  tableMessageWithData,
+} from "./vuu-message-utils.ts";
 
 const sessions = new Map<string, ISession>();
 
@@ -76,10 +82,14 @@ export function updateLoop(name: string, interval: number) {
     // console.log(`update loops tick (${sessions.size} sessions)`);
     const start = performance.now();
     for (const session of sessions.values()) {
-      const queuedMessages = session.readQueue();
-      // console.log(
-      //   `${queuedMessages?.length ?? 0} messages for session ${session.id}`
-      // );
+      const queuedMessages = session.dequeueAllMessages();
+      if (queuedMessages && queuedMessages.length > 0) {
+        console.log(
+          `[VUU:core:Session] tick ${interval}ms ${
+            queuedMessages?.length ?? 0
+          } messages for session ${session.id}`
+        );
+      }
       if (Array.isArray(queuedMessages)) {
         for (const message of queuedMessages) {
           session.ws.send(JSON.stringify(message));
@@ -199,21 +209,49 @@ class Session implements ISession {
 
   enqueue(requestId: string, messageBody: ServerMessageBody) {
     if (this.#token && this.#user) {
-      this.#queue.push({
-        module: "CORE",
-        requestId,
-        sessionId: this.#id,
-        token: this.#token,
-        user: this.#user,
-        body: messageBody,
-      });
+      const tableMessageForViewport = tableMessageWithData(messageBody)
+        ? this.#queue.find(tableMessageViewport(messageBody))
+        : undefined;
+
+      if (tableMessageForViewport) {
+        const { rows: earlierRows } = tableMessageForViewport.body;
+        const { rows: newRows } = messageBody as ServerToClientTableRows;
+
+        for (const newRow of newRows) {
+          const pos = earlierRows.findIndex(
+            (r) => r.rowIndex === newRow.rowIndex
+          );
+          //QUESTION: by conflating updates like this, we preserve the timeSTamp value
+          // of first TABLE_ROW update queued, losing the timeStamp of later updates
+          // to same rows within same tick. Does thia matter ?
+          if (pos === -1) {
+            earlierRows.push(newRow);
+          } else {
+            earlierRows[pos] = newRow;
+          }
+        }
+      } else {
+        this.#queue.push({
+          module: "CORE",
+          requestId,
+          sessionId: this.#id,
+          token: this.#token,
+          user: this.#user,
+          body: messageBody,
+        });
+        logger.info(
+          `[VUU:core:Session] enqueue ${messageBody.type}, ${
+            this.#queue.length
+          } messages queued`
+        );
+      }
     } else {
       throw Error("no message can be sent to client before LOGIN");
     }
   }
 
-  readQueue = () => {
-    const queue = this.#queue.extractAll();
+  dequeueAllMessages = () => {
+    const queue = this.#queue.dequeueAllMessages();
     if (queue.length > 0) {
       return queue;
     } else {
@@ -277,9 +315,9 @@ export const accurateTimer = (fn: Function, time = 1000) => {
   return { cancel };
 };
 
-accurateTimer(() => {
-  console.log(
-    `[VUU:core:sessions] messages sent per second ${messageCountPerSecond}`
-  );
-  messageCountPerSecond = 0;
-}, 1000);
+// accurateTimer(() => {
+//   console.log(
+//     `[VUU:core:sessions] messages sent per second ${messageCountPerSecond}`
+//   );
+//   messageCountPerSecond = 0;
+// }, 1000);

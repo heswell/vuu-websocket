@@ -441,22 +441,28 @@ export type SortSetInsertPosition = number | "start" | "end";
 
 export const getSortSetInsertionPosition = (
   sortSet: SortSet,
+  // TOSO support multi col search
+  sortCol: VuuSortCol | undefined,
   sortValue: VuuRowDataItemType
 ): SortSetInsertPosition => {
   const [, firstSortValue] = sortSet.at(0) as SortItem;
   const [, lastSortValue] = sortSet.at(-1) as SortItem;
+  const reverseSort = sortCol?.sortType === "D";
 
-  const reverseSort = parseInt(firstSortValue) > parseInt(lastSortValue);
+  if (sortCol === undefined) {
+    return "end";
+  }
 
-  if (reverseSort && parseInt(sortValue) > parseInt(firstSortValue)) {
+  if (reverseSort && sortValue >= firstSortValue) {
     return "start";
-  } else if (reverseSort && parseInt(sortValue) < parseInt(lastSortValue)) {
+  } else if (reverseSort && sortValue <= lastSortValue) {
     return "end";
-  } else if (!reverseSort && parseInt(sortValue) > parseInt(lastSortValue)) {
+  } else if (!reverseSort && sortValue >= lastSortValue) {
     return "end";
-  } else if (!reverseSort && parseInt(sortValue) < parseInt(firstSortValue)) {
+  } else if (!reverseSort && sortValue <= firstSortValue) {
     return "start";
   }
 
+  // TODO calculate position for insert - use binary search
   return -1;
 };

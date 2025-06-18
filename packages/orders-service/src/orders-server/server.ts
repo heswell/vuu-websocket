@@ -1,6 +1,7 @@
 import { uuid } from "@vuu-ui/vuu-utils";
 import { WebSocketConnectionHandler } from "./WebSocketConnectionHandler";
 import logger from "../logger";
+import { startNewOrderCreation, stopNewOrderCreation } from "./order-factory";
 
 export interface WebsocketData {
   sessionId: string;
@@ -18,6 +19,7 @@ export async function start() {
     fetch(req, server) {
       const sessionId = uuid();
       logger.info({ sessionId }, "create session");
+      const url = new URL(req.url);
       const success = server.upgrade(req, { data: { sessionId } });
       if (success) {
         // Bun automatically returns a 101 Switching Protocols
@@ -25,8 +27,34 @@ export async function start() {
         return undefined;
       }
 
-      // handle HTTP request normally
-      return new Response("Hello world!");
+      switch (url.pathname) {
+        case "/admin/start": {
+          const responseInit: ResponseInit = {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+            },
+          };
+
+          const newOrdersPerSecond = parseInt(
+            url.searchParams.get("newOrdersPerSecond") ?? "1"
+          );
+
+          startNewOrderCreation({ newOrdersPerSecond });
+          return new Response("ok", responseInit);
+        }
+        case "/admin/stop":
+          const responseInit: ResponseInit = {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+            },
+          };
+          stopNewOrderCreation();
+          return new Response("ok", responseInit);
+        default:
+          console.log(`unknown url path ${url.pathname}`);
+          // handle HTTP request normally
+          return new Response("Hello world!");
+      }
     },
     websocket: new WebSocketConnectionHandler(),
   });

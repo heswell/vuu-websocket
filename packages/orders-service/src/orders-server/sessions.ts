@@ -5,11 +5,12 @@ import { OrdersServiceMessage } from "./order-service-types";
 import OrderStore from "./OrderStore";
 import type { WebsocketData } from "./server";
 import { WebSocketSink } from "./WebSocketSink";
-import { ArrayDataStreamSource } from "./ArrayDataStreamSource";
+import logger from "../logger";
+// import { ArrayDataStreamSource } from "./ArrayDataStreamSource";
 
 export interface ISession<T extends object> {
   addViewport: (viewportId: string) => void;
-  enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
+  clear: () => void;
   kill: () => void;
   readQueue: () => null | T[];
   sendHeartBeat: () => void;
@@ -18,7 +19,7 @@ export interface ISession<T extends object> {
   readonly outgoingHeartbeat?: number;
   readonly viewports: string[];
   readonly stream: WritableStream;
-  readonly ws: WebSocket;
+  readonly ws: ServerWebSocket;
 }
 
 const sessions = new Map<string, ISession<OrdersServiceMessage>>();
@@ -28,24 +29,28 @@ export const startHeartbeats = (updateFrequency = 60_000) => {
 };
 
 export const startMainUpdateLoop = (updateFrequency = 250) => {
-  console.log(`update frequency ${updateFrequency}`);
+  logger.info(
+    `[ORDERS:service:sessions] startMainUpdateLoop, @ ${updateFrequency}ms`
+  );
   return updateLoop("Regular Updates", updateFrequency);
 };
 
 export function heartbeatLoop(interval: number) {
-  console.log(`===> starting heartbeat loop @  ${interval}`);
+  logger.info(`[ORDERS:service:sessions] heartbeatLoop loop @  ${interval}ms`);
 
   let _keepGoing = true;
   let _timer: Timer | null = null;
 
   const tick = () => {
-    console.log(`[heartbeatLoop] tick (${sessions.size} sessions)`);
+    console.log(
+      `[ORDERS:service:sessions] heartbeat tick (${sessions.size} sessions)`
+    );
     const expiredSessions: ISession<OrdersServiceMessage>[] = [];
     for (const session of sessions.values()) {
       if (session.clientUnresponsive) {
-        console.log(
-          `[heartbeatLoop] session #${session.id} received no heartbeat response from client`
-        );
+        // console.log(
+        //   `[heartbeatLoop] session #${session.id} received no heartbeat response from client`
+        // );
         expiredSessions.push(session);
       } else {
         session.sendHeartBeat();
@@ -83,7 +88,14 @@ export function updateLoop(name: string, interval: number) {
     // console.log(`update loops tick (${sessions.size} sessions)`);
     const start = performance.now();
     if (OrderStore.hasUpdates) {
-      const messages = OrderStore.queuedMessages;
+      const messages = OrderStore.dequeueAllMessages();
+      console.log(
+        `[ORDERS:service:sessions] ${messages.length} messages dequeued from OrderStore`
+      );
+
+      if (sessions.size === 0) {
+        logger.info(`[ORDERS:service:sessions] no open sessions`);
+      }
 
       for (const session of sessions.values()) {
         // const readStream = new ReadableStream(
@@ -104,6 +116,10 @@ export function updateLoop(name: string, interval: number) {
           end - start
         }ms`
       );
+    } else {
+      console.log(
+        `[ORDERS:service:sessions] no messages to dequeue from OrderStore`
+      );
     }
 
     if (_keepGoing) {
@@ -114,7 +130,7 @@ export function updateLoop(name: string, interval: number) {
   tick();
 
   function stopper() {
-    console.log(`stopping updateLoop ${name}`);
+    console.log(`[ORDERS:service:sessions] stopping updateLoop ${name}`);
     if (_timer) {
       clearTimeout(_timer);
     }
@@ -221,21 +237,6 @@ class Session<T extends object> implements ISession<T> {
     }
   }
 
-  enqueue(requestId: string, messageBody: ServerMessageBody) {
-    if (this.#token && this.#user) {
-      this.#queue.push({
-        module: "CORE",
-        requestId,
-        sessionId: this.#id,
-        token: this.#token,
-        user: this.#user,
-        body: messageBody,
-      });
-    } else {
-      throw Error("no message can be sent to client before LOGIN");
-    }
-  }
-
   readQueue = () => {
     const queue = this.#queue.extractAll();
     if (queue.length > 0) {
@@ -252,7 +253,7 @@ class Session<T extends object> implements ISession<T> {
   }
 
   kill() {
-    console.log(`[Session] #${this.id} KILL`);
+    console.log(`[ORDERS:service:Session] #${this.id} KILL`);
     this.#ws.close();
   }
 }

@@ -9,17 +9,27 @@ import {
   setRandomBidAskSizeUpdate,
   setRandomBidAskUpdate,
 } from "../../../utils";
+import { TableContainer } from "@heswell/vuu-server/src/core/table/TableContainer";
 
 export class PricesProvider extends Provider {
   constructor(table: Table) {
     super(table, ["instruments"]);
   }
 
-  async load(module: Module) {
+  async load(tableContainer: TableContainer) {
+    const instrumentsTable = tableContainer.getTable("instruments");
     const {
       columnMap: { ric },
       rows: instruments,
-    } = module.getTable("instruments");
+    } = instrumentsTable;
+
+    console.log(
+      `[PricesProvider] ${instrumentsTable.rowCount} instrument rows`
+    );
+
+    instrumentsTable.on("rowInserted", () => {
+      // ???
+    });
 
     const row: Record<string, VuuRowDataItemType> = {};
 
@@ -47,12 +57,12 @@ export class PricesProvider extends Provider {
 
     this.loaded = true;
 
-    this.beginUpdateLoop(module);
+    this.beginUpdateLoop(tableContainer);
   }
 
-  beginUpdateLoop(module: Module) {
+  beginUpdateLoop(tableContainer: TableContainer) {
     console.log("begin price update loop");
-    const pricesTable = module.getTable("prices");
+    const pricesTable = tableContainer.getTable("prices");
     const {
       columnMap: { ask, askSize, bid, bidSize },
       rowCount: priceCount,

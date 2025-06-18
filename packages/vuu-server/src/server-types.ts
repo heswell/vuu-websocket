@@ -1,6 +1,7 @@
 import {
   ClientMessageBody,
   ServerMessageBody,
+  ServerToClientTableRows,
   VuuClientMessage,
   VuuColumnDataType,
   VuuServerMessage,
@@ -8,6 +9,7 @@ import {
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { Table } from "@heswell/data";
+import { ServerWebSocket } from "bun";
 
 export interface ServiceDefinition {
   name: string;
@@ -53,6 +55,8 @@ export declare type RowMeta = {
 };
 
 export interface IMessageQueue {
+  // TODO better name
+  find: (vpId: string) => VuuServerMessage<ServerToClientTableRows> | undefined;
   push(message: VuuServerMessage, rowMeta?: RowMeta): void;
 }
 
@@ -64,14 +68,15 @@ export declare type VuuProtocolHandler<
 
 export interface ISession {
   addViewport: (viewportId: string) => void;
+  clear: () => void;
   enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
-  readQueue: () => null | VuuClientMessage[];
+  dequeueAllMessages: () => null | VuuServerMessage[];
   kill: () => void;
   readonly id: string;
   readonly clientUnresponsive?: boolean;
-  readonly outgoingHeartbeat?: number;
+  outgoingHeartbeat?: number;
   readonly viewports: string[];
-  readonly ws: WebSocket;
+  readonly ws: ServerWebSocket;
 }
 
 export interface DataTableService extends ConfiguredService {

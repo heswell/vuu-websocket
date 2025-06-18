@@ -1,8 +1,9 @@
-import { DataTableDefinition } from "@heswell/server-types";
-import { DataSourceRow, TableSchema } from "@vuu-ui/vuu-data-types";
+import { DataTableDefinition } from "@heswell/vuu-server";
+import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
+import logger from "../logger.ts";
 
 // export type TableIndex = Map<string, number>;
 export type TableIndex = Record<string, number | undefined>;
@@ -158,11 +159,6 @@ export class Table extends EventEmitter<TableEvents> {
         this.emit("rowUpdated", rowIdx, results);
       }
     }
-    const row = this.getRowAtKey(key, false);
-    if (row) {
-    } else {
-      console.log(`upsert, need to insert`);
-    }
   }
 
   insert(row: VuuDataRow, emitEvent = true) {
@@ -170,6 +166,9 @@ export class Table extends EventEmitter<TableEvents> {
     const key = row[indexOfKeyValue];
     const rowIdx = this.rows.push(row) - 1;
     this.#index[key.toString()] = rowIdx;
+    logger.info(
+      `[Table] ${this.schema.table.module}:${this.schema.table.table}, insert [${rowIdx}] publish ? ${emitEvent} rows lonegh ${this.rows.length}`
+    );
     if (emitEvent) {
       this.emit("rowInserted", rowIdx, row);
     }

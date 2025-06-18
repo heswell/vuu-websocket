@@ -1,8 +1,8 @@
 import { ParentOrdersProvider } from "./providers/ParentOrdersProvider";
-import { orders } from "./OrdersTableDefs";
-import { ModuleContainer } from "@heswell/vuu-server";
+import { parentOrders } from "./OrdersTableDefs";
+import { ModuleFactory } from "@heswell/vuu-server";
 
 export const OrdersModule = () =>
-  ModuleContainer.withNameSpace("ORDERS")
-    .addTable(orders, (table) => new ParentOrdersProvider(table))
+  ModuleFactory.withNameSpace("ORDERS")
+    .addTable(parentOrders, (table) => new ParentOrdersProvider(table))
     .asModule();

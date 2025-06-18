@@ -1,10 +1,11 @@
 import { Table } from "@heswell/data";
-import { Module } from "./Module";
+import { ViewServerModule } from "./core/module/VsModule";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { TableContainer } from "./core/table/TableContainer";
 
 export interface IProvider {
   dependencies: string[];
-  load: (module: Module) => Promise<void>;
+  load: (tableContainer: TableContainer) => Promise<void>;
   loaded: boolean;
   table: Table;
 }
@@ -74,7 +75,7 @@ export abstract class Provider implements IProvider {
     this.#loaded = loaded;
   }
 
-  abstract load(module: Module): Promise<void>;
+  abstract load(tableContainer: TableContainer): Promise<void>;
 
   protected insertRow(row: VuuDataRowDto) {
     const { schema } = this.table;

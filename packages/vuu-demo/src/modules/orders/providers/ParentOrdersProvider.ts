@@ -1,5 +1,7 @@
 import { Provider } from "@heswell/vuu-server";
 import type { OrdersServiceMessage } from "@heswell/orders-service";
+import { OrdersServiceDataMessage } from "@heswell/orders-service/src/orders-server/order-service-types";
+import logger from "../../../logger";
 
 const ordersServiceUrl = `ws://localhost:${process.env.ORDERS_URL}`;
 
@@ -16,43 +18,52 @@ export class ParentOrdersProvider extends Provider {
         try {
           const socket = new WebSocket(ordersServiceUrl);
           socket.addEventListener("message", (evt) => {
-            const payload = JSON.parse(evt.data as string);
-            if (Array.isArray(payload)) {
-              for (const item of payload) {
-                const message = item as OrdersServiceMessage;
-                this.table.upsert(message.data);
+            const orderServiceMessage = JSON.parse(evt.data as string) as
+              | OrdersServiceMessage
+              | OrdersServiceMessage[];
+            logger.info(
+              { orderServiceMessage },
+              `[ORDERS:module:ParentOrdersModule] IN `
+            );
+            if (Array.isArray(orderServiceMessage)) {
+              console.log(
+                `[ORDERS:module:ParentOrdersModule] ${orderServiceMessage.length} messages from OrdersService`
+              );
+              for (const message of orderServiceMessage) {
+                const { data } = message as OrdersServiceDataMessage;
+                logger.info(
+                  `[ORDERS:module:ParentOrdersModule] table.upsert ${data[0]}`
+                );
+                this.table.upsert(data);
                 messageCount += 1;
               }
             } else {
-              const message = payload as OrdersServiceMessage;
               // TODO does this make sense - is there a distinction between
               // initial load and any other insert/update ?
-              if (message.type === "HB") {
+              if (orderServiceMessage.type === "HB") {
                 socket.send(`{"type": "HB", "ts": ${Date.now()}}`);
-              } else if (typeof message.count === "number") {
-                console.log(`[OrdersProvider] ${message.count} loaded`);
+              } else if (orderServiceMessage.type === "bulk-insert") {
+                for (const row of orderServiceMessage.data) {
+                  this.table.upsert(row);
+                }
+              } else if (orderServiceMessage.type === "bulk-insert-complete") {
+                logger.info(
+                  `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${orderServiceMessage.count} rows loaded`
+                );
                 this.loaded = true;
                 resolve();
-              } else if (message.type === "insert") {
-                const [firstElement] = message.data;
-                if (Array.isArray(firstElement)) {
-                  for (const order of message.data) {
-                    this.table.upsert(order);
-                  }
-                  messageCount += message.data.length;
-                } else {
-                  this.table.upsert(message.data);
-                  messageCount += 1;
-                }
+              } else if (orderServiceMessage.type === "insert") {
+                this.table.upsert(orderServiceMessage.data);
+                messageCount += 1;
               } else {
                 console.log(
-                  `[ORDERS:module:OrdersProvider] message IN, unexpected message type '${message.type}'`
+                  `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${orderServiceMessage.type}'`
                 );
               }
             }
           });
           socket.addEventListener("open", (event) => {
-            console.log(
+            logger.info(
               `[ORDERS:module:OrdersProvider] websocket open, subscribing to all orders`
             );
             socket.send(JSON.stringify({ type: "subscribe" }));

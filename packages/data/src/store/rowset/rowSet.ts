@@ -27,6 +27,7 @@ import { Table, UpdateResultTuple } from "../table.ts";
 import { BaseRowSet } from "./BaseRowSet.ts";
 import { DataResponse } from "./IRowSet.ts";
 import { TableColumnType } from "@heswell/vuu-server";
+import logger from "../../logger.ts";
 
 const SINGLE_COLUMN = 1;
 
@@ -123,6 +124,7 @@ export class RowSet extends BaseRowSet {
       ? getDeltaRange(this.range, range)
       : getFullRange(range);
     const resultset = this.slice(from, to);
+    logger.info(`[RowSet] setRange ${range.from}:${range.to}`);
     this.range = range;
     return {
       rows: resultset,
@@ -168,9 +170,9 @@ export class RowSet extends BaseRowSet {
   get last() {
     return this.table.rows.at(-1);
   }
-  get rawData() {
-    return this.table.rows;
-  }
+  // get rawData() {
+  //   return this.table.rows;
+  // }
 
   // selected are the index positions of rows as presented to the user. That
   // means they refer to positions within the current indexSet. We will store
@@ -447,6 +449,7 @@ export class RowSet extends BaseRowSet {
 
       const insertPosition = getSortSetInsertionPosition(
         this.sortSet,
+        sortCol,
         sortValue
       );
 

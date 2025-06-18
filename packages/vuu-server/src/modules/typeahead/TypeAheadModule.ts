@@ -1,6 +1,6 @@
 import { Module, ModuleContainer } from "@heswell/vuu-server";
 import { VuuRpcServiceRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
-import type { TableContainer } from "../../ModuleContainer";
+import type { TableContainer } from "../../core/module/ModuleContainer";
 import { RpcHandler } from "../../RpcRegistry";
 
 class TypeAheadRpcHandler implements RpcHandler {

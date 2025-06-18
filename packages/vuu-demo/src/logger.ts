@@ -5,7 +5,7 @@ const pathToLogs = path.join(__dirname, "../../../logs");
 
 const fileTransport = pino.transport({
   target: "pino/file",
-  options: { destination: `${pathToLogs}/vuu-server.log` },
+  options: { destination: `${pathToLogs}/vuu-demo.log` },
 });
 
 export default pino(
