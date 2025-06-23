@@ -1,7 +1,5 @@
 import { VuuLink, VuuTable } from "@vuu-ui/vuu-protocol-types";
 
-import TableDefContainer from "../core/module/TableDefContainer";
-import { toColumnName } from "@vuu-ui/vuu-utils";
 import { ViewServerModule } from "../core/module/VsModule";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
@@ -11,10 +9,10 @@ export type Column = {
 };
 
 export const columnUtils = {
-  allFrom: (tableDef: TableDef) => tableDef.columns.map(toColumnName),
+  allFrom: (tableDef: TableDef) => tableDef.columns,
 
   allFromExcept: (tableDef: TableDef, name: string) =>
-    tableDef.columns.filter((td) => td.name !== name).map(toColumnName),
+    tableDef.columns.filter((td) => td.name !== name),
 };
 
 export interface TableDefConfig {
@@ -75,10 +73,8 @@ class TableDefImpl implements TableDef {
   }
 }
 
-export function TableDef(options: TableDefConfig): TableDef {
-  const tableDef = new TableDefImpl(options);
-  return tableDef;
-}
+export const TableDef = (options: TableDefConfig): TableDef =>
+  new TableDefImpl(options);
 
 export type JoinType = "LeftOuterJoin";
 export interface JoinSpec {
@@ -115,30 +111,65 @@ export function Join(table: TableDef, joinSpec: JoinSpec): Join {
   return new JoinImpl(table, joinSpec);
 }
 
-export interface JoinTableDef {
+export interface JoinTableDefConfig
+  extends Omit<TableDefConfig, "columns" | "keyField"> {
   baseTable: TableDef;
-  joinColumns: string[];
-  // eventually will be an array of Join[]
+  joinColumns: Column[];
   joins: Join;
-  name: string;
 }
 
-class JoinTableDefImpl implements JoinTableDef {
-  joinFields?: string | string[];
-  joins: Join;
-  links?: VuuLink[];
+export interface JoinTableDef extends TableDef {
   baseTable: TableDef;
-  joinColumns: string[];
+  containsTable: (tableName: string) => boolean;
+  joinColumns: Column[];
+  joins: Join;
+}
+
+export const isJoinTableDef = (
+  tableDef: TableDef | JoinTableDef
+): tableDef is JoinTableDef => tableDef instanceof JoinTableDefImpl;
+
+class JoinTableDefImpl extends TableDefImpl implements JoinTableDef {
+  joins: Join;
+  baseTable: TableDef;
+  joinColumns: Column[];
   name: string;
-  constructor(options: JoinTableDef) {
-    const { baseTable, joinColumns, joins, name } = options;
+  constructor({
+    baseTable,
+    joinFields,
+    joins,
+    joinColumns,
+    name,
+    links,
+  }: JoinTableDefConfig) {
+    super({
+      columns: joinColumns,
+      joinFields,
+      keyField: baseTable.keyField,
+      name,
+      links,
+    });
     this.baseTable = baseTable;
     this.joinColumns = joinColumns;
     this.joins = joins;
     this.name = name;
   }
+
+  get joinTableColumns() {
+    return [];
+  }
+
+  containsTable(tableName: string) {
+    if (this.baseTable.name == tableName) {
+      return true;
+    }
+    if (this.joins.table.name === tableName) {
+      return true;
+    }
+    return false;
+  }
 }
 
-export function JoinTableDef(options: JoinTableDef): JoinTableDef {
+export function JoinTableDef(options: JoinTableDefConfig): JoinTableDef {
   return new JoinTableDefImpl(options);
 }

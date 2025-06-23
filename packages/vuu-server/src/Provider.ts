@@ -1,10 +1,9 @@
 import { Table } from "@heswell/data";
 import { ViewServerModule } from "./core/module/VsModule";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
-import { TableContainer } from "./core/table/TableContainer";
+import { type TableContainer } from "./core/table/TableContainer";
 
 export interface IProvider {
-  dependencies: string[];
   load: (tableContainer: TableContainer) => Promise<void>;
   loaded: boolean;
   table: Table;
@@ -50,16 +49,10 @@ export const setRandomBidAskSizeUpdate = (bidAsk: BidAskSize) => {
 export type ProviderFactory = (table: Table) => IProvider;
 
 export abstract class Provider implements IProvider {
-  #dependencies: string[];
   #loaded = false;
   #table: Table;
-  constructor(table: Table, dependencies: string[] = []) {
-    this.#dependencies = dependencies;
+  constructor(table: Table) {
     this.#table = table;
-  }
-
-  get dependencies() {
-    return this.#dependencies;
   }
 
   get table() {

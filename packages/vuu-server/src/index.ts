@@ -1,5 +1,6 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
 export { default as ModuleContainer } from "./core/module/ModuleContainer";
+export type { TableContainer } from "./core/table/TableContainer";
 export { TypeAheadModule } from "./modules/typeahead/TypeAheadModule";
 export { Provider } from "./Provider";
 export type {

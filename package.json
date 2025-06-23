@@ -12,6 +12,7 @@
     "start:demo": "bun ./scripts/start-demo.ts",
     "debug:demo": "bun --inspect ./scripts/start-demo.ts",
     "start:orders": "bun ./scripts/start-orders.ts",
+    "start:prices": "bun ./scripts/start-prices.ts",
     "start:refdata": "bun ./scripts/start-refdata.ts",
     "debug": "bun --inspect ./start.ts",
     "test": "echo \"Error: no test specified\" && exit 1",

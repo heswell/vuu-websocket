@@ -10,6 +10,7 @@ import {
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { Table } from "@heswell/data";
 import { ServerWebSocket } from "bun";
+import { JoinTableProvider } from "./provider/JoinTableProvider";
 
 export interface ServiceDefinition {
   name: string;
@@ -31,6 +32,7 @@ export declare type TableColumn = {
 };
 
 export interface DataTableDefinition {
+  joinProvider?: JoinTableProvider;
   schema: TableSchema;
 }
 

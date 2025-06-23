@@ -1,5 +1,5 @@
 import { Table } from "@heswell/data";
-import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { JoinTable } from "./JoinTable";
 
 export class TableContainer {
   static #instance: TableContainer;
@@ -17,7 +17,7 @@ export class TableContainer {
 
   #tables: Map<string, Table> = new Map();
 
-  add(table: Table) {
+  addTable(table: Table) {
     console.log(`[TableContainer] add table ${table.name}`);
     this.#tables.set(table.name, table);
   }

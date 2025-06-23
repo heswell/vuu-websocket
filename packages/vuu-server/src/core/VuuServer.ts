@@ -3,11 +3,12 @@ import { ViewServerModule } from "./module/VsModule";
 import { type VuuServerConfig } from "./VuuServerOptions";
 import moduleContainer from "./module/ModuleContainer";
 import run from "../server";
-import { TableDef } from "../api/TableDef";
-import { tableDefToSchema } from "../tableDefToSchema";
+import { isJoinTableDef, JoinTableDef, TableDef } from "../api/TableDef";
 import { IProvider } from "../Provider";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import tableContainer from "./table/TableContainer";
+import { vuuInMemPlugin } from "../feature/inmem/VuuInMemPlugin";
+import joinTableProvider from "../provider/JoinTableProvider";
 
 export class VuuServer {
   private providerContainer: ProviderContainer;
@@ -19,11 +20,21 @@ export class VuuServer {
   }
 
   private createTable(moduleName: string, tableDef: TableDef) {
-    const table = new Table({
-      schema: tableDefToSchema(moduleName, tableDef),
-    });
-    tableContainer.add(table);
-    return table;
+    return vuuInMemPlugin.tableFactory(
+      moduleName,
+      tableDef,
+      tableContainer,
+      joinTableProvider
+    );
+  }
+
+  private createJoinTable(moduleName: string, joinTableDef: JoinTableDef) {
+    return vuuInMemPlugin.joinTableFactory(
+      moduleName,
+      joinTableDef,
+      tableContainer,
+      joinTableProvider
+    );
   }
 
   private registerProvider(table: Table, provider: IProvider) {
@@ -32,10 +43,6 @@ export class VuuServer {
   }
 
   private registerModule = (module: ViewServerModule) => {
-    console.log(`register Module ${module.name}`, {
-      module,
-    });
-
     // const realizedModule = new RealizedViewServerModule({
     //   name: module.name,
     //   tableDefs: module.tableDefs,
@@ -44,11 +51,17 @@ export class VuuServer {
     moduleContainer.register(module);
 
     module.tableDefs.forEach((tableDef) => {
+      console.log(
+        `VuUServer process tabledef for module ${module.name} table ${tableDef.name}`
+      );
       tableDef.setModule(module);
-      const table = this.createTable(module.name, tableDef);
-      console.log(`Loading provider for table ${table.name}...`);
-      const provider = module.getProviderForTable(table, this);
-      this.registerProvider(table, provider);
+      if (isJoinTableDef(tableDef)) {
+        const table = this.createJoinTable(module.name, tableDef);
+      } else {
+        const table = this.createTable(module.name, tableDef);
+        const provider = module.getProviderForTable(table);
+        this.registerProvider(table, provider);
+      }
     });
   };
 

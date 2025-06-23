@@ -154,7 +154,7 @@ export class RowSet extends BaseRowSet {
 
     for (let i = lo, len = indexSet.length; i < len && i < hi; i++) {
       const rowIndex = getRowIndex(i);
-      results.push(projectRow(table.rows[rowIndex], i));
+      results.push(projectRow(table.rowAt(rowIndex), i));
     }
 
     return results;

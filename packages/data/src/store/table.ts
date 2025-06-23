@@ -4,6 +4,7 @@ import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 import logger from "../logger.ts";
+import { JoinTableProvider } from "@heswell/vuu-server/src/provider/JoinTableProvider.ts";
 
 // export type TableIndex = Map<string, number>;
 export type TableIndex = Record<string, number | undefined>;
@@ -46,25 +47,32 @@ export class Table extends EventEmitter<TableEvents> {
   #index: TableIndex = {};
 
   public columnMap: ColumnMap;
-  public rows: VuuDataRow[] = [];
+  #rows: VuuDataRow[] = [];
   public status: "ready" | null = null;
   public readonly schema: TableSchema;
 
-  private readonly indexOfKeyField: number;
+  public readonly indexOfKeyField: number;
+  private joinProvider?: JoinTableProvider;
 
-  constructor({ schema }: DataTableDefinition) {
+  constructor({ joinProvider, schema }: DataTableDefinition) {
     super();
 
     const columnMap = buildColumnMap(schema.columns);
 
     this.schema = schema;
     this.columnMap = columnMap;
+    this.joinProvider = joinProvider;
     this.indexOfKeyField = columnMap[schema.key];
   }
 
   get columns() {
     return this.schema.columns;
   }
+
+  get rows() {
+    return this.#rows;
+  }
+
   get index() {
     return this.#index;
   }
@@ -79,6 +87,10 @@ export class Table extends EventEmitter<TableEvents> {
 
   get rowCount() {
     return this.rows.length;
+  }
+
+  rowAt(rowIdx: number) {
+    return this.#rows[rowIdx];
   }
 
   getUniqueValuesForColumn(column: string, pattern?: string) {
@@ -163,14 +175,19 @@ export class Table extends EventEmitter<TableEvents> {
 
   insert(row: VuuDataRow, emitEvent = true) {
     const indexOfKeyValue = this.columnMap[this.primaryKey];
-    const key = row[indexOfKeyValue];
+    const key = row[indexOfKeyValue] as string;
     const rowIdx = this.rows.push(row) - 1;
     this.#index[key.toString()] = rowIdx;
-    logger.info(
-      `[Table] ${this.schema.table.module}:${this.schema.table.table}, insert [${rowIdx}] publish ? ${emitEvent} rows lonegh ${this.rows.length}`
-    );
     if (emitEvent) {
       this.emit("rowInserted", rowIdx, row);
+    }
+
+    this.sendToJoinSink(key, row);
+  }
+
+  sendToJoinSink(rowKey: string, rowData: VuuDataRow) {
+    if (this.joinProvider?.hasJoins(this.name)) {
+      this.joinProvider.sendEvent(this.name, "insert", rowKey, rowData);
     }
   }
 

@@ -1,7 +1,8 @@
-import { type Module } from "@heswell/vuu-server";
+import { ModuleFactory } from "@heswell/vuu-server";
+import { PricesProvider } from "./PricesProvider";
+import { prices } from "./PriceTableDefs";
 
-export const PriceModule = () => {
-  console.log("[PriceModule]");
-  const module: Module = {};
-  return module;
-};
+export const PricesModule = () =>
+  ModuleFactory.withNameSpace("PRICES")
+    .addTable(prices, (table) => new PricesProvider(table))
+    .asModule();

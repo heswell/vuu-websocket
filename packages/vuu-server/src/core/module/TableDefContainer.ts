@@ -1,5 +1,3 @@
-import { TableDef } from "../../api/TableDef";
-import { TableJoinFactory } from "../../TableJoinProvider";
 import { TableDefs } from "./ModuleFactory";
 
 // This is created in main class and passed as an implicit parameter in Scala
@@ -18,6 +16,7 @@ export class TableDefContainer {
   #tablesByModule = new Map<string, TableDefs>();
 
   add(module: string, tableDefs: TableDefs) {
+    console.log(`TableDefContainer add module ${module}`);
     this.#tablesByModule.set(module, tableDefs);
   }
 

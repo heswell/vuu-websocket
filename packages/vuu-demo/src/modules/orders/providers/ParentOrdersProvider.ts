@@ -1,10 +1,8 @@
 import { Provider } from "@heswell/vuu-server";
-import type { OrdersServiceMessage } from "@heswell/orders-service";
-import { OrdersServiceDataMessage } from "@heswell/orders-service/src/orders-server/order-service-types";
 import logger from "../../../logger";
+import { ResourceMessage, SnapshotBatch } from "@heswell/service-utils";
 
 const ordersServiceUrl = `ws://localhost:${process.env.ORDERS_URL}`;
-
 let messageCount = 0;
 
 export class ParentOrdersProvider extends Provider {
@@ -19,8 +17,8 @@ export class ParentOrdersProvider extends Provider {
           const socket = new WebSocket(ordersServiceUrl);
           socket.addEventListener("message", (evt) => {
             const orderServiceMessage = JSON.parse(evt.data as string) as
-              | OrdersServiceMessage
-              | OrdersServiceMessage[];
+              | ResourceMessage
+              | { type: "HB" };
             logger.info(
               { orderServiceMessage },
               `[ORDERS:module:ParentOrdersModule] IN `
@@ -30,7 +28,7 @@ export class ParentOrdersProvider extends Provider {
                 `[ORDERS:module:ParentOrdersModule] ${orderServiceMessage.length} messages from OrdersService`
               );
               for (const message of orderServiceMessage) {
-                const { data } = message as OrdersServiceDataMessage;
+                const { rows: data } = message as SnapshotBatch;
                 logger.info(
                   `[ORDERS:module:ParentOrdersModule] table.upsert ${data[0]}`
                 );
@@ -42,19 +40,19 @@ export class ParentOrdersProvider extends Provider {
               // initial load and any other insert/update ?
               if (orderServiceMessage.type === "HB") {
                 socket.send(`{"type": "HB", "ts": ${Date.now()}}`);
-              } else if (orderServiceMessage.type === "bulk-insert") {
-                for (const row of orderServiceMessage.data) {
+              } else if (orderServiceMessage.type === "snapshot-batch") {
+                for (const row of orderServiceMessage.rows) {
                   this.table.upsert(row);
                 }
-              } else if (orderServiceMessage.type === "bulk-insert-complete") {
+              } else if (orderServiceMessage.type === "snapshot-count") {
                 logger.info(
                   `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${orderServiceMessage.count} rows loaded`
                 );
                 this.loaded = true;
                 resolve();
-              } else if (orderServiceMessage.type === "insert") {
-                this.table.upsert(orderServiceMessage.data);
-                messageCount += 1;
+                // } else if (orderServiceMessage.type === "insert") {
+                //   this.table.upsert(orderServiceMessage.data);
+                //   messageCount += 1;
               } else {
                 console.log(
                   `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${orderServiceMessage.type}'`
@@ -66,7 +64,9 @@ export class ParentOrdersProvider extends Provider {
             logger.info(
               `[ORDERS:module:OrdersProvider] websocket open, subscribing to all orders`
             );
-            socket.send(JSON.stringify({ type: "subscribe" }));
+            socket.send(
+              JSON.stringify({ type: "subscribe", resource: "parentOrders" })
+            );
           });
         } catch (err) {
           reject(err);

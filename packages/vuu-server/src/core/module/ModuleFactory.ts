@@ -1,9 +1,11 @@
-import { ProviderFactory } from "../../Provider";
+import { IProvider, ProviderFactory } from "../../Provider";
 import { ServiceFactory } from "../../Service";
 import { TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
 import tableDefContainer from "./TableDefContainer";
+import { VuuServer } from "../VuuServer";
+import { Table } from "@heswell/data";
 
 export type TableDefTuple = [TableDef, ProviderFactory];
 
@@ -49,14 +51,14 @@ export function TableDefs(
     },
 
     get(tableName: string) {
-      const tableDef = tableDefs.find(([{ name }]) => name === tableName);
+      const tableDef = realizedTableDefs.find(({ name }) => name === tableName);
       if (tableDef) {
-        return tableDef[0];
+        return tableDef;
       } else {
         throw Error(
-          `Table ${tableName} could not be found in ${tableDefs
-            .map(([td]) => td.name)
-            .join(",")}`
+          `Table ${tableName} could not be found in [${this.realizedTableDefs
+            .map((td) => td.name)
+            .join(",")}]`
         );
       }
     },
@@ -76,15 +78,35 @@ function ModuleFactoryNode(tableDefs: TableDefs, moduleName: string) {
       ModuleFactoryNode(tableDefs.addJoin(func), moduleName),
 
     asModule(): ViewServerModule {
-      console.log(tableDefs);
       const baseTables = tableDefs.tableDefsAndProviders;
       const justBaseTables = baseTables.map(([tableDef]) => tableDef);
-      const mutableTableDefs = TableDefs(justBaseTables, [], []);
+      let mutableTableDefs = TableDefs(justBaseTables, [], []);
+
+      // order is important here, add the matable defs before we iterate the joindefs
       tableDefContainer.add(moduleName, mutableTableDefs);
 
-      return new ViewServerModule({
+      tableDefs.joinDefFuncs.forEach((toJTFunc) => {
+        const realizedJoinTable = toJTFunc(tableDefContainer);
+        mutableTableDefs = mutableTableDefs.addRealized(realizedJoinTable);
+      });
+
+      return new (class extends ViewServerModule {
+        getProviderForTable(table: Table): IProvider {
+          const tableProviderTuple = baseTables.find(
+            ([{ name }]) => name === table.name
+          );
+          if (tableProviderTuple) {
+            const [, providerFactory] = tableProviderTuple;
+            return providerFactory(table);
+          } else {
+            throw Error(
+              `[ViewServerModule] getProviderForTable, no baseTable ${table.name}`
+            );
+          }
+        }
+      })({
         name: moduleName,
-        tableDefsAndProviders: baseTables,
+        tableDefs: mutableTableDefs.realizedTableDefs,
       });
     },
   };
