@@ -23,7 +23,7 @@ import {
   sortReversed,
   SortSet,
 } from "../sortUtils.ts";
-import { Table, UpdateResultTuple } from "../table.ts";
+import { Table } from "../table.ts";
 import { BaseRowSet } from "./BaseRowSet.ts";
 import { DataResponse } from "./IRowSet.ts";
 import { TableColumnType } from "@heswell/vuu-server";
@@ -346,29 +346,20 @@ export class RowSet extends BaseRowSet {
     console.log(`filter took ${end - start} ms`);
   }
 
-  update(
-    rowIndex: number,
-    updates: UpdateResultTuple
-  ): DataResponse | undefined {
-    // TODO is sortCols ever null ?
-    // if we've sorted the data we're going to have to search for the rowIndex
+  update(rowIdx: number, _: VuuDataRow): DataResponse | undefined {
     if (this.currentFilter === undefined && this.sortCols === undefined) {
-      if (rowIndex >= this.range.from && rowIndex < this.range.to) {
-        return { rows: this.slice(rowIndex, rowIndex + 1), size: this.size };
+      if (rowIdx >= this.range.from && rowIdx < this.range.to) {
+        return { rows: this.slice(rowIdx, rowIdx + 1), size: this.size };
       }
-    } else if (this.currentFilter === null) {
-      throw Error("whoah");
-      // only need to update if values we actually have in the sort are affected
-      // const { sortSet } = this;
-      // for (let i = this.range.from; i < this.range.to; i++) {
-      //   const [rowIdx] = sortSet[i];
-      //   if (rowIdx === rowIndex) {
-      //     return [i, ...updates];
-      //   }
-      // }
+    } else if (this.currentFilter === undefined) {
+      // if we've sorted the data we're going to have to search for the rowIndex
+      const sortedIdx = this.sortSet.findIndex(([idx]) => idx === rowIdx);
+      if (sortedIdx >= this.range.from && sortedIdx < this.range.to) {
+        return { rows: this.slice(sortedIdx, sortedIdx + 1), size: this.size };
+      }
     } else if (this.filterSet) {
       if (this.sortCols === undefined) {
-        const filterIdx = this.filterSet.findIndex((i) => i === rowIndex);
+        const filterIdx = this.filterSet.findIndex((i) => i === rowIdx);
         if (filterIdx !== -1) {
           if (filterIdx >= this.range.from && filterIdx < this.range.to) {
             return {

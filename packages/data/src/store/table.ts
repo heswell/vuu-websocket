@@ -4,28 +4,13 @@ import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 import logger from "../logger.ts";
-import { JoinTableProvider } from "@heswell/vuu-server/src/provider/JoinTableProvider.ts";
+import type { JoinEventType, JoinTableProvider } from "@heswell/vuu-server";
 
 // export type TableIndex = Map<string, number>;
 export type TableIndex = Record<string, number | undefined>;
 
-/**
- * repeating tuple of pairs of update values [colIdx, value, colIdx, value ...]
- */
-export type UpdateTuple = [] | [number, VuuRowDataItemType];
-
-/**
- * repeating tuple of triples of updated values [colIdx, originalValue, updatedeValue, colIdx, value ...]
- */
-export type UpdateResultTuple =
-  | []
-  | [number, VuuRowDataItemType, VuuRowDataItemType];
-
 export type RowInsertHandler = (rowIndex: number, row: VuuDataRow) => void;
-export type RowUpdateHandler = (
-  rowIndex: number,
-  results: UpdateResultTuple
-) => void;
+export type RowUpdateHandler = (rowIndex: number, row: VuuDataRow) => void;
 export type RowDeletedHandler = (rowIndex: number, row: VuuDataRow) => void;
 export type TableReadyHandler = () => void;
 
@@ -124,24 +109,14 @@ export class Table extends EventEmitter<TableEvents> {
     }
   }
 
-  update(rowIdx: number, updates: UpdateTuple, clientInitiated = false) {
-    const results = [] as UpdateResultTuple;
-    let row = this.rows[rowIdx];
-    for (let i = 0, j = 0; i < updates.length; i += 2, j += 3) {
-      const colIdx = updates[i] as number;
-      const value = updates[i + 1];
-      results[j] = colIdx;
-      results[j + 1] = row[colIdx];
-      results[j + 2] = row[colIdx] = value;
-    }
-
+  update(rowIdx: number, row: VuuDataRow, clientInitiated = false) {
     if (clientInitiated) {
       setTimeout(() => {
         // we delay this so that confirmation is sent to client before row update
-        this.emit("rowUpdated", rowIdx, results);
+        this.emit("rowUpdated", rowIdx, row);
       }, 15);
     } else {
-      this.emit("rowUpdated", rowIdx, results);
+      this.emit("rowUpdated", rowIdx, row);
     }
     return true;
   }
@@ -167,6 +142,9 @@ export class Table extends EventEmitter<TableEvents> {
         }
       }
 
+      // why not just ensure join table is listening to the rowUpdated event
+      this.sendToJoinSink("update", key, row);
+
       if (emitEvent && results.length > 0) {
         this.emit("rowUpdated", rowIdx, results);
       }
@@ -182,12 +160,16 @@ export class Table extends EventEmitter<TableEvents> {
       this.emit("rowInserted", rowIdx, row);
     }
 
-    this.sendToJoinSink(key, row);
+    this.sendToJoinSink("insert", key, row);
   }
 
-  sendToJoinSink(rowKey: string, rowData: VuuDataRow) {
+  sendToJoinSink(
+    eventType: JoinEventType,
+    rowKey: string,
+    rowData?: VuuDataRow
+  ) {
     if (this.joinProvider?.hasJoins(this.name)) {
-      this.joinProvider.sendEvent(this.name, "insert", rowKey, rowData);
+      this.joinProvider.sendEvent(this.name, eventType, rowKey, rowData);
     }
   }
 
@@ -221,6 +203,8 @@ export class Table extends EventEmitter<TableEvents> {
         const end = performance.now();
         console.log(`updating index after delete took ${end - start} ms`);
         this.emit("rowDeleted", rowIdx, row);
+
+        this.sendToJoinSink("delete", key);
       } else {
         throw Error(`Table.remove key ${key} not found`);
       }

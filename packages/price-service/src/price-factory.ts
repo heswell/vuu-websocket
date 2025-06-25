@@ -58,8 +58,8 @@ function createInitialSnapshot() {
 }
 
 const UpdateParams = {
-  UPDATES_PER_BATCH: 100,
-  UPDATE_LOOP_INTERVAL: 100,
+  UPDATES_PER_BATCH: 0,
+  UPDATE_LOOP_INTERVAL: 0,
 };
 
 let updateGenerationRunning = false;
@@ -68,13 +68,8 @@ let currentNewOrderTimer: number | Timer | null = null;
 function generatePriceUpdates() {
   // TODO can we have sub-ms times ?
   // const time = Clock.currentTime;
-  const created = Date.now();
 
   const { UPDATE_LOOP_INTERVAL, UPDATES_PER_BATCH } = UpdateParams;
-
-  console.log(
-    `[PRICES:service:prices-factory] per loop  (${UPDATE_LOOP_INTERVAL}ms) create ${UPDATES_PER_BATCH} price updates)`
-  );
 
   const data = PriceStore.getSnapshot("prices");
   const count = data.length;
@@ -135,9 +130,6 @@ function logUpdateRate() {
   }
   updatesPerSecondCount = 0;
 }
-
-createInitialSnapshot();
-startGeneratingUpdates({ updatesPerSecond: 10000 });
 
 export function startGeneratingUpdates({
   updatesPerSecond = 1,
@@ -200,3 +192,6 @@ function calculateUpdateFrequency(updatesPerSecond: number) {
     };
   }
 }
+
+createInitialSnapshot();
+startGeneratingUpdates({ updatesPerSecond: 10000 });

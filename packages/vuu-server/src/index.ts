@@ -4,6 +4,10 @@ export type { TableContainer } from "./core/table/TableContainer";
 export { TypeAheadModule } from "./modules/typeahead/TypeAheadModule";
 export { Provider } from "./Provider";
 export type {
+  JoinTableProvider,
+  JoinEventType,
+} from "./provider/JoinTableProvider";
+export type {
   DataTableDefinition,
   TableColumn,
   TableColumnType,

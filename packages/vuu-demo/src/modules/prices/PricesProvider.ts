@@ -16,10 +16,10 @@ export class PricesProvider extends Provider {
   async load() {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
-        logger.info(
-          `[PRICES:module:PricesProvider] load parent orders, subscribing to price service on ${priceServiceUrl}`
-        );
         try {
+          console.log(
+            `[PRICES:module:PricesProvider] load prices, subscribing to price service on ${priceServiceUrl}`
+          );
           const socket = new WebSocket(priceServiceUrl);
           socket.addEventListener("message", (evt) => {
             const priceServiceMessage = JSON.parse(evt.data as string) as
@@ -63,8 +63,16 @@ export class PricesProvider extends Provider {
               }
             }
           });
-          socket.addEventListener("open", (event) => {
+          socket.addEventListener("error", (event) => {
             logger.info(
+              `[PRICES:module:PricesProvider] error subscribing to all prices`
+            );
+          });
+          socket.addEventListener("close", (event) => {
+            logger.info(`[PRICES:module:PricesProvider] websocket closed`);
+          });
+          socket.addEventListener("open", (event) => {
+            console.log(
               `[PRICES:module:PricesProvider] websocket open, subscribing to all prices`
             );
             socket.send(
@@ -72,6 +80,9 @@ export class PricesProvider extends Provider {
             );
           });
         } catch (err) {
+          console.log(
+            `[PRICES:module:PricesProvider] unable to connect to ${priceServiceUrl}`
+          );
           reject(err);
         }
 

@@ -2,6 +2,7 @@ import { Table } from "@heswell/data";
 import { ViewServerModule } from "./core/module/VsModule";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { type TableContainer } from "./core/table/TableContainer";
+import { loadTableFromRemoteResource } from "@heswell/service-utils";
 
 export interface IProvider {
   load: (tableContainer: TableContainer) => Promise<void>;
@@ -80,4 +81,29 @@ export abstract class Provider implements IProvider {
     }
     this.table.insert(dataRow, false);
   }
+}
+
+export abstract class RemoteProvider extends Provider {
+  #loadPromise: Promise<void> | undefined;
+
+  async load(_: TableContainer) {
+    if (this.#loadPromise === undefined) {
+      const { resource, url } = this.remoteServiceDetails();
+      const start = performance.now();
+      const count = await loadTableFromRemoteResource({
+        resource,
+        url,
+        table: this.table,
+      });
+      const end = performance.now();
+      console.log(
+        `[module:SIMUL:RemoteProvider] ${count} ${resource} inserted [${
+          end - start
+        }ms]`
+      );
+    } else {
+      throw Error("[module:SIMUL:RemoteProvider] load has already been called");
+    }
+  }
+  abstract remoteServiceDetails(): { resource: string; url: string };
 }

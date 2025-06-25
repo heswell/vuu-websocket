@@ -1,6 +1,6 @@
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
-import { getSession } from "./sessions";
+import { getSession } from "./net/sessions";
 import { WebsocketData } from "./server";
 import { messageAPI } from "./VuuProtocolHandler";
 

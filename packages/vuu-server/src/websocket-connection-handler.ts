@@ -7,7 +7,7 @@ import {
   getSession,
   startHeartbeats,
   startMainUpdateLoop,
-} from "./sessions";
+} from "./net/sessions";
 import { webSocketMessageHandler } from "./websocket-message-handler";
 import { WebsocketData } from "./server";
 import { messageAPI } from "./VuuProtocolHandler";

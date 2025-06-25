@@ -4,16 +4,17 @@ import type {
   ServerToClientTableRows,
 } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
-import ViewportContainer from "./ViewportContainer.ts";
-import logger from "./logger.ts";
-import { MessageQueue } from "./messageQueue";
-import type { WebsocketData } from "./server";
-import type { ISession } from "./server-types";
+import ViewportContainer from "../ViewportContainer.ts";
+import logger from "../logger.ts";
+import { MessageQueue } from "../messageQueue.ts";
+import type { WebsocketData } from "../server.ts";
+import type { ISession } from "../server-types.ts";
 import {
   tableMessageViewport,
   tableMessageWithData,
-} from "./vuu-message-utils.ts";
+} from "../vuu-message-utils.ts";
 
+// TODO use SessionContainer
 const sessions = new Map<string, ISession>();
 
 let messageCountPerSecond = 0;
@@ -64,7 +65,7 @@ export function heartbeatLoop(interval: number) {
   tick();
 
   function stopper() {
-    console.log(`stopping heartbeat updateLoop`);
+    console.log(`[VUU:net:SessionContainer] stopping heartbeat updateLoop`);
     if (_timer) {
       clearTimeout(_timer);
     }
@@ -83,13 +84,6 @@ export function updateLoop(name: string, interval: number) {
     const start = performance.now();
     for (const session of sessions.values()) {
       const queuedMessages = session.dequeueAllMessages();
-      if (queuedMessages && queuedMessages.length > 0) {
-        console.log(
-          `[VUU:core:Session] tick ${interval}ms ${
-            queuedMessages?.length ?? 0
-          } messages for session ${session.id}`
-        );
-      }
       if (Array.isArray(queuedMessages)) {
         for (const message of queuedMessages) {
           session.ws.send(JSON.stringify(message));
@@ -156,7 +150,7 @@ class Session implements ISession {
     //   config.CLIENT_UPDATE_FREQUENCY,
     //   this.queueReader
     // );
-    console.log(`new session created sessionId ${this.#id}`);
+    console.log(`[VUU:net:Session] new session created sessionId ${this.#id}`);
   }
 
   clear() {
@@ -173,7 +167,7 @@ class Session implements ISession {
   set incomingHeartbeat(hb: number) {
     const latency = hb - this.#heartbeat;
     this.#heatbeatResponseReceived = true;
-    console.log(`[VUU:core:Session] incoming HB, latency ${latency}`);
+    console.log(`[VUU:net:Session] incoming HB, latency ${latency}`);
   }
 
   set outgoingHeartbeat(hb: number) {
@@ -240,7 +234,7 @@ class Session implements ISession {
           body: messageBody,
         });
         logger.info(
-          `[VUU:core:Session] enqueue ${messageBody.type}, ${
+          `[VUU:net:Session] enqueue ${messageBody.type}, ${
             this.#queue.length
           } messages queued`
         );

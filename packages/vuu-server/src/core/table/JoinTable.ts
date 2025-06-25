@@ -25,7 +25,18 @@ export class JoinTable extends Table {
   }
 
   insertKey(rowKey: string) {
-    this.emit("rowInserted", rowKey);
+    const rowIdx = this.baseTable.rowIndexAtKey(rowKey);
+    if (rowIdx !== -1) {
+      this.emit("rowInserted", rowIdx, this.rowAt(rowIdx));
+    }
+  }
+
+  publishUpdateForKey(rowKey: string) {
+    console.log(`join table publishUpdateForKey ${rowKey}`);
+    const rowIdx = this.baseTable.rowIndexAtKey(rowKey);
+    if (rowIdx !== -1) {
+      this.emit("rowUpdated", rowIdx, this.rowAt(rowIdx));
+    }
   }
 
   get rows() {
@@ -36,9 +47,10 @@ export class JoinTable extends Table {
     const baseRow = this.baseTable.rowAt(rowIdx);
     const key = baseRow[this.baseTable.indexOfKeyField] as string;
     const joinIndex = this.joinTable.rowIndexAtKey(key);
+
     const joinRow = this.joinTable
       .rowAt(joinIndex)
-      .toSpliced(this.joinTable.indexOfKeyField, 1);
+      ?.toSpliced(this.joinTable.indexOfKeyField, 1);
     return baseRow.concat(joinRow);
   }
 }

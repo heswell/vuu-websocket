@@ -5,7 +5,7 @@ export { type IDequeue, MessageQueue } from "./MessageQueue";
 export * from "./SessionContainer";
 export {
   type ResourceRequest,
-  loadTableFromRemoteResource as loadResource,
+  loadTableFromRemoteResource,
 } from "./resource-loader";
 export * from "./WebSocketSink";
 export * from "./WebSocketConnectionHandler";

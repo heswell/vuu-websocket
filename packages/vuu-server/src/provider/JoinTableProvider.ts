@@ -3,6 +3,8 @@ import { JoinTable } from "../core/table/JoinTable";
 import { JoinTableDef } from "../api/TableDef";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
+export type JoinEventType = "insert" | "update" | "delete";
+
 class JoinDefToJoinTable {
   constructor(public joinDef: JoinTableDef, public table: JoinTable) {}
 }
@@ -47,14 +49,22 @@ export class JoinTableProvider {
 
   sendEvent(
     tableName: string,
-    eventType: "insert" | "update" | "delete",
+    eventType: JoinEventType,
     rowKey: string,
-    rowData: VuuDataRow
+    rowData?: VuuDataRow
   ) {
     this.#joinDefs.forEach(({ joinDef, table }) => {
-      if (joinDef.baseTable.name === tableName) {
-        if (eventType === "insert") {
+      if (eventType === "insert") {
+        // We don't care about inserts to right join table (as long as we only support left outer jpins)
+        if (joinDef.baseTable.name === tableName) {
           table.insertKey(rowKey);
+        }
+      } else if (eventType === "update") {
+        if (
+          joinDef.baseTable.name === tableName ||
+          joinDef.joins.table.name === tableName
+        ) {
+          table.publishUpdateForKey(rowKey);
         }
       }
     });

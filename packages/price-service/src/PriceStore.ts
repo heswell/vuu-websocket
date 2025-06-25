@@ -1,7 +1,7 @@
 import { Table } from "@heswell/data";
 import {
   type IDataStore,
-  loadResource,
+  loadTableFromRemoteResource,
   MessageQueue,
   type ResourceMessage,
 } from "@heswell/service-utils";
@@ -19,7 +19,7 @@ async function loadInstruments(
   resolve: (value: void | PromiseLike<void>) => void
 ) {
   const start = performance.now();
-  await loadResource({
+  await loadTableFromRemoteResource({
     columns: ["ric"],
     resource: "instruments",
     table,
