@@ -1,9 +1,7 @@
 import {
   VuuServerConfig,
   VuuServer,
-  HttpServerOptions,
   TypeAheadModule,
-  WebSocketOptions,
 } from "@heswell/vuu-server";
 import { PricesModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
@@ -21,8 +19,8 @@ export default function start() {
   const config = VuuServerConfig(httpServerOptions, webSocketOptions)
     .withModule(PricesModule())
     .withModule(SimulationModule())
-    .withModule(OrdersModule());
-  // .withModule(TypeAheadModule());
+    .withModule(OrdersModule())
+    .withModule(TypeAheadModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())
   // .withModule(BasketModule());

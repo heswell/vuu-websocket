@@ -1,6 +1,6 @@
 import { InstrumentProvider } from "./providers/InstrumentProvider";
 import { InstrumentService } from "./services/InstrumentService";
-import { ModuleFactory } from "@heswell/vuu-server";
+import { Column, ModuleFactory, ViewPortDef } from "@heswell/vuu-server";
 import { instruments } from "./SimulTableDefs";
 import {
   columnUtils as Columns,
@@ -14,7 +14,16 @@ export const SimulationModule = () =>
     .addTable(
       instruments,
       (table) => new InstrumentProvider(table),
-      (table) => new InstrumentService(table)
+      (table, provider, providerContainer) =>
+        ViewPortDef(
+          table.schema.columns.map<Column>(
+            ({ name, serverDataType: dataType }) => ({
+              name,
+              dataType,
+            })
+          ),
+          new InstrumentService(table, providerContainer)
+        )
     )
     .addJoinTable((tableDefContainer) =>
       JoinTableDef({

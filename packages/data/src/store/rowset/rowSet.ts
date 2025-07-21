@@ -50,12 +50,18 @@ export class RowSet extends BaseRowSet {
   constructor(
     viewportId: string,
     table: Table,
-    columns: TableColumnType[],
+    columns: string[],
     { filter, range, sortSet }: RowSetConstructorOptions = NO_OPTIONS
   ) {
     super(viewportId, table, columns);
-    const keyFieldIndex = table.columnMap[table.schema.key];
-    this.project = projectColumns(keyFieldIndex, this.viewportId);
+    const { columnMap } = table;
+    const keyFieldIndex = columnMap[table.schema.key];
+    this.project = projectColumns(
+      keyFieldIndex,
+      this.viewportId,
+      columns,
+      columnMap
+    );
     this.sortSet = sortSet ?? this.buildSortSet();
     this.setMapKeys(this.sortedIndex, this.sortSet);
 
@@ -347,6 +353,11 @@ export class RowSet extends BaseRowSet {
   }
 
   update(rowIdx: number, _: VuuDataRow): DataResponse | undefined {
+    // console.log(`[RowSet] update [${rowIdx}]`, {
+    //   sortCols: this.sortCols,
+    //   filter: this.currentFilter,
+    // });
+
     if (this.currentFilter === undefined && this.sortCols === undefined) {
       if (rowIdx >= this.range.from && rowIdx < this.range.to) {
         return { rows: this.slice(rowIdx, rowIdx + 1), size: this.size };

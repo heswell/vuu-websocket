@@ -60,26 +60,68 @@ export type MultiRowProjectorFactory = (
   vpSize: number
 ) => RowProjector;
 
-export const projectColumns = (
+export function projectColumns(
   keyFieldIndex: number,
   viewPortId: string
-): MultiRowProjectorFactory => {
-  return (selected: string[] = [], vpSize: number) =>
-    (data: VuuDataRow, rowIndex: number) => {
-      const rowKey = data[keyFieldIndex] as string;
-      return {
-        rowIndex,
-        rowKey,
-        sel: selected.includes(rowKey) ? 1 : 0,
-        ts: +new Date(),
-        updateType: "U",
-        viewPortId,
-        vpSize,
-        vpVersion: "",
-        data,
-      } as VuuRow;
+): MultiRowProjectorFactory;
+export function projectColumns(
+  keyFieldIndex: number,
+  viewPortId: string,
+  columns: string[],
+  columnMap: ColumnMap
+): MultiRowProjectorFactory;
+export function projectColumns(
+  keyFieldIndex: number,
+  viewPortId: string,
+  columns?: string[],
+  columnMap?: ColumnMap
+): MultiRowProjectorFactory {
+  console.log({
+    columns: columns?.join(","),
+    columnMap: JSON.stringify(columnMap),
+  });
+
+  if (columns === undefined && columnMap === undefined) {
+    return (selected: string[] = [], vpSize: number) =>
+      (data: VuuDataRow, rowIndex: number) => {
+        const rowKey = data[keyFieldIndex] as string;
+        return {
+          rowIndex,
+          rowKey,
+          sel: selected.includes(rowKey) ? 1 : 0,
+          ts: +new Date(),
+          updateType: "U",
+          viewPortId,
+          vpSize,
+          vpVersion: "",
+          data,
+        } as VuuRow;
+      };
+  } else if (columns && columnMap) {
+    const projectRowData = (data: VuuDataRow) => {
+      return columns.map((col) => data[columnMap[col]]);
     };
-};
+    return (selected: string[] = [], vpSize: number) =>
+      (data: VuuDataRow, rowIndex: number) => {
+        const rowKey = data[keyFieldIndex] as string;
+        return {
+          rowIndex,
+          rowKey,
+          sel: selected.includes(rowKey) ? 1 : 0,
+          ts: +new Date(),
+          updateType: "U",
+          viewPortId,
+          vpSize,
+          vpVersion: "",
+          data: projectRowData(data),
+        } as VuuRow;
+      };
+  } else {
+    throw Error(
+      "[columnUtils] projectColumns, if either columns or columnMap are provided, both must be provided"
+    );
+  }
+}
 
 export const projectColumn = (
   keyFieldIndex: number,

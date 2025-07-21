@@ -73,6 +73,7 @@ function generatePriceUpdates() {
 
   const data = PriceStore.getSnapshot("prices");
   const count = data.length;
+  // const count = 10;
 
   for (let i = 0; i < UPDATES_PER_BATCH; i++) {
     const rowIdx = random(0, count);

@@ -4,7 +4,6 @@ import type {
   ServerToClientTableRows,
 } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
-import ViewportContainer from "../ViewportContainer.ts";
 import logger from "../logger.ts";
 import { MessageQueue } from "../messageQueue.ts";
 import type { WebsocketData } from "../server.ts";
@@ -266,9 +265,9 @@ class Session implements ISession {
 
   kill() {
     console.log(`[Session] #${this.id} KILL`);
-    this.#viewports.forEach((viewportId) =>
-      ViewportContainer.closeViewport(viewportId)
-    );
+    // this.#viewports.forEach((viewportId) =>
+    // ViewportContainer.closeViewport(viewportId)
+    // );
     this.#ws.close();
   }
 }

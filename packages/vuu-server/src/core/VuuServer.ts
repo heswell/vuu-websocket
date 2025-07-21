@@ -1,54 +1,80 @@
 import { Table } from "@heswell/data";
-import { ViewServerModule } from "./module/VsModule";
-import { type VuuServerConfig } from "./VuuServerOptions";
-import moduleContainer from "./module/ModuleContainer";
-import run from "../server";
 import { isJoinTableDef, JoinTableDef, TableDef } from "../api/TableDef";
-import { IProvider } from "../Provider";
-import { ProviderContainer } from "../provider/ProviderContainer";
-import tableContainer from "./table/TableContainer";
 import { vuuInMemPlugin } from "../feature/inmem/VuuInMemPlugin";
-import joinTableProvider from "../provider/JoinTableProvider";
+import { IProvider } from "../provider/Provider";
+import { ProviderContainer } from "../provider/ProviderContainer";
+import run from "../server";
+import { RealizedViewServerModule, ViewServerModule } from "./module/VsModule";
+import { type VuuServerConfig } from "./VuuServerOptions";
+import { ViewportContainer } from "../viewport/ViewportContainer";
+
+import { JoinTableProvider } from "../provider/JoinTableProvider";
+import { ModuleContainer } from "./module/ModuleContainer";
+import { TableContainer } from "./table/TableContainer";
+import { CoreServerApiHandler } from "./CoreServerApiHandler";
+import { DataTable, isDataTable } from "./table/InMemDataTable";
 
 export class VuuServer {
-  private providerContainer: ProviderContainer;
+  protected providerContainer: ProviderContainer;
+  public joinProvider: JoinTableProvider;
+  public tableContainer: TableContainer;
+  public serverApi: CoreServerApiHandler;
+  public viewPortContainer: ViewportContainer;
+  public moduleContainer: ModuleContainer;
 
   constructor({ modules, ...config }: VuuServerConfig) {
-    this.providerContainer = new ProviderContainer();
+    this.joinProvider = new JoinTableProvider();
+    this.tableContainer = new TableContainer(this.joinProvider);
+    this.providerContainer = new ProviderContainer(this.joinProvider);
+    this.viewPortContainer = new ViewportContainer(
+      this.tableContainer,
+      this.providerContainer
+    );
+    this.moduleContainer = new ModuleContainer();
 
     modules.forEach(this.registerModule);
-  }
-
-  private createTable(moduleName: string, tableDef: TableDef) {
-    return vuuInMemPlugin.tableFactory(
-      moduleName,
-      tableDef,
-      tableContainer,
-      joinTableProvider
+    this.serverApi = new CoreServerApiHandler(
+      this.viewPortContainer,
+      this.tableContainer,
+      this.providerContainer
     );
   }
 
-  private createJoinTable(moduleName: string, joinTableDef: JoinTableDef) {
+  private createTable(tableDef: TableDef) {
+    console.log(`[VuuServer] createTable ${tableDef.name}`);
+    return vuuInMemPlugin.tableFactory(
+      tableDef,
+      this.tableContainer,
+      this.joinProvider
+    );
+  }
+
+  private createJoinTable(joinTableDef: JoinTableDef) {
     return vuuInMemPlugin.joinTableFactory(
-      moduleName,
       joinTableDef,
-      tableContainer,
-      joinTableProvider
+      this.tableContainer,
+      this.joinProvider
     );
   }
 
   private registerProvider(table: Table, provider: IProvider) {
-    console.log(`register provider for table ${table.name}`);
+    console.log(`[VuuServer] registerProvider for ${table.name} table`);
     this.providerContainer.add(table, provider);
+    if (isDataTable(table)) {
+      table.provider = provider;
+    }
   }
 
   private registerModule = (module: ViewServerModule) => {
-    // const realizedModule = new RealizedViewServerModule({
-    //   name: module.name,
-    //   tableDefs: module.tableDefs,
-    // });
+    const vs = this;
+    const realizedModule = new (class extends RealizedViewServerModule {
+      rpcHandlers = module.rpcHandlersUnrealized.map((rpcFunc) => rpcFunc(vs));
+    })({
+      name: module.name,
+      tableDefs: module.tableDefs,
+    });
 
-    moduleContainer.register(module);
+    this.moduleContainer.register(realizedModule);
 
     module.tableDefs.forEach((tableDef) => {
       console.log(
@@ -56,19 +82,31 @@ export class VuuServer {
       );
       tableDef.setModule(module);
       if (isJoinTableDef(tableDef)) {
-        const table = this.createJoinTable(module.name, tableDef);
+        const table = this.createJoinTable(tableDef);
+        console.log(
+          `[VuUServer] what do we do with this joun table we just created`
+        );
       } else {
-        const table = this.createTable(module.name, tableDef);
+        const table = this.createTable(tableDef);
         const provider = module.getProviderForTable(table);
         this.registerProvider(table, provider);
       }
     });
+
+    module.viewPortDefs.forEach((serviceFactory, tableName) => {
+      console.log(`[VuuServer] set serviceFactory for table ${tableName}`);
+      this.viewPortContainer.addViewPortDefinition(tableName, serviceFactory);
+    });
   };
+
+  startServer() {
+    run(this);
+  }
 
   start() {
     console.log("[VuuServer] start");
-    this.providerContainer.start();
-    moduleContainer.start();
-    run();
+    this.providerContainer.start(this.tableContainer);
+    this.moduleContainer.start();
+    this.startServer();
   }
 }

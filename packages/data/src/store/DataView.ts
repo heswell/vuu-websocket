@@ -44,7 +44,7 @@ export declare type DataViewEvents = {
 export default class DataView extends EventEmitter<DataViewEvents> {
   #config: WithFullConfig = vanillaConfig;
   #columnMap: ColumnMap;
-  #columns: TableColumn[];
+  #columns: string[];
   #id: string;
   #table: Table;
   #updateQueue: UpdateQueue;
@@ -70,12 +70,14 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       // visualLink: config.visualLink || this.#config.visualLink,
     };
 
+    console.log(`DataView columns = ${this.#config.columns.join(",")}`);
+
     this.#table = table;
     this.#updateQueue = updateQueue;
     this.#columnMap = buildColumnMap(this.#config.columns);
-    this.#columns = this.#config.columns.map(toColumn);
+    this.#columns = this.#config.columns;
 
-    const rowSet = new RowSet(id, table, this.columns, { range });
+    const rowSet = new RowSet(id, table, this.#config.columns, { range });
     // TODO we should pass columns into the rowset as it will be needed for computed columns
     this.rowSet =
       this.groupBy.length === 0
@@ -106,7 +108,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   }
 
   get columns() {
-    return this.#columns;
+    return this.#columns.map(toColumn);
   }
   get hasFilter() {
     return this.#config.filterSpec.filter !== "";
@@ -134,11 +136,11 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.insert(rowIdx, row);
-    logger.info(
-      `[DataView:${this.#table.schema.table.table}] rowInserted ${
-        rows.length
-      } to be returned (rowSet range ${JSON.stringify(this.rowSet.range)})`
-    );
+    // logger.info(
+    //   `[DataView:${this.#table.schema.table.table}] rowInserted ${
+    //     rows.length
+    //   } to be returned (rowSet range ${JSON.stringify(this.rowSet.range)})`
+    // );
     this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
@@ -147,10 +149,9 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
-  private rowUpdated: RowUpdateHandler = (idx, updates) => {
+  private rowUpdated: RowUpdateHandler = (idx, vuuDataRow) => {
     const { rowSet } = this;
-    const dataResponse = rowSet.update(idx, updates);
-
+    const dataResponse = rowSet.update(idx, vuuDataRow);
     if (dataResponse) {
       if (rowSet instanceof RowSet) {
         const { rows, size } = dataResponse;
@@ -168,7 +169,9 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   }
 
   // this should be invoked by setting the options
-  changeViewport(options: VuuViewportChangeRequest): DataResponse | undefined {
+  changeViewport(
+    options: Omit<VuuViewportChangeRequest, "viewPortId">
+  ): DataResponse | undefined {
     // console.log({ options, config: this.#config });
     const { noChanges, ...changes } = isConfigChanged(this.#config, options);
 
@@ -341,12 +344,5 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   protected enqueue(_messageBody: ServerMessageBody) {
     console.log(`DataView enqueue should be overridden`);
-  }
-  protected enqueueDataMessages(
-    _rows: VuuRow[],
-    _vpSize: number,
-    _viewPortId: string
-  ) {
-    console.log(`DataView enqueueDataMessages should be overridden`);
   }
 }

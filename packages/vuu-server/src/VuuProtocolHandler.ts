@@ -22,78 +22,10 @@ import {
   ClientToServerSelection,
   VuuRow,
 } from "@vuu-ui/vuu-protocol-types";
-import ViewportContainer from "./ViewportContainer.ts";
+// import ViewportContainer from "./viewport/ViewportContainer.ts";
 import { tableRowsMessageBody } from "@heswell/data";
-import ModuleContainer from "./core/module/ModuleContainer.ts";
-import tableContainer from "./core/table/TableContainer.ts";
-
-const GET_TABLE_LIST: VuuProtocolHandler = (message, session) => {
-  session.enqueue(message.requestId, {
-    type: "TABLE_LIST_RESP",
-    tables: ModuleContainer.tableList,
-  });
-};
-
-const GET_TABLE_META: VuuProtocolHandler = (message, session) => {
-  const { table } = message.body as VuuTableMetaRequest;
-  const schema = ModuleContainer.getTableSchema(table);
-  session.enqueue(message.requestId, {
-    columns: schema.columns.map((col) => col.name),
-    dataTypes: schema.columns.map((col) => col.serverDataType),
-    key: schema.key,
-    type: "TABLE_META_RESP",
-    table: schema.table,
-  });
-};
-
-const CREATE_VP: VuuProtocolHandler = (message, session) => {
-  const body = message.body as VuuViewportCreateRequest;
-  const { table: vuuTable } = body;
-  const table = tableContainer.getTable(vuuTable.table);
-
-  logger.info({ session: session.id, vuuTable }, "CREATE_VP");
-  const start = performance.now();
-  const viewport = ViewportContainer.createViewport(session, table, body);
-  // why do we need this ?
-  session.addViewport(viewport.id);
-
-  const end1 = performance.now();
-
-  session.enqueue(message.requestId, {
-    ...body,
-    table: table.name,
-    type: "CREATE_VP_SUCCESS",
-    viewPortId: viewport.id,
-  });
-
-  const { rows, size } = viewport.getDataForCurrentRange();
-  logger.info(
-    { session: session.id, vuuTable },
-    `CREATE_VP ${rows.length} rows of ${size} (range ${body.range.from}:${
-      body.range.to
-    }) keys: #${rows[0]?.rowKey} - ${rows.at(-1)?.rowKey}, indices [${
-      rows[0]?.rowIndex
-    }] = [${rows.at(-1)?.rowIndex}]`
-  );
-
-  enqueueDataMessages(rows, size, session, viewport.id, true);
-
-  const end2 = performance.now();
-  console.log(
-    `[CREATE_VP_SUCCESS] create vp took ${
-      end1 - start
-    } ms , including response queing ${end2 - start} ms`
-  );
-  // } else {
-  //   const key = asTableKey(message.body.table);
-  //   const queuedSubscription =
-  //     _queuedSubscriptions[key] || (_queuedSubscriptions[key] = []);
-  //   queuedSubscription.push({ message, session });
-  //   console.log(
-  //     `queued subscriptions for ${key} = ${queuedSubscription.length}`
-  //   );
-  // }
-};
+// import ModuleContainer from "./core/module/ModuleContainer.ts";
+// import tableContainer from "./core/table/TableContainer.ts";
 
 const REMOVE_VP: VuuProtocolHandler = (message, session) => {
   const { viewPortId } = message.body as VuuViewportRemoveRequest;
@@ -106,58 +38,11 @@ const REMOVE_VP: VuuProtocolHandler = (message, session) => {
   });
 };
 
-const CHANGE_VP: VuuProtocolHandler = (message, session) => {
-  // should be purge the queue of any pending updates outside the requested range ?
-  const body = message.body as VuuViewportChangeRequest;
-
-  session.enqueue(message.requestId, {
-    ...body,
-    type: "CHANGE_VP_SUCCESS",
-  });
-
-  const { viewPortId } = body;
-  const viewport = ViewportContainer.getViewport(viewPortId);
-  if (viewport) {
-    const dataResponse = viewport.changeViewport(body);
-    if (dataResponse) {
-      const { rows, size, sizeMessageRequired } = dataResponse;
-      enqueueDataMessages(rows, size, session, viewPortId, sizeMessageRequired);
-    }
-  }
-};
-
-const CHANGE_VP_RANGE: VuuProtocolHandler = (message, session) => {
-  const { from, to, viewPortId } = message.body as VuuViewportRangeRequest;
-  // should be purge the queue of any pending updates outside the requested range ?
-  session.enqueue(message.requestId, {
-    from,
-    to,
-    type: "CHANGE_VP_RANGE_SUCCESS",
-    viewPortId,
-  });
-
-  const viewport = ViewportContainer.getViewport(viewPortId);
-  if (viewport) {
-    const { rows, size } = viewport.setRange({ from, to });
-    logger.info(
-      { session: session.id, viewport: viewPortId },
-      `[VuuProtocolHandler] CHANGE_VP_RANGE ${from}:${to}, ${
-        rows.length
-      } rows of ${size}, keys: #${rows[0]?.rowKey} - ${
-        rows.at(-1)?.rowKey
-      }, indices [${rows[0]?.rowIndex}] = [${rows.at(-1)?.rowIndex}]`
-    );
-    enqueueDataMessages(rows, size, session, viewPortId);
-  } else {
-    throw Error(`[VuuProtocolHandler] no viewport for id #${viewPortId}`);
-  }
-};
-
 const GET_VP_VISUAL_LINKS: VuuProtocolHandler = (message, session) => {
   const { vpId } = message.body as VuuViewportVisualLinksRequest;
   // Get the visualLinks from the viewportContainer
   console.log(JSON.stringify(message));
-  const viewport = ViewportContainer.getViewport(vpId);
+  const viewport = ViewportContainer.getViewportById(vpId);
   const vuuLinks = ModuleContainer.getLinks(viewport.table.schema.table);
   if (vuuLinks) {
     const links = ViewportContainer.getVisualLinks(vpId, vuuLinks);
@@ -189,7 +74,7 @@ const REMOVE_VISUAL_LINK: VuuProtocolHandler = (message, session) => {
 
 const GET_VIEW_PORT_MENUS: VuuProtocolHandler = (message, session) => {
   const { vpId } = message.body as VuuViewportMenusRequest;
-  const viewport = ViewportContainer.getViewport(vpId);
+  const viewport = ViewportContainer.getViewportById(vpId);
   const menu = ModuleContainer.getMenu(viewport.table.schema.table);
 
   if (menu) {
@@ -205,7 +90,7 @@ const VIEW_PORT_MENUS_SELECT_RPC: VuuProtocolHandler = (message, session) => {
   const { vpId, rpcName } = message.body as ClientToServerMenuSelectRPC;
   if (rpcName === "VP_BULK_EDIT_BEGIN_RPC") {
     // we need the selected rows from the target viewport
-    const viewport = ViewportContainer.getViewport(vpId);
+    const viewport = ViewportContainer.getViewportById(vpId);
     const sessionTable =
       ModuleContainer.createSessionTableFromSelectedRows(viewport);
 
@@ -226,34 +111,35 @@ const RPC_CALL: VuuProtocolHandler<VuuRpcServiceRequest> = (
   message,
   session
 ) => {
-  const { body, module } = message;
+  const { body, module: moduleName } = message;
   const messageBody = body as VuuRpcServiceRequest;
   const { method, service } = messageBody;
   console.log(
-    `[VuuProtocolHandler] RPC_CALL <${module}> get handler for ${service} ${JSON.stringify(
+    `[VuuProtocolHandler] RPC_CALL <${moduleName}> get handler for ${service} ${JSON.stringify(
       message,
       null,
       2
     )}`
   );
-  const rpcHandler = ModuleContainer.getRpcHandler(module, service, method);
-  if (rpcHandler) {
-    // TODO should it be async ?
-    const start = performance.now();
-    const result = rpcHandler.handleRpcCall(messageBody);
-    const end = performance.now();
-    console.log(`typeaheadService took ${end - start}ms`);
-    session.enqueue(message.requestId, {
-      method,
-      result,
-      type: "RPC_RESP",
-    });
-  }
+  const module = ModuleContainer.get(moduleName);
+
+  const rpcHandler = module.rpcHandlerByService(service);
+  // TODO should it be async ?
+  const start = performance.now();
+  const result = rpcHandler.handleRpcCall(messageBody) as string[];
+  const end = performance.now();
+  console.log(`typeaheadService took ${end - start}ms`);
+  session.enqueue(message.requestId, {
+    error: null,
+    method,
+    result,
+    type: "RPC_RESP",
+  });
 };
 
 const VIEW_PORT_RPC_CALL: VuuProtocolHandler = (message, session) => {
   const { namedParams, rpcName, vpId } = message.body as VuuRpcViewportRequest;
-  const { table } = ViewportContainer.getViewport(vpId);
+  const { table } = ViewportContainer.getViewportById(vpId);
   console.log(
     `VIEW_PORT_RPC_CALL rpcName ${rpcName} ${JSON.stringify(message)} table ${
       table.schema.table.table
@@ -297,7 +183,7 @@ const VIEW_PORT_RPC_CALL: VuuProtocolHandler = (message, session) => {
 
 const VP_EDIT_CELL_RPC: VuuProtocolHandler = (message, session) => {
   const { field, rowKey, value, vpId } = message.body as VuuRpcEditCellRequest;
-  const { table } = ViewportContainer.getViewport(vpId);
+  const { table } = ViewportContainer.getViewportById(vpId);
   const rowIdx = table.rowIndexAtKey(rowKey);
   const colIdx = table.columnMap[field];
   // apply update, will enqueue update
@@ -314,23 +200,16 @@ const VP_EDIT_CELL_RPC: VuuProtocolHandler = (message, session) => {
   });
 };
 
-const SET_SELECTION: VuuProtocolHandler = (message, session) => {
-  const { selection, vpId } = message.body as ClientToServerSelection;
-  const viewport = ViewportContainer.getViewport(vpId);
-  const { rows, size } = viewport.select(selection);
-  enqueueDataMessages(rows, size, session, vpId);
-};
-
 const OPEN_TREE_NODE: VuuProtocolHandler = (message, session) => {
   const { treeKey, vpId } = message.body as ClientToServerOpenTreeNode;
-  const viewport = ViewportContainer.getViewport(vpId);
+  const viewport = ViewportContainer.getViewportById(vpId);
   const { rows, size } = viewport.openTreeNode(treeKey);
   enqueueDataMessages(rows, size, session, vpId);
 };
 
 const CLOSE_TREE_NODE: VuuProtocolHandler = (message, session) => {
   const { treeKey, vpId } = message.body as ClientToServerCloseTreeNode;
-  const viewport = ViewportContainer.getViewport(vpId);
+  const viewport = ViewportContainer.getViewportById(vpId);
   const { rows, size } = viewport.closeTreeNode(treeKey);
   enqueueDataMessages(rows, size, session, vpId);
 };

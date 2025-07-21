@@ -1,3 +1,4 @@
+import { VuuServer } from "./core/VuuServer";
 import { ServerMessagingConfig } from "./server-types";
 import { websocketConnectionHandler } from "./websocket-connection-handler";
 import { uuid } from "@vuu-ui/vuu-utils";
@@ -18,7 +19,7 @@ export interface WebsocketData {
   sessionId: string;
 }
 
-export default async function start() {
+export default async function start(vuuServer: VuuServer) {
   const websocketServer = Bun.serve({
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",
@@ -38,7 +39,7 @@ export default async function start() {
       // handle HTTP request normally
       return new Response("Hello world!");
     },
-    websocket: websocketConnectionHandler(msgConfig),
+    websocket: websocketConnectionHandler(msgConfig, vuuServer),
   });
 
   console.log(

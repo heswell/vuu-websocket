@@ -1,7 +1,6 @@
 import { Table } from "@heswell/data";
-import { ViewServerModule } from "./core/module/VsModule";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
-import { type TableContainer } from "./core/table/TableContainer";
+import { type TableContainer } from "../core/table/TableContainer";
 import { loadTableFromRemoteResource } from "@heswell/service-utils";
 
 export interface IProvider {

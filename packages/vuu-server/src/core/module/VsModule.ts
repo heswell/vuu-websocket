@@ -1,56 +1,27 @@
 import { Table } from "@heswell/data";
-import { IProvider } from "../../Provider";
+import { IProvider } from "../../provider/Provider";
 import { VuuLink } from "@vuu-ui/vuu-protocol-types";
 import { IService, ServiceMessage } from "../../Service";
-import { RpcHandler, RpcRegistry } from "../../RpcRegistry";
 import { TableDef } from "../../api/TableDef";
-import tableContainer from "../table/TableContainer";
+import { RpcHandler, RpcHandlerFunc } from "../../net/rpc/RpcHandler";
+import { ServiceFactory } from "./ModuleFactory";
 
 export interface ModuleConstructorProps {
   name: string;
   tableDefs: TableDef[];
 }
 
-/** 
- Recursive function that loads providers respecting the declared
- dependencies. Guarantees that dependencies are loaded before
- dependents.
-*/
-const loadProviders = (
-  providers: IProvider[],
-  module: ViewServerModule,
-  loaded: string[] = []
-): Promise<string[]> =>
-  new Promise(async (resolve, reject) => {
-    const unloadedProviders = providers.filter((provider) => !provider.loaded);
-    const readyToLoad = unloadedProviders.filter((provider) => {
-      return true;
-    });
-
-    console.log(`[ViewServerModule] loadProviders ${module.name} 
-      loaded ${loaded.join(",")}
-      readyToLoad ${readyToLoad.map((m) => m.table.name).join(",")}
-      `);
-
-    const loadingProviders: Array<Promise<void>> = [];
-    for (const provider of readyToLoad) {
-      loadingProviders.push(provider.load(tableContainer));
-    }
-    await Promise.all(loadingProviders);
-    loaded = loaded.concat(readyToLoad.map(({ table }) => table.name));
-    if (loaded.length === providers.length) {
-      resolve(loaded);
-    } else {
-      return loadProviders(providers, module, loaded);
-    }
-  });
-
 export class ViewServerModule {
   #name: string;
   #tableDefs: TableDef[];
   #links = new Map<string, VuuLink[]>();
-  #rpcRegistry = new RpcRegistry();
   #services = new Map<string, IService>();
+
+  // this will be overridden at class creation time, see ModuleFactory
+  rpcHandlersUnrealized: RpcHandlerFunc[] = [];
+
+  // this will be overridden at class creation time, see ModuleFactory
+  viewPortDefs: Map<string, ServiceFactory> = new Map();
 
   constructor({ name, tableDefs }: ModuleConstructorProps) {
     this.#name = name;
@@ -59,18 +30,6 @@ export class ViewServerModule {
 
   get name() {
     return this.#name;
-  }
-
-  addRpcHandler(rpcHandler: RpcHandler) {
-    // console.log(`[Module] #${this.#name} addRpcHandler`, {
-    //   rpcHandler,
-    // });
-
-    const { serviceName, methods } = rpcHandler;
-    this.#rpcRegistry.register(serviceName, rpcHandler, methods);
-  }
-  getRpcHandler(serviceName: string, method: string) {
-    return this.#rpcRegistry.getHandler(serviceName, method);
   }
 
   private getTableDef(tableName: string) {
@@ -100,11 +59,6 @@ export class ViewServerModule {
 
   async start() {
     console.log(`[Module] start #${this.#name}`);
-    // let providers = Array.from(this.#providers.values());
-
-    // await loadProviders(providers, this);
-
-    // console.log(`[${this.name}] all tables loaded`);
   }
 
   get tableDefs() {
@@ -170,7 +124,21 @@ export class ViewServerModule {
 }
 
 export class RealizedViewServerModule extends ViewServerModule {
+  rpcHandlers: RpcHandler[] = [];
   constructor(props: ModuleConstructorProps) {
     super(props);
+  }
+
+  rpcHandlerByService(service: string): RpcHandler {
+    const rpcHandler = this.rpcHandlers.find((rpcHandler) =>
+      rpcHandler.implementsService(service)
+    );
+    if (rpcHandler) {
+      return rpcHandler;
+    } else {
+      throw Error(
+        `[RealizedViewServerModule] no rpcHandler for service '${service}'`
+      );
+    }
   }
 }

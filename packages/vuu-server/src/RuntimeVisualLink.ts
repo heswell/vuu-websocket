@@ -1,4 +1,4 @@
-import { Viewport } from "./ViewportContainer";
+import { Viewport } from "./viewport/ViewportContainer";
 import { SelectionEventHandler } from "@heswell/data/src/store/DataView";
 
 export class RuntimeVisualLink {

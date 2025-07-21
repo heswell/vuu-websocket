@@ -1,9 +1,8 @@
 import { DataTableDefinition } from "@heswell/vuu-server";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
-import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
-import logger from "../logger.ts";
 import type { JoinEventType, JoinTableProvider } from "@heswell/vuu-server";
 
 // export type TableIndex = Map<string, number>;
@@ -131,22 +130,13 @@ export class Table extends EventEmitter<TableEvents> {
       this.insert(newRow, emitEvent);
     } else {
       const row = this.rows[rowIdx];
-
-      const results = [] as UpdateResultTuple;
-      for (let i = 0, pos = 0; i < newRow.length; i++) {
-        if (i !== indexOfKeyField && newRow[i] !== row[i]) {
-          results[pos] = i;
-          results[pos + 1] = row[i];
-          results[pos + 2] = row[i] = newRow[i];
-          pos += 2;
-        }
-      }
-
+      // check for differences ?
+      this.rows[rowIdx] = newRow;
       // why not just ensure join table is listening to the rowUpdated event
-      this.sendToJoinSink("update", key, row);
+      this.sendToJoinSink("update", key, newRow);
 
-      if (emitEvent && results.length > 0) {
-        this.emit("rowUpdated", rowIdx, results);
+      if (emitEvent) {
+        this.emit("rowUpdated", rowIdx, newRow);
       }
     }
   }

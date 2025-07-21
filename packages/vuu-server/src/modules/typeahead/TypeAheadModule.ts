@@ -1,11 +1,12 @@
-import { Module, ModuleContainer } from "@heswell/vuu-server";
+import { TableContainer } from "@heswell/vuu-server";
 import { VuuRpcServiceRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
-import type { TableContainer } from "../../core/module/ModuleContainer";
-import { RpcHandler } from "../../RpcRegistry";
+import { ModuleFactory } from "@heswell/vuu-server";
+import { RpcHandler } from "../../net/rpc/RpcHandler";
 
-class TypeAheadRpcHandler implements RpcHandler {
+class TypeAheadRpcHandler extends RpcHandler {
   #tableContainer: TableContainer;
   constructor(tableContainer: any) {
+    super();
     this.#tableContainer = tableContainer;
   }
 
@@ -33,7 +34,7 @@ class TypeAheadRpcHandler implements RpcHandler {
     console.log(
       `[TypeAheadRpcHandler] getUniqueFieldValues col: ${column} (${vuuTable.table})`
     );
-    const table = this.#tableContainer.getTable(vuuTable);
+    const table = this.#tableContainer.getTable(vuuTable.table);
     return table.getUniqueValuesForColumn(column).slice(0, 10);
   }
 
@@ -45,12 +46,18 @@ class TypeAheadRpcHandler implements RpcHandler {
     console.log(
       `[TypeAheadRpcHandler] getUniqueFieldValuesStartingWith ${pattern} col: ${column} (${vuuTable.table})`
     );
-    const table = this.#tableContainer.getTable(vuuTable);
+    const table = this.#tableContainer.getTable(vuuTable.table);
     return table.getUniqueValuesForColumn(column, pattern).slice(0, 10);
+  }
+
+  implementsService(serviceName: string) {
+    return serviceName === this.serviceName;
   }
 }
 
 export const TypeAheadModule = () =>
-  ModuleContainer.withNameSpace("TYPEAHEAD")
-    .addRpcHandler((tableContainer) => new TypeAheadRpcHandler(tableContainer))
+  ModuleFactory.withNameSpace("TYPEAHEAD")
+    .addRpcHandler(
+      (vuuServer) => new TypeAheadRpcHandler(vuuServer.tableContainer)
+    )
     .asModule();

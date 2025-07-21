@@ -1,5 +1,7 @@
 import { Table } from "@heswell/data";
 import { RpcNamedParams, VuuMenu } from "@vuu-ui/vuu-protocol-types";
+import { ProviderContainer } from "./provider/ProviderContainer";
+import { ViewPortDef } from "./api/ViewPortDef";
 
 export interface ServiceMessage {
   name: string;
@@ -10,8 +12,6 @@ export interface IService {
   getMenu(): VuuMenu | undefined;
   invokeService(message: ServiceMessage): unknown;
 }
-
-export type ServiceFactory = (table: Table) => IService;
 
 export abstract class Service implements IService {
   #table: Table;

@@ -10,16 +10,7 @@ class JoinDefToJoinTable {
 }
 
 export class JoinTableProvider {
-  static #instance: JoinTableProvider;
-
-  public static get instance(): JoinTableProvider {
-    if (!JoinTableProvider.#instance) {
-      JoinTableProvider.#instance = new JoinTableProvider();
-    }
-    return JoinTableProvider.#instance;
-  }
-
-  private constructor() {
+  constructor() {
     console.log("create JoinTableProvider");
   }
 
@@ -70,5 +61,3 @@ export class JoinTableProvider {
     });
   }
 }
-
-export default JoinTableProvider.instance;

@@ -13,7 +13,7 @@ export const parentOrders = TableDef({
     { name: "account", dataType: "string" },
     { name: "trader", dataType: "string" },
     { name: "created", dataType: "long" },
-    { name: "lastUpdated", dataType: "long" },
+    { name: "lastUpdate", dataType: "long" },
     { name: "column13", dataType: "double" },
     { name: "column14", dataType: "double" },
     { name: "column15", dataType: "double" },

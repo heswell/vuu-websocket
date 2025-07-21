@@ -1,5 +1,6 @@
 import {
   ClientMessageBody,
+  ClientToServerLogin,
   ServerMessageBody,
   ServerToClientTableRows,
   VuuClientMessage,
@@ -74,8 +75,10 @@ export interface ISession {
   enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
   dequeueAllMessages: () => null | VuuServerMessage[];
   kill: () => void;
+  login: (requestId: string, message: ClientToServerLogin) => void;
   readonly id: string;
   readonly clientUnresponsive?: boolean;
+  incomingHeartbeat?: number;
   outgoingHeartbeat?: number;
   readonly viewports: string[];
   readonly ws: ServerWebSocket;

@@ -1,15 +1,12 @@
-import {
-  Clock,
-  accurateTimer,
-  getRandom,
-  random,
-} from "@heswell/service-utils";
+import { accurateTimer, getRandom, random } from "@heswell/service-utils";
+import { Clock } from "@vuu-ui/vuu-utils";
 import OrderStore from "./OrderStore";
 import logger from "./logger";
 import { ParentOrder, ParentOrderDto } from "./order-service-types";
 
 let parentOrderId = 0;
-let lastTime = Clock.baseTime;
+
+const clock = new Clock({ year: 2025, month: 4, day: 15, hours: 9 });
 
 const initialParentOrderCount = 10_000;
 // const initialParentOrderCount = 10;
@@ -54,10 +51,12 @@ let count = 0;
 let ordersPerSecondCount = 0;
 
 function createOrder(
-  created = lastTime,
+  created: number,
   status = getRandom(orderStatus) as ParentOrderDto["status"]
 ) {
-  const id = `${parentOrderId++}`;
+  parentOrderId += 1;
+
+  const id = `${parentOrderId.toString().padStart(8, "0")}`;
   const side = getRandom(sides);
   const algo = getRandom(algos);
   const quantity = 1000 * random(1, 100);
@@ -69,7 +68,7 @@ function createOrder(
       : quantity - random(100, quantity);
   const account = getRandom(accounts);
   const trader = "trader joe";
-  const lastUpdated = created;
+  const lastUpdate = created;
   const column13 = 0;
   const column14 = 0;
   const column15 = 0;
@@ -115,7 +114,7 @@ function createOrder(
     account,
     trader,
     created,
-    lastUpdated,
+    lastUpdate,
     column13,
     column14,
     column15,
@@ -149,11 +148,12 @@ function createOrder(
 
 function createInitialSnapshot() {
   const start = performance.now();
-  const created = Date.now();
 
   for (let i = 0; i < initialParentOrderCount; i++) {
-    OrderStore.addParentOrder(createOrder(created));
-    lastTime += 10;
+    const order = createOrder(clock.now);
+    OrderStore.addParentOrder(order);
+    clock.advance(random(0, 100));
+    console.log(`${clock} ${order.id}`);
   }
 
   const end = performance.now();
@@ -175,11 +175,9 @@ let newOrderCreationRunning = false;
 let currentNewOrderTimer: number | Timer | null = null;
 
 function createNewOrders() {
-  // TODO can we have sub-ms times ?
-  // const time = Clock.currentTime;
-  const created = Date.now();
-
   const { NEW_ORDER_LOOP_INTERVAL, ORDERS_PER_BATCH } = NewOrderCreationParams;
+  clock.advance(NEW_ORDER_LOOP_INTERVAL);
+  const created = clock.now;
 
   console.log(
     `[ORDERS:service:order-factory] per loop  (${NEW_ORDER_LOOP_INTERVAL}ms) create ${ORDERS_PER_BATCH} new orders)`
@@ -205,7 +203,7 @@ function logOrderCreationRate() {
 }
 
 createInitialSnapshot();
-startNewOrderCreation({ newOrdersPerSecond: 5 });
+// startNewOrderCreation({ newOrdersPerSecond: 5 });
 
 export function startNewOrderCreation({
   newOrdersPerSecond = 1,
@@ -234,8 +232,6 @@ export function stopNewOrderCreation() {
     currentNewOrderTimer = null;
   }
 }
-
-setTimeout(createNewOrders, 10);
 
 accurateTimer(logOrderCreationRate, 1000);
 

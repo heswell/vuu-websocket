@@ -14,13 +14,13 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@vuu-ui/vuu-filter-parser": "0.9.2",
-    "@vuu-ui/vuu-utils": "0.9.2"
+    "@vuu-ui/vuu-filter-parser": "0.13.13",
+    "@vuu-ui/vuu-utils": "0.13.13"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "0.9.2",
-    "@vuu-ui/vuu-filter-types": "0.9.2",
-    "@vuu-ui/vuu-protocol-types": "0.9.2",
+    "@vuu-ui/vuu-data-types": "0.13.13",
+    "@vuu-ui/vuu-filter-types": "0.13.13",
+    "@vuu-ui/vuu-protocol-types": "0.13.13",
     "react-jsx-runtime": "^1.0.0-alpha.1"
   }
 }

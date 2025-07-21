@@ -1,6 +1,6 @@
 import { Provider } from "@heswell/vuu-server";
 import logger from "../../../logger";
-import { ResourceMessage, SnapshotBatch } from "@heswell/service-utils";
+import { ResourceMessage, SnapshotBatch, Upsert } from "@heswell/service-utils";
 
 const ordersServiceUrl = `ws://localhost:${process.env.ORDERS_URL}`;
 let messageCount = 0;
@@ -16,37 +16,32 @@ export class ParentOrdersProvider extends Provider {
         try {
           const socket = new WebSocket(ordersServiceUrl);
           socket.addEventListener("message", (evt) => {
-            const orderServiceMessage = JSON.parse(evt.data as string) as
+            const serviceMessage = JSON.parse(evt.data as string) as
               | ResourceMessage
               | { type: "HB" };
-            logger.info(
-              { orderServiceMessage },
-              `[ORDERS:module:ParentOrdersModule] IN `
-            );
-            if (Array.isArray(orderServiceMessage)) {
+            if (Array.isArray(serviceMessage)) {
               console.log(
-                `[ORDERS:module:ParentOrdersModule] ${orderServiceMessage.length} messages from OrdersService`
+                `[ORDERS:module:ParentOrdersModule] ${serviceMessage.length} messages from OrdersService`
               );
-              for (const message of orderServiceMessage) {
-                const { rows: data } = message as SnapshotBatch;
-                logger.info(
-                  `[ORDERS:module:ParentOrdersModule] table.upsert ${data[0]}`
-                );
-                this.table.upsert(data);
+              for (const message of serviceMessage) {
+                const { row } = message as Upsert;
+                console.log(row.join(","));
+
+                this.table.upsert(row);
                 messageCount += 1;
               }
             } else {
               // TODO does this make sense - is there a distinction between
               // initial load and any other insert/update ?
-              if (orderServiceMessage.type === "HB") {
+              if (serviceMessage.type === "HB") {
                 socket.send(`{"type": "HB", "ts": ${Date.now()}}`);
-              } else if (orderServiceMessage.type === "snapshot-batch") {
-                for (const row of orderServiceMessage.rows) {
+              } else if (serviceMessage.type === "snapshot-batch") {
+                for (const row of serviceMessage.rows) {
                   this.table.upsert(row);
                 }
-              } else if (orderServiceMessage.type === "snapshot-count") {
+              } else if (serviceMessage.type === "snapshot-count") {
                 logger.info(
-                  `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${orderServiceMessage.count} rows loaded`
+                  `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${serviceMessage.count} rows loaded`
                 );
                 this.loaded = true;
                 resolve();
@@ -55,7 +50,7 @@ export class ParentOrdersProvider extends Provider {
                 //   messageCount += 1;
               } else {
                 console.log(
-                  `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${orderServiceMessage.type}'`
+                  `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${serviceMessage.type}'`
                 );
               }
             }

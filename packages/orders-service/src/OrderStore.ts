@@ -67,11 +67,11 @@ export class OrderStore implements IDataStore, IDequeue<ResourceMessage> {
   }
 
   get hasUpdates() {
-    console.log(
-      `[ORDERS:service:OrderStore] hasUpdates ? ququq length = ${
-        this.#queue.length
-      }`
-    );
+    // console.log(
+    //   `[ORDERS:service:OrderStore] hasUpdates ? ququq length = ${
+    //     this.#queue.length
+    //   }`
+    // );
     return this.#queue.length > 0;
   }
 
@@ -99,8 +99,8 @@ export class OrderStore implements IDataStore, IDequeue<ResourceMessage> {
     if (publishMessage) {
       this.#queue.push({
         type: "insert",
-        tableName: "parentOrders",
-        data: dataRow,
+        resource: "parentOrders",
+        row: dataRow,
       });
     }
   }

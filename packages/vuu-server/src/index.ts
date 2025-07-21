@@ -1,8 +1,9 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
-export { default as ModuleContainer } from "./core/module/ModuleContainer";
 export type { TableContainer } from "./core/table/TableContainer";
+export type { ProviderContainer } from "./provider/ProviderContainer";
 export { TypeAheadModule } from "./modules/typeahead/TypeAheadModule";
-export { Provider } from "./Provider";
+export { Provider, RemoteProvider } from "./provider/Provider";
+export { RpcHandler } from "./net/rpc/RpcHandler";
 export type {
   JoinTableProvider,
   JoinEventType,
@@ -14,7 +15,8 @@ export type {
 } from "./server-types";
 export { Service } from "./Service";
 export * from "./api/TableDef";
-export { default as ViewportContainer } from "./ViewportContainer";
+export * from "./api/ViewPortDef";
 export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
 export { ModuleFactory } from "./core/module/ModuleFactory";
+export { websocketConnectionHandler } from "./websocket-connection-handler";

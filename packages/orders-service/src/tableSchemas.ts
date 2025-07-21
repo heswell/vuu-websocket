@@ -30,7 +30,7 @@ export const parentOrdersSchema: TableSchema = {
     { name: "account", serverDataType: "string" },
     { name: "trader", serverDataType: "string" },
     { name: "created", serverDataType: "long" },
-    { name: "lastUpdated", serverDataType: "long" },
+    { name: "lastUpdate", serverDataType: "long" },
     { name: "column13", serverDataType: "double" },
     { name: "column14", serverDataType: "double" },
     { name: "column15", serverDataType: "double" },

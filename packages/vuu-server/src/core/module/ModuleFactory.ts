@@ -1,13 +1,22 @@
-import { IProvider, ProviderFactory } from "../../Provider";
-import { ServiceFactory } from "../../Service";
+import { IProvider, Provider, ProviderFactory } from "../../provider/Provider";
 import { TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
 import tableDefContainer from "./TableDefContainer";
-import { VuuServer } from "../VuuServer";
 import { Table } from "@heswell/data";
+import { ProviderContainer } from "../../provider/ProviderContainer";
+import { ViewPortDef } from "../../api/ViewPortDef";
+import { TableContainer } from "../table/TableContainer";
+import { RpcHandlerFunc } from "../../net/rpc/RpcHandler";
 
 export type TableDefTuple = [TableDef, ProviderFactory];
+
+export type ServiceFactory = (
+  table: Table,
+  provider: Provider,
+  providerContainer: ProviderContainer,
+  tableContainer: TableContainer
+) => ViewPortDef;
 
 export interface TableDefs {
   add: (tableDef: TableDef, providerFactory: ProviderFactory) => TableDefs;
@@ -65,17 +74,43 @@ export function TableDefs(
   };
 }
 
-function ModuleFactoryNode(tableDefs: TableDefs, moduleName: string) {
+function ModuleFactoryNode(
+  tableDefs: TableDefs,
+  rpcHandlers: RpcHandlerFunc[],
+  viewPortDefs: Map<string, ServiceFactory>,
+  moduleName: string
+) {
   return {
     addTable: (
       tableDef: TableDef,
       providerFactory: ProviderFactory,
       serviceFactory?: ServiceFactory
-    ) =>
-      ModuleFactoryNode(tableDefs.add(tableDef, providerFactory), moduleName),
-
+    ) => {
+      if (serviceFactory) {
+        viewPortDefs.set(tableDef.name, serviceFactory);
+      }
+      return ModuleFactoryNode(
+        tableDefs.add(tableDef, providerFactory),
+        rpcHandlers,
+        viewPortDefs,
+        moduleName
+      );
+    },
     addJoinTable: (func: TableJoinFactory) =>
-      ModuleFactoryNode(tableDefs.addJoin(func), moduleName),
+      ModuleFactoryNode(
+        tableDefs.addJoin(func),
+        rpcHandlers,
+        viewPortDefs,
+        moduleName
+      ),
+
+    addRpcHandler: (rpcFunc: RpcHandlerFunc) =>
+      ModuleFactoryNode(
+        tableDefs,
+        rpcHandlers.concat(rpcFunc),
+        viewPortDefs,
+        moduleName
+      ),
 
     asModule(): ViewServerModule {
       const baseTables = tableDefs.tableDefsAndProviders;
@@ -88,6 +123,10 @@ function ModuleFactoryNode(tableDefs: TableDefs, moduleName: string) {
       tableDefs.joinDefFuncs.forEach((toJTFunc) => {
         const realizedJoinTable = toJTFunc(tableDefContainer);
         mutableTableDefs = mutableTableDefs.addRealized(realizedJoinTable);
+      });
+
+      console.log(`[ModuleFactory] as Module`, {
+        viewPortDefs,
       });
 
       return new (class extends ViewServerModule {
@@ -104,6 +143,8 @@ function ModuleFactoryNode(tableDefs: TableDefs, moduleName: string) {
             );
           }
         }
+        rpcHandlersUnrealized = rpcHandlers;
+        viewPortDefs = viewPortDefs;
       })({
         name: moduleName,
         tableDefs: mutableTableDefs.realizedTableDefs,
@@ -114,5 +155,5 @@ function ModuleFactoryNode(tableDefs: TableDefs, moduleName: string) {
 
 export const ModuleFactory = {
   withNameSpace: (name: string) =>
-    ModuleFactoryNode(TableDefs([], [], []), name),
+    ModuleFactoryNode(TableDefs([], [], []), [], new Map(), name),
 };

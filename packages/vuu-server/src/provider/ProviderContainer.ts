@@ -1,9 +1,14 @@
 import { Table } from "@heswell/data";
-import { IProvider } from "../Provider";
-import tableContainer from "../core/table/TableContainer";
+import { IProvider } from "./Provider";
+import { JoinTableProvider } from "./JoinTableProvider";
+import { TableContainer } from "../core/table/TableContainer";
 
 export class ProviderContainer {
   #providersByTable: Map<string, [Table, IProvider]> = new Map();
+
+  constructor(private joinProvider: JoinTableProvider) {
+    console.log("create ProviderContainer");
+  }
 
   add(table: Table, provider: IProvider) {
     if (this.#providersByTable.has(table.name)) {
@@ -20,12 +25,12 @@ export class ProviderContainer {
       return tableAndProvider[1];
     } else {
       throw Error(
-        `[ProviderContainer] getProviderForTable, no provider exists for table ${table.name}`
+        `[ProviderContainer] getProviderForTable, no provider exists for table ${tableName}`
       );
     }
   }
 
-  start() {
+  start(tableContainer: TableContainer) {
     console.log(`[ProviderContainer] start`);
     this.#providersByTable.forEach(([, provider]) => {
       provider.load(tableContainer);

@@ -32,7 +32,6 @@ export class JoinTable extends Table {
   }
 
   publishUpdateForKey(rowKey: string) {
-    console.log(`join table publishUpdateForKey ${rowKey}`);
     const rowIdx = this.baseTable.rowIndexAtKey(rowKey);
     if (rowIdx !== -1) {
       this.emit("rowUpdated", rowIdx, this.rowAt(rowIdx));

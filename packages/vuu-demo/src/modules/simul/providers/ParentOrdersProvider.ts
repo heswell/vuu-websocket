@@ -13,7 +13,7 @@ const childMaxMultiple = 10;
 
 export class ParentOrdersProvider extends Provider {
   constructor(table: Table) {
-    super(table, ["instruments"]);
+    super(table);
   }
   async load(module: Module) {
     const {

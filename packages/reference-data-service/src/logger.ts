@@ -1,8 +1,11 @@
 import pino from "pino";
+import path from "path";
+
+const pathToLogs = path.join(__dirname, "../../../logs");
 
 const fileTransport = pino.transport({
   target: "pino/file",
-  options: { destination: `${__dirname}/reference-data-service.log` },
+  options: { destination: `${pathToLogs}/reference-data-service.log` },
 });
 
 export default pino(

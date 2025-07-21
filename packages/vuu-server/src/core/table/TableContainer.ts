@@ -1,17 +1,9 @@
 import { Table } from "@heswell/data";
-import { JoinTable } from "./JoinTable";
+import { JoinTableProvider } from "../../provider/JoinTableProvider";
+import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 
 export class TableContainer {
-  static #instance: TableContainer;
-
-  public static get instance(): TableContainer {
-    if (!TableContainer.#instance) {
-      TableContainer.#instance = new TableContainer();
-    }
-    return TableContainer.#instance;
-  }
-
-  private constructor() {
+  constructor(private joinProvider: JoinTableProvider) {
     console.log("create TableContainer");
   }
 
@@ -20,6 +12,13 @@ export class TableContainer {
   addTable(table: Table) {
     console.log(`[TableContainer] add table ${table.name}`);
     this.#tables.set(table.name, table);
+  }
+
+  getDefinedTables(): VuuTable[] {
+    return this.#tables
+      .values()
+      .map((table) => table.schema.table)
+      .toArray();
   }
 
   getTable(tableName: string) {
@@ -31,5 +30,3 @@ export class TableContainer {
     }
   }
 }
-
-export default TableContainer.instance;

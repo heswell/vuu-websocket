@@ -9,7 +9,6 @@ import {
   MultiRowProjectorFactory,
 } from "../columnUtils";
 import { DataResponse } from "./IRowSet";
-import { TableColumnType } from "@heswell/vuu-server";
 
 const NULL_SORTSET: SortSet = [[-1, -1, -1]];
 
@@ -22,7 +21,7 @@ export abstract class BaseRowSet {
   protected sortCols: VuuSortCol[] | undefined;
   protected sortedIndex = new Map<string, number>();
 
-  public columns: TableColumnType[];
+  public columns: string[];
   public currentFilter: Filter | undefined;
   /** filterSet is an array of index positions into the sortSet */
   public filterSet: number[] | undefined;
@@ -34,7 +33,7 @@ export abstract class BaseRowSet {
     throw Error("project method must be implemented");
   };
 
-  constructor(viewportId: string, table: Table, columns: TableColumnType[]) {
+  constructor(viewportId: string, table: Table, columns: string[]) {
     this.viewportId = viewportId;
     this._table = table;
     this.columns = columns;

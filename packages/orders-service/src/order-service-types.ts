@@ -10,7 +10,7 @@ export interface ParentOrderDto {
   account: string;
   trader: string;
   created: number;
-  lastUpdated: number;
+  lastUpdate: number;
   column13: number;
   column14: number;
   column15: number;
@@ -54,7 +54,7 @@ export class ParentOrder implements ParentOrderDto {
     public account: string,
     public trader: string,
     public created: number,
-    public lastUpdated: number,
+    public lastUpdate: number,
     public column13: number,
     public column14: number,
     public column15: number,

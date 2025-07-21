@@ -1,29 +1,15 @@
-import { VuuRpcServiceRequest, VuuTable } from "@vuu-ui/vuu-protocol-types";
-import { RealizedViewServerModule, ViewServerModule } from "./VsModule";
-import { ServiceFactory, ServiceMessage } from "../../Service";
-import { Viewport } from "../../ViewportContainer";
-import { RpcHandlerFactory } from "../../RpcRegistry";
-import TableDefContainer from "./TableDefContainer";
-import { TableJoinFactory } from "../../TableJoinProvider";
-import { TableDefs } from "./ModuleFactory";
+import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { RealizedViewServerModule } from "./VsModule";
+import { ServiceMessage } from "../../Service";
 
 export class ModuleContainer {
-  static #instance: ModuleContainer;
-
-  public static get instance(): ModuleContainer {
-    if (!ModuleContainer.#instance) {
-      ModuleContainer.#instance = new ModuleContainer();
-    }
-    return ModuleContainer.#instance;
-  }
-
-  private constructor() {
+  constructor() {
     console.log("create ModuleService");
   }
 
-  #modules = new Map<string, ViewServerModule>();
+  #modules = new Map<string, RealizedViewServerModule>();
 
-  register(module: ViewServerModule) {
+  register(module: RealizedViewServerModule) {
     this.#modules.set(module.name, module);
   }
 
@@ -32,7 +18,7 @@ export class ModuleContainer {
     this.#modules.forEach((module) => module.start());
   }
 
-  private getModule(name: string) {
+  get(name: string) {
     const module = this.#modules.get(name);
     if (module) {
       return module;
@@ -41,12 +27,12 @@ export class ModuleContainer {
   }
 
   createSessionTableFromSelectedRows(viewport: Viewport) {
-    const module = this.getModule(viewport.table.schema.table.module);
+    const module = this.get(viewport.table.schema.table.module);
     return module.createSessionTableFromSelectedRows(viewport);
   }
 
   getLinks({ module, table }: VuuTable) {
-    return this.getModule(module).getLinks(table);
+    return this.get(module).getLinks(table);
   }
 
   get tableList() {
@@ -58,22 +44,14 @@ export class ModuleContainer {
   }
 
   getTableSchema({ module, table }: VuuTable) {
-    return this.getModule(module).getTableSchema(table);
+    return this.get(module).getTableSchema(table);
   }
 
   getMenu({ module, table }: VuuTable) {
-    return this.getModule(module).getMenu(table);
-  }
-
-  getRpcHandler(module: string, service: string, method: string) {
-    console.log(`[ModuleContainer] getRpcHandler ${module} ${service}`);
-    // TODO what about module ?
-    return this.getModule(module).getRpcHandler(service, method);
+    return this.get(module).getMenu(table);
   }
 
   invokeService({ module, table }: VuuTable, message: ServiceMessage) {
-    return this.getModule(module).invokeService(table, message);
+    return this.get(module).invokeService(table, message);
   }
 }
-
-export default ModuleContainer.instance;

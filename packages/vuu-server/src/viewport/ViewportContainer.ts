@@ -1,53 +1,19 @@
-import { Table, tableRowsMessageBody } from "@heswell/data";
+import { Table } from "@heswell/data";
 import type {
-  ServerMessageBody,
   VuuCreateVisualLink,
   VuuLink,
   VuuLinkDescriptor,
-  VuuRow,
   VuuTable,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
-import { DataView, type DataViewConfig } from "@heswell/data";
-import { ISession } from "./server-types";
-import { RuntimeVisualLink } from "./RuntimeVisualLink";
-
-export class Viewport extends DataView {
-  #links?: VuuLink[];
-  #session: ISession;
-  constructor(
-    session: ISession,
-    id: string,
-    table: Table,
-    config: DataViewConfig
-  ) {
-    super(id, table, config);
-    this.#session = session;
-  }
-
-  get sessionId() {
-    return this.#session.id;
-  }
-
-  select(selection: number[]) {
-    const response = super.select(selection);
-    setTimeout(() => {
-      this.emit("row-selection");
-    }, 0);
-    return response;
-  }
-
-  protected enqueue(messageBody: ServerMessageBody) {
-    this.#session.enqueue("NA", messageBody);
-  }
-
-  enqueueDataMessages(rows: VuuRow[], vpSize: number) {
-    if (rows.length) {
-      this.#session.enqueue("", tableRowsMessageBody(rows, vpSize, this.id));
-    }
-  }
-}
+import { ISession } from "../server-types";
+import { RuntimeVisualLink } from "../RuntimeVisualLink";
+import { Viewport } from "./Viewport";
+import { ServiceFactory } from "../core/module/ModuleFactory";
+import { TableContainer } from "../core/table/TableContainer";
+import { ProviderContainer } from "../provider/ProviderContainer";
+import { ViewPortDef } from "../api/ViewPortDef";
 
 export type ViewportCreationEvent = {
   id: string;
@@ -65,14 +31,10 @@ export type ViewportEvents = {
 };
 
 export class ViewportContainer extends EventEmitter<ViewportEvents> {
-  static #instance: ViewportContainer;
-  public static get instance(): ViewportContainer {
-    if (!ViewportContainer.#instance) {
-      ViewportContainer.#instance = new ViewportContainer();
-    }
-    return ViewportContainer.#instance;
-  }
-  private constructor() {
+  constructor(
+    private tableContainer: TableContainer,
+    private providerContainer: ProviderContainer
+  ) {
     super();
     console.log("create ViewportContainer");
   }
@@ -80,6 +42,36 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   #runtimeVisualLinks = new Map<string, RuntimeVisualLink>();
   #sessionViewportMap = new Map<string, string[]>();
   #viewports = new Map<string, Viewport>();
+  #viewPortDefinitions: Map<string, ServiceFactory> = new Map();
+
+  addViewPortDefinition(tableName: string, viewPortDefFunc: ServiceFactory) {
+    console.log(`[ViewportContainer] addViewPortDefinition ${tableName}`);
+    this.#viewPortDefinitions.set(tableName, viewPortDefFunc);
+  }
+
+  getViewPortDefinition(table: Table) {
+    const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
+    if (viewPortDefFunc) {
+      console.log(
+        `[ViewportContainer] getViewPortDefinition this is where the ViewPortDef gets called, should create service`
+      );
+      return viewPortDefFunc(
+        table,
+        table.provider,
+        this.providerContainer,
+        this.tableContainer
+      );
+    } else {
+      console.log(
+        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}`
+      );
+      return ViewPortDef.default(table.tableDef.columns);
+    }
+  }
+
+  private getViewPortDefinitionCreator(table: Table) {
+    return this.#viewPortDefinitions.get(table.name);
+  }
 
   get viewportCount() {
     return this.#viewports.size;
@@ -91,13 +83,20 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest
   ) {
     const id = uuid();
-    const viewport = new Viewport(session, id, table, {
-      columns,
-      filterSpec,
-      groupBy,
-      range,
-      sort,
-    });
+    const viewPortDef = this.getViewPortDefinition(table);
+    const viewport = new Viewport(
+      session,
+      id,
+      table,
+      {
+        columns,
+        filterSpec,
+        groupBy,
+        range,
+        sort,
+      },
+      viewPortDef
+    );
 
     this.#viewports.set(id, viewport);
     const viewports = this.#sessionViewportMap.get(session.id);
@@ -114,7 +113,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     return viewport;
   }
 
-  getViewport(viewportId: string) {
+  getViewportById(viewportId: string) {
     const viewport = this.#viewports.get(viewportId);
     if (viewport) {
       return viewport;
@@ -124,7 +123,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   closeViewport(viewportId: string) {
-    const viewport = this.getViewport(viewportId);
+    const viewport = this.getViewportById(viewportId);
     viewport.destroy();
     this.#viewports.delete(viewportId);
     const viewports = this.#sessionViewportMap.get(viewport.sessionId);
@@ -150,6 +149,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
   closeViewportsForSession(sessionId: string) {
     console.log(`close all viewports for session ${sessionId}`);
+  }
+
+  handleRpcRequest(viewportId: string, rpcName: string, params: unknown[]) {
+    console.log(`handleViewportRpcReqiest`);
+    const viewport = this.getViewportById(viewportId);
+    // return viewport.
   }
 
   createVisualLink({
@@ -184,7 +189,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   getVisualLinks(viewportId: string, vuuLinks: VuuLink[]) {
-    const viewport = this.getViewport(viewportId);
+    const viewport = this.getViewportById(viewportId);
     const otherViewportsForSession = this.getViewportsBySessionId(
       viewport.sessionId
     );
@@ -206,8 +211,6 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     );
   }
 }
-
-export default ViewportContainer.instance;
 
 const getLinkToTable = (vuuLinks: VuuLink[], tableName: string) => {
   return vuuLinks.find(({ toTable }) => toTable === tableName);

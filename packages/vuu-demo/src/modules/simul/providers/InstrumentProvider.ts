@@ -1,4 +1,4 @@
-import { RemoteProvider } from "@heswell/vuu-server/src/Provider";
+import { RemoteProvider } from "@heswell/vuu-server";
 
 const refDataServiceUrl = `ws://localhost:${process.env.REFDATA_URL}`;
 
