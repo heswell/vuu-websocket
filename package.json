@@ -23,11 +23,11 @@
   "license": "ISC",
   "devDependencies": {
     "@types/bun": "^1.1.6",
-    "@vuu-ui/vuu-protocol-types": "0.13.13",
+    "@vuu-ui/vuu-protocol-types": "0.13.16",
     "typescript": "^5.5.3"
   },
   "dependencies": {
-    "@vuu-ui/vuu-utils": "0.13.13",
+    "@vuu-ui/vuu-utils": "0.13.16",
     "pure-uuid": "^1.8.1"
   }
 }

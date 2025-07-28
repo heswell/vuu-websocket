@@ -21,8 +21,8 @@ export class TableContainer {
       .toArray();
   }
 
-  getTable(tableName: string) {
-    const table = this.#tables.get(tableName);
+  getTable<T = Table>(tableName: string) {
+    const table = this.#tables.get(tableName) as T;
     if (table) {
       return table;
     } else {

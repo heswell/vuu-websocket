@@ -16,6 +16,7 @@ const locations: Record<string, [string, string]> = {
 };
 const currencies = ["CAD", "GBX", "USD", "EUR", "GBP"];
 const chars = Array.from("ABCDEFGHIJKLM");
+// const chars = Array.from("ABCDEFGHIJKLMNOPQRS");
 
 await instrumentStore.ready;
 

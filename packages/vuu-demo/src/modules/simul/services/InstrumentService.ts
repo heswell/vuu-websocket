@@ -1,11 +1,21 @@
 import { Table } from "@heswell/data";
-import { ProviderContainer, RpcHandler } from "@heswell/vuu-server";
+import {
+  DefaultRpcHandler,
+  ProviderContainer,
+  TableContainer,
+} from "@heswell/vuu-server";
 import { VuuMenu, VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
-export class InstrumentService extends RpcHandler {
-  constructor(table: Table, providerContainer: ProviderContainer) {
-    super();
-    console.log("Instrument Service created");
+export class InstrumentService extends DefaultRpcHandler {
+  constructor(
+    table: Table,
+    providerContainer: ProviderContainer,
+    tableContainer: TableContainer
+  ) {
+    super(tableContainer);
+    console.log("=======> Instrument Service created", {
+      tableContainer,
+    });
   }
 
   handleRpcCall(rpcMessage: VuuRpcServiceRequest) {

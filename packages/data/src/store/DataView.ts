@@ -50,7 +50,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   #updateQueue: UpdateQueue;
 
   private _vuuFilter: VuuFilter = EmptyFilter;
-  private rowSet: RowSet | GroupRowSet;
+  protected rowSet: RowSet | GroupRowSet;
 
   constructor(
     id: string,

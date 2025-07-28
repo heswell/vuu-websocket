@@ -3,6 +3,7 @@ import type {
   VuuCreateVisualLink,
   VuuLink,
   VuuLinkDescriptor,
+  VuuRpcViewportRequest,
   VuuTable,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
@@ -14,6 +15,7 @@ import { ServiceFactory } from "../core/module/ModuleFactory";
 import { TableContainer } from "../core/table/TableContainer";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewPortDef } from "../api/ViewPortDef";
+import { RpcParams } from "../net/rpc/Rpc";
 
 export type ViewportCreationEvent = {
   id: string;
@@ -151,10 +153,16 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     console.log(`close all viewports for session ${sessionId}`);
   }
 
-  handleRpcRequest(viewportId: string, rpcName: string, params: unknown[]) {
-    console.log(`handleViewportRpcReqiest`);
-    const viewport = this.getViewportById(viewportId);
-    // return viewport.
+  handleRpcRequest(
+    viewPortId: string,
+    rpcName: string,
+    params: Record<string, unknown>
+  ) {
+    const viewport = this.getViewportById(viewPortId);
+    return viewport.viewPortDef.service.processViewPortRpcCall(
+      rpcName,
+      new RpcParams([], params, viewport.columns, viewport.keys)
+    );
   }
 
   createVisualLink({

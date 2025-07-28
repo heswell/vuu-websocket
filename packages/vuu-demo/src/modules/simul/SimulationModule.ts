@@ -14,7 +14,7 @@ export const SimulationModule = () =>
     .addTable(
       instruments,
       (table) => new InstrumentProvider(table),
-      (table, provider, providerContainer) =>
+      (table, provider, providerContainer, tableContainer) =>
         ViewPortDef(
           table.schema.columns.map<Column>(
             ({ name, serverDataType: dataType }) => ({
@@ -22,7 +22,7 @@ export const SimulationModule = () =>
               dataType,
             })
           ),
-          new InstrumentService(table, providerContainer)
+          new InstrumentService(table, providerContainer, tableContainer)
         )
     )
     .addJoinTable((tableDefContainer) =>

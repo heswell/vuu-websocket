@@ -44,6 +44,10 @@ export abstract class BaseRowSet {
     return this._table;
   }
 
+  get keys() {
+    return this.filterSet ?? this.sortSet;
+  }
+
   protected get keyMap() {
     return this.filterSet ? this.filterKeyMap : this.sortedIndex;
   }

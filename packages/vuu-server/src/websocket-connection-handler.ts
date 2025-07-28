@@ -33,34 +33,32 @@ export const websocketConnectionHandler = (
         stopMainLoop = startMainUpdateLoop(config.CLIENT_UPDATE_FREQUENCY);
         stopHeartbeats = startHeartbeats(config.HEARTBEAT_FREQUENCY);
       }
-
-      const { objectCount } = heapStats();
-      console.log(` =====>  object count ${objectCount.toLocaleString()}`);
     },
     message: async (
       ws: ServerWebSocket<WebsocketData>,
-      message: string | Buffer
+      msg: string | Buffer
     ) => {
-      // console.log(`=====> ${message}`);
       const session = getSession(ws.data.sessionId);
-      // console.log(`session id = ${session?.id}`);
       if (session) {
-        const vuuMessage = JSON.parse(message as string) as VuuClientMessage;
+        const vuuMessage = JSON.parse(msg as string) as VuuClientMessage;
         const { requestId } = vuuMessage;
-        // console.log(`===> [${vuuMessage.body.type}]`);
         if (vuuMessage.body.type === "LOGIN") {
           return session.login(requestId, vuuMessage.body);
         } else if (vuuMessage.body.type === "HB_RESP") {
           session.incomingHeartbeat = vuuMessage.body.ts;
+        } else if (vuuMessage.body.type === "RPC_CALL") {
+          const result = vuuServer.moduleContainer
+            .get(vuuMessage.module)
+            .rpcHandlerByService(vuuMessage.body.service)
+            .processRpcCall(vuuMessage.body) as any;
+          session.enqueue(requestId, {
+            error: null,
+            method: vuuMessage.body.method,
+            result,
+            type: "RPC_RESP",
+          });
         } else {
           vuuServer.serverApi.process(vuuMessage, session);
-
-          // const handler = messageAPI[vuuMessage.body.type];
-          // if (handler) {
-          //   handler(vuuMessage, session);
-          // } else {
-          //   console.log(`unknown message type ${vuuMessage.body.type}`);
-          // }
         }
       } else {
         console.error(`no session found`);

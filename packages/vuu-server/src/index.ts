@@ -1,9 +1,10 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
 export type { TableContainer } from "./core/table/TableContainer";
 export type { ProviderContainer } from "./provider/ProviderContainer";
-export { TypeAheadModule } from "./modules/typeahead/TypeAheadModule";
 export { Provider, RemoteProvider } from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
+export { RpcNames } from "./net/ws/RpcNames";
+export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export type {
   JoinTableProvider,
   JoinEventType,

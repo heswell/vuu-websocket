@@ -1,6 +1,9 @@
 import {
+  ClientToServerMenuSelectRPC,
   ClientToServerSelection,
   VuuClientMessage,
+  VuuRpcServiceRequest,
+  VuuRpcViewportRequest,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
@@ -12,6 +15,7 @@ import { ViewportContainer } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { ISession } from "../server-types";
 import { tableRowsMessageBody } from "@heswell/data";
+import { hasViewPortContext, isViewportRpcRequest } from "@vuu-ui/vuu-utils";
 
 export class CoreServerApiHandler {
   constructor(
@@ -20,7 +24,10 @@ export class CoreServerApiHandler {
     private providerContainer: ProviderContainer
   ) {}
 
-  process({ requestId, body }: VuuClientMessage, session: ISession) {
+  process(
+    { requestId, body }: VuuClientMessage | VuuClientMessage,
+    session: ISession
+  ) {
     switch (body.type) {
       case "GET_TABLE_LIST":
         session.enqueue(requestId, {
@@ -45,6 +52,16 @@ export class CoreServerApiHandler {
         return this.processGetViewPortMenusRequest(requestId, body, session);
       case "CHANGE_VP_RANGE":
         return this.processViewPortRange(requestId, body, session);
+      case "RPC_REQUEST":
+        return this.processRpcRequest(requestId, body, session);
+      case "VIEW_PORT_RPC_CALL":
+        return this.processViewPortRpcRequest(requestId, body, session);
+      case "VIEW_PORT_MENUS_SELECT_RPC":
+        return this.processViewPortMenuSelectionRpcCall(
+          requestId,
+          body,
+          session
+        );
       default:
         throw Error(
           `[VUU:core:CoreServerApiHandler] unsupported message type ${body.type}`
@@ -176,5 +193,62 @@ export class CoreServerApiHandler {
     const viewport = this.viewPortContainer.getViewportById(vpId);
     const { rows, size } = viewport.select(selection);
     session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, false));
+  }
+
+  private processViewPortMenuSelectionRpcCall(
+    requestId: string,
+    body: ClientToServerMenuSelectRPC,
+    session: ISession
+  ) {
+    console.log(`menu select invoked`, {
+      body,
+    });
+  }
+  private processRpcRequest(
+    requestId: string,
+    rpcRequest: VuuRpcServiceRequest,
+    session: ISession
+  ) {
+    const { rpcName } = rpcRequest;
+
+    if (hasViewPortContext(rpcRequest)) {
+      const result = this.viewPortContainer.handleRpcRequest(
+        rpcRequest.context.viewPortId,
+        rpcName,
+        rpcRequest.params
+      );
+
+      session.enqueue(requestId, {
+        action: { type: "VP_RPC_SUCCESS" },
+        error: null,
+        type: "RPC_RESPONSE",
+        result: {
+          data: result,
+          type: "SUCCESS_RESULT",
+        },
+        rpcName,
+      });
+    }
+  }
+  private processViewPortRpcRequest(
+    requestId: string,
+    { namedParams, params, rpcName, vpId }: VuuRpcViewportRequest,
+    session: ISession
+  ) {
+    const result = this.viewPortContainer.handleRpcRequest(
+      vpId,
+      rpcName,
+      namedParams
+    );
+
+    session.enqueue(requestId, {
+      action: { type: "VP_RPC_SUCCESS", result },
+      type: "VIEW_PORT_RPC_REPONSE",
+      namedParams,
+      params,
+      result,
+      rpcName,
+      vpId,
+    });
   }
 }

@@ -1,4 +1,9 @@
-import { ServerMessageBody, VuuLink, VuuRow } from "@vuu-ui/vuu-protocol-types";
+import {
+  ServerMessageBody,
+  VuuLink,
+  VuuRow,
+  VuuTable,
+} from "@vuu-ui/vuu-protocol-types";
 import { ISession } from "../server-types";
 import {
   DataView,
@@ -26,6 +31,14 @@ export class Viewport extends DataView {
     this.#viewPortDef = viewPortDef;
   }
 
+  get columns() {
+    return this.#viewPortDef.columns;
+  }
+
+  get keys() {
+    return this.rowSet.keys;
+  }
+
   get sessionId() {
     return this.#session.id;
   }
@@ -40,6 +53,18 @@ export class Viewport extends DataView {
       this.emit("row-selection");
     }, 0);
     return response;
+  }
+
+  getUniqueFieldValues(vuuTable: VuuTable, column: string) {
+    return ["blah"];
+  }
+
+  getUniqueFieldValuesStartingWith(
+    vuuTable: VuuTable,
+    column: string,
+    pattern: string
+  ) {
+    return ["blootah"];
   }
 
   protected enqueue(messageBody: ServerMessageBody) {

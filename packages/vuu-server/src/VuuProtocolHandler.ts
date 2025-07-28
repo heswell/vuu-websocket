@@ -72,20 +72,6 @@ const REMOVE_VISUAL_LINK: VuuProtocolHandler = (message, session) => {
   });
 };
 
-const GET_VIEW_PORT_MENUS: VuuProtocolHandler = (message, session) => {
-  const { vpId } = message.body as VuuViewportMenusRequest;
-  const viewport = ViewportContainer.getViewportById(vpId);
-  const menu = ModuleContainer.getMenu(viewport.table.schema.table);
-
-  if (menu) {
-    session.enqueue(message.requestId, {
-      type: "VIEW_PORT_MENUS_RESP",
-      menu,
-      vpId,
-    });
-  }
-};
-
 const VIEW_PORT_MENUS_SELECT_RPC: VuuProtocolHandler = (message, session) => {
   const { vpId, rpcName } = message.body as ClientToServerMenuSelectRPC;
   if (rpcName === "VP_BULK_EDIT_BEGIN_RPC") {
