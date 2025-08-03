@@ -1,21 +1,21 @@
 import { Table } from "@heswell/data";
 import type {
   VuuCreateVisualLink,
-  VuuLink,
   VuuLinkDescriptor,
-  VuuRpcViewportRequest,
   VuuTable,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
 import { ISession } from "../server-types";
 import { RuntimeVisualLink } from "../RuntimeVisualLink";
-import { Viewport } from "./Viewport";
+import { Viewport, ViewPortSelection, ViewPortVisualLink } from "./Viewport";
 import { ServiceFactory } from "../core/module/ModuleFactory";
 import { TableContainer } from "../core/table/TableContainer";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewPortDef } from "../api/ViewPortDef";
 import { RpcParams } from "../net/rpc/Rpc";
+import { DataTable, isDataTable } from "../core/table/InMemDataTable";
+import { SelectionViewPortMenuItem } from "./ViewPortMenu";
 
 export type ViewportCreationEvent = {
   id: string;
@@ -41,7 +41,6 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     console.log("create ViewportContainer");
   }
 
-  #runtimeVisualLinks = new Map<string, RuntimeVisualLink>();
   #sessionViewportMap = new Map<string, string[]>();
   #viewports = new Map<string, Viewport>();
   #viewPortDefinitions: Map<string, ServiceFactory> = new Map();
@@ -65,7 +64,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       );
     } else {
       console.log(
-        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}`
+        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}, returning default with columns only, no services`
       );
       return ViewPortDef.default(table.tableDef.columns);
     }
@@ -150,7 +149,28 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   closeViewportsForSession(sessionId: string) {
-    console.log(`close all viewports for session ${sessionId}`);
+    console.log(
+      `[ViewportContainer] close all viewports for session ${sessionId}`
+    );
+    for (const viewPort of this.listViewportsForSession(sessionId)) {
+      this.closeViewport(viewPort.id);
+    }
+  }
+
+  callRpcSelection(vpId: string, rpcName: string) {
+    const viewport = this.getViewportById(vpId);
+    const { menuMap } = viewport.viewPortDef.service;
+    console.log({ menuMap });
+    const menuItem = menuMap.get(rpcName);
+    if (menuItem instanceof SelectionViewPortMenuItem) {
+      return menuItem.func(
+        ViewPortSelection(viewport.getSelection(), viewport)
+      );
+    } else {
+      throw Error(
+        `[ViewportContainer] callRpcSelection, no selection menuItem found for ${rpcName}`
+      );
+    }
   }
 
   handleRpcRequest(
@@ -165,61 +185,67 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     );
   }
 
-  createVisualLink({
-    childColumnName,
-    childVpId,
-    parentColumnName,
-    parentVpId,
-  }: Omit<VuuCreateVisualLink, "type">) {
-    const childViewport = this.#viewports.get(childVpId);
-    const parentViewport = this.#viewports.get(parentVpId);
-    if (childViewport && parentViewport) {
-      const runtimeVisualLink = new RuntimeVisualLink(
-        childViewport,
-        parentViewport,
-        childColumnName,
-        parentColumnName
-      );
-      this.#runtimeVisualLinks.set(childVpId, runtimeVisualLink);
-    } else {
-      console.warn(`unable to create visual link, viewport not found`);
-    }
+  linkViewPorts(
+    childVpId: string,
+    parentVpId: string,
+    childColumnName: string,
+    parentColumnName: string
+  ) {
+    const child = this.getViewportById(childVpId);
+    const parent = this.getViewportById(parentVpId);
+    const childColumn = child.dataTable.columnForName(childColumnName);
+    const parentColumn = parent.dataTable.columnForName(parentColumnName);
+    child.setVisualLink(
+      ViewPortVisualLink(child, parent, childColumn, parentColumn)
+    );
   }
 
-  removeVisualLink(childVpId: string) {
-    const visualLink = this.#runtimeVisualLinks.get(childVpId);
-    if (visualLink) {
-      visualLink.remove();
-      this.#runtimeVisualLinks.delete(childVpId);
-    } else {
-      throw Error("unable to remove visual link childVpId not found");
-    }
+  unlinkViewPorts(childVpId: string) {
+    const viewPort = this.getViewportById(childVpId);
+    viewPort.removeVisualLink();
   }
 
-  getVisualLinks(viewportId: string, vuuLinks: VuuLink[]) {
+  getViewPortVisualLinks(viewportId: string) {
     const viewport = this.getViewportById(viewportId);
-    const otherViewportsForSession = this.getViewportsBySessionId(
+    const { tableDef } = getViewPortDataTable(viewport);
+    const visualLinks = tableDef.links;
+
+    const otherViewportsForSession = this.listActiveViewportsForSession(
       viewport.sessionId
     );
+
     const availableLinks: VuuLinkDescriptor[] = [];
-    // TODO must be active (i.e. in same layout)
     for (const vp of otherViewportsForSession) {
-      const link = getLinkToTable(vuuLinks, vp.table.schema.table.table);
-      if (link) {
-        availableLinks.push({ parentVpId: vp.id, link });
+      if (vp !== viewport) {
+        const {
+          tableDef: { name },
+        } = getViewPortDataTable(vp);
+        const link = visualLinks.links.find(({ toTable }) => toTable === name);
+        if (link) {
+          availableLinks.push({ parentVpId: vp.id, link });
+        }
       }
     }
 
     return availableLinks;
   }
 
-  private getViewportsBySessionId(sessionId: string) {
+  private listActiveViewportsForSession(sessionId: string) {
+    // TODO must be active (i.e. in same layout)
+    return this.listViewportsForSession(sessionId);
+  }
+
+  private listViewportsForSession(sessionId: string) {
     return Array.from(this.#viewports.values()).filter(
       ({ sessionId: id }) => id === sessionId
     );
   }
 }
 
-const getLinkToTable = (vuuLinks: VuuLink[], tableName: string) => {
-  return vuuLinks.find(({ toTable }) => toTable === tableName);
+const getViewPortDataTable = (vp: Viewport) => {
+  if (isDataTable(vp.table)) {
+    return vp.table as DataTable;
+  } else {
+    throw Error("[ViewPortContainer] viewport table is not a DataTable");
+  }
 };

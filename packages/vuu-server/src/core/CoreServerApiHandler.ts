@@ -2,6 +2,8 @@ import {
   ClientToServerMenuSelectRPC,
   ClientToServerSelection,
   VuuClientMessage,
+  VuuCreateVisualLink,
+  VuuRemoveVisualLink,
   VuuRpcServiceRequest,
   VuuRpcViewportRequest,
   VuuTableMetaRequest,
@@ -9,6 +11,7 @@ import {
   VuuViewportCreateRequest,
   VuuViewportMenusRequest,
   VuuViewportRangeRequest,
+  VuuViewportVisualLinksRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewportContainer } from "../viewport/ViewportContainer";
@@ -39,15 +42,20 @@ export class CoreServerApiHandler {
         return this.processGetTableMetaRequest(requestId, body, session);
       case "CREATE_VP":
         return this.processCreateViewPortRequest(requestId, body, session);
+      case "CREATE_VISUAL_LINK":
+        return this.processCreateVisualLinkRequest(requestId, body, session);
+      case "REMOVE_VISUAL_LINK":
+        return this.processRemoveVisualLinkRequest(requestId, body, session);
       case "CHANGE_VP":
         return this.processChangeViewPortRequest(requestId, body, session);
       case "SET_SELECTION":
         return this.processSetSelectionRequest(requestId, body, session);
       case "GET_VP_VISUAL_LINKS":
-        console.log(
-          `[VUU:core:CoreServerApiHandler] not yet implemented ${body.type}`
+        return this.processGetViewPortVisualLinksRequest(
+          requestId,
+          body,
+          session
         );
-        break;
       case "GET_VIEW_PORT_MENUS":
         return this.processGetViewPortMenusRequest(requestId, body, session);
       case "CHANGE_VP_RANGE":
@@ -102,7 +110,7 @@ export class CoreServerApiHandler {
 
     session.enqueue(requestId, {
       type: "VIEW_PORT_MENUS_RESP",
-      menu: viewPort.viewPortDef.service.menuItems,
+      menu: viewPort.viewPortDef.service.menuItems.asJson,
       vpId,
     });
   }
@@ -132,6 +140,44 @@ export class CoreServerApiHandler {
 
     const { rows, size } = viewport.getDataForCurrentRange();
     session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, true));
+  }
+
+  private processCreateVisualLinkRequest(
+    requestId: string,
+    {
+      childVpId,
+      parentVpId,
+      childColumnName,
+      parentColumnName,
+    }: VuuCreateVisualLink,
+    session: ISession
+  ) {
+    this.viewPortContainer.linkViewPorts(
+      childVpId,
+      parentVpId,
+      childColumnName,
+      parentColumnName
+    );
+
+    session.enqueue(requestId, {
+      childVpId,
+      childColumnName,
+      parentVpId,
+      parentColumnName,
+      type: "CREATE_VISUAL_LINK_SUCCESS",
+    });
+  }
+
+  private processRemoveVisualLinkRequest(
+    requestId: string,
+    { childVpId }: VuuRemoveVisualLink,
+    session: ISession
+  ) {
+    this.viewPortContainer.unlinkViewPorts(childVpId);
+    session.enqueue(requestId, {
+      childVpId,
+      type: "REMOVE_VISUAL_LINK_SUCCESS",
+    });
   }
 
   private processChangeViewPortRequest(
@@ -195,13 +241,31 @@ export class CoreServerApiHandler {
     session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, false));
   }
 
-  private processViewPortMenuSelectionRpcCall(
+  private processGetViewPortVisualLinksRequest(
     requestId: string,
-    body: ClientToServerMenuSelectRPC,
+    { vpId }: VuuViewportVisualLinksRequest,
     session: ISession
   ) {
-    console.log(`menu select invoked`, {
-      body,
+    const links = this.viewPortContainer.getViewPortVisualLinks(vpId);
+    session.enqueue(requestId, {
+      links,
+      type: "VP_VISUAL_LINKS_RESP",
+      vpId,
+    });
+  }
+
+  private processViewPortMenuSelectionRpcCall(
+    requestId: string,
+    { vpId, rpcName }: ClientToServerMenuSelectRPC,
+    session: ISession
+  ) {
+    const result = this.viewPortContainer.callRpcSelection(vpId, rpcName);
+
+    session.enqueue(requestId, {
+      action: { type: "NO_ACTION" },
+      type: "VIEW_PORT_MENU_RESP",
+      rpcName,
+      vpId,
     });
   }
   private processRpcRequest(

@@ -217,6 +217,10 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     return this.rowSet.selectedKeys;
   }
 
+  get selectedRowKeyIndex() {
+    return this.rowSet.selectedRowKeyIndex;
+  }
+
   aggregate(aggregations: VuuAggregation[]): DataResponse {
     this.#config = {
       ...this.#config,

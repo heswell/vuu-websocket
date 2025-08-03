@@ -1,6 +1,5 @@
 import { ServerMessagingConfig } from "./server-types";
 import { ServerWebSocket } from "bun";
-import { heapStats } from "bun:jsc";
 import {
   clearSession,
   createSession,
@@ -46,17 +45,6 @@ export const websocketConnectionHandler = (
           return session.login(requestId, vuuMessage.body);
         } else if (vuuMessage.body.type === "HB_RESP") {
           session.incomingHeartbeat = vuuMessage.body.ts;
-        } else if (vuuMessage.body.type === "RPC_CALL") {
-          const result = vuuServer.moduleContainer
-            .get(vuuMessage.module)
-            .rpcHandlerByService(vuuMessage.body.service)
-            .processRpcCall(vuuMessage.body) as any;
-          session.enqueue(requestId, {
-            error: null,
-            method: vuuMessage.body.method,
-            result,
-            type: "RPC_RESP",
-          });
         } else {
           vuuServer.serverApi.process(vuuMessage, session);
         }
@@ -75,6 +63,7 @@ export const websocketConnectionHandler = (
         // if (teardownHandler) {
         //   teardownHandler?.({}, session);
         // }
+        vuuServer.viewPortContainer.closeViewportsForSession(ws.data.sessionId);
         const sessionCount = clearSession(ws.data.sessionId);
         if (sessionCount === 0) {
           stopHeartbeats?.();

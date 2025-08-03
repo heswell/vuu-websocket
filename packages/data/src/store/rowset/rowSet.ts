@@ -265,6 +265,13 @@ export class RowSet extends BaseRowSet {
     return this.selected.map((key) => {});
   }
 
+  get selectedRowKeyIndex() {
+    return this.selected.reduce<Map<string, number>>(
+      (map, key) => (map.set(key, this.keyMap.get(key) as number), map),
+      new Map()
+    );
+  }
+
   sort(sortCols: VuuSortCol[]) {
     const start = performance.now();
     const { table, filterSet, sortSet } = this;

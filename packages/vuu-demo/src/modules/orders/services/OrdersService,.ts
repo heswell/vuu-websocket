@@ -8,16 +8,16 @@ import {
   SelectionViewPortMenuItem,
   ViewPortMenu,
 } from "@heswell/vuu-server/src/viewport/ViewPortMenu";
-import { VuuMenu, VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
+import { VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
-export class InstrumentService extends DefaultRpcHandler {
+export class OrdersService extends DefaultRpcHandler {
   constructor(
     table: Table,
     providerContainer: ProviderContainer,
     tableContainer: TableContainer
   ) {
     super(tableContainer);
-    console.log("=======> Instrument Service created", {
+    console.log("=======> Orders Service created", {
       tableContainer,
     });
   }
@@ -26,19 +26,14 @@ export class InstrumentService extends DefaultRpcHandler {
     console.log(`rpc message received`);
   }
 
-  private editRows = () => {
-    console.log("edit rows");
-  };
-
-  private addRowsToOrders = () => {
-    console.log("addRowsToOrders");
+  private cancelOrders = () => {
+    console.log("cancel orders");
   };
 
   get menuItems() {
     // prettier-ignore
     return ViewPortMenu(
-      new SelectionViewPortMenuItem( "Edit rows", "", this.editRows, "VP_BULK_EDIT_BEGIN_RPC" ),
-      new SelectionViewPortMenuItem( "Add rows to orders", "", this.addRowsToOrders, "ADD_ROWS_TO_ORDERS" )
-    )
+      new SelectionViewPortMenuItem( "Cancel Order", "", this.cancelOrders, "CANCEL_ORDER" )
+    );
   }
 }

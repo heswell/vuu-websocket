@@ -128,17 +128,4 @@ export class RealizedViewServerModule extends ViewServerModule {
   constructor(props: ModuleConstructorProps) {
     super(props);
   }
-
-  rpcHandlerByService(service: string): RpcHandler {
-    const rpcHandler = this.rpcHandlers.find((rpcHandler) =>
-      rpcHandler.implementsService(service)
-    );
-    if (rpcHandler) {
-      return rpcHandler;
-    } else {
-      throw Error(
-        `[RealizedViewServerModule] no rpcHandler for service '${service}'`
-      );
-    }
-  }
 }

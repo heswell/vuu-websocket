@@ -1,6 +1,11 @@
 import { InstrumentProvider } from "./providers/InstrumentProvider";
 import { InstrumentService } from "./services/InstrumentService";
-import { Column, ModuleFactory, ViewPortDef } from "@heswell/vuu-server";
+import {
+  Column,
+  ModuleFactory,
+  ViewPortDef,
+  VisualLinks,
+} from "@heswell/vuu-server";
 import { instruments } from "./SimulTableDefs";
 import {
   columnUtils as Columns,
@@ -41,6 +46,7 @@ export const SimulationModule = () =>
           tableDefContainer.get("PRICES", "prices"),
           JoinSpec("ric", "ric", "LeftOuterJoin")
         ),
+        links: VisualLinks(),
       })
     )
     .asModule();

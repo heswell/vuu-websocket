@@ -1,11 +1,12 @@
 import { Table } from "@heswell/data";
 import { JoinTableProvider } from "../../provider/JoinTableProvider";
-import { TableDef } from "../../api/TableDef";
+import { Column, TableDef } from "../../api/TableDef";
 import { IProvider, Provider } from "../../provider/Provider";
 import { ColumnValueProvider } from "./ColumnValueProvider";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
 export interface DataTable {
+  columnForName: (columnName: string) => Column;
   columnValueProvider: ColumnValueProvider;
   provider: IProvider | undefined;
   rows: VuuDataRow[];
@@ -38,6 +39,21 @@ export class InMemDataTable extends Table implements DataTable {
   }
   set tableDef(tableDef: TableDef) {
     this.#tableDef = tableDef;
+  }
+
+  columnForName(columnName: string) {
+    const column = this.#tableDef.columns.find(
+      (col) => col.name === columnName
+    );
+    if (column) {
+      return column;
+    } else {
+      throw Error(
+        `[DataTable] columnForName ${
+          this.#tableDef.name
+        } has no column ${columnName}`
+      );
+    }
   }
 }
 

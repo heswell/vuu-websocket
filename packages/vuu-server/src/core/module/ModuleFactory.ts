@@ -1,4 +1,9 @@
-import { IProvider, Provider, ProviderFactory } from "../../provider/Provider";
+import {
+  IProvider,
+  NullProvider,
+  Provider,
+  ProviderFactory,
+} from "../../provider/Provider";
 import { TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
@@ -103,6 +108,21 @@ function ModuleFactoryNode(
         viewPortDefs,
         moduleName
       ),
+    addSessionTable: (
+      tableDef: TableDef,
+      providerFactory: ProviderFactory = () => NullProvider,
+      serviceFactory?: ServiceFactory
+    ) => {
+      if (serviceFactory) {
+        viewPortDefs.set(tableDef.name, serviceFactory);
+      }
+      return ModuleFactoryNode(
+        tableDefs.add(tableDef, providerFactory),
+        rpcHandlers,
+        viewPortDefs,
+        moduleName
+      );
+    },
 
     addRpcHandler: (rpcFunc: RpcHandlerFunc) =>
       ModuleFactoryNode(

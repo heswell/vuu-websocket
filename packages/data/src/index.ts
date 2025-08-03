@@ -1,6 +1,9 @@
 import { SET_FILTER_DATA_COLUMNS } from "./store/filter.ts";
 
-export { default as DataView } from "./store/DataView.ts";
+export {
+  default as DataView,
+  type SelectionEventHandler,
+} from "./store/DataView.ts";
 export { type DataViewConfig } from "./store/DataView.ts";
 export * from "./store/table.ts";
 

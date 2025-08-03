@@ -48,6 +48,15 @@ export const setRandomBidAskSizeUpdate = (bidAsk: BidAskSize) => {
 
 export type ProviderFactory = (table: Table) => IProvider;
 
+export const NullProvider: IProvider = {
+  load: function (tableContainer: TableContainer): Promise<void> {
+    // nothing to see here
+    return Promise.resolve(undefined);
+  },
+  loaded: false,
+  table: undefined,
+};
+
 export abstract class Provider implements IProvider {
   #loaded = false;
   #table: Table;

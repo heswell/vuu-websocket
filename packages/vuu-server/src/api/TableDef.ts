@@ -15,12 +15,44 @@ export const columnUtils = {
     tableDef.columns.filter((td) => td.name !== name),
 };
 
+export interface Link {
+  fromColumn: string;
+  toTable: string;
+  toColumn: string;
+}
+
+class LinkImpl implements Link {
+  constructor(
+    public fromColumn: string,
+    public toTable: string,
+    public toColumn: string
+  ) {}
+}
+
+export const Link = (
+  fromColumn: string,
+  toTable: string,
+  toColumn: string
+): Link => new LinkImpl(fromColumn, toTable, toColumn);
+
+class VisualLinksImpl {
+  constructor(public links: Link[]) {}
+}
+
+export interface VisualLinks {
+  links: Link[];
+}
+
+export function VisualLinks(...links: Link[]): VisualLinks {
+  return new VisualLinksImpl(links);
+}
+
 export interface TableDefConfig {
   columns: Column[];
   joinFields?: string | string[];
   keyField: string;
   name: string;
-  links?: VuuLink[];
+  links: VisualLinks;
 }
 
 export interface TableDef extends TableDefConfig {
@@ -33,7 +65,7 @@ class TableDefImpl implements TableDef {
   columns: Column[];
   joinFields?: string | string[];
   keyField: string;
-  links?: VuuLink[];
+  links: VisualLinks;
   name: string;
 
   #module: ViewServerModule | null = null;
@@ -73,8 +105,14 @@ class TableDefImpl implements TableDef {
   }
 }
 
-export const TableDef = (options: TableDefConfig): TableDef =>
-  new TableDefImpl(options);
+export const TableDef = (
+  options: Omit<TableDefConfig, "links"> & {
+    links?: VisualLinks;
+  }
+): TableDef => {
+  const { links = VisualLinks(), ...rest } = options;
+  return new TableDefImpl({ ...rest, links });
+};
 
 export type JoinType = "LeftOuterJoin";
 export interface JoinSpec {

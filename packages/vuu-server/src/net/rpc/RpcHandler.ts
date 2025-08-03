@@ -1,30 +1,39 @@
-import {
-  VuuMenu,
-  VuuRpcServiceRequest,
-  VuuRpcViewportRequest,
-} from "@vuu-ui/vuu-protocol-types";
 import { VuuServer } from "../../core/VuuServer";
 import { RpcParams } from "./Rpc";
+import {
+  EmptyViewPortMenu,
+  ViewPortMenu,
+  ViewPortMenuFolder,
+  ViewPortMenuItem,
+} from "../../viewport/ViewPortMenu";
 
 export type RpcHandlerFunc = (vuuServer: VuuServer) => RpcHandler;
 
-const NoMenu: VuuMenu = { name: "", menus: [] } as const;
-
 export class RpcHandler {
-  processRpcCall(rpcMessage: VuuRpcServiceRequest) {
-    console.log(`[RpcHandler] VuuRpcServiceRequest`);
-    return undefined;
-  }
-
   processViewPortRpcCall(methodName: string, rpcParams: RpcParams): unknown {
     return undefined;
   }
-  get menuItems() {
-    return NoMenu;
+  get menuItems(): ViewPortMenu {
+    return EmptyViewPortMenu;
   }
-  // abstract methods?: string[];
-  // abstract serviceName?: string;
-  implementsService(serviceName: string) {
-    return false;
+
+  get menuMap() {
+    return this.menusAsMap();
+  }
+
+  private menusAsMap() {
+    const foldMenus = (
+      menu: ViewPortMenu,
+      map = new Map<string, ViewPortMenuItem>()
+    ): Map<string, ViewPortMenuItem> => {
+      if (menu instanceof ViewPortMenuFolder) {
+        menu.menus.forEach((menu) => foldMenus(menu, map));
+      } else if (menu instanceof ViewPortMenuItem) {
+        map.set(menu.rpcName, menu);
+      }
+      return map;
+    };
+
+    return foldMenus(this.menuItems);
   }
 }
