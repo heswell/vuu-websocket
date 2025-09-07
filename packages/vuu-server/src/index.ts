@@ -19,5 +19,7 @@ export * from "./api/TableDef";
 export * from "./api/ViewPortDef";
 export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
+export { NoAction } from "./viewport/ViewPortAction";
+export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
 export { websocketConnectionHandler } from "./websocket-connection-handler";

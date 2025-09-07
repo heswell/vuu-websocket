@@ -1,6 +1,8 @@
 import { Table } from "@heswell/data";
 import { JoinTableProvider } from "../../provider/JoinTableProvider";
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { DataTable } from "./InMemDataTable";
+import { InMemSessionDataTable } from "./InMemSessionDataTable";
 
 export class TableContainer {
   constructor(private joinProvider: JoinTableProvider) {
@@ -28,5 +30,15 @@ export class TableContainer {
     } else {
       throw Error(`[TableContainer] no table ${tableName}`);
     }
+  }
+
+  createSimpleSessionTable(baseTable: DataTable, sessionId: string) {
+    const table = new InMemSessionDataTable(
+      sessionId,
+      baseTable.tableDef,
+      this.joinProvider
+    );
+    this.#tables.set(table.name, table);
+    return table;
   }
 }

@@ -1,6 +1,7 @@
 import { Table } from "@heswell/data";
 import {
   DefaultRpcHandler,
+  NoAction,
   ProviderContainer,
   TableContainer,
 } from "@heswell/vuu-server";
@@ -28,10 +29,12 @@ export class InstrumentService extends DefaultRpcHandler {
 
   private editRows = () => {
     console.log("edit rows");
+    return new NoAction();
   };
 
   private addRowsToOrders = () => {
     console.log("addRowsToOrders");
+    return new NoAction();
   };
 
   get menuItems() {

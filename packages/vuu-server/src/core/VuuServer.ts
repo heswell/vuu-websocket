@@ -41,7 +41,6 @@ export class VuuServer {
   }
 
   private createTable(tableDef: TableDef) {
-    console.log(`[VuuServer] createTable ${tableDef.name}`);
     return vuuInMemPlugin.tableFactory(
       tableDef,
       this.tableContainer,
@@ -58,7 +57,6 @@ export class VuuServer {
   }
 
   private registerProvider(table: Table, provider: IProvider) {
-    console.log(`[VuuServer] registerProvider for ${table.name} table`);
     this.providerContainer.add(table, provider);
     if (isDataTable(table)) {
       table.provider = provider;

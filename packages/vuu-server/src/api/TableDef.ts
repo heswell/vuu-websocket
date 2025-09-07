@@ -56,10 +56,12 @@ export interface TableDefConfig {
 }
 
 export interface TableDef extends TableDefConfig {
+  getModule: () => ViewServerModule;
   setModule: (module: ViewServerModule) => void;
   schema: TableSchema;
   asVuuTable: VuuTable;
 }
+export interface SessionTableDef extends TableDef {}
 
 class TableDefImpl implements TableDef {
   columns: Column[];
@@ -78,6 +80,13 @@ class TableDefImpl implements TableDef {
     this.links = links;
     this.name = name;
   }
+  getModule() {
+    if (this.#module === null) {
+      throw Error("[TableDef] getModule, module is null ");
+    }
+    return this.#module;
+  }
+
   setModule(module: ViewServerModule) {
     this.#module = module;
   }
@@ -110,6 +119,15 @@ export const TableDef = (
     links?: VisualLinks;
   }
 ): TableDef => {
+  const { links = VisualLinks(), ...rest } = options;
+  return new TableDefImpl({ ...rest, links });
+};
+
+export const SessionTableDef = (
+  options: Omit<TableDefConfig, "links"> & {
+    links?: VisualLinks;
+  }
+): SessionTableDef => {
   const { links = VisualLinks(), ...rest } = options;
   return new TableDefImpl({ ...rest, links });
 };

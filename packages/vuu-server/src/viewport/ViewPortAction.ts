@@ -1,11 +1,22 @@
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { type RenderComponent } from "./RenderComponent";
 
-export class ViewPortAction {}
+export interface ViewPortAction {}
 
-export class NoAction extends ViewPortAction {}
+export const NoAction = (): ViewPortAction => ({
+  type: "NO_ACTION",
+});
 
-export class OpenDialogViewPortAction extends ViewPortAction {
-  constructor(public table: VuuTable, public renderComponent: string = "grid") {
-    super();
-  }
+export interface OpenDialogViewPortAction extends ViewPortAction {
+  renderComponent: RenderComponent | string;
+  table: VuuTable;
+  type: "OPEN_DIALOG_ACTION";
 }
+export const OpenDialogViewPortAction = (
+  table: VuuTable,
+  renderComponent: OpenDialogViewPortAction["renderComponent"]
+): OpenDialogViewPortAction => ({
+  type: "OPEN_DIALOG_ACTION",
+  table,
+  renderComponent,
+});

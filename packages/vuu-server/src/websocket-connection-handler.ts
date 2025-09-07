@@ -63,7 +63,9 @@ export const websocketConnectionHandler = (
         // if (teardownHandler) {
         //   teardownHandler?.({}, session);
         // }
-        vuuServer.viewPortContainer.closeViewportsForSession(ws.data.sessionId);
+        vuuServer.viewPortContainer.removeViewportsForSession(
+          ws.data.sessionId
+        );
         const sessionCount = clearSession(ws.data.sessionId);
         if (sessionCount === 0) {
           stopHeartbeats?.();

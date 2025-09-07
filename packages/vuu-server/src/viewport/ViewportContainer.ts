@@ -123,7 +123,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  closeViewport(viewportId: string) {
+  removeViewport(viewportId: string) {
     const viewport = this.getViewportById(viewportId);
     viewport.destroy();
     this.#viewports.delete(viewportId);
@@ -148,23 +148,23 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  closeViewportsForSession(sessionId: string) {
+  removeViewportsForSession(sessionId: string) {
     console.log(
       `[ViewportContainer] close all viewports for session ${sessionId}`
     );
     for (const viewPort of this.listViewportsForSession(sessionId)) {
-      this.closeViewport(viewPort.id);
+      this.removeViewport(viewPort.id);
     }
   }
 
-  callRpcSelection(vpId: string, rpcName: string) {
+  callRpcSelection(vpId: string, rpcName: string, sessionId: string) {
     const viewport = this.getViewportById(vpId);
     const { menuMap } = viewport.viewPortDef.service;
-    console.log({ menuMap });
     const menuItem = menuMap.get(rpcName);
     if (menuItem instanceof SelectionViewPortMenuItem) {
       return menuItem.func(
-        ViewPortSelection(viewport.getSelection(), viewport)
+        ViewPortSelection(viewport.getSelection(), viewport),
+        sessionId
       );
     } else {
       throw Error(

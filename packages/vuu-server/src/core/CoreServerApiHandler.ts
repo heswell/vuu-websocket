@@ -11,6 +11,7 @@ import {
   VuuViewportCreateRequest,
   VuuViewportMenusRequest,
   VuuViewportRangeRequest,
+  VuuViewportRemoveRequest,
   VuuViewportVisualLinksRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "../provider/ProviderContainer";
@@ -19,6 +20,7 @@ import { TableContainer } from "./table/TableContainer";
 import { ISession } from "../server-types";
 import { tableRowsMessageBody } from "@heswell/data";
 import { hasViewPortContext, isViewportRpcRequest } from "@vuu-ui/vuu-utils";
+import logger from "../logger.ts";
 
 export class CoreServerApiHandler {
   constructor(
@@ -42,6 +44,8 @@ export class CoreServerApiHandler {
         return this.processGetTableMetaRequest(requestId, body, session);
       case "CREATE_VP":
         return this.processCreateViewPortRequest(requestId, body, session);
+      case "REMOVE_VP":
+        return this.processRemoveViewPortRequest(requestId, body, session);
       case "CREATE_VISUAL_LINK":
         return this.processCreateVisualLinkRequest(requestId, body, session);
       case "REMOVE_VISUAL_LINK":
@@ -59,6 +63,7 @@ export class CoreServerApiHandler {
       case "GET_VIEW_PORT_MENUS":
         return this.processGetViewPortMenusRequest(requestId, body, session);
       case "CHANGE_VP_RANGE":
+        logger.info({ requestId }, `CHANGE_VP_RANGE ${body.from}:${body.to}`);
         return this.processViewPortRange(requestId, body, session);
       case "RPC_REQUEST":
         return this.processRpcRequest(requestId, body, session);
@@ -140,6 +145,20 @@ export class CoreServerApiHandler {
 
     const { rows, size } = viewport.getDataForCurrentRange();
     session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, true));
+  }
+
+  private processRemoveViewPortRequest(
+    requestId: string,
+    { viewPortId }: VuuViewportRemoveRequest,
+    session: ISession
+  ) {
+    this.viewPortContainer.removeViewport(viewPortId);
+    session.removeViewport(viewPortId);
+
+    session.enqueue(requestId, {
+      type: "REMOVE_VP_SUCCESS",
+      viewPortId,
+    });
   }
 
   private processCreateVisualLinkRequest(
@@ -259,12 +278,16 @@ export class CoreServerApiHandler {
     { vpId, rpcName }: ClientToServerMenuSelectRPC,
     session: ISession
   ) {
-    const result = this.viewPortContainer.callRpcSelection(vpId, rpcName);
+    const action = this.viewPortContainer.callRpcSelection(
+      vpId,
+      rpcName,
+      session.id
+    );
 
     session.enqueue(requestId, {
-      action: { type: "NO_ACTION" },
-      type: "VIEW_PORT_MENU_RESP",
+      action,
       rpcName,
+      type: "VIEW_PORT_MENU_RESP",
       vpId,
     });
   }

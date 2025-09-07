@@ -51,7 +51,8 @@ export abstract class ViewPortMenuItem implements ViewPortMenu {
 }
 
 export type SelectionMenuFunc = (
-  selection: ViewPortSelection
+  selection: ViewPortSelection,
+  sessionId: string
 ) => ViewPortAction;
 
 export class SelectionViewPortMenuItem extends ViewPortMenuItem {
@@ -68,7 +69,7 @@ export class SelectionViewPortMenuItem extends ViewPortMenuItem {
   get asJson(): VuuMenuItem {
     return {
       context: "selected-rows",
-      filter: "",
+      filter: this.filter,
       name: this.name,
       rpcName: this.rpcName,
     };
@@ -82,7 +83,7 @@ export class CellViewPortMenuItem extends ViewPortMenuItem {
   get asJson(): VuuMenuItem {
     return {
       context: "cell",
-      filter: "",
+      filter: this.filter,
       name: this.name,
       rpcName: this.rpcName,
     };
@@ -96,7 +97,7 @@ export class TableViewPortMenuItem extends ViewPortMenuItem {
   get asJson(): VuuMenuItem {
     return {
       context: "grid",
-      filter: "",
+      filter: this.filter,
       name: this.name,
       rpcName: this.rpcName,
     };
@@ -110,7 +111,7 @@ export class RowViewPortMenuItem extends ViewPortMenuItem {
   get asJson(): VuuMenuItem {
     return {
       context: "row",
-      filter: "",
+      filter: this.filter,
       name: this.name,
       rpcName: this.rpcName,
     };

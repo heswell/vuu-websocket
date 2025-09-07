@@ -55,6 +55,11 @@ export class InMemDataTable extends Table implements DataTable {
       );
     }
   }
+
+  processUpdate(key: string, row: VuuDataRow) {
+    // TODO check for update
+    this.insert(row);
+  }
 }
 
 export const isDataTable = (table: object): table is DataTable =>

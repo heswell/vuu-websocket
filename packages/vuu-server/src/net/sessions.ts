@@ -188,7 +188,7 @@ class Session implements ISession {
   get ws() {
     return this.#ws;
   }
-
+  // TODO what are they for ?
   addViewport(viewportId: string) {
     this.#viewports.push(viewportId);
   }
@@ -202,42 +202,22 @@ class Session implements ISession {
 
   enqueue(requestId: string, messageBody: ServerMessageBody) {
     if (this.#token && this.#user) {
-      const tableMessageForViewport = tableMessageWithData(messageBody)
-        ? this.#queue.find(tableMessageViewport(messageBody))
-        : undefined;
-
-      if (tableMessageForViewport) {
-        const { rows: earlierRows } = tableMessageForViewport.body;
-        const { rows: newRows } = messageBody as ServerToClientTableRows;
-
-        for (const newRow of newRows) {
-          const pos = earlierRows.findIndex(
-            (r) => r.rowIndex === newRow.rowIndex
-          );
-          //QUESTION: by conflating updates like this, we preserve the timeSTamp value
-          // of first TABLE_ROW update queued, losing the timeStamp of later updates
-          // to same rows within same tick. Does thia matter ?
-          if (pos === -1) {
-            earlierRows.push(newRow);
-          } else {
-            earlierRows[pos] = newRow;
-          }
-        }
-      } else {
-        this.#queue.push({
-          module: "CORE",
-          requestId,
-          sessionId: this.#id,
-          token: this.#token,
-          user: this.#user,
-          body: messageBody,
-        });
-        logger.info(
-          `[VUU:net:Session] enqueue ${messageBody.type}, ${
-            this.#queue.length
-          } messages queued`
-        );
-      }
+      // removed logic here that updated existing data upates with later updates.
+      // It broke scrolling because TABLE_ROW entries were being inserted to an earlier batch,
+      // placing them before the corresponding CHANGE_RANGE_SUCCESS ACK message
+      this.#queue.push({
+        module: "CORE",
+        requestId,
+        sessionId: this.#id,
+        token: this.#token,
+        user: this.#user,
+        body: messageBody,
+      });
+      logger.info(
+        `[VUU:net:Session] enqueue ${requestId} ${messageBody.type}, ${
+          this.#queue.length
+        } messages queued`
+      );
     } else {
       throw Error("no message can be sent to client before LOGIN");
     }
@@ -245,6 +225,13 @@ class Session implements ISession {
 
   dequeueAllMessages = () => {
     const queue = this.#queue.dequeueAllMessages();
+    if (queue.length) {
+      logger.info(
+        `dequeued messages to send to client ${queue
+          .map((m) => `#${m.requestId} ${m.body.type}`)
+          .join(",")}`
+      );
+    }
     if (queue.length > 0) {
       return queue;
     } else {

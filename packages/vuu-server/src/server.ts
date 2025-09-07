@@ -4,7 +4,7 @@ import { websocketConnectionHandler } from "./websocket-connection-handler";
 import { uuid } from "@vuu-ui/vuu-utils";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
-const CLIENT_UPDATE_FREQUENCY = 250;
+const CLIENT_UPDATE_FREQUENCY = 120;
 const HEARTBEAT_FREQUENCY = 6000;
 
 const msgConfig: ServerMessagingConfig = {
