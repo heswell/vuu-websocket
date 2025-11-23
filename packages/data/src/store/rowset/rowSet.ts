@@ -1,6 +1,3 @@
-/**
- * Keep all except for groupRowset in this file to avoid circular reference warnings
- */
 import { filterPredicate } from "@vuu-ui/vuu-filter-parser";
 import { Filter } from "@vuu-ui/vuu-filter-types";
 import type {
@@ -12,12 +9,8 @@ import type {
 import { projectColumn, projectColumns } from "../columnUtils.ts";
 import { extendsExistingFilter } from "../filter.ts";
 import { getDeltaRange, getFullRange } from "../rangeUtils.ts";
-import { identifySelectionChanges } from "../selectionUtils";
 import {
   getSortSetInsertionPosition,
-  revertToIndexSort,
-  sort,
-  sortExtend,
   sortExtendsExistingSort,
   sortRemoved,
   sortReversed,
@@ -26,7 +19,6 @@ import {
 import { Table } from "../table.ts";
 import { BaseRowSet } from "./BaseRowSet.ts";
 import { DataResponse } from "./IRowSet.ts";
-import { TableColumnType } from "@heswell/vuu-server";
 import logger from "../../logger.ts";
 
 const SINGLE_COLUMN = 1;
@@ -40,13 +32,6 @@ export type RowSetConstructorOptions = {
 };
 
 export class RowSet extends BaseRowSet {
-  // TODO stream as above
-  // static fromGroupRowSet({ table, columns, currentFilter: filter }) {
-  //   return new RowSet(table, columns, {
-  //     filter,
-  //   });
-  // }
-  //TODO consolidate API of rowSet, groupRowset
   constructor(
     viewportId: string,
     table: Table,
@@ -62,8 +47,6 @@ export class RowSet extends BaseRowSet {
       columns,
       columnMap
     );
-    this.sortSet = sortSet ?? this.buildSortSet();
-    this.setMapKeys(this.sortedIndex, this.sortSet);
 
     if (range) {
       this.range = range;
@@ -72,56 +55,6 @@ export class RowSet extends BaseRowSet {
     if (filter) {
       this.currentFilter = filter;
       this.filter(filter);
-    }
-  }
-
-  /**
-   *
-   * Initialise an empty sortset,
-   * allowing for two sort columns.
-   * We are only currently supporting one or two columns sorting.
-   * TODO mechanism for > 2 column sort
-   * populate map of row key values to sortSet index positions
-   */
-  buildSortSet() {
-    const { rows } = this.table;
-    const sortSet: SortSet = Array(rows.length);
-    for (let i = 0; i < rows.length; i++) {
-      // this is the initial, unsorted state, where rowIndex value
-      // (first item of sortSet tuple) equals rowIndex value from data)
-      // and is same as natural array position. The latter will no longer
-      // be true once data is sorted.
-      sortSet[i] = [i, 0, 0];
-    }
-    return sortSet;
-  }
-
-  setMapKeys(
-    keyMap: Map<string, number>,
-    sortSet: SortSet,
-    filterSet?: number[]
-  ) {
-    const { table, indexOfKeyField } = this;
-    keyMap.clear();
-
-    if (filterSet) {
-      for (let i = 0; i < filterSet.length; i++) {
-        const sortSetIndexIndex = filterSet[i];
-        const [rowIndex] = sortSet[sortSetIndexIndex];
-        const keyValue = table.rows[rowIndex][indexOfKeyField];
-        keyMap.set(keyValue.toString(), i);
-      }
-    } else {
-      for (let i = 0; i < sortSet.length; i++) {
-        const [rowIndex] = sortSet[i];
-        const keyValue = table.rows[rowIndex][indexOfKeyField] as string;
-        if (keyMap.has(keyValue)) {
-          throw Error(
-            `duplicate key value ${keyValue} (${this.table.schema.table.table})`
-          );
-        }
-        keyMap.set(keyValue, i);
-      }
     }
   }
 
@@ -148,9 +81,9 @@ export class RowSet extends BaseRowSet {
   }
 
   slice(lo: number, hi: number) {
-    const { table, filterSet, selected, sortSet } = this;
+    const { table, selected } = this;
+    const { keys: indexSet, filterSet, sortSet } = this.sortedIndex;
 
-    const indexSet = filterSet ?? sortSet;
     const getRowIndex = filterSet
       ? (idx: number) => sortSet[filterSet[idx]][0]
       : (idx: number) => sortSet[idx][0];
@@ -167,7 +100,7 @@ export class RowSet extends BaseRowSet {
   }
 
   get size() {
-    return this.filterSet?.length ?? this.sortSet.length;
+    return this.sortedIndex.length;
   }
 
   get first() {
@@ -176,55 +109,23 @@ export class RowSet extends BaseRowSet {
   get last() {
     return this.table.rows.at(-1);
   }
-  // get rawData() {
-  //   return this.table.rows;
-  // }
 
-  // selected are the index positions of rows as presented to the user. That
-  // means they refer to positions within the current indexSet. We will store
-  // them as positions within the underlying table, which never change.
-  // Note: deletions from the underlying table will have to be dealt with.
-
-  private selectedIndicesToKeyValues = (selectedIndices: number[]) => {
-    const {
-      filterSet,
-      sortSet,
-      table: { columnMap, rows, schema },
-    } = this;
-    const indexOfKeyField = columnMap[schema.key];
-    if (filterSet) {
-      return selectedIndices.map((idx) => {
-        const sortSetIndex = filterSet[idx];
-        const [rowIndex] = sortSet[sortSetIndex];
-        return rows[rowIndex][indexOfKeyField] as string;
-      });
-    } else {
-      return selectedIndices.map(
-        (idx) => rows[sortSet[idx][0]][indexOfKeyField] as string
-      );
+  selectRow(rowKey: string, preserveExistingSelection: boolean) {
+    const deselectedRowKeys = preserveExistingSelection
+      ? []
+      : Array.from(this.selected);
+    if (!preserveExistingSelection) {
+      this.selected.clear();
     }
-  };
+    this.selected.add(rowKey);
 
-  select(selected: number[]): DataResponse {
-    const {
-      filterKeyMap,
-      filterSet,
-      range,
-      size,
-      sortedIndex: sortKeyMap,
-      sortSet,
-    } = this;
+    const { range, size } = this;
+    const { filterSet, keyMap, sortSet } = this.sortedIndex;
     const { columnMap, rows } = this._table;
 
-    const selectedKeyValues = this.selectedIndicesToKeyValues(selected);
-
+    // walk the rows in client range and create update records for any where
+    // key value is deselected or selected
     const { from, to } = range;
-    const [newSelected, deselected] = identifySelectionChanges(
-      this.selected,
-      selectedKeyValues
-    );
-    this.selected = selectedKeyValues;
-    const keyMap = filterSet ? filterKeyMap : sortKeyMap;
     const getRowIndex = filterSet
       ? (idx: number) => sortSet[filterSet[idx]][0]
       : (idx: number) => sortSet[idx][0];
@@ -235,11 +136,11 @@ export class RowSet extends BaseRowSet {
     const projectRow = projectColumn(
       keyFieldIndex,
       this.viewportId,
-      selectedKeyValues,
+      this.selected,
       this.size
     );
 
-    for (const key of newSelected) {
+    for (const key of this.selected) {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
@@ -247,7 +148,7 @@ export class RowSet extends BaseRowSet {
       }
     }
 
-    for (const key of deselected) {
+    for (const key of deselectedRowKeys) {
       const idx = keyMap.get(key) as number;
       const rowIndex = getRowIndex(idx);
       if (idx >= from && idx < to) {
@@ -257,6 +158,68 @@ export class RowSet extends BaseRowSet {
 
     return {
       rows: updatedRows,
+      selectedRowCount: 0,
+      size,
+    };
+  }
+
+  deselectRow(rowKey: string, preserveExistingSelection: boolean) {
+    const deselectedRowKeys = preserveExistingSelection
+      ? [rowKey]
+      : Array.from(this.selected);
+    if (!preserveExistingSelection) {
+      this.selected.clear();
+    } else {
+      this.selected.delete(rowKey);
+    }
+
+    const { range, size } = this;
+    const { filterSet, keyMap, sortSet } = this.sortedIndex;
+    const { columnMap, rows } = this._table;
+
+    // walk the rows in client range and create update records for any where
+    // key value is deselected or selected
+    const { from, to } = range;
+    const getRowIndex = filterSet
+      ? (idx: number) => sortSet[filterSet[idx]][0]
+      : (idx: number) => sortSet[idx][0];
+
+    const keyFieldIndex = columnMap[this.table.schema.key];
+
+    const updatedRows: VuuRow[] = [];
+    const projectRow = projectColumn(
+      keyFieldIndex,
+      this.viewportId,
+      this.selected,
+      this.size
+    );
+
+    for (const key of deselectedRowKeys) {
+      const idx = keyMap.get(key) as number;
+      const rowIndex = getRowIndex(idx);
+      if (idx >= from && idx < to) {
+        updatedRows.push(projectRow(rows[rowIndex], idx));
+      }
+    }
+
+    return {
+      rows: updatedRows,
+      selectedRowCount: 0,
+      size,
+    };
+  }
+
+  selectRowRange(
+    fromRowKey: string,
+    toRowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    const { size } = this;
+    const updatedRows: VuuRow[] = [];
+
+    return {
+      rows: updatedRows,
+      selectedRowCount: 0,
       size,
     };
   }
@@ -274,33 +237,29 @@ export class RowSet extends BaseRowSet {
 
   sort(sortCols: VuuSortCol[]) {
     const start = performance.now();
-    const { table, filterSet, sortSet } = this;
+    const { table } = this;
+    const { filterSet, sortSet } = this.sortedIndex;
     const { columnMap } = this._table;
 
     if (sortRemoved(this.sortCols, sortCols)) {
-      // we don't need to do this, we just bypass the sortSet entirely
-      revertToIndexSort(sortSet);
+      this.sortedIndex.revertSort();
     } else if (sortReversed(this.sortCols, sortCols, SINGLE_COLUMN)) {
-      sortSet.reverse();
-      this.setMapKeys(this.sortedIndex, sortSet);
+      this.sortedIndex.reverseSortSet();
     } else if (sortExtendsExistingSort(this.sortCols, sortCols)) {
-      sortExtend(sortSet, table.rows, sortCols, columnMap);
+      this.sortedIndex.extendSort(sortCols);
     } else {
-      sort(sortSet, table.rows, sortCols, columnMap);
+      this.sortedIndex.sort(sortCols);
     }
 
     this.sortCols = sortCols.length > 0 ? sortCols : undefined;
 
-    this.setMapKeys(this.sortedIndex, sortSet);
-
     if (filterSet && this.currentFilter) {
       const fn = filterPredicate(columnMap, this.currentFilter);
 
-      const indexSet = sortSet;
       const getRowIndex = (idx: number) => sortSet[idx][0];
       const newFilterSet: number[] = [];
 
-      for (let i = 0; i < indexSet.length; i++) {
+      for (let i = 0; i < sortSet.length; i++) {
         const rowIdx = getRowIndex(i);
         const row = table.rows[rowIdx];
         if (fn(row)) {
@@ -308,9 +267,7 @@ export class RowSet extends BaseRowSet {
         }
       }
 
-      this.setMapKeys(this.filterKeyMap, this.sortSet, newFilterSet);
-
-      this.filterSet = newFilterSet;
+      this.sortedIndex.filterSet = newFilterSet;
     }
     const end = performance.now();
     console.log(`sort took ${end - start} ms`);
@@ -318,7 +275,7 @@ export class RowSet extends BaseRowSet {
 
   clearFilter() {
     this.currentFilter = undefined;
-    this.filterSet = undefined;
+    this.sortedIndex.filterSet = undefined;
   }
 
   filter(filter: Filter) {
@@ -331,7 +288,8 @@ export class RowSet extends BaseRowSet {
     );
 
     const fn = filterPredicate(columnMap, filter);
-    const { table, filterSet, sortSet } = this;
+    const { table } = this;
+    const { filterSet, sortSet } = this.sortedIndex;
 
     // if we're extending the current filter, filterset cannot be undefined
     const indexSet = extendsCurrentFilter ? (filterSet as number[]) : sortSet;
@@ -350,9 +308,7 @@ export class RowSet extends BaseRowSet {
       }
     }
 
-    this.setMapKeys(this.filterKeyMap, this.sortSet, newFilterSet);
-
-    this.filterSet = newFilterSet;
+    this.sortedIndex.filterSet = newFilterSet;
     this.currentFilter = filter;
 
     const end = performance.now();
@@ -371,13 +327,17 @@ export class RowSet extends BaseRowSet {
       }
     } else if (this.currentFilter === undefined) {
       // if we've sorted the data we're going to have to search for the rowIndex
-      const sortedIdx = this.sortSet.findIndex(([idx]) => idx === rowIdx);
+      const sortedIdx = this.sortedIndex.sortSet.findIndex(
+        ([idx]) => idx === rowIdx
+      );
       if (sortedIdx >= this.range.from && sortedIdx < this.range.to) {
         return { rows: this.slice(sortedIdx, sortedIdx + 1), size: this.size };
       }
-    } else if (this.filterSet) {
+    } else if (this.sortedIndex.filterSet) {
       if (this.sortCols === undefined) {
-        const filterIdx = this.filterSet.findIndex((i) => i === rowIdx);
+        const filterIdx = this.sortedIndex.filterSet.findIndex(
+          (i) => i === rowIdx
+        );
         if (filterIdx !== -1) {
           if (filterIdx >= this.range.from && filterIdx < this.range.to) {
             return {
@@ -389,19 +349,11 @@ export class RowSet extends BaseRowSet {
       } else {
         throw Error("whoah, filter AND sort");
       }
-      // sorted AND/OR filtered
-      // for (let i = this.range.from; i < this.range.to; i++) {
-      //   //TODO this is an index into sortSet not directly into data
-      //   const rowIdx = this.filterSet[i];
-      //   if (rowIdx === rowIndex) {
-      //     return [i, ...updates];
-      //   }
-      // }
     }
   }
 
   delete(rowIndex: number, row: VuuDataRow): DataResponse {
-    const { sortSet } = this;
+    const { sortSet } = this.sortedIndex;
     if (this.sortCols === undefined) {
       // the sortSet is still in table order
       sortSet.length -= 1;
@@ -427,11 +379,12 @@ export class RowSet extends BaseRowSet {
   }
   insert(rowIndex: number, row: VuuDataRow): DataResponse {
     const { columnMap } = this._table;
+    const { sortSet } = this.sortedIndex;
 
     // TODO multi colun sort sort DSC
     if (this.sortCols === undefined && this.currentFilter === undefined) {
       // simplest scenario, row will be at end of sortset ...
-      this.sortSet.push([rowIndex, 0, 0]);
+      sortSet.push([rowIndex, 0, 0]);
       if (rowIndex >= this.range.to) {
         // ... row is beyond viewport
         return {
@@ -457,13 +410,13 @@ export class RowSet extends BaseRowSet {
       const sortValue = row[sortColKey];
 
       const insertPosition = getSortSetInsertionPosition(
-        this.sortSet,
+        sortSet,
         sortCol,
         sortValue
       );
 
       if (insertPosition === "start") {
-        this.sortSet.unshift([rowIndex, sortValue, 0]);
+        sortSet.unshift([rowIndex, sortValue, 0]);
 
         if (this.range.from === 0) {
           return this.currentRange();
@@ -474,7 +427,7 @@ export class RowSet extends BaseRowSet {
           };
         }
       } else if (insertPosition === "end") {
-        this.sortSet.push([rowIndex, sortValue, 0]);
+        sortSet.push([rowIndex, sortValue, 0]);
         // TODO work out if within viewport
         return {
           rows: [],
@@ -490,105 +443,5 @@ export class RowSet extends BaseRowSet {
     } else {
       throw Error("only support insert into no-filter rowsets at the moment");
     }
-
-    // else if (this.currentFilter === undefined) {
-    //   // sort only - currently only support single column sorting
-    //   const sortCols = mapSortDefsToSortCriteria(
-    //     this.sortCols,
-    //     this._table.columnMap
-    //   );
-    //   const [[colIdx]] = sortCols;
-    //   const sortRow: SortItem = [rowIndex, row[colIdx], 0];
-    //   const sorter = sortBy([[1, ASC]]); // the sortSet is always ascending
-    //   const sortPos = sortPosition(
-    //     this.sortSet,
-    //     sorter,
-    //     sortRow,
-    //     "last-available"
-    //   );
-    //   this.sortSet.splice(sortPos, 0, sortRow);
-
-    //   const viewportPos = sortPos;
-
-    //   if (viewportPos >= this.range.to) {
-    //     return {
-    //       size: this.size,
-    //     };
-    //   } else if (viewportPos >= this.range.from) {
-    //     return {
-    //       size: this.size,
-    //       replace: true,
-    //     };
-    //   } else {
-    //     return {
-    //       size: this.size,
-    //     };
-    //   }
-    // } else if (this.sortCols === undefined) {
-    //   // filter only
-    //   const fn = filterPredicate(columnMap, this.currentFilter);
-    //   if (fn(row)) {
-    //     const navIdx = this.filterSet?.length;
-    //     this.filterSet?.push(rowIndex);
-    //     if (navIdx >= this.range.to) {
-    //       // ... row is beyond viewport
-    //       return {
-    //         size: this.size,
-    //       };
-    //     } else if (navIdx >= this.range.from) {
-    //       // ... row is within viewport
-    //       return {
-    //         size: this.size,
-    //         replace: true,
-    //       };
-    //     } else {
-    //       return {
-    //         size: this.size,
-    //       };
-    //     }
-    //   } else {
-    //     return {};
-    //   }
-    // } else {
-    //   // sort AND filter
-    //   const fn = filterPredicate(columnMap, this.currentFilter);
-    //   if (fn(row)) {
-    //     // TODO what about totalCOunt
-
-    //     const sortCols = mapSortDefsToSortCriteria(
-    //       this.sortCols,
-    //       this.table.columnMap
-    //     );
-    //     const [[colIdx, direction]] = sortCols; // TODO multi-colun sort
-    //     const sortRow = [rowIndex, row[colIdx]];
-    //     const sorter = sortBy([[1, direction]]); // TODO DSC
-    //     const navIdx = sortPosition(
-    //       this.filterSet,
-    //       sorter,
-    //       sortRow,
-    //       "last-available"
-    //     );
-    //     this.filterSet.splice(navIdx, 0, sortRow);
-
-    //     if (navIdx >= this.range.to) {
-    //       // ... row is beyond viewport
-    //       return {
-    //         size: this.size,
-    //       };
-    //     } else if (navIdx >= this.range.from) {
-    //       // ... row is within viewport
-    //       return {
-    //         size: this.size,
-    //         replace: true,
-    //       };
-    //     } else {
-    //       return {
-    //         size: this.size,
-    //       };
-    //     }
-    //   } else {
-    //     return {};
-    //   }
-    // }
   }
 }

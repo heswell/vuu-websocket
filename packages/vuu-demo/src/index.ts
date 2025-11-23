@@ -14,8 +14,8 @@ export default function start() {
 
   const config = VuuServerConfig(httpServerOptions, webSocketOptions)
     .withModule(PricesModule())
-    .withModule(SimulationModule())
-    .withModule(OrdersModule());
+    .withModule(SimulationModule());
+  // .withModule(OrdersModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())
   // .withModule(BasketModule());

@@ -1,18 +1,14 @@
 import {
   ArrayDataStreamSource,
+  IDataStore,
   IDequeue,
   ResourceMessage,
   SessionContainer,
   WebSocketSink,
   type WebsocketData,
 } from "@heswell/service-utils";
-import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket, WebSocketHandler } from "bun";
 import logger from "./logger";
-
-export interface IDataStore {
-  getSnapshot: (resourceName: string) => VuuDataRow[];
-}
 
 interface ClientMessage {
   resource: string;
@@ -32,7 +28,7 @@ export class WebSocketConnectionHandler
   }
 
   open = (ws: ServerWebSocket<WebsocketData>) => {
-    logger.info(
+    console.log(
       `[${this.loggingContext}:WebSocketConnectionHandler] new WebSocket, open a new Session = ${ws.data.sessionId}`
     );
 
@@ -93,9 +89,9 @@ export class WebSocketConnectionHandler
   };
 }
 
-setInterval(() => {
-  const count = WebSocketSink.messageCount;
-  if (count > 0) {
-    console.log(`${count} messages`);
-  }
-}, 1000);
+// setInterval(() => {
+//   const count = WebSocketSink.messageCount;
+//   if (count > 0) {
+//     console.log(`${count} messages`);
+//   }
+// }, 1000);

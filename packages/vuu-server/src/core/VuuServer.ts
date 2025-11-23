@@ -12,7 +12,7 @@ import { JoinTableProvider } from "../provider/JoinTableProvider";
 import { ModuleContainer } from "./module/ModuleContainer";
 import { TableContainer } from "./table/TableContainer";
 import { CoreServerApiHandler } from "./CoreServerApiHandler";
-import { DataTable, isDataTable } from "./table/InMemDataTable";
+import { isDataTable } from "./table/InMemDataTable";
 
 export class VuuServer {
   protected providerContainer: ProviderContainer;

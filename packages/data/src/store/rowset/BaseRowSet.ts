@@ -8,26 +8,23 @@ import {
   metaData,
   MultiRowProjectorFactory,
 } from "../columnUtils";
-import { DataResponse } from "./IRowSet";
-
-const NULL_SORTSET: SortSet = [[-1, -1, -1]];
+import { DataResponse, DataResponseSelectedRows } from "./IRowSet";
+import { SortedIndex } from "../SortedIndex";
 
 export abstract class BaseRowSet {
   protected _table: Table;
-  protected filterKeyMap: Map<string, number> = new Map();
   protected meta: ColumnMetaData;
   /** key values of selected rows   */
-  protected selected: string[] = [];
+  protected selected = new Set<string>();
   protected sortCols: VuuSortCol[] | undefined;
-  protected sortedIndex = new Map<string, number>();
 
   public columns: string[];
   public currentFilter: Filter | undefined;
   /** filterSet is an array of index positions into the sortSet */
-  public filterSet: number[] | undefined;
   public range: VuuRange = NULL_RANGE;
-  public sortSet: SortSet = NULL_SORTSET;
   public viewportId: string;
+
+  protected sortedIndex: SortedIndex;
 
   project: MultiRowProjectorFactory = () => () => {
     throw Error("project method must be implemented");
@@ -38,6 +35,7 @@ export abstract class BaseRowSet {
     this._table = table;
     this.columns = columns;
     this.meta = metaData(columns);
+    this.sortedIndex = new SortedIndex(table);
   }
 
   get table() {
@@ -45,11 +43,11 @@ export abstract class BaseRowSet {
   }
 
   get keys() {
-    return this.filterSet ?? this.sortSet;
+    return this.sortedIndex.keys;
   }
 
   protected get keyMap() {
-    return this.filterSet ? this.filterKeyMap : this.sortedIndex;
+    return this.sortedIndex.keyMap;
   }
 
   get totalRowCount() {
@@ -57,7 +55,7 @@ export abstract class BaseRowSet {
   }
 
   get selectedRowCount() {
-    return this.selected.length;
+    return this.selected.size;
   }
 
   get selectedKeys() {
@@ -73,6 +71,28 @@ export abstract class BaseRowSet {
   abstract filter(filter: Filter): void;
 
   abstract sort(sortDefs: VuuSortCol[]): void;
+
+  selectRow(
+    rowKey: string,
+    preserveExistingSelection: boolean
+  ): DataResponseSelectedRows {
+    throw Error("not implemented");
+  }
+
+  deselectRow(
+    rowKey: string,
+    preserveExistingSelection: boolean
+  ): DataResponseSelectedRows {
+    throw Error("not implemented");
+  }
+
+  selectRowRange(
+    fromRowKey: string,
+    toRowKey: string,
+    preserveExistingSelection: boolean
+  ): DataResponseSelectedRows {
+    throw Error("not implemented");
+  }
 
   clear() {
     console.log("clear rowset");

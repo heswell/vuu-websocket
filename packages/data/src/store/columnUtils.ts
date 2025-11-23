@@ -1,12 +1,11 @@
-import { TableColumn } from "@heswell/server-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
 import { SET_FILTER_DATA_COLUMNS } from "./filter.ts";
-import { TableIndex } from "./table.ts";
 import {
   VuuDataRow,
   VuuRow,
   VuuRowDataItemType,
 } from "@vuu-ui/vuu-protocol-types";
+import { TableColumn } from "@heswell/vuu-server";
 
 type ColumnDescriptor = string | { name: string; key?: number };
 
@@ -56,7 +55,7 @@ export type GroupRowProjector = (
 ) => VuuRow;
 export type RowProjector = (row: VuuDataRow, rowIndex: number) => VuuRow;
 export type MultiRowProjectorFactory = (
-  selectedKeyValues: string[],
+  selectedKeyValues: Set<string>,
   vpSize: number
 ) => RowProjector;
 
@@ -82,13 +81,13 @@ export function projectColumns(
   });
 
   if (columns === undefined && columnMap === undefined) {
-    return (selected: string[] = [], vpSize: number) =>
+    return (selected: Set<string>, vpSize: number) =>
       (data: VuuDataRow, rowIndex: number) => {
         const rowKey = data[keyFieldIndex] as string;
         return {
           rowIndex,
           rowKey,
-          sel: selected.includes(rowKey) ? 1 : 0,
+          sel: selected.has(rowKey) ? 1 : 0,
           ts: +new Date(),
           updateType: "U",
           viewPortId,
@@ -101,13 +100,13 @@ export function projectColumns(
     const projectRowData = (data: VuuDataRow) => {
       return columns.map((col) => data[columnMap[col]]);
     };
-    return (selected: string[] = [], vpSize: number) =>
+    return (selected: Set<string>, vpSize: number) =>
       (data: VuuDataRow, rowIndex: number) => {
         const rowKey = data[keyFieldIndex] as string;
         return {
           rowIndex,
           rowKey,
-          sel: selected.includes(rowKey) ? 1 : 0,
+          sel: selected.has(rowKey) ? 1 : 0,
           ts: +new Date(),
           updateType: "U",
           viewPortId,
@@ -126,7 +125,7 @@ export function projectColumns(
 export const projectColumn = (
   keyFieldIndex: number,
   viewPortId: string,
-  selected: string[],
+  selected: Set<string>,
   vpSize: number
 ): RowProjector => {
   return (data: VuuDataRow, rowIndex: number) => {
@@ -134,7 +133,7 @@ export const projectColumn = (
     return {
       rowIndex,
       rowKey,
-      sel: selected.includes(rowKey) ? 1 : 0,
+      sel: selected.has(rowKey) ? 1 : 0,
       ts: +new Date(),
       updateType: "U",
       viewPortId,

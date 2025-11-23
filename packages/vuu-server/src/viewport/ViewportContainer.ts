@@ -157,13 +157,36 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
+  disableViewport(viewportId: string) {
+    console.log(`[ViewportContainer] disableViewport ${viewportId}`);
+    const viewport = this.getViewportById(viewportId);
+    if (viewport.enabled) {
+      viewport.enabled = false;
+    } else {
+      console.warn(
+        `[ViewportContainer] enableViewport, viewport ${viewportId} is already disabled`
+      );
+    }
+  }
+  enableViewport(viewportId: string) {
+    console.log(`[ViewportContainer] enableViewport ${viewportId}`);
+    const viewport = this.getViewportById(viewportId);
+    if (!viewport.enabled) {
+      viewport.enabled = true;
+    } else {
+      console.warn(
+        `[ViewportContainer] enableViewport, viewport ${viewportId} is already enabled`
+      );
+    }
+  }
+
   callRpcSelection(vpId: string, rpcName: string, sessionId: string) {
     const viewport = this.getViewportById(vpId);
     const { menuMap } = viewport.viewPortDef.service;
     const menuItem = menuMap.get(rpcName);
     if (menuItem instanceof SelectionViewPortMenuItem) {
       return menuItem.func(
-        ViewPortSelection(viewport.getSelection(), viewport),
+        ViewPortSelection(viewport.selectedKeys, viewport),
         sessionId
       );
     } else {
@@ -182,6 +205,38 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     return viewport.viewPortDef.service.processViewPortRpcCall(
       rpcName,
       new RpcParams([], params, viewport.columns, viewport.keys)
+    );
+  }
+
+  selectRow(
+    viewPortId: string,
+    rowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    const viewport = this.getViewportById(viewPortId);
+    return viewport.selectRow(rowKey, preserveExistingSelection);
+  }
+
+  deselectRow(
+    viewPortId: string,
+    rowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    const viewport = this.getViewportById(viewPortId);
+    return viewport.deselectRow(rowKey, preserveExistingSelection);
+  }
+
+  selectRowRange(
+    viewPortId: string,
+    fromRowKey: string,
+    toRowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    const viewport = this.getViewportById(viewPortId);
+    return viewport.selectRowRange(
+      fromRowKey,
+      toRowKey,
+      preserveExistingSelection
     );
   }
 

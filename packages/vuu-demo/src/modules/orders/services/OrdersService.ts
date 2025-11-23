@@ -6,7 +6,6 @@ import {
   TableContainer,
 } from "@heswell/vuu-server";
 import { isDataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
-import { RenderComponent } from "@heswell/vuu-server/src/viewport/RenderComponent";
 import { ViewPortSelection } from "@heswell/vuu-server/src/viewport/Viewport";
 import { OpenDialogViewPortAction } from "@heswell/vuu-server/src/viewport/ViewPortAction";
 import {

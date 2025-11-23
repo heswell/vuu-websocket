@@ -2,8 +2,13 @@ import { ServerWebSocket, WebSocketHandler } from "bun";
 import { WebsocketData } from "./server";
 import { WebSocketSink } from "./WebSocketSink";
 import instrumentStore from "./InstrumentStore";
-import { ArrayDataStreamSource, ResourceRequest } from "@heswell/service-utils";
+import {
+  ArrayDataStreamSource,
+  ResourceRequest,
+  Upsert,
+} from "@heswell/service-utils";
 import logger from "./logger";
+import { StoreDataStreamSource } from "@heswell/service-utils/src/StoreDataStreamSource";
 
 type ISession = {
   id: string;
@@ -16,7 +21,7 @@ export class WebSocketConnectionHandler
   #sessions = new Map<string, ISession>();
 
   open = (ws: ServerWebSocket<WebsocketData>) => {
-    logger.info(
+    console.log(
       `[ReferenceDataService] new WebSocket, open a new Session = ${ws.data.sessionId}`
     );
     const { sessionId } = ws.data;
@@ -30,9 +35,13 @@ export class WebSocketConnectionHandler
     ws: ServerWebSocket<WebsocketData>,
     message: string | Buffer
   ) => {
-    const { columns, resource, type } = JSON.parse(
-      message as string
-    ) as ResourceRequest;
+    const {
+      columns = [],
+      resource,
+      type,
+    } = JSON.parse(message as string) as ResourceRequest;
+
+    console.log({ columns, resource, type });
 
     const session = this.#sessions.get(ws.data.sessionId);
     if (session === undefined) {
@@ -63,6 +72,22 @@ export class WebSocketConnectionHandler
 
         break;
 
+      case "subscription":
+        {
+          console.log(
+            `[WebsocketConnectionHandler] subscription request received for ${resource}`
+          );
+          const readStream = new ReadableStream(
+            new StoreDataStreamSource(
+              instrumentStore,
+              columns,
+              "ReferenceData:service"
+            )
+          );
+          readStream.pipeTo(wsStream);
+        }
+
+        break;
       default:
         logger.warn(
           `[WebSocketConnectionHandler] unknown message type ${type}`
@@ -90,9 +115,9 @@ export class WebSocketConnectionHandler
   };
 }
 
-setInterval(() => {
-  const count = WebSocketSink.messageCount;
-  if (count > 0) {
-    console.log(`${count} messages`);
-  }
-}, 1000);
+// setInterval(() => {
+//   const count = WebSocketSink.messageCount;
+//   if (count > 0) {
+//     console.log(`${count} messages`);
+//   }
+// }, 1000);

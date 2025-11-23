@@ -2,6 +2,7 @@ import { VuuServer } from "./core/VuuServer";
 import { ServerMessagingConfig } from "./server-types";
 import { websocketConnectionHandler } from "./websocket-connection-handler";
 import { uuid } from "@vuu-ui/vuu-utils";
+import path from "path";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
 const CLIENT_UPDATE_FREQUENCY = 120;
@@ -13,22 +14,25 @@ const msgConfig: ServerMessagingConfig = {
   PRIORITY_UPDATE_FREQUENCY,
 };
 
-const WS_PORT = process.env.WEBSOCKET_PORT ?? 9090;
+const WS_PORT = process.env.WEBSOCKET_PORT ?? 8090;
 
 export interface WebsocketData {
   sessionId: string;
 }
 
 export default async function start(vuuServer: VuuServer) {
+  const certsPath = path.join(import.meta.dir, "../certs");
+
   const websocketServer = Bun.serve({
-    // certFile: "./certs/myCA.pem",
-    // keyFile: "./certs/myCA.key",
-    // passphrase: "1234",
+    certFile: `${certsPath}/cert.pem`,
+    keyFile: `${certsPath}/key.pem`,
     port: WS_PORT,
 
     fetch(req, server) {
       const sessionId = uuid();
-      console.log(`websocket upgrade request sessionId ${sessionId}`);
+      console.log(
+        `[VUU:server] websocket upgrade request sessionId ${sessionId}`
+      );
       const success = server.upgrade(req, { data: { sessionId } });
       if (success) {
         // Bun automatically returns a 101 Switching Protocols
@@ -37,12 +41,30 @@ export default async function start(vuuServer: VuuServer) {
       }
 
       // handle HTTP request normally
-      return new Response("Hello world!");
+      const url = new URL(req.url);
+      if (url.pathname === "/api/authn") {
+        console.log("auth request");
+        const vuuUser = {
+          name: "steve",
+          authorizations: [],
+        };
+        const token = `${btoa(JSON.stringify(vuuUser))}.${uuid()}`;
+
+        const responseInit: ResponseInit = {
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "vuu-auth-token": token,
+          },
+        };
+        return new Response("ok", responseInit);
+      } else {
+        return new Response("Hello world!");
+      }
     },
     websocket: websocketConnectionHandler(msgConfig, vuuServer),
   });
 
   console.log(
-    `Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
+    `[VUU] Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
   );
 }

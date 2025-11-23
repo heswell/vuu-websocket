@@ -1,12 +1,12 @@
 export * from "./ArrayDataStreamSource";
-export { accurateTimer } from "./Clock";
-export { default as Clock } from "./Clock";
-export { type IDequeue, MessageQueue } from "./MessageQueue";
-export * from "./SessionContainer";
-export {
-  type ResourceRequest,
-  loadTableFromRemoteResource,
-} from "./resource-loader";
-export * from "./WebSocketSink";
-export * from "./WebSocketConnectionHandler";
+export { accurateTimer, default as Clock } from "./Clock";
+export * from "./DataStore";
+export { MessageQueue, type IDequeue } from "./MessageQueue";
 export * from "./random-utils";
+export {
+  loadTableFromRemoteResource,
+  type ResourceRequest,
+} from "./resource-loader";
+export * from "./SessionContainer";
+export * from "./WebSocketConnectionHandler";
+export * from "./WebSocketSink";

@@ -1,10 +1,10 @@
 import {
   ClientMessageBody,
-  ClientToServerLogin,
   ServerMessageBody,
   ServerToClientTableRows,
   VuuClientMessage,
   VuuColumnDataType,
+  VuuLoginRequest,
   VuuServerMessage,
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
@@ -74,9 +74,9 @@ export interface ISession {
   removeViewport: (viewportId: string) => void;
   clear: () => void;
   enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
-  dequeueAllMessages: () => null | VuuServerMessage[];
+  dequeueAllMessages: () => null | (VuuServerMessage | string)[];
   kill: () => void;
-  login: (requestId: string, message: ClientToServerLogin) => void;
+  login: (requestId: string, message: VuuLoginRequest) => void;
   readonly id: string;
   readonly clientUnresponsive?: boolean;
   incomingHeartbeat?: number;

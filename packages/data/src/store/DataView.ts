@@ -136,7 +136,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.insert(rowIdx, row);
-    // logger.info(
+    // console.log(
     //   `[DataView:${this.#table.schema.table.table}] rowInserted ${
     //     rows.length
     //   } to be returned (rowSet range ${JSON.stringify(this.rowSet.range)})`
@@ -209,8 +209,24 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     return this.rowSet.setRange(range, useDelta);
   }
 
-  select(selection: number[]): DataResponse {
-    return this.rowSet.select(selection);
+  selectRow(rowKey: string, preserveExistingSelection: boolean) {
+    return this.rowSet.selectRow(rowKey, preserveExistingSelection);
+  }
+
+  deselectRow(rowKey: string, preserveExistingSelection: boolean) {
+    return this.rowSet.deselectRow(rowKey, preserveExistingSelection);
+  }
+
+  selectRowRange(
+    fromRowKey: string,
+    toRowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    return this.rowSet.selectRowRange(
+      fromRowKey,
+      toRowKey,
+      preserveExistingSelection
+    );
   }
 
   get selectedKeys() {

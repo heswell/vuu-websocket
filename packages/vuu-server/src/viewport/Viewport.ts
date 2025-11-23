@@ -12,20 +12,13 @@ import { DataTable, isDataTable } from "../core/table/InMemDataTable";
 import { SelectionEventHandler } from "@heswell/data";
 
 export interface ViewPortSelection {
-  rowKeyIndex: Map<string, number>;
   viewPort: Viewport;
 }
 
-export function ViewPortSelection(
-  selection: Map<string, number>,
-  viewPort: Viewport
-) {
+export function ViewPortSelection(viewPort: Viewport) {
   return new (class implements ViewPortSelection {
-    constructor(
-      public rowKeyIndex: Map<string, number>,
-      public viewPort: Viewport
-    ) {}
-  })(selection, viewPort);
+    constructor(public viewPort: Viewport) {}
+  })(viewPort);
 }
 
 export interface ViewPortVisualLink {
@@ -128,6 +121,7 @@ export const ViewPortVisualLink = (
   new RuntimeViewPortVisualLink(childVp, parentVp, childColumn, parentColumn);
 
 export class Viewport extends DataView {
+  #enabled: boolean = true;
   #session: ISession;
   #viewPortDef: ViewPortDef;
   #viewPortVisualLink?: RuntimeViewPortVisualLink;
@@ -147,6 +141,14 @@ export class Viewport extends DataView {
 
   get columns() {
     return this.#viewPortDef.columns;
+  }
+
+  get enabled() {
+    return this.#enabled;
+  }
+
+  set enabled(enabled: boolean) {
+    this.#enabled = enabled;
   }
 
   get dataTable() {
@@ -173,12 +175,33 @@ export class Viewport extends DataView {
     return this.selectedRowKeyIndex;
   }
 
+  /** deprecated */
   select(selection: number[]) {
     const response = super.select(selection);
     setTimeout(() => {
       this.emit("row-selection");
     }, 0);
     return response;
+  }
+
+  selectRow(rowKey: string, preserveExistingSelection: boolean) {
+    return super.selectRow(rowKey, preserveExistingSelection);
+  }
+
+  deselectRow(rowKey: string, preserveExistingSelection: boolean) {
+    return super.deselectRow(rowKey, preserveExistingSelection);
+  }
+
+  selectRowRange(
+    fromRowKey: string,
+    toRowKey: string,
+    preserveExistingSelection: boolean
+  ) {
+    return super.selectRowRange(
+      fromRowKey,
+      toRowKey,
+      preserveExistingSelection
+    );
   }
 
   setVisualLink(link: RuntimeViewPortVisualLink) {

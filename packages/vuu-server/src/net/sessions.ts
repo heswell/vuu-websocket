@@ -1,17 +1,13 @@
 import type {
-  ClientToServerLogin,
   ServerMessageBody,
-  ServerToClientTableRows,
+  VuuLoginRequest,
+  VuuLoginSuccessResponse,
 } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
 import logger from "../logger.ts";
 import { MessageQueue } from "../messageQueue.ts";
 import type { WebsocketData } from "../server.ts";
 import type { ISession } from "../server-types.ts";
-import {
-  tableMessageViewport,
-  tableMessageWithData,
-} from "../vuu-message-utils.ts";
 
 // TODO use SessionContainer
 const sessions = new Map<string, ISession>();
@@ -85,7 +81,12 @@ export function updateLoop(name: string, interval: number) {
       const queuedMessages = session.dequeueAllMessages();
       if (Array.isArray(queuedMessages)) {
         for (const message of queuedMessages) {
-          session.ws.send(JSON.stringify(message));
+          if (typeof message === "string") {
+            session.ws.send(message);
+          } else {
+            const str = JSON.stringify(message);
+            session.ws.send(str);
+          }
           messageCountPerSecond += 1;
         }
       } else if (typeof queuedMessages === "string") {
@@ -132,7 +133,7 @@ class Session implements ISession {
   #heartbeat = 0;
   #heatbeatResponseReceived = true;
   #id: string;
-  #user: string | undefined;
+  #user: string = "test-user";
   #ws: ServerWebSocket;
   #token: string | undefined;
   #queue: MessageQueue;
@@ -200,19 +201,23 @@ class Session implements ISession {
     }
   }
 
-  enqueue(requestId: string, messageBody: ServerMessageBody) {
-    if (this.#token && this.#user) {
+  enqueue(requestId: string, messageBody: ServerMessageBody | string) {
+    if (this.#token) {
       // removed logic here that updated existing data upates with later updates.
       // It broke scrolling because TABLE_ROW entries were being inserted to an earlier batch,
       // placing them before the corresponding CHANGE_RANGE_SUCCESS ACK message
-      this.#queue.push({
-        module: "CORE",
-        requestId,
-        sessionId: this.#id,
-        token: this.#token,
-        user: this.#user,
-        body: messageBody,
-      });
+      if (typeof messageBody === "string") {
+        this.#queue.push(messageBody);
+      } else {
+        this.#queue.push({
+          module: "CORE",
+          requestId,
+          sessionId: this.#id,
+          token: this.#token,
+          user: this.#user,
+          body: messageBody,
+        });
+      }
       logger.info(
         `[VUU:net:Session] enqueue ${requestId} ${messageBody.type}, ${
           this.#queue.length
@@ -225,13 +230,13 @@ class Session implements ISession {
 
   dequeueAllMessages = () => {
     const queue = this.#queue.dequeueAllMessages();
-    if (queue.length) {
-      logger.info(
-        `dequeued messages to send to client ${queue
-          .map((m) => `#${m.requestId} ${m.body.type}`)
-          .join(",")}`
-      );
-    }
+    // if (queue.length) {
+    //   logger.info(
+    //     `dequeued messages to send to client ${queue
+    //       .map((m) => `#${m.requestId} ${m.body.type}`)
+    //       .join(",")}`
+    //   );
+    // }
     if (queue.length > 0) {
       return queue;
     } else {
@@ -239,15 +244,17 @@ class Session implements ISession {
     }
   };
 
-  login(requestId: string, message: ClientToServerLogin) {
+  login(requestId: string, message: VuuLoginRequest) {
     console.log({ requestId, login: message });
-    const { token, user } = message;
-    this.#user = user;
+    const { token } = message;
     this.#token = token;
+
+    // this.enqueue(requestId, "Token has expired");
+
     this.enqueue(requestId, {
       type: "LOGIN_SUCCESS",
-      token,
-    });
+      vuuServerId: "server1",
+    } as VuuLoginSuccessResponse);
   }
 
   kill() {

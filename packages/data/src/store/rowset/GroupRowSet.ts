@@ -29,8 +29,6 @@ import {
   mapAggregationCriteria,
 } from "../aggregationUtils";
 import { GroupAggregator } from "./GroupAggregator";
-import { identifySelectionChanges } from "../selectionUtils";
-import { UpdateResultTuple } from "../table";
 
 export type Groups = { [key: string]: GroupedStruct };
 

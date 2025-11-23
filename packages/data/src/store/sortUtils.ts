@@ -16,7 +16,7 @@ export type SortItem = [number, ...VuuRowDataItemType[]];
 export type SortSet = SortItem[];
 
 type SortResult = 1 | 0 | -1;
-type SortComparator<T = SortItem> = (a: T, b: T) => SortResult;
+export type SortComparator<T = SortItem> = (a: T, b: T) => SortResult;
 
 export const mapSortDefsToSortCriteria = (
   sortDefs: VuuSortCol[] | undefined,
@@ -46,8 +46,6 @@ export function sortExtend(
     sort2ColsPlus1(sortSet, rows, sortDefs, columnMap);
   }
 }
-const sortIndex: SortComparator = ([a1], [b1]) =>
-  a1 > b1 ? 1 : b1 > a1 ? -1 : 0;
 
 const sort1A: SortComparator = ([, a1 = 0], [, b1 = 0]) =>
   a1 > b1 ? 1 : b1 > a1 ? -1 : 0;
@@ -72,8 +70,6 @@ const sort1A2A3A: SortComparator = (
     : b3 > a3
     ? -1
     : 0;
-
-export const revertToIndexSort = (sortSet: SortSet) => sortSet.sort(sortIndex);
 
 export const getSortFunctionOptimisedForSortCriteria = (
   sortDefs: VuuSortCol[]

@@ -2,6 +2,7 @@ import { Table } from "@heswell/data";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { type TableContainer } from "../core/table/TableContainer";
 import { loadTableFromRemoteResource } from "@heswell/service-utils";
+import { RemoteResourceMessageType } from "@heswell/service-utils/src/resource-loader";
 
 export interface IProvider {
   load: (tableContainer: TableContainer) => Promise<void>;
@@ -96,16 +97,19 @@ export abstract class RemoteProvider extends Provider {
 
   async load(_: TableContainer) {
     if (this.#loadPromise === undefined) {
-      const { resource, url } = this.remoteServiceDetails();
+      const { columns, remoteResourceMessageType, resource, url } =
+        this.remoteServiceDetails();
       const start = performance.now();
       const count = await loadTableFromRemoteResource({
+        columns,
         resource,
+        remoteResourceMessageType,
         url,
         table: this.table,
       });
       const end = performance.now();
       console.log(
-        `[module:SIMUL:RemoteProvider] ${count} ${resource} inserted [${
+        `[module:SIMUL:RemoteProvider] initial snapshot loaded, ${count} ${resource} inserted [${
           end - start
         }ms]`
       );
@@ -113,5 +117,10 @@ export abstract class RemoteProvider extends Provider {
       throw Error("[module:SIMUL:RemoteProvider] load has already been called");
     }
   }
-  abstract remoteServiceDetails(): { resource: string; url: string };
+  abstract remoteServiceDetails(): {
+    columns: string[];
+    remoteResourceMessageType?: RemoteResourceMessageType[];
+    resource: string;
+    url: string;
+  };
 }

@@ -4,7 +4,7 @@ import { ResourceMessage } from "./ArrayDataStreamSource";
 export interface ResourceRequest {
   columns?: string[];
   resource: string;
-  type: "snapshot";
+  type: "snapshot" | "subscription";
 }
 
 export type RemoteResourceUpdateType = "insert" | "update" | "delete";
@@ -38,6 +38,7 @@ export const loadTableFromRemoteResource = async ({
   url: string;
 }) => {
   const requestSnapshot = remoteResourceMessageType.includes("snapshot");
+  const requestInserts = remoteResourceMessageType.includes("insert");
   const requestUpdates = remoteResourceMessageType.includes("update");
   let { promise, resolve, reject } = Promise.withResolvers<number>();
   let socketStatus: "init" | "open" | "closed" | "data-load-complete" = "init";
@@ -63,7 +64,7 @@ export const loadTableFromRemoteResource = async ({
         );
         socketStatus = "data-load-complete";
 
-        if (!requestUpdates) {
+        if (!requestUpdates && !requestInserts) {
           socket?.close();
         }
         // Promise is resolved when initial data load completes, updates, inserts and deletes,
@@ -74,7 +75,11 @@ export const loadTableFromRemoteResource = async ({
         for (const row of message.rows) {
           table.insert(row);
         }
+      } else if (message.type === "insert") {
+        console.log(`>>> ${message.row[6]}`);
+        table.insert(message.row);
       } else {
+        console.log({ message });
         throw Error(
           `[service-utils] unexpected message from remote resource service`
         );
@@ -86,7 +91,11 @@ export const loadTableFromRemoteResource = async ({
       console.log(
         `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`
       );
-      if (requestSnapshot) {
+      if (requestSnapshot && requestInserts) {
+        socket?.send(
+          JSON.stringify({ type: "subscription", columns, resource })
+        );
+      } else if (requestSnapshot) {
         socket?.send(JSON.stringify({ type: "snapshot", columns, resource }));
       }
     });

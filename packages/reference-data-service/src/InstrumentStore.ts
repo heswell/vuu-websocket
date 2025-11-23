@@ -1,15 +1,9 @@
 import { Table } from "@heswell/data";
-import {
-  IDataStore,
-  IDequeue,
-  MessageQueue,
-  ResourceMessage,
-} from "@heswell/service-utils";
+import { IDataStore, DataStoreEvents } from "@heswell/service-utils";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { instrumentsSchema } from "./tableSchemas";
-import logger from "./logger";
 import { InstrumentDto } from "./InstrumentDto";
-import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 
 const projectRow = (
   columns: string[],
@@ -24,7 +18,10 @@ const projectRow = (
   };
 };
 
-class InstrumentStore implements IDataStore, IDequeue<ResourceMessage> {
+class InstrumentStore
+  extends EventEmitter<DataStoreEvents>
+  implements IDataStore
+{
   static #instance: InstrumentStore;
 
   public static get instance(): InstrumentStore {
@@ -37,13 +34,24 @@ class InstrumentStore implements IDataStore, IDequeue<ResourceMessage> {
   #instrumentsTable: Table = new Table({ schema: instrumentsSchema });
   #instrumentColumns = instrumentsSchema.columns.map((col) => col.name);
 
-  #queue = new MessageQueue<ResourceMessage>();
-
   #ready: Promise<void>;
 
   private constructor() {
+    super();
     this.#ready = Promise.resolve();
     import("./instrument-factory");
+  }
+  get count() {
+    return this.#instrumentsTable.rowCount;
+  }
+
+  getRows(from: number, to: number, columns: string[]): VuuDataRow[] {
+    const rows: VuuDataRow[] = [];
+    const rowMapper = projectRow(columns, this.#instrumentsTable.columnMap);
+    for (let i = from; i < to; i++) {
+      rows.push(rowMapper(this.#instrumentsTable.rows[i]));
+    }
+    return rows;
   }
 
   getSnapshot(resource: string, columns?: string[]) {
@@ -63,24 +71,10 @@ class InstrumentStore implements IDataStore, IDequeue<ResourceMessage> {
     return this.#ready;
   }
 
-  get hasUpdates() {
-    if (this.#queue.length > 0) {
-      console.log(
-        `[RefData:service:InstrumentsStore] hasUpdates ? queue length = ${
-          this.#queue.length
-        }`
-      );
-    }
-    return this.#queue.length > 0;
-  }
-
-  dequeueAllMessages() {
-    return this.#queue.dequeueAllMessages();
-  }
-
-  addInstrument(instrument: InstrumentDto, publishMessage = false) {
-    logger.info(
-      `[RefData:service:InstrumentStore] add Instrument  (publish ${publishMessage}),  ric: ${instrument.ric} `
+  addInstrument(instrument: InstrumentDto) {
+    // logger.info(
+    console.log(
+      `[RefData:service:InstrumentStore] add Instrument,  ric: ${instrument.ric} `
     );
     const columns = this.#instrumentColumns;
     const colCount = columns.length;
@@ -91,24 +85,12 @@ class InstrumentStore implements IDataStore, IDequeue<ResourceMessage> {
     }
     this.#instrumentsTable.insert(dataRow);
 
-    if (publishMessage) {
-      this.#queue.push({
-        type: "insert",
-        resource: "instruments",
-        row: dataRow,
-      });
-    }
+    this.emit("insert", dataRow);
   }
 
   updateInstrument(dataRow: VuuDataRow) {
     console.log(`update instrument ${JSON.stringify(dataRow)}`);
     this.#instrumentsTable.upsert(dataRow, true);
-
-    this.#queue.push({
-      type: "update",
-      resource: "instruments",
-      row: dataRow,
-    });
   }
 
   get instrumentsTable() {

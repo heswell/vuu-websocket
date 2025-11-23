@@ -1,14 +1,17 @@
 import {
   ClientToServerMenuSelectRPC,
-  ClientToServerSelection,
+  DeselectRowRequest,
+  SelectRowRangeRequest,
+  SelectRowRequest,
   VuuClientMessage,
   VuuCreateVisualLink,
   VuuRemoveVisualLink,
   VuuRpcServiceRequest,
-  VuuRpcViewportRequest,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
+  VuuViewportDisableRequest,
+  VuuViewportEnableRequest,
   VuuViewportMenusRequest,
   VuuViewportRangeRequest,
   VuuViewportRemoveRequest,
@@ -19,7 +22,7 @@ import { ViewportContainer } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { ISession } from "../server-types";
 import { tableRowsMessageBody } from "@heswell/data";
-import { hasViewPortContext, isViewportRpcRequest } from "@vuu-ui/vuu-utils";
+import { hasViewPortContext } from "@vuu-ui/vuu-utils";
 import logger from "../logger.ts";
 
 export class CoreServerApiHandler {
@@ -46,14 +49,22 @@ export class CoreServerApiHandler {
         return this.processCreateViewPortRequest(requestId, body, session);
       case "REMOVE_VP":
         return this.processRemoveViewPortRequest(requestId, body, session);
+      case "DISABLE_VP":
+        return this.processDisableViewPortRequest(requestId, body, session);
+      case "ENABLE_VP":
+        return this.processEnableViewPortRequest(requestId, body, session);
       case "CREATE_VISUAL_LINK":
         return this.processCreateVisualLinkRequest(requestId, body, session);
       case "REMOVE_VISUAL_LINK":
         return this.processRemoveVisualLinkRequest(requestId, body, session);
       case "CHANGE_VP":
         return this.processChangeViewPortRequest(requestId, body, session);
-      case "SET_SELECTION":
-        return this.processSetSelectionRequest(requestId, body, session);
+      case "SELECT_ROW":
+        return this.processSelectRowRequest(requestId, body, session);
+      case "DESELECT_ROW":
+        return this.processDeselectRowRequest(requestId, body, session);
+      case "SELECT_ROW_RANGE":
+        return this.processSelectRowRangeRequest(requestId, body, session);
       case "GET_VP_VISUAL_LINKS":
         return this.processGetViewPortVisualLinksRequest(
           requestId,
@@ -67,8 +78,6 @@ export class CoreServerApiHandler {
         return this.processViewPortRange(requestId, body, session);
       case "RPC_REQUEST":
         return this.processRpcRequest(requestId, body, session);
-      case "VIEW_PORT_RPC_CALL":
-        return this.processViewPortRpcRequest(requestId, body, session);
       case "VIEW_PORT_MENUS_SELECT_RPC":
         return this.processViewPortMenuSelectionRpcCall(
           requestId,
@@ -160,6 +169,48 @@ export class CoreServerApiHandler {
       viewPortId,
     });
   }
+  private processDisableViewPortRequest(
+    requestId: string,
+    { viewPortId }: VuuViewportDisableRequest,
+    session: ISession
+  ) {
+    try {
+      this.viewPortContainer.disableViewport(viewPortId);
+      // session.removeViewport(viewPortId);
+
+      session.enqueue(requestId, {
+        type: "DISABLE_VP_SUCCESS",
+        viewPortId,
+      });
+    } catch (e) {
+      throw e;
+      // session.enqueue(requestId, {
+      //   type: "DISABLE_VP_REJECT",
+      //   viewPortId,
+      // });
+    }
+  }
+  private processEnableViewPortRequest(
+    requestId: string,
+    { viewPortId }: VuuViewportEnableRequest,
+    session: ISession
+  ) {
+    try {
+      this.viewPortContainer.enableViewport(viewPortId);
+      // session.removeViewport(viewPortId);
+
+      session.enqueue(requestId, {
+        type: "ENABLE_VP_SUCCESS",
+        viewPortId,
+      });
+    } catch (e) {
+      throw e;
+      // session.enqueue(requestId, {
+      //   type: "ENABLE_VP_REJECT",
+      //   viewPortId,
+      // });
+    }
+  }
 
   private processCreateVisualLinkRequest(
     requestId: string,
@@ -245,19 +296,68 @@ export class CoreServerApiHandler {
     }
   }
 
-  private processSetSelectionRequest(
+  private processSelectRowRequest(
     requestId: string,
-    { selection, vpId }: ClientToServerSelection,
+    { preserveExistingSelection, rowKey, vpId }: SelectRowRequest,
     session: ISession
   ) {
+    const { rows, selectedRowCount, size } = this.viewPortContainer.selectRow(
+      vpId,
+      rowKey,
+      preserveExistingSelection
+    );
     session.enqueue(requestId, {
-      selection,
-      type: "SET_SELECTION_SUCCESS",
+      selectedRowCount,
+      type: "SELECT_ROW_SUCCESS",
       vpId,
     });
-    const viewport = this.viewPortContainer.getViewportById(vpId);
-    const { rows, size } = viewport.select(selection);
-    session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, false));
+
+    session.enqueue("", tableRowsMessageBody(rows, size, vpId, false));
+  }
+
+  private processDeselectRowRequest(
+    requestId: string,
+    { preserveExistingSelection, rowKey, vpId }: DeselectRowRequest,
+    session: ISession
+  ) {
+    const { rows, selectedRowCount, size } = this.viewPortContainer.deselectRow(
+      vpId,
+      rowKey,
+      preserveExistingSelection
+    );
+    session.enqueue(requestId, {
+      selectedRowCount,
+      type: "DESELECT_ROW_SUCCESS",
+      vpId,
+    });
+
+    session.enqueue("", tableRowsMessageBody(rows, size, vpId, false));
+  }
+
+  private processSelectRowRangeRequest(
+    requestId: string,
+    {
+      preserveExistingSelection,
+      fromRowKey,
+      toRowKey,
+      vpId,
+    }: SelectRowRangeRequest,
+    session: ISession
+  ) {
+    const { rows, selectedRowCount, size } =
+      this.viewPortContainer.selectRowRange(
+        vpId,
+        fromRowKey,
+        toRowKey,
+        preserveExistingSelection
+      );
+    session.enqueue(requestId, {
+      selectedRowCount,
+      type: "SELECT_ROW_SUCCESS",
+      vpId,
+    });
+
+    session.enqueue("", tableRowsMessageBody(rows, size, vpId, false));
   }
 
   private processGetViewPortVisualLinksRequest(
@@ -316,26 +416,5 @@ export class CoreServerApiHandler {
         rpcName,
       });
     }
-  }
-  private processViewPortRpcRequest(
-    requestId: string,
-    { namedParams, params, rpcName, vpId }: VuuRpcViewportRequest,
-    session: ISession
-  ) {
-    const result = this.viewPortContainer.handleRpcRequest(
-      vpId,
-      rpcName,
-      namedParams
-    );
-
-    session.enqueue(requestId, {
-      action: { type: "VP_RPC_SUCCESS", result },
-      type: "VIEW_PORT_RPC_REPONSE",
-      namedParams,
-      params,
-      result,
-      rpcName,
-      vpId,
-    });
   }
 }

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "module": "src/index.ts",
   "scripts": {
+    "create-data": "bun ./scripts/generate-instruments.ts",
     "refdata-client": "bun ./src/mock-client/mock-refdata-client.ts",
     "refdata-service": "bun ./src/reference-data-server/reference-data-server.ts",
     "test": "bun --watch ./test.ts"

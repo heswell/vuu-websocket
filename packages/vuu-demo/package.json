@@ -16,10 +16,10 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/data": "3.0.0",
-    "@vuu-ui/vuu-utils": "0.13.16",
+    "@vuu-ui/vuu-utils": "0.13.45",
     "pino": "9.6.0"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "0.13.16"
+    "@vuu-ui/vuu-data-types": "0.13.45"
   }
 }

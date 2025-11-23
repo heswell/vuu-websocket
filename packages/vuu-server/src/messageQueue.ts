@@ -35,7 +35,7 @@ const ROWSET = "rowset";
 const UPDATE = "update";
 
 export class MessageQueue implements IMessageQueue {
-  #queue: VuuServerMessage[];
+  #queue: (VuuServerMessage | string)[];
 
   constructor() {
     this.#queue = [];
@@ -53,7 +53,7 @@ export class MessageQueue implements IMessageQueue {
     return q;
   }
 
-  push(message: VuuServerMessage, rowMeta?: RowMeta) {
+  push(message: VuuServerMessage | string, rowMeta?: RowMeta) {
     // if (message.type === MessageTypeOut.Update) {
     //   mergeAndPurgeUpdate(this.#queue, message);
     // } else if (message.type === MessageTypeOut.Rowset && rowMeta) {
@@ -217,8 +217,8 @@ const mergeAndPurgeUpdate = (
 };
 
 function extractMessages(
-  queue: VuuServerMessage[],
-  test: (message: VuuServerMessage) => boolean
+  queue: (VuuServerMessage | string)[],
+  test: (message: VuuServerMessage | string) => boolean
 ) {
   var extract = [];
 
