@@ -1,6 +1,7 @@
 import { Table } from "@heswell/data";
 import {
   DefaultRpcHandler,
+  EditSessionRpcHandler,
   NoAction,
   ProviderContainer,
   TableContainer,
@@ -11,11 +12,11 @@ import {
 } from "@heswell/vuu-server/src/viewport/ViewPortMenu";
 import { VuuMenu, VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
-export class InstrumentService extends DefaultRpcHandler {
+export class InstrumentService extends EditSessionRpcHandler {
   constructor(
     table: Table,
     providerContainer: ProviderContainer,
-    tableContainer: TableContainer
+    tableContainer: TableContainer,
   ) {
     super(tableContainer);
     console.log("=======> Instrument Service created", {

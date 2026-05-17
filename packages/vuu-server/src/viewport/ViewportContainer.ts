@@ -1,14 +1,17 @@
 import { Table } from "@heswell/data";
 import type {
-  VuuCreateVisualLink,
   VuuLinkDescriptor,
   VuuTable,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
 import { ISession } from "../server-types";
-import { RuntimeVisualLink } from "../RuntimeVisualLink";
-import { Viewport, ViewPortSelection, ViewPortVisualLink } from "./Viewport";
+import {
+  Viewport,
+  ViewPortSelection,
+  ViewPortUpdate,
+  ViewPortVisualLink,
+} from "./Viewport";
 import { ServiceFactory } from "../core/module/ModuleFactory";
 import { TableContainer } from "../core/table/TableContainer";
 import { ProviderContainer } from "../provider/ProviderContainer";
@@ -16,6 +19,11 @@ import { ViewPortDef } from "../api/ViewPortDef";
 import { RpcParams } from "../net/rpc/Rpc";
 import { DataTable, isDataTable } from "../core/table/InMemDataTable";
 import { SelectionViewPortMenuItem } from "./ViewPortMenu";
+import { RequestContext } from "../net/RequestProcessor";
+import { VuuUser } from "../core/auths/VuuUser";
+import { ClientSessionId } from "../net/ClientConnectionCreator";
+import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
+import { ViewPortId } from "../client/messages/ClientMessage";
 
 export type ViewportCreationEvent = {
   id: string;
@@ -35,7 +43,7 @@ export type ViewportEvents = {
 export class ViewportContainer extends EventEmitter<ViewportEvents> {
   constructor(
     private tableContainer: TableContainer,
-    private providerContainer: ProviderContainer
+    private providerContainer: ProviderContainer,
   ) {
     super();
     console.log("create ViewportContainer");
@@ -54,17 +62,17 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
     if (viewPortDefFunc) {
       console.log(
-        `[ViewportContainer] getViewPortDefinition this is where the ViewPortDef gets called, should create service`
+        `[ViewportContainer] getViewPortDefinition this is where the ViewPortDef gets called, should create service`,
       );
       return viewPortDefFunc(
         table,
         table.provider,
         this.providerContainer,
-        this.tableContainer
+        this.tableContainer,
       );
     } else {
       console.log(
-        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}, returning default with columns only, no services`
+        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}, returning default with columns only, no services`,
       );
       return ViewPortDef.default(table.tableDef.columns);
     }
@@ -78,33 +86,35 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     return this.#viewports.size;
   }
 
-  createViewport(
-    session: ISession,
+  create(
+    requestId: string,
+    user: VuuUser,
+    clientSessionId: ClientSessionId,
+    outboundQueue: PublishQueue<ViewPortUpdate>,
     table: Table,
-    { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest
+    { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest,
   ) {
-    const id = uuid();
+    const { sessionId } = clientSessionId;
+    const id = ViewPortId.oneNew();
     const viewPortDef = this.getViewPortDefinition(table);
     const viewport = new Viewport(
-      session,
       id,
+      user,
+      clientSessionId,
+      outboundQueue,
+      { columns, filterSpec, groupBy, sort },
+      range,
       table,
-      {
-        columns,
-        filterSpec,
-        groupBy,
-        range,
-        sort,
-      },
-      viewPortDef
+      { columns, filterSpec, groupBy, range, sort },
+      viewPortDef,
     );
 
     this.#viewports.set(id, viewport);
-    const viewports = this.#sessionViewportMap.get(session.id);
+    const viewports = this.#sessionViewportMap.get(sessionId);
     if (viewports) {
       viewports.push(id);
     } else {
-      this.#sessionViewportMap.set(session.id, [id]);
+      this.#sessionViewportMap.set(sessionId, [id]);
     }
     this.emit("viewport-created", {
       id: viewport.id,
@@ -143,14 +153,14 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       });
     } else {
       throw Error(
-        `[ViewportContainer] closeViewport, viewportId ${viewportId} not found in sessionMap`
+        `[ViewportContainer] closeViewport, viewportId ${viewportId} not found in sessionMap`,
       );
     }
   }
 
   removeViewportsForSession(sessionId: string) {
     console.log(
-      `[ViewportContainer] close all viewports for session ${sessionId}`
+      `[ViewportContainer] close all viewports for session ${sessionId}`,
     );
     for (const viewPort of this.listViewportsForSession(sessionId)) {
       this.removeViewport(viewPort.id);
@@ -164,7 +174,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       viewport.enabled = false;
     } else {
       console.warn(
-        `[ViewportContainer] enableViewport, viewport ${viewportId} is already disabled`
+        `[ViewportContainer] enableViewport, viewport ${viewportId} is already disabled`,
       );
     }
   }
@@ -175,7 +185,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       viewport.enabled = true;
     } else {
       console.warn(
-        `[ViewportContainer] enableViewport, viewport ${viewportId} is already enabled`
+        `[ViewportContainer] enableViewport, viewport ${viewportId} is already enabled`,
       );
     }
   }
@@ -187,11 +197,11 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (menuItem instanceof SelectionViewPortMenuItem) {
       return menuItem.func(
         ViewPortSelection(viewport.selectedKeys, viewport),
-        sessionId
+        sessionId,
       );
     } else {
       throw Error(
-        `[ViewportContainer] callRpcSelection, no selection menuItem found for ${rpcName}`
+        `[ViewportContainer] callRpcSelection, no selection menuItem found for ${rpcName}`,
       );
     }
   }
@@ -199,19 +209,20 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   handleRpcRequest(
     viewPortId: string,
     rpcName: string,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
+    ctx: RequestContext,
   ) {
     const viewport = this.getViewportById(viewPortId);
-    return viewport.viewPortDef.service.processViewPortRpcCall(
+    return viewport.viewPortDef.service.processRpcRequest(
       rpcName,
-      new RpcParams([], params, viewport.columns, viewport.keys)
+      RpcParams(params, viewport, ctx),
     );
   }
 
   selectRow(
     viewPortId: string,
     rowKey: string,
-    preserveExistingSelection: boolean
+    preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
     return viewport.selectRow(rowKey, preserveExistingSelection);
@@ -220,7 +231,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   deselectRow(
     viewPortId: string,
     rowKey: string,
-    preserveExistingSelection: boolean
+    preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
     return viewport.deselectRow(rowKey, preserveExistingSelection);
@@ -230,13 +241,13 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     viewPortId: string,
     fromRowKey: string,
     toRowKey: string,
-    preserveExistingSelection: boolean
+    preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
     return viewport.selectRowRange(
       fromRowKey,
       toRowKey,
-      preserveExistingSelection
+      preserveExistingSelection,
     );
   }
 
@@ -244,14 +255,15 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     childVpId: string,
     parentVpId: string,
     childColumnName: string,
-    parentColumnName: string
+    parentColumnName: string,
   ) {
+    console.log(`[ViewportContainer] link Viewports`);
     const child = this.getViewportById(childVpId);
     const parent = this.getViewportById(parentVpId);
     const childColumn = child.dataTable.columnForName(childColumnName);
     const parentColumn = parent.dataTable.columnForName(parentColumnName);
     child.setVisualLink(
-      ViewPortVisualLink(child, parent, childColumn, parentColumn)
+      ViewPortVisualLink(child, parent, childColumn, parentColumn),
     );
   }
 
@@ -266,7 +278,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     const visualLinks = tableDef.links;
 
     const otherViewportsForSession = this.listActiveViewportsForSession(
-      viewport.sessionId
+      viewport.sessionId,
     );
 
     const availableLinks: VuuLinkDescriptor[] = [];
@@ -292,7 +304,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
   private listViewportsForSession(sessionId: string) {
     return Array.from(this.#viewports.values()).filter(
-      ({ sessionId: id }) => id === sessionId
+      ({ sessionId: id }) => id === sessionId,
     );
   }
 }

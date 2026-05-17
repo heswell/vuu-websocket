@@ -381,7 +381,7 @@ export class RowSet extends BaseRowSet {
     const { columnMap } = this._table;
     const { sortSet } = this.sortedIndex;
 
-    // TODO multi colun sort sort DSC
+    // TODO multi column sort sort DSC
     if (this.sortCols === undefined && this.currentFilter === undefined) {
       // simplest scenario, row will be at end of sortset ...
       sortSet.push([rowIndex, 0, 0]);
@@ -434,6 +434,7 @@ export class RowSet extends BaseRowSet {
           size: this.size,
         };
       } else {
+        // TODO we're not adding to sortset
         // for now
         return {
           rows: [],

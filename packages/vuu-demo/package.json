@@ -2,8 +2,8 @@
   "name": "@heswell/vuu-demo",
   "version": "3.0.0",
   "description": "Vuu Server Sample App",
-  "main": "dist/src/index.js",
-  "module": "src/index.ts",
+  "main": "dist/src/SimulMain.js",
+  "module": "src/SimulMain.ts",
   "publishConfig": {
     "access": "public"
   },
@@ -16,10 +16,10 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/data": "3.0.0",
-    "@vuu-ui/vuu-utils": "0.13.45",
+    "@vuu-ui/vuu-utils": "0.13.76",
     "pino": "9.6.0"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "0.13.45"
+    "@vuu-ui/vuu-data-types": "0.13.76"
   }
 }

@@ -3,7 +3,6 @@ import { isJoinTableDef, JoinTableDef, TableDef } from "../api/TableDef";
 import { vuuInMemPlugin } from "../feature/inmem/VuuInMemPlugin";
 import { IProvider } from "../provider/Provider";
 import { ProviderContainer } from "../provider/ProviderContainer";
-import run from "../server";
 import { RealizedViewServerModule, ViewServerModule } from "./module/VsModule";
 import { type VuuServerConfig } from "./VuuServerOptions";
 import { ViewportContainer } from "../viewport/ViewportContainer";
@@ -13,6 +12,10 @@ import { ModuleContainer } from "./module/ModuleContainer";
 import { TableContainer } from "./table/TableContainer";
 import { CoreServerApiHandler } from "./CoreServerApiHandler";
 import { isDataTable } from "./table/InMemDataTable";
+import { ViewServerHandlerFactoryImpl } from "../net/ViewServerHandler";
+import { uuid } from "@vuu-ui/vuu-utils";
+import { ClientSessionContainer } from "../net/ClientSessionContainer";
+import { WebSocketServer } from "../net/ws/WebSocketServer";
 
 export class VuuServer {
   protected providerContainer: ProviderContainer;
@@ -22,29 +25,54 @@ export class VuuServer {
   public viewPortContainer: ViewportContainer;
   public moduleContainer: ModuleContainer;
 
-  constructor({ modules, ...config }: VuuServerConfig) {
+  private vuuServerId = uuid();
+
+  constructor({ loginTokenService, modules, ...config }: VuuServerConfig) {
+    const sessionContainer = ClientSessionContainer(
+      config.webSocketOptions.maxSessionsPerUser,
+    );
+
     this.joinProvider = new JoinTableProvider();
+
     this.tableContainer = new TableContainer(this.joinProvider);
+
     this.providerContainer = new ProviderContainer(this.joinProvider);
+
     this.viewPortContainer = new ViewportContainer(
       this.tableContainer,
-      this.providerContainer
+      this.providerContainer,
     );
+
     this.moduleContainer = new ModuleContainer();
 
     modules.forEach(this.registerModule);
+
     this.serverApi = new CoreServerApiHandler(
       this.viewPortContainer,
       this.tableContainer,
-      this.providerContainer
+      this.providerContainer,
     );
+
+    const factory = new ViewServerHandlerFactoryImpl(
+      loginTokenService,
+      sessionContainer,
+      this.serverApi,
+      this.moduleContainer,
+      this.vuuServerId,
+    );
+
+    // TODO do we need these ?
+    this.providerContainer.start(this.tableContainer);
+    this.moduleContainer.start();
+
+    new WebSocketServer(config.webSocketOptions, factory);
   }
 
   private createTable(tableDef: TableDef) {
     return vuuInMemPlugin.tableFactory(
       tableDef,
       this.tableContainer,
-      this.joinProvider
+      this.joinProvider,
     );
   }
 
@@ -52,7 +80,7 @@ export class VuuServer {
     return vuuInMemPlugin.joinTableFactory(
       joinTableDef,
       this.tableContainer,
-      this.joinProvider
+      this.joinProvider,
     );
   }
 
@@ -76,13 +104,13 @@ export class VuuServer {
 
     module.tableDefs.forEach((tableDef) => {
       console.log(
-        `VuUServer process tabledef for module ${module.name} table ${tableDef.name}`
+        `VuUServer process tabledef for module ${module.name} table ${tableDef.name}`,
       );
       tableDef.setModule(module);
       if (isJoinTableDef(tableDef)) {
         const table = this.createJoinTable(tableDef);
         console.log(
-          `[VuUServer] what do we do with this joun table we just created`
+          `[VuUServer] what do we do with this joun table we just created`,
         );
       } else {
         const table = this.createTable(tableDef);
@@ -96,15 +124,4 @@ export class VuuServer {
       this.viewPortContainer.addViewPortDefinition(tableName, serviceFactory);
     });
   };
-
-  startServer() {
-    run(this);
-  }
-
-  start() {
-    console.log("[VuuServer] start");
-    this.providerContainer.start(this.tableContainer);
-    this.moduleContainer.start();
-    this.startServer();
-  }
 }

@@ -3,10 +3,13 @@ import {
   DeselectRowRequest,
   SelectRowRangeRequest,
   SelectRowRequest,
+  ServerMessageBody,
   VuuClientMessage,
   VuuCreateVisualLink,
+  VuuMenu,
   VuuRemoveVisualLink,
   VuuRpcServiceRequest,
+  VuuServerMessage,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
@@ -24,142 +27,170 @@ import { ISession } from "../server-types";
 import { tableRowsMessageBody } from "@heswell/data";
 import { hasViewPortContext } from "@vuu-ui/vuu-utils";
 import logger from "../logger.ts";
+import { RequestContext } from "../net/RequestProcessor.ts";
+import { ServerApi } from "../net/ServerApi.ts";
+import {
+  CreateViewPortReject,
+  CreateViewPortSuccess,
+  GetTableMetaResponse,
+  GetViewPortMenusResponse,
+  GetViewPortVisualLinksResponse,
+  JsonViewServerMessage,
+} from "../net/Messages.ts";
 
-export class CoreServerApiHandler {
+const vsMsg = (body: ServerMessageBody, ctx: RequestContext) =>
+  JsonViewServerMessage(ctx.requestId, ctx.session.sessionId, body);
+
+export class CoreServerApiHandler implements ServerApi {
   constructor(
     private viewPortContainer: ViewportContainer,
     private tableContainer: TableContainer,
-    private providerContainer: ProviderContainer
+    private providers: ProviderContainer,
   ) {}
 
-  process(
-    { requestId, body }: VuuClientMessage | VuuClientMessage,
-    session: ISession
-  ) {
+  process({ requestId, body }: VuuClientMessage, ctx: RequestContext) {
     switch (body.type) {
-      case "GET_TABLE_LIST":
-        session.enqueue(requestId, {
-          type: "TABLE_LIST_RESP",
-          tables: this.tableContainer.getDefinedTables(),
-        });
-        break;
+      // case "GET_TABLE_LIST":
+      //   session.enqueue(requestId, {
+      //     type: "TABLE_LIST_RESP",
+      //     tables: this.tableContainer.getDefinedTables(),
+      //   });
+      //   break;
       case "GET_TABLE_META":
-        return this.processGetTableMetaRequest(requestId, body, session);
+        return this.processGetTableMetaRequest(body, ctx);
       case "CREATE_VP":
-        return this.processCreateViewPortRequest(requestId, body, session);
-      case "REMOVE_VP":
-        return this.processRemoveViewPortRequest(requestId, body, session);
-      case "DISABLE_VP":
-        return this.processDisableViewPortRequest(requestId, body, session);
-      case "ENABLE_VP":
-        return this.processEnableViewPortRequest(requestId, body, session);
-      case "CREATE_VISUAL_LINK":
-        return this.processCreateVisualLinkRequest(requestId, body, session);
-      case "REMOVE_VISUAL_LINK":
-        return this.processRemoveVisualLinkRequest(requestId, body, session);
-      case "CHANGE_VP":
-        return this.processChangeViewPortRequest(requestId, body, session);
-      case "SELECT_ROW":
-        return this.processSelectRowRequest(requestId, body, session);
-      case "DESELECT_ROW":
-        return this.processDeselectRowRequest(requestId, body, session);
-      case "SELECT_ROW_RANGE":
-        return this.processSelectRowRangeRequest(requestId, body, session);
+        return this.processCreateViewPortRequest(body, ctx);
       case "GET_VP_VISUAL_LINKS":
-        return this.processGetViewPortVisualLinksRequest(
-          requestId,
-          body,
-          session
-        );
+        return this.processGetViewPortVisualLinksRequest(body, ctx);
       case "GET_VIEW_PORT_MENUS":
-        return this.processGetViewPortMenusRequest(requestId, body, session);
-      case "CHANGE_VP_RANGE":
-        logger.info({ requestId }, `CHANGE_VP_RANGE ${body.from}:${body.to}`);
-        return this.processViewPortRange(requestId, body, session);
-      case "RPC_REQUEST":
-        return this.processRpcRequest(requestId, body, session);
-      case "VIEW_PORT_MENUS_SELECT_RPC":
-        return this.processViewPortMenuSelectionRpcCall(
-          requestId,
-          body,
-          session
-        );
+        return this.processGetViewPortMenusRequest(body, ctx);
+      // case "REMOVE_VP":
+      //   return this.processRemoveViewPortRequest(requestId, body, session);
+      // case "DISABLE_VP":
+      //   return this.processDisableViewPortRequest(requestId, body, session);
+      // case "ENABLE_VP":
+      //   return this.processEnableViewPortRequest(requestId, body, session);
+      // case "CREATE_VISUAL_LINK":
+      //   return this.processCreateVisualLinkRequest(requestId, body, session);
+      // case "REMOVE_VISUAL_LINK":
+      //   return this.processRemoveVisualLinkRequest(requestId, body, session);
+      // case "CHANGE_VP":
+      //   return this.processChangeViewPortRequest(requestId, body, session);
+      // case "SELECT_ROW":
+      //   return this.processSelectRowRequest(requestId, body, session);
+      // case "DESELECT_ROW":
+      //   return this.processDeselectRowRequest(requestId, body, session);
+      // case "SELECT_ROW_RANGE":
+      //   return this.processSelectRowRangeRequest(requestId, body, session);
+      // case "CHANGE_VP_RANGE":
+      //   logger.info({ requestId }, `CHANGE_VP_RANGE ${body.from}:${body.to}`);
+      //   return this.processViewPortRange(requestId, body, session);
+      // case "RPC_REQUEST":
+      //   return this.handleViewportRpcRequest(requestId, body, ctx, session);
+      // case "VIEW_PORT_MENUS_SELECT_RPC":
+      //   return this.processViewPortMenuSelectionRpcCall(
+      //     requestId,
+      //     body,
+      //     session,
+      //   );
       default:
         throw Error(
-          `[VUU:core:CoreServerApiHandler] unsupported message type ${body.type}`
+          `[VUU:core:CoreServerApiHandler] unsupported message type ${body.type}`,
         );
     }
   }
 
   private processGetTableMetaRequest(
-    requestId: string,
-    body: VuuTableMetaRequest,
-    session: ISession
+    msg: VuuTableMetaRequest,
+    ctx: RequestContext,
   ) {
-    const table = this.tableContainer.getTable(body.table.table);
+    const table = this.tableContainer.getTable(msg.table.table);
     if (table) {
       const viewPortDef = this.viewPortContainer.getViewPortDefinition(table);
-      session.enqueue(requestId, {
-        type: "TABLE_META_RESP",
-        columns: viewPortDef.columns.map((col) => col.name),
-        dataTypes: viewPortDef.columns.map((col) => col.dataType),
-        key: table.tableDef.keyField,
-        table: body.table,
-      });
+      const columns = viewPortDef.columns.map((col) => col.name);
+      const dataTypes = viewPortDef.columns.map((col) => col.dataType);
+      const { key, table: vuuTable } = table.schema;
+      const tableMetaResponseBody = GetTableMetaResponse(
+        vuuTable,
+        columns,
+        dataTypes,
+        key,
+      );
+      return vsMsg(tableMetaResponseBody, ctx);
     } else {
       throw Error(
         `[VUU:core:CoreServerApiHandler] GET_TABLE_META no table found ${JSON.stringify(
-          body.table
-        )}`
+          msg.table,
+        )}`,
       );
     }
   }
 
+  private processCreateViewPortRequest(
+    msg: VuuViewportCreateRequest,
+    ctx: RequestContext,
+  ) {
+    const tableName = msg.table.table;
+    const table = this.tableContainer.getTable(tableName);
+    // if (table.getTableDef.visibility !== Public)
+    if (msg.columns.length === 1 && msg.columns[0] === "*") {
+      console.log("all columns");
+    } else {
+      // validateColumns(table, msg.columns);
+      // ViewPortColumnCreator.create(table, msg.columns)
+    }
+
+    const { requestId, user, session, queue } = ctx;
+
+    const viewport = this.viewPortContainer.create(
+      requestId,
+      user,
+      session,
+      queue,
+      table,
+      // TODO revisit from  here
+      msg,
+    );
+
+    if (viewport) {
+      console.log(
+        `[CoreServerApi] created viewport ${viewport.id} on tbale ${tableName}`,
+      );
+      return vsMsg(CreateViewPortSuccess(viewport.id, tableName, msg), ctx);
+    } else {
+      return vsMsg(
+        CreateViewPortReject(
+          msg.table,
+          `Failed to process request ${ctx.requestId}`,
+        ),
+        ctx,
+      );
+    }
+  }
+
+  private processGetViewPortVisualLinksRequest(
+    { vpId }: VuuViewportVisualLinksRequest,
+    ctx: RequestContext,
+  ) {
+    const links = this.viewPortContainer.getViewPortVisualLinks(vpId);
+    return vsMsg(GetViewPortVisualLinksResponse(vpId, links), ctx);
+  }
+
   private processGetViewPortMenusRequest(
-    requestId: string,
     { vpId }: VuuViewportMenusRequest,
-    session: ISession
+    ctx: RequestContext,
   ) {
     const viewPort = this.viewPortContainer.getViewportById(vpId);
-
-    session.enqueue(requestId, {
-      type: "VIEW_PORT_MENUS_RESP",
-      menu: viewPort.viewPortDef.service.menuItems.asJson,
-      vpId,
-    });
+    const menu = viewPort.viewPortDef.service.menuItems.asJson;
+    return vsMsg(GetViewPortMenusResponse(vpId, menu), ctx);
   }
 
-  private processCreateViewPortRequest(
-    requestId: string,
-    body: VuuViewportCreateRequest,
-    session: ISession
-  ) {
-    const { table: vuuTable } = body;
-    const table = this.tableContainer.getTable(vuuTable.table);
-
-    const viewport = this.viewPortContainer.createViewport(
-      session,
-      table,
-      body
-    );
-    // why do we need this ?
-    session.addViewport(viewport.id);
-
-    session.enqueue(requestId, {
-      ...body,
-      table: table.name,
-      type: "CREATE_VP_SUCCESS",
-      viewPortId: viewport.id,
-    });
-
-    const { rows, size } = viewport.getDataForCurrentRange();
-    session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, true));
-  }
+  //--------------------------------------------------
 
   private processRemoveViewPortRequest(
     requestId: string,
     { viewPortId }: VuuViewportRemoveRequest,
-    session: ISession
+    session: ISession,
   ) {
     this.viewPortContainer.removeViewport(viewPortId);
     session.removeViewport(viewPortId);
@@ -172,7 +203,7 @@ export class CoreServerApiHandler {
   private processDisableViewPortRequest(
     requestId: string,
     { viewPortId }: VuuViewportDisableRequest,
-    session: ISession
+    session: ISession,
   ) {
     try {
       this.viewPortContainer.disableViewport(viewPortId);
@@ -193,7 +224,7 @@ export class CoreServerApiHandler {
   private processEnableViewPortRequest(
     requestId: string,
     { viewPortId }: VuuViewportEnableRequest,
-    session: ISession
+    session: ISession,
   ) {
     try {
       this.viewPortContainer.enableViewport(viewPortId);
@@ -220,13 +251,13 @@ export class CoreServerApiHandler {
       childColumnName,
       parentColumnName,
     }: VuuCreateVisualLink,
-    session: ISession
+    session: ISession,
   ) {
     this.viewPortContainer.linkViewPorts(
       childVpId,
       parentVpId,
       childColumnName,
-      parentColumnName
+      parentColumnName,
     );
 
     session.enqueue(requestId, {
@@ -241,7 +272,7 @@ export class CoreServerApiHandler {
   private processRemoveVisualLinkRequest(
     requestId: string,
     { childVpId }: VuuRemoveVisualLink,
-    session: ISession
+    session: ISession,
   ) {
     this.viewPortContainer.unlinkViewPorts(childVpId);
     session.enqueue(requestId, {
@@ -253,7 +284,7 @@ export class CoreServerApiHandler {
   private processChangeViewPortRequest(
     requestId: string,
     { viewPortId, ...options }: VuuViewportChangeRequest,
-    session: ISession
+    session: ISession,
   ) {
     session.enqueue(requestId, {
       ...options,
@@ -268,7 +299,7 @@ export class CoreServerApiHandler {
         const { rows, size, sizeMessageRequired = false } = dataResponse;
         session.enqueue(
           "",
-          tableRowsMessageBody(rows, size, viewport.id, sizeMessageRequired)
+          tableRowsMessageBody(rows, size, viewport.id, sizeMessageRequired),
         );
       }
     }
@@ -277,7 +308,7 @@ export class CoreServerApiHandler {
   private processViewPortRange(
     requestId: string,
     { from, to, viewPortId }: VuuViewportRangeRequest,
-    session: ISession
+    session: ISession,
   ) {
     // should be purge the queue of any pending updates outside the requested range ?
     session.enqueue(requestId, {
@@ -299,12 +330,12 @@ export class CoreServerApiHandler {
   private processSelectRowRequest(
     requestId: string,
     { preserveExistingSelection, rowKey, vpId }: SelectRowRequest,
-    session: ISession
+    session: ISession,
   ) {
     const { rows, selectedRowCount, size } = this.viewPortContainer.selectRow(
       vpId,
       rowKey,
-      preserveExistingSelection
+      preserveExistingSelection,
     );
     session.enqueue(requestId, {
       selectedRowCount,
@@ -318,12 +349,12 @@ export class CoreServerApiHandler {
   private processDeselectRowRequest(
     requestId: string,
     { preserveExistingSelection, rowKey, vpId }: DeselectRowRequest,
-    session: ISession
+    session: ISession,
   ) {
     const { rows, selectedRowCount, size } = this.viewPortContainer.deselectRow(
       vpId,
       rowKey,
-      preserveExistingSelection
+      preserveExistingSelection,
     );
     session.enqueue(requestId, {
       selectedRowCount,
@@ -342,14 +373,14 @@ export class CoreServerApiHandler {
       toRowKey,
       vpId,
     }: SelectRowRangeRequest,
-    session: ISession
+    session: ISession,
   ) {
     const { rows, selectedRowCount, size } =
       this.viewPortContainer.selectRowRange(
         vpId,
         fromRowKey,
         toRowKey,
-        preserveExistingSelection
+        preserveExistingSelection,
       );
     session.enqueue(requestId, {
       selectedRowCount,
@@ -360,28 +391,15 @@ export class CoreServerApiHandler {
     session.enqueue("", tableRowsMessageBody(rows, size, vpId, false));
   }
 
-  private processGetViewPortVisualLinksRequest(
-    requestId: string,
-    { vpId }: VuuViewportVisualLinksRequest,
-    session: ISession
-  ) {
-    const links = this.viewPortContainer.getViewPortVisualLinks(vpId);
-    session.enqueue(requestId, {
-      links,
-      type: "VP_VISUAL_LINKS_RESP",
-      vpId,
-    });
-  }
-
   private processViewPortMenuSelectionRpcCall(
     requestId: string,
     { vpId, rpcName }: ClientToServerMenuSelectRPC,
-    session: ISession
+    session: ISession,
   ) {
     const action = this.viewPortContainer.callRpcSelection(
       vpId,
       rpcName,
-      session.id
+      session.id,
     );
 
     session.enqueue(requestId, {
@@ -391,10 +409,11 @@ export class CoreServerApiHandler {
       vpId,
     });
   }
-  private processRpcRequest(
+  private handleViewportRpcRequest(
     requestId: string,
     rpcRequest: VuuRpcServiceRequest,
-    session: ISession
+    ctx: RequestContext,
+    session: ISession,
   ) {
     const { rpcName } = rpcRequest;
 
@@ -402,7 +421,8 @@ export class CoreServerApiHandler {
       const result = this.viewPortContainer.handleRpcRequest(
         rpcRequest.context.viewPortId,
         rpcName,
-        rpcRequest.params
+        rpcRequest.params,
+        ctx,
       );
 
       session.enqueue(requestId, {

@@ -1,13 +1,27 @@
 import { SortSet } from "@heswell/data";
 import { Column } from "../../api/TableDef";
+import { Viewport } from "../../viewport/Viewport";
+import { RequestContext } from "../RequestProcessor";
 
-export class RpcParams<T = Record<string, unknown>> {
+export type RpcParams<T = Record<string, unknown>> = {
+  namedParams: T;
+  viewport: Viewport;
+  ctx: RequestContext;
+};
+class RpcParamsImpl<T = Record<string, unknown>> {
   constructor(
-    public params: unknown[],
     public namedParams: T,
-    public viewPortColumns?: Column[],
-    public vpKeys?: number[] | SortSet
+    public viewport: Viewport,
+    public ctx: RequestContext,
   ) {}
+}
+
+export function RpcParams<T = Record<string, unknown>>(
+  namedParams: T,
+  viewport: Viewport,
+  ctx: RequestContext,
+): RpcParams<T> {
+  return new RpcParamsImpl<T>(namedParams, viewport, ctx);
 }
 
 export type RpcResult = {};

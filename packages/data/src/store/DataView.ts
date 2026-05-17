@@ -5,7 +5,6 @@ import {
   VuuFilter,
   VuuGroupBy,
   VuuRange,
-  VuuRow,
   VuuSort,
   VuuSortCol,
   VuuViewportChangeRequest,
@@ -16,7 +15,6 @@ import {
   vanillaConfig,
   type ColumnMap,
 } from "@vuu-ui/vuu-utils";
-import { TableColumn } from "@heswell/vuu-server";
 import { buildColumnMap, toColumn } from "./columnUtils.ts";
 import { Range, resetRange } from "./rangeUtils.ts";
 import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
@@ -136,11 +134,6 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
     const { rows, size } = this.rowSet.insert(rowIdx, row);
-    // console.log(
-    //   `[DataView:${this.#table.schema.table.table}] rowInserted ${
-    //     rows.length
-    //   } to be returned (rowSet range ${JSON.stringify(this.rowSet.range)})`
-    // );
     this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
@@ -210,7 +203,9 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   }
 
   selectRow(rowKey: string, preserveExistingSelection: boolean) {
-    return this.rowSet.selectRow(rowKey, preserveExistingSelection);
+    const result = this.rowSet.selectRow(rowKey, preserveExistingSelection);
+    this.emit("row-selection");
+    return result;
   }
 
   deselectRow(rowKey: string, preserveExistingSelection: boolean) {

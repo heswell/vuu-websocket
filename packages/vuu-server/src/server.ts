@@ -1,8 +1,11 @@
 import { VuuServer } from "./core/VuuServer";
 import { ServerMessagingConfig } from "./server-types";
-import { websocketConnectionHandler } from "./websocket-connection-handler";
+import { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";
 import { uuid } from "@vuu-ui/vuu-utils";
 import path from "path";
+import { type Authenticator } from "./net/auth/Authenticator";
+import { AuthenticatorWithUserList } from "./net/auth/AuthenticatorWithUserList";
+import loginTokenService from "./net/LoginTokenService";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
 const CLIENT_UPDATE_FREQUENCY = 120;
@@ -20,6 +23,11 @@ export interface WebsocketData {
   sessionId: string;
 }
 
+const authenticator: Authenticator = new AuthenticatorWithUserList(
+  loginTokenService,
+  [],
+);
+
 export default async function start(vuuServer: VuuServer) {
   const certsPath = path.join(import.meta.dir, "../certs");
 
@@ -28,10 +36,10 @@ export default async function start(vuuServer: VuuServer) {
     keyFile: `${certsPath}/key.pem`,
     port: WS_PORT,
 
-    fetch(req, server) {
+    async fetch(req, server) {
       const sessionId = uuid();
       console.log(
-        `[VUU:server] websocket upgrade request sessionId ${sessionId}`
+        `[VUU:server] websocket upgrade request sessionId ${sessionId}`,
       );
       const success = server.upgrade(req, { data: { sessionId } });
       if (success) {
@@ -42,29 +50,53 @@ export default async function start(vuuServer: VuuServer) {
 
       // handle HTTP request normally
       const url = new URL(req.url);
-      if (url.pathname === "/api/authn") {
-        console.log("auth request");
-        const vuuUser = {
-          name: "steve",
-          authorizations: [],
-        };
-        const token = `${btoa(JSON.stringify(vuuUser))}.${uuid()}`;
 
-        const responseInit: ResponseInit = {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "vuu-auth-token": token,
-          },
-        };
-        return new Response("ok", responseInit);
-      } else {
-        return new Response("Hello world!");
+      if (url.pathname === "/api/authn") {
+        // this is the 'basic' auth flow where we authenticate against
+        // Vuu. We post user/password and vuu returns a vuu user token
+        if (req.method === "POST") {
+          const { username, password } = (await req.json()) as {
+            username: string;
+            password: string;
+          };
+          const token = await authenticator.authenticate([username, password]);
+
+          const responseInit: ResponseInit = {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+              "vuu-auth-token": token,
+            },
+          };
+          return new Response(null, responseInit);
+        }
+      } else if (url.pathname === "/api/login") {
+        // this is the 'keycloak' auth flow where we first authenticate against
+        // keycloak to get an access token. We exchange the access token for a vuu
+        // user token.
+        if (req.method === "GET") {
+          const vuuUser = {
+            name: "steve",
+            authorizations: [],
+          };
+          const token = `${btoa(JSON.stringify(vuuUser))}.${uuid()}`;
+
+          const responseInit: ResponseInit = {
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+              "Content-Type": "application/json",
+            },
+          };
+          return new Response(JSON.stringify({ token }), responseInit);
+        }
       }
+      return new Response("Hello world!");
     },
     websocket: websocketConnectionHandler(msgConfig, vuuServer),
   });
 
   console.log(
-    `[VUU] Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
+    `[VUU] Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`,
   );
 }

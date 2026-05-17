@@ -1,5 +1,5 @@
 import { Table } from "@heswell/data";
-import { ResourceMessage } from "./ArrayDataStreamSource";
+import { ResourceMessage } from "./StoreDataStreamSource";
 
 export interface ResourceRequest {
   columns?: string[];
@@ -76,8 +76,9 @@ export const loadTableFromRemoteResource = async ({
           table.insert(row);
         }
       } else if (message.type === "insert") {
-        console.log(`>>> ${message.row[6]}`);
         table.insert(message.row);
+      } else if (message.type === "inserts") {
+        console.log(`inserts received`);
       } else {
         console.log({ message });
         throw Error(

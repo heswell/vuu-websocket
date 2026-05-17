@@ -4,7 +4,6 @@ import {
   VuuRemoveVisualLink,
   VuuRpcEditCellRequest,
   VuuRpcServiceRequest,
-  VuuRpcViewportRequest,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
@@ -19,7 +18,6 @@ import type { ISession, VuuProtocolHandler } from "./server-types";
 import {
   ClientToServerCloseTreeNode,
   ClientToServerOpenTreeNode,
-  ClientToServerSelection,
   VuuRow,
 } from "@vuu-ui/vuu-protocol-types";
 // import ViewportContainer from "./viewport/ViewportContainer.ts";

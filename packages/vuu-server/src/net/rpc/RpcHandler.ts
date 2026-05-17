@@ -10,7 +10,7 @@ import {
 export type RpcHandlerFunc = (vuuServer: VuuServer) => RpcHandler;
 
 export class RpcHandler {
-  processViewPortRpcCall(methodName: string, rpcParams: RpcParams): unknown {
+  processRpcRequest(methodName: string, rpcParams: RpcParams): unknown {
     return undefined;
   }
   get menuItems(): ViewPortMenu {
@@ -24,7 +24,7 @@ export class RpcHandler {
   private menusAsMap() {
     const foldMenus = (
       menu: ViewPortMenu,
-      map = new Map<string, ViewPortMenuItem>()
+      map = new Map<string, ViewPortMenuItem>(),
     ): Map<string, ViewPortMenuItem> => {
       if (menu instanceof ViewPortMenuFolder) {
         menu.menus.forEach((menu) => foldMenus(menu, map));

@@ -5,6 +5,13 @@ import { IProvider, Provider } from "../../provider/Provider";
 import { ColumnValueProvider } from "./ColumnValueProvider";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
+export class RowKeyUpdate {
+  constructor(
+    public key: string,
+    public source: Table,
+    public isDelete = false,
+  ) {}
+}
 export interface DataTable {
   columnForName: (columnName: string) => Column;
   columnValueProvider: ColumnValueProvider;
@@ -43,7 +50,7 @@ export class InMemDataTable extends Table implements DataTable {
 
   columnForName(columnName: string) {
     const column = this.#tableDef.columns.find(
-      (col) => col.name === columnName
+      (col) => col.name === columnName,
     );
     if (column) {
       return column;
@@ -51,7 +58,7 @@ export class InMemDataTable extends Table implements DataTable {
       throw Error(
         `[DataTable] columnForName ${
           this.#tableDef.name
-        } has no column ${columnName}`
+        } has no column ${columnName}`,
       );
     }
   }

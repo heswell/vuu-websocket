@@ -71,9 +71,10 @@ export declare type VuuProtocolHandler<
 
 export interface ISession {
   addViewport: (viewportId: string) => void;
+  authenticated: boolean;
   removeViewport: (viewportId: string) => void;
   clear: () => void;
-  enqueue: (requestId: string, messageBody: ServerMessageBody) => void;
+  enqueue: (requestId: string, messageBody: ServerMessageBody | string) => void;
   dequeueAllMessages: () => null | (VuuServerMessage | string)[];
   kill: () => void;
   login: (requestId: string, message: VuuLoginRequest) => void;

@@ -3,8 +3,10 @@ export type { TableContainer } from "./core/table/TableContainer";
 export type { ProviderContainer } from "./provider/ProviderContainer";
 export { Provider, RemoteProvider } from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
-export { RpcNames } from "./net/ws/RpcNames";
+export { RpcNames } from "./util/RpcNames";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
+export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
+export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
 export type {
   JoinTableProvider,
   JoinEventType,
@@ -22,4 +24,4 @@ export * from "./core/VuuServerOptions";
 export { NoAction } from "./viewport/ViewPortAction";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
-export { websocketConnectionHandler } from "./websocket-connection-handler";
+export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";

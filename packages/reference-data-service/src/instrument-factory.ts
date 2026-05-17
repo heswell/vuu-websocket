@@ -2,6 +2,7 @@ import logger from "./logger";
 import instrumentStore from "./InstrumentStore";
 import path, { resolve } from "path";
 import { DataGenerator } from "./DataGenerator";
+import { InstrumentDto } from "./InstrumentDto";
 
 const dataPath = path.resolve(
   import.meta.path,
@@ -23,9 +24,13 @@ async function loadInstruments() {
     const str = decoder.decode(chunk);
     remainingData += str;
     let lines = remainingData.split(/\r?\n/);
-    for await (const record of new DataGenerator(lines, 100)) {
-      instrumentStore.addInstrument(JSON.parse(record));
-      count += 1;
+    for await (const record of new DataGenerator(lines)) {
+      try {
+        instrumentStore.addInstrument(record as InstrumentDto);
+        count += 1;
+      } catch (e) {
+        console.warn(`error parsing data record ${record}`);
+      }
     }
     remainingData = lines.at(-1) ?? "";
   }

@@ -2,12 +2,21 @@ import { uuid } from "@vuu-ui/vuu-utils";
 import { WebSocketConnectionHandler } from "./WebSocketConnectionHandler";
 import "./InstrumentStore";
 import logger from "./logger";
+import { parseArgs, type ParseArgsOptionsConfig } from "@heswell/service-utils";
+import path from "path";
 
 export interface WebsocketData {
   sessionId: string;
 }
 
 export async function start() {
+  const runtimeOptions = (await Bun.file(
+    path.join(import.meta.path, "../config.json")
+  ).json()) as ParseArgsOptionsConfig;
+
+  const values = parseArgs(runtimeOptions);
+  console.log(JSON.stringify(values));
+
   const websocketServer = Bun.serve<WebsocketData>({
     // certFile: "./certs/myCA.pem",
     // keyFile: "./certs/myCA.key",

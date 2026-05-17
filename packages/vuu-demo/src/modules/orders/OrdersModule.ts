@@ -67,9 +67,9 @@ export const OrdersModule = () =>
             ({ name, serverDataType: dataType }) => ({
               name,
               dataType,
-            })
+            }),
           ),
-          new OrdersService(table, providerContainer, tableContainer)
-        )
+          new OrdersService(table, providerContainer, tableContainer),
+        ),
     )
     .asModule();

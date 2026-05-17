@@ -40,6 +40,7 @@ async function createInstruments() {
             const exchange = locations[suffix][1];
             const lotSize = random(10, 1000);
 
+            const delay = random(0, 400);
             writer.write(
               InstrumentNL(
                 bbg,
@@ -48,7 +49,8 @@ async function createInstruments() {
                 exchange,
                 isin,
                 lotSize,
-                ric
+                ric,
+                delay < 100 ? 0 : delay < 200 ? 100 : delay < 300 ? 200 : 300
               )
             );
 

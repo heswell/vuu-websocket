@@ -72,24 +72,19 @@ class InstrumentStore
   }
 
   addInstrument(instrument: InstrumentDto) {
-    // logger.info(
-    console.log(
-      `[RefData:service:InstrumentStore] add Instrument,  ric: ${instrument.ric} `
-    );
-    const columns = this.#instrumentColumns;
+    const columns = this.#instrumentColumns as Array<keyof InstrumentDto>;
     const colCount = columns.length;
     const dataRow: VuuDataRow = Array(colCount);
     // export data in same order that columns are specified in schema
     for (let i = 0; i < colCount; i++) {
       dataRow[i] = instrument[columns[i]];
     }
-    this.#instrumentsTable.insert(dataRow);
+    this.#instrumentsTable.insert(dataRow, false);
 
     this.emit("insert", dataRow);
   }
 
   updateInstrument(dataRow: VuuDataRow) {
-    console.log(`update instrument ${JSON.stringify(dataRow)}`);
     this.#instrumentsTable.upsert(dataRow, true);
   }
 

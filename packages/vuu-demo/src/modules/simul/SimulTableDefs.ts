@@ -1,4 +1,10 @@
-import { TableDef } from "@heswell/vuu-server";
+import { Column, TableDef } from "@heswell/vuu-server";
+import { SchemaColumn } from "@vuu-ui/vuu-data-types";
+
+const VUU_TIMESTAMP_COLUMNS: Column[] = [
+  { name: "vuuCreatedTimestamp", dataType: "long" },
+  { name: "vuuUpdatedTimestamp", dataType: "long" },
+];
 
 export const instruments = TableDef({
   columns: [
@@ -9,6 +15,7 @@ export const instruments = TableDef({
     { name: "isin", dataType: "string" },
     { name: "lotSize", dataType: "int" },
     { name: "ric", dataType: "string" },
+    ...VUU_TIMESTAMP_COLUMNS,
   ],
   joinFields: "ric",
   keyField: "ric",

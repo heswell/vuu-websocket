@@ -10,11 +10,15 @@ import {
 import type { WebsocketData } from "./server";
 // import { messageAPI } from "./VuuProtocolHandler";
 import { VuuServer } from "./core/VuuServer";
-import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
+import {
+  VuuClientMessage,
+  VuuLoginSuccessResponse,
+} from "@vuu-ui/vuu-protocol-types";
+import loginTokenService from "./net/LoginTokenService";
 
 export const websocketConnectionHandler = (
   config: ServerMessagingConfig,
-  vuuServer: VuuServer
+  vuuServer: VuuServer,
 ) => {
   let stopHeartbeats: undefined | (() => void);
   let stopMainLoop: undefined | (() => void);
@@ -25,7 +29,7 @@ export const websocketConnectionHandler = (
     idleTimeout: 10,
     open: (ws: ServerWebSocket<WebsocketData>) => {
       console.log(
-        `[VUU:server:websocket-connection-handler] new WebSocket, open a new Session = ${ws.data.sessionId}`
+        `[VUU:server:websocket-connection-handler] new WebSocket, open a new Session = ${ws.data.sessionId}`,
       );
       const sessionCount = createSession(ws.data.sessionId, ws);
       if (sessionCount === 1) {
@@ -35,14 +39,25 @@ export const websocketConnectionHandler = (
     },
     message: async (
       ws: ServerWebSocket<WebsocketData>,
-      msg: string | Buffer
+      msg: string | Buffer,
     ) => {
       const session = getSession(ws.data.sessionId);
       if (session) {
         const vuuMessage = JSON.parse(msg as string) as VuuClientMessage;
         const { requestId } = vuuMessage;
         if (vuuMessage.body.type === "LOGIN") {
-          return session.login(requestId, vuuMessage.body);
+          const loginResult = loginTokenService.login(vuuMessage.body);
+          if (typeof loginResult === "string") {
+            session.enqueue(requestId, loginResult);
+            // TODO clear the session
+          } else {
+            // TODO we should create the session here
+            session.authenticated = true;
+            session.enqueue(requestId, {
+              type: "LOGIN_SUCCESS",
+              vuuServerId: "server1",
+            } as VuuLoginSuccessResponse);
+          }
         } else if (vuuMessage.body.type === "HB_RESP") {
           session.incomingHeartbeat = vuuMessage.body.ts;
         } else {
@@ -64,7 +79,7 @@ export const websocketConnectionHandler = (
         //   teardownHandler?.({}, session);
         // }
         vuuServer.viewPortContainer.removeViewportsForSession(
-          ws.data.sessionId
+          ws.data.sessionId,
         );
         const sessionCount = clearSession(ws.data.sessionId);
         if (sessionCount === 0) {

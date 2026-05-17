@@ -17,8 +17,13 @@ export interface Upsert {
   row: VuuDataRow;
   type: "insert" | "update";
 }
+export interface Upserts {
+  resource: string;
+  rows: VuuDataRow[];
+  type: "inserts" | "updates";
+}
 
-export type ResourceMessage = SnapshotCount | SnapshotBatch | Upsert;
+export type ResourceMessage = SnapshotCount | SnapshotBatch | Upsert | Upserts;
 
 export class StoreDataStreamSource
   implements UnderlyingDefaultSource<ResourceMessage>
@@ -49,19 +54,31 @@ export class StoreDataStreamSource
           row: dataRow,
         } as Upsert);
       });
+      store.on("inserts", (dataRows) => {
+        controller.enqueue({
+          resource: "instruments",
+          type: "inserts",
+          rows: dataRows,
+        } as Upserts);
+      });
     } else if (!this.snapshotSent) {
-      const end = Math.min(index + this.batchSize, store.count);
-      const batchSize = end - index;
-      const rows = store.getRows(index, end, columns);
-      const message: ResourceMessage = {
-        isLast: end === store.count,
-        rows,
-        type: "snapshot-batch",
-      };
-      controller.enqueue(message);
-      this.index += batchSize;
+      controller.enqueue(this.nextSnapshotBatch);
     }
   }
 
   cancel?: UnderlyingSourceCancelCallback | undefined;
+
+  private get nextSnapshotBatch() {
+    const { columns, store, index } = this;
+    const end = Math.min(index + this.batchSize, store.count);
+    const batchSize = end - index;
+    const rows = store.getRows(index, end, columns);
+    this.index += batchSize;
+    const message: ResourceMessage = {
+      isLast: end === store.count,
+      rows,
+      type: "snapshot-batch",
+    };
+    return message;
+  }
 }

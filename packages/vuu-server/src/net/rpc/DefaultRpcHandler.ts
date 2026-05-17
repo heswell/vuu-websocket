@@ -18,13 +18,13 @@ export class DefaultRpcHandler extends RpcHandler {
     this.#rpcHandlerMap.set(functionName, handlerFunc);
   }
 
-  processViewPortRpcCall(methodName: string, rpcParams: RpcParams) {
-    const rpcHandler = this.#rpcHandlerMap.get(methodName);
+  processRpcRequest(rpcName: string, rpcParams: RpcParams) {
+    const rpcHandler = this.#rpcHandlerMap.get(rpcName);
     if (rpcHandler) {
       return rpcHandler(rpcParams);
     } else {
       throw Error(
-        `[DefaultRpcHandler] could not find rpcMethodHandler ${methodName}`
+        `[DefaultRpcHandler] could not find rpcMethodHandler ${rpcName}`,
       );
     }
   }

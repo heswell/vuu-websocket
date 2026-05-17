@@ -1,4 +1,11 @@
-import { ServerMessageBody, VuuTable } from "@vuu-ui/vuu-protocol-types";
+import {
+  ServerMessageBody,
+  VuuFilter,
+  VuuGroupBy,
+  VuuRange,
+  VuuSort,
+  VuuTable,
+} from "@vuu-ui/vuu-protocol-types";
 import { ISession } from "../server-types";
 import {
   DataView,
@@ -8,12 +15,28 @@ import {
 } from "@heswell/data";
 import { ViewPortDef } from "../api/ViewPortDef";
 import { Column } from "../api/TableDef";
-import { DataTable, isDataTable } from "../core/table/InMemDataTable";
+import {
+  DataTable,
+  isDataTable,
+  RowKeyUpdate,
+} from "../core/table/InMemDataTable";
 import { SelectionEventHandler } from "@heswell/data";
+import { ClientSessionId } from "../net/ClientConnectionCreator";
+import { VuuUser } from "../core/auths/VuuUser";
+import { PublishQueue } from "../util/PublishQueue";
 
+type ViewPortUpdateType = "SIZE" | "ROW";
 export interface ViewPortSelection {
   viewPort: Viewport;
 }
+
+// TODO this needs some work
+export type ViewPortStructuralFields = {
+  columns: string[];
+  filterSpec: VuuFilter;
+  groupBy: VuuGroupBy;
+  sort: VuuSort;
+};
 
 export function ViewPortSelection(viewPort: Viewport) {
   return new (class implements ViewPortSelection {
@@ -21,6 +44,18 @@ export function ViewPortSelection(viewPort: Viewport) {
   })(viewPort);
 }
 
+export class ViewPortUpdate {
+  constructor(
+    public vpRequestId: string,
+    vp: Viewport,
+    table: Table, // rather than scala RowSource
+    key: RowKeyUpdate,
+    index: number,
+    vpUpdate: ViewPortUpdateType,
+    size: number,
+    ts: number,
+  ) {}
+}
 export interface ViewPortVisualLink {
   childVp: Viewport;
   parentVp: Viewport;
@@ -33,7 +68,7 @@ export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
     public childVp: Viewport,
     public parentVp: Viewport,
     public childColumn: Column,
-    public parentColumn: Column
+    public parentColumn: Column,
   ) {
     parentVp.on("row-selection", this.handleSelectionEvent);
   }
@@ -44,25 +79,22 @@ export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
     if (dataResponse) {
       const { rows, size } = dataResponse;
       this.childVp.enqueue(
-        tableRowsMessageBody(rows, size, this.childVp.id, true)
+        tableRowsMessageBody(rows, size, this.childVp.id, true),
       );
     }
   }
 
   private handleSelectionEvent: SelectionEventHandler = () => {
-    console.log(
-      `selection event selected keys ${this.parentVp.selectedKeys.join(" , ")}`
-    );
     const { selectedKeys } = this.parentVp;
-    if (selectedKeys.length === 0) {
+    if (selectedKeys.size === 0) {
       const dataResponse = this.childVp.filter({ filter: "" });
       if (dataResponse) {
         const { rows, size } = dataResponse;
         this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true)
+          tableRowsMessageBody(rows, size, this.childVp.id, true),
         );
       }
-    } else if (selectedKeys.length === 1) {
+    } else if (selectedKeys.size === 1) {
       const [key] = this.parentVp.selectedKeys;
       const filter = `${this.childColumn.name} = "${key}"`;
       // // TODO need a way to ensure that this triggers update
@@ -71,12 +103,14 @@ export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
       if (dataResponse) {
         const { rows, size } = dataResponse;
         this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true)
+          tableRowsMessageBody(rows, size, this.childVp.id, true),
         );
       }
     } else {
       const [key] = this.parentVp.selectedKeys;
-      const values = selectedKeys.map((value) => `"${value}"`).join(",");
+      const values = Array.from(selectedKeys)
+        .map((value) => `"${value}"`)
+        .join(",");
       const filter = `${this.childColumn.name} in [${values}]`;
       // // TODO need a way to ensure that this triggers update
       // console.log(`set filter ${filter}`);
@@ -84,7 +118,7 @@ export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
       if (dataResponse) {
         const { rows, size } = dataResponse;
         this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true)
+          tableRowsMessageBody(rows, size, this.childVp.id, true),
         );
       }
     }
@@ -116,26 +150,32 @@ export const ViewPortVisualLink = (
   childVp: Viewport,
   parentVp: Viewport,
   childColumn: Column,
-  parentColumn: Column
+  parentColumn: Column,
 ) =>
   new RuntimeViewPortVisualLink(childVp, parentVp, childColumn, parentColumn);
 
 export class Viewport extends DataView {
   #enabled: boolean = true;
-  #session: ISession;
+  #clientSessionId: ClientSessionId;
+  #outboundQ: PublishQueue<ViewPortUpdate>;
   #viewPortDef: ViewPortDef;
   #viewPortVisualLink?: RuntimeViewPortVisualLink;
 
   constructor(
-    session: ISession,
     id: string,
+    user: VuuUser,
+    clientSessionId: ClientSessionId,
+    outboundQ: PublishQueue<ViewPortUpdate>,
+    structuralFields: ViewPortStructuralFields,
+    range: VuuRange,
     table: Table,
     config: DataViewConfig,
     // in scala, this is passed with config as 'structural'
-    viewPortDef: ViewPortDef
+    viewPortDef: ViewPortDef,
   ) {
     super(id, table, config);
-    this.#session = session;
+    this.#clientSessionId = clientSessionId;
+    this.#outboundQ = outboundQ;
     this.#viewPortDef = viewPortDef;
   }
 
@@ -164,7 +204,7 @@ export class Viewport extends DataView {
   }
 
   get sessionId() {
-    return this.#session.id;
+    return this.#clientSessionId.sessionId;
   }
 
   get viewPortDef() {
@@ -195,12 +235,12 @@ export class Viewport extends DataView {
   selectRowRange(
     fromRowKey: string,
     toRowKey: string,
-    preserveExistingSelection: boolean
+    preserveExistingSelection: boolean,
   ) {
     return super.selectRowRange(
       fromRowKey,
       toRowKey,
-      preserveExistingSelection
+      preserveExistingSelection,
     );
   }
 
@@ -219,6 +259,7 @@ export class Viewport extends DataView {
   }
 
   enqueue(messageBody: ServerMessageBody) {
-    this.#session.enqueue("", messageBody);
+    console.log(`[ViewPort] wbqueue message ${messageBody.type}`);
+    this.#outboundQ.push(ViewPortUpdate(messageBody));
   }
 }

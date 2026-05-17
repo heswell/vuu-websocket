@@ -5,14 +5,18 @@ export const InstrumentNL = (
   exchange: string,
   isin: string,
   lotSize: number,
-  ric: string
+  ric: string,
+  delay = 100
 ) =>
   JSON.stringify({
-    bbg,
-    currency,
-    description,
-    exchange,
-    isin,
-    lotSize,
-    ric,
+    data: {
+      bbg,
+      currency,
+      description,
+      exchange,
+      isin,
+      lotSize,
+      ric,
+    },
+    delay,
   }) + "\n";

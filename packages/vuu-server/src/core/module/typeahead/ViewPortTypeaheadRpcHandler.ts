@@ -1,7 +1,7 @@
 import { SortSet } from "@heswell/data";
 import { DefaultRpcHandler } from "../../../net/rpc/DefaultRpcHandler";
 import { RpcParams } from "../../../net/rpc/Rpc";
-import { RpcNames } from "../../../net/ws/RpcNames";
+import { RpcNames } from "../../../util/RpcNames";
 import { TableContainer } from "../../table/TableContainer";
 import { Column } from "../../../api/TableDef";
 import { DataTable } from "../../table/InMemDataTable";
@@ -18,11 +18,11 @@ export class ViewPortTypeaheadRpcHandler {
     this.#tableContainer = tableContainer;
     rpcRegistry.registerRpc(
       RpcNames.UniqueFieldValuesRpc,
-      this.processGetUniqueFieldValuesRequest
+      this.processGetUniqueFieldValuesRequest,
     );
     rpcRegistry.registerRpc(
       RpcNames.UniqueFieldValuesStartsWithRpc,
-      this.processGetUniqueFieldValuesStartWithRequest
+      this.processGetUniqueFieldValuesStartWithRequest,
     );
   }
 
@@ -32,7 +32,7 @@ export class ViewPortTypeaheadRpcHandler {
     vpKeys,
   }: RpcParams<TypeaheadRpcParams>) => {
     console.log(
-      `[ViewPortTypoeaheadRpcHandler] processGetUniqueFieldValuesRequest ${table} ${column}`
+      `[ViewPortTypoeaheadRpcHandler] processGetUniqueFieldValuesRequest ${table} ${column}`,
     );
     if (viewPortColumns && vpKeys) {
       return this.getUniqueFieldValues(
@@ -40,18 +40,18 @@ export class ViewPortTypeaheadRpcHandler {
         module,
         column,
         viewPortColumns,
-        vpKeys
+        vpKeys,
       );
     } else {
       throw Error(
-        `[ViewPortTypeaheadRpcHandler] processGetUniqueFieldValuesRequest required viewPortColumns and vpKeys`
+        `[ViewPortTypeaheadRpcHandler] processGetUniqueFieldValuesRequest required viewPortColumns and vpKeys`,
       );
     }
   };
 
   processGetUniqueFieldValuesStartWithRequest = (params: RpcParams) => {
     console.log(
-      `[ViewPortTypoeaheadRpcHandler] processGetUniqueFieldValuesStartWithRequest`
+      `[ViewPortTypoeaheadRpcHandler] processGetUniqueFieldValuesStartWithRequest`,
     );
     return {};
   };
@@ -61,18 +61,18 @@ export class ViewPortTypeaheadRpcHandler {
     module: string,
     column: string,
     viewPortColumns: Column[],
-    vpKeys: number[] | SortSet
+    vpKeys: number[] | SortSet,
   ) {
     const table = this.#tableContainer.getTable<DataTable>(tableName);
     const start = performance.now();
     const values = table.columnValueProvider.getUniqueValuesVPColumn(
       column,
       viewPortColumns,
-      vpKeys
+      vpKeys,
     );
     const end = performance.now();
     console.log(
-      `[ViewPortTypeaheadRpcHandler] toom ${end - start}ms to get suggestions`
+      `[ViewPortTypeaheadRpcHandler] toom ${end - start}ms to get suggestions`,
     );
     console.log(values?.join(","));
     return values;

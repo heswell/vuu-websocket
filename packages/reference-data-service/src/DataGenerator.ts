@@ -1,16 +1,17 @@
-export class DataGenerator<T> {
-  private data: T[];
-  private delay: number;
+export class DataGenerator {
+  private data: string[];
 
-  constructor(data: T[], delay: number = 100) {
+  constructor(data: string[]) {
     this.data = data;
-    this.delay = delay;
   }
 
-  async *[Symbol.asyncIterator](): AsyncGenerator<T, void, unknown> {
+  async *[Symbol.asyncIterator](): AsyncGenerator {
     for (const item of this.data) {
-      await new Promise((resolve) => setTimeout(resolve, this.delay));
-      yield item;
+      const { data, delay } = JSON.parse(item);
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+      yield data;
     }
   }
 }

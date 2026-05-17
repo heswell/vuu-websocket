@@ -1,31 +1,38 @@
+import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { ViewServerModule } from "./module/VsModule";
 
 export type HttpServerOptions = {};
-export type WebSocketOptions = {
+export type VuuWebSocketOptions = {
+  certPath?: string;
+  maxSessionsPerUser?: number;
   webSocketPort: string | number;
 };
 
 export interface VuuServerConfig {
   httpServerOptions: HttpServerOptions;
-  webSocketOptions: WebSocketOptions;
+  loginTokenService: LoginTokenService;
+  webSocketOptions: VuuWebSocketOptions;
   modules: ViewServerModule[];
   withModule: (module: ViewServerModule) => VuuServerConfig;
 }
 
 export function VuuServerConfig(
   httpServerOptions: HttpServerOptions,
-  webSocketOptions: WebSocketOptions,
-  modules: ViewServerModule[] = []
+  webSocketOptions: VuuWebSocketOptions,
+  loginTokenService: LoginTokenService,
+  modules: ViewServerModule[] = [],
 ): VuuServerConfig {
   return {
     httpServerOptions,
+    loginTokenService,
     webSocketOptions,
     modules,
     withModule: (module: ViewServerModule) =>
       VuuServerConfig(
         httpServerOptions,
         webSocketOptions,
-        modules.concat(module)
+        loginTokenService,
+        modules.concat(module),
       ),
   };
 }

@@ -2,12 +2,14 @@ import type {
   ServerMessageBody,
   VuuLoginRequest,
   VuuLoginSuccessResponse,
+  VuuServerMessage,
 } from "@vuu-ui/vuu-protocol-types";
 import { ServerWebSocket } from "bun";
 import logger from "../logger.ts";
 import { MessageQueue } from "../messageQueue.ts";
 import type { WebsocketData } from "../server.ts";
 import type { ISession } from "../server-types.ts";
+import { isTokenErrorMessage } from "./LoginTokenService.ts";
 
 // TODO use SessionContainer
 const sessions = new Map<string, ISession>();
@@ -36,13 +38,13 @@ export function heartbeatLoop(interval: number) {
     for (const session of sessions.values()) {
       if (session.clientUnresponsive) {
         console.log(
-          `[heartbeatLoop] session #${session.id} received no heartbeat response from client`
+          `[heartbeatLoop] session #${session.id} received no heartbeat response from client`,
         );
         expiredSessions.push(session);
-      } else {
+      } else if (session.authenticated) {
         session.outgoingHeartbeat = ts;
         session.ws.send(
-          `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`
+          `{"requestId":"NA","sessionId":"${session.id}","user":"","token":"","body":{"type":"HB", "ts": ${ts} }}`,
         );
       }
     }
@@ -114,7 +116,7 @@ export function updateLoop(name: string, interval: number) {
 
 export const createSession = (
   sessionId: string,
-  ws: ServerWebSocket<WebsocketData>
+  ws: ServerWebSocket<WebsocketData>,
 ) => {
   sessions.set(sessionId, new Session(sessionId, ws));
   return sessions.size;
@@ -130,12 +132,12 @@ export const clearSession = (sessionId: string) => {
 };
 
 class Session implements ISession {
+  #authenticated = false;
   #heartbeat = 0;
   #heatbeatResponseReceived = true;
   #id: string;
   #user: string = "test-user";
   #ws: ServerWebSocket;
-  #token: string | undefined;
   #queue: MessageQueue;
   #viewports: string[] = [];
 
@@ -155,6 +157,14 @@ class Session implements ISession {
 
   clear() {
     this.#queue.length = 0;
+  }
+
+  get authenticated() {
+    return this.#authenticated;
+  }
+
+  set authenticated(_value: boolean) {
+    this.#authenticated = true;
   }
 
   get id() {
@@ -202,60 +212,42 @@ class Session implements ISession {
   }
 
   enqueue(requestId: string, messageBody: ServerMessageBody | string) {
-    if (this.#token) {
-      // removed logic here that updated existing data upates with later updates.
-      // It broke scrolling because TABLE_ROW entries were being inserted to an earlier batch,
-      // placing them before the corresponding CHANGE_RANGE_SUCCESS ACK message
-      if (typeof messageBody === "string") {
-        this.#queue.push(messageBody);
-      } else {
-        this.#queue.push({
-          module: "CORE",
-          requestId,
-          sessionId: this.#id,
-          token: this.#token,
-          user: this.#user,
-          body: messageBody,
-        });
-      }
+    // removed logic here that updated existing data upates with later updates.
+    // It broke scrolling because TABLE_ROW entries were being inserted to an earlier batch,
+    // placing them before the corresponding CHANGE_RANGE_SUCCESS ACK message
+    if (typeof messageBody === "string") {
+      this.#queue.push(messageBody);
+      logger.info(
+        `[VUU:net:Session] enqueue ${requestId} ${messageBody}, ${
+          this.#queue.length
+        } messages queued`,
+      );
+    } else {
+      this.#queue.push({
+        module: "CORE",
+        requestId,
+        sessionId: this.#id,
+        body: messageBody,
+      });
       logger.info(
         `[VUU:net:Session] enqueue ${requestId} ${messageBody.type}, ${
           this.#queue.length
-        } messages queued`
+        } messages queued`,
       );
-    } else {
-      throw Error("no message can be sent to client before LOGIN");
     }
   }
 
   dequeueAllMessages = () => {
-    const queue = this.#queue.dequeueAllMessages();
-    // if (queue.length) {
-    //   logger.info(
-    //     `dequeued messages to send to client ${queue
-    //       .map((m) => `#${m.requestId} ${m.body.type}`)
-    //       .join(",")}`
-    //   );
-    // }
-    if (queue.length > 0) {
-      return queue;
+    const messages = this.#queue.dequeueAllMessages();
+    if (messages.length > 0) {
+      // if (messages.length > 2 && Array.isArray(messages)) {
+      //   return frontRunSizeMessages(messages);
+      // }
+      return messages;
     } else {
       return null;
     }
   };
-
-  login(requestId: string, message: VuuLoginRequest) {
-    console.log({ requestId, login: message });
-    const { token } = message;
-    this.#token = token;
-
-    // this.enqueue(requestId, "Token has expired");
-
-    this.enqueue(requestId, {
-      type: "LOGIN_SUCCESS",
-      vuuServerId: "server1",
-    } as VuuLoginSuccessResponse);
-  }
 
   kill() {
     console.log(`[Session] #${this.id} KILL`);
@@ -308,3 +300,43 @@ export const accurateTimer = (fn: Function, time = 1000) => {
 //   );
 //   messageCountPerSecond = 0;
 // }, 1000);
+
+const frontRunSizeMessages = (messages: VuuServerMessage[]) => {
+  const out: VuuServerMessage[] = [];
+  const [tableRowMessage] = messages;
+  const { body: firstBody } = tableRowMessage;
+  if (
+    firstBody.type !== "TABLE_ROW" ||
+    firstBody.rows.length !== 2 ||
+    firstBody.rows[0].updateType !== "SIZE"
+  ) {
+    return messages;
+  }
+
+  let vpSize = 0;
+  let insertPos = 1;
+
+  for (let i = 1; i < messages.length; i++) {
+    const { body } = messages[i];
+    if (
+      body.type !== "TABLE_ROW" ||
+      body.rows.length !== 2 ||
+      body.rows[0].updateType !== "SIZE"
+    ) {
+      return messages;
+    }
+
+    const [size, data] = body.rows;
+    vpSize = size.vpSize;
+    firstBody.rows.splice(insertPos, 0, size);
+    firstBody.rows.push(data);
+    insertPos += 1;
+  }
+
+  // increment vpSize on data rows
+  for (let i = insertPos; i < firstBody.rows.length; i++) {
+    firstBody.rows[i].vpSize = vpSize;
+  }
+
+  return [tableRowMessage];
+};
