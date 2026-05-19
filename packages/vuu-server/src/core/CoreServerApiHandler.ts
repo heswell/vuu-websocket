@@ -26,20 +26,26 @@ import { TableContainer } from "./table/TableContainer";
 import { ISession } from "../server-types";
 import { tableRowsMessageBody } from "@heswell/data";
 import { hasViewPortContext } from "@vuu-ui/vuu-utils";
-import logger from "../logger.ts";
 import { RequestContext } from "../net/RequestProcessor.ts";
 import { ServerApi } from "../net/ServerApi.ts";
 import {
+  ChangeViewPortRangeSuccess,
   CreateViewPortReject,
   CreateViewPortSuccess,
+  ErrorResponse,
   GetTableMetaResponse,
   GetViewPortMenusResponse,
   GetViewPortVisualLinksResponse,
   JsonViewServerMessage,
+  VsMsg,
 } from "../net/Messages.ts";
+import { ViewPortRange } from "../viewport/Viewport.ts";
 
 const vsMsg = (body: ServerMessageBody, ctx: RequestContext) =>
   JsonViewServerMessage(ctx.requestId, ctx.session.sessionId, body);
+
+const errorMsg = (s: String, ctx: RequestContext) =>
+  VsMsg(ctx.requestId, ctx.session.sessionId, ErrorResponse(s));
 
 export class CoreServerApiHandler implements ServerApi {
   constructor(
@@ -50,12 +56,9 @@ export class CoreServerApiHandler implements ServerApi {
 
   process({ requestId, body }: VuuClientMessage, ctx: RequestContext) {
     switch (body.type) {
-      // case "GET_TABLE_LIST":
-      //   session.enqueue(requestId, {
-      //     type: "TABLE_LIST_RESP",
-      //     tables: this.tableContainer.getDefinedTables(),
-      //   });
-      //   break;
+      case "HB_RESP":
+        // do nothing
+        break;
       case "GET_TABLE_META":
         return this.processGetTableMetaRequest(body, ctx);
       case "CREATE_VP":
@@ -64,6 +67,14 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processGetViewPortVisualLinksRequest(body, ctx);
       case "GET_VIEW_PORT_MENUS":
         return this.processGetViewPortMenusRequest(body, ctx);
+      case "CHANGE_VP_RANGE":
+        return this.processViewPortRange(body, ctx);
+      // case "GET_TABLE_LIST":
+      //   session.enqueue(requestId, {
+      //     type: "TABLE_LIST_RESP",
+      //     tables: this.tableContainer.getDefinedTables(),
+      //   });
+      //   break;
       // case "REMOVE_VP":
       //   return this.processRemoveViewPortRequest(requestId, body, session);
       // case "DISABLE_VP":
@@ -82,9 +93,6 @@ export class CoreServerApiHandler implements ServerApi {
       //   return this.processDeselectRowRequest(requestId, body, session);
       // case "SELECT_ROW_RANGE":
       //   return this.processSelectRowRangeRequest(requestId, body, session);
-      // case "CHANGE_VP_RANGE":
-      //   logger.info({ requestId }, `CHANGE_VP_RANGE ${body.from}:${body.to}`);
-      //   return this.processViewPortRange(requestId, body, session);
       // case "RPC_REQUEST":
       //   return this.handleViewportRpcRequest(requestId, body, ctx, session);
       // case "VIEW_PORT_MENUS_SELECT_RPC":
@@ -156,6 +164,10 @@ export class CoreServerApiHandler implements ServerApi {
       console.log(
         `[CoreServerApi] created viewport ${viewport.id} on tbale ${tableName}`,
       );
+
+      // This diverges from the originasl;
+      viewport.postDataForCurrentRange();
+
       return vsMsg(CreateViewPortSuccess(viewport.id, tableName, msg), ctx);
     } else {
       return vsMsg(
@@ -183,6 +195,25 @@ export class CoreServerApiHandler implements ServerApi {
     const viewPort = this.viewPortContainer.getViewportById(vpId);
     const menu = viewPort.viewPortDef.service.menuItems.asJson;
     return vsMsg(GetViewPortMenusResponse(vpId, menu), ctx);
+  }
+
+  private processViewPortRange(
+    msg: VuuViewportRangeRequest,
+    ctx: RequestContext,
+  ) {
+    try {
+      this.viewPortContainer.changeRange(
+        ctx.session,
+        msg.viewPortId,
+        ViewPortRange(msg.from, msg.to),
+      );
+      return vsMsg(
+        ChangeViewPortRangeSuccess(msg.viewPortId, msg.from, msg.to),
+        ctx,
+      );
+    } catch (e) {
+      errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
   }
 
   //--------------------------------------------------
@@ -302,28 +333,6 @@ export class CoreServerApiHandler implements ServerApi {
           tableRowsMessageBody(rows, size, viewport.id, sizeMessageRequired),
         );
       }
-    }
-  }
-
-  private processViewPortRange(
-    requestId: string,
-    { from, to, viewPortId }: VuuViewportRangeRequest,
-    session: ISession,
-  ) {
-    // should be purge the queue of any pending updates outside the requested range ?
-    session.enqueue(requestId, {
-      from,
-      to,
-      type: "CHANGE_VP_RANGE_SUCCESS",
-      viewPortId,
-    });
-
-    const viewport = this.viewPortContainer.getViewportById(viewPortId);
-    if (viewport) {
-      const { rows, size } = viewport.setRange({ from, to });
-      session.enqueue("", tableRowsMessageBody(rows, size, viewport.id, false));
-    } else {
-      throw Error(`[VuuProtocolHandler] no viewport for id #${viewPortId}`);
     }
   }
 

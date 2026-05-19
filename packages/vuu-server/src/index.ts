@@ -25,3 +25,4 @@ export { NoAction } from "./viewport/ViewPortAction";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
 export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";
+export { LifecycleContainer } from "./toolbox/thread/LifecycleContainer";

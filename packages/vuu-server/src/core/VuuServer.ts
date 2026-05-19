@@ -16,6 +16,9 @@ import { ViewServerHandlerFactoryImpl } from "../net/ViewServerHandler";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { ClientSessionContainer } from "../net/ClientSessionContainer";
 import { WebSocketServer } from "../net/ws/WebSocketServer";
+import { LifeCycleRunner } from "../toolbox/thread/LifeCycleRunner";
+import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
+import { FlowControllerFactory } from "../net/flowcontrol/FLowController";
 
 export class VuuServer {
   protected providerContainer: ProviderContainer;
@@ -27,7 +30,14 @@ export class VuuServer {
 
   private vuuServerId = uuid();
 
-  constructor({ loginTokenService, modules, ...config }: VuuServerConfig) {
+  constructor(
+    { loginTokenService, modules, ...config }: VuuServerConfig,
+    lifecycle: LifecycleContainer,
+  ) {
+    const flowControllerFactory: FlowControllerFactory =
+      new FlowControllerFactory();
+    // config.clientConnection.hasHeartbeat,
+
     const sessionContainer = ClientSessionContainer(
       config.webSocketOptions.maxSessionsPerUser,
     );
@@ -58,6 +68,7 @@ export class VuuServer {
       sessionContainer,
       this.serverApi,
       this.moduleContainer,
+      flowControllerFactory,
       this.vuuServerId,
     );
 
@@ -66,6 +77,13 @@ export class VuuServer {
     this.moduleContainer.start();
 
     new WebSocketServer(config.webSocketOptions, factory);
+
+    const handlerRunner = new LifeCycleRunner(
+      "sessionRunner",
+      () => sessionContainer.runOnce(),
+      60,
+    );
+    lifecycle.apply(handlerRunner);
   }
 
   private createTable(tableDef: TableDef) {

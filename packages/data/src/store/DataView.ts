@@ -54,7 +54,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     id: string,
     table: Table,
     { range, ...config }: DataViewConfig,
-    updateQueue = new UpdateQueue()
+    updateQueue = new UpdateQueue(),
   ) {
     super();
     this.#id = id;
@@ -161,9 +161,17 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     return this.rowSet;
   }
 
+  get range() {
+    return this.rowSet.range;
+  }
+
+  get size() {
+    return this.rowSet.size;
+  }
+
   // this should be invoked by setting the options
   changeViewport(
-    options: Omit<VuuViewportChangeRequest, "viewPortId">
+    options: Omit<VuuViewportChangeRequest, "viewPortId">,
   ): DataResponse | undefined {
     // console.log({ options, config: this.#config });
     const { noChanges, ...changes } = isConfigChanged(this.#config, options);
@@ -186,8 +194,8 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   getDataForCurrentRange() {
     logger.info(
       `[DataView] getDataForCurrentRange rowSet range ${JSON.stringify(
-        this.rowSet.range
-      )}`
+        this.rowSet.range,
+      )}`,
     );
     return this.rowSet.currentRange();
   }
@@ -196,8 +204,8 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   setRange(range: Range, useDelta = true): DataResponse {
     logger.info(
       `[DATAVIEW] setRange ${JSON.stringify(range)}, table ${JSON.stringify(
-        this.table.schema.table
-      )} contains ${this.table.rowCount} rows`
+        this.table.schema.table,
+      )} contains ${this.table.rowCount} rows`,
     );
     return this.rowSet.setRange(range, useDelta);
   }
@@ -215,12 +223,12 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   selectRowRange(
     fromRowKey: string,
     toRowKey: string,
-    preserveExistingSelection: boolean
+    preserveExistingSelection: boolean,
   ) {
     return this.rowSet.selectRowRange(
       fromRowKey,
       toRowKey,
-      preserveExistingSelection
+      preserveExistingSelection,
     );
   }
 
@@ -243,7 +251,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       return this.setRange(resetRange(this.rowSet.range), false);
     } else {
       throw Error(
-        "DataView aggregate cannot perform aggregation on a non grouped dataset"
+        "DataView aggregate cannot perform aggregation on a non grouped dataset",
       );
     }
   }
@@ -277,7 +285,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
         this._vuuFilter = { filter: "" };
         const dataResponse = this.rowSet.setRange(
           resetRange(this.rowSet.range),
-          false
+          false,
         );
         return {
           ...dataResponse,
@@ -304,7 +312,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
       const dataResponse = this.rowSet.setRange(
         resetRange(this.rowSet.range),
-        false
+        false,
       );
       return {
         ...dataResponse,

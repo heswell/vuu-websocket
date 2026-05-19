@@ -10,6 +10,7 @@ export interface ClientSessionContainer {
     messageHandler: MessageHandler,
   ) => void;
   remove: (vuuUser: VuuUser, sessionId: ClientSessionId) => void;
+  runOnce: () => void;
 }
 
 class ClientSessionContainerImpl implements ClientSessionContainer {
@@ -82,6 +83,15 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
     console.log(
       `[ClientSessionContainer] register session ${sessionId} for user ${userKey}`,
     );
+  }
+
+  runOnce() {
+    // console.log(
+    //   `[ClientSessionContainer] runOnce (${this.sessions.size} sessions)`,
+    // );
+    this.sessions.forEach((handler) => {
+      handler.sendUpdates();
+    });
   }
 }
 

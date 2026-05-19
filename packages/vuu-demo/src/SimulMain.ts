@@ -1,4 +1,8 @@
-import { VuuServerConfig, VuuServer } from "@heswell/vuu-server";
+import {
+  VuuServerConfig,
+  VuuServer,
+  LifecycleContainer,
+} from "@heswell/vuu-server";
 import { PricesModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
@@ -20,6 +24,8 @@ export default function main() {
 
   const loginTokenService = LoginTokenService();
 
+  const lifecycle = new LifecycleContainer();
+
   const config = VuuServerConfig(
     httpServerOptions,
     webSocketOptions,
@@ -32,5 +38,7 @@ export default function main() {
   // .withModule(PermissionModule())
   // .withModule(BasketModule());
 
-  const vuuServer = new VuuServer(config);
+  const vuuServer = new VuuServer(config, lifecycle);
+
+  lifecycle.start();
 }

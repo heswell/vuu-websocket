@@ -1,5 +1,8 @@
 import {
   ServerMessageBody,
+  ServerToClientError,
+  ServerToClientHeartBeat,
+  ServerToClientTableRows,
   VuuColumnDataType,
   VuuLinkDescriptor,
   VuuLoginSuccessResponse,
@@ -11,8 +14,10 @@ import {
   VuuViewportCreateRequest,
   VuuViewportCreateSuccessResponse,
   VuuViewportMenusResponse,
+  VuuViewportRangeResponse,
   VuuViewportVisualLinksResponse,
 } from "@vuu-ui/vuu-protocol-types";
+import { RowUpdate } from "./row/RowUpdate";
 
 interface ViewServerMessage {
   body: ServerMessageBody;
@@ -20,6 +25,11 @@ interface ViewServerMessage {
   requestId: string;
   sessionId: string;
 }
+
+export const HeartBeat = (ts: number): ServerToClientHeartBeat => ({
+  ts,
+  type: "HB",
+});
 
 export const JsonViewServerMessage = (
   requestId: string,
@@ -31,6 +41,18 @@ export const JsonViewServerMessage = (
   sessionId,
   body,
   module,
+});
+
+export const VsMsg = (
+  requestId: string,
+  sessionId: string,
+  body: ServerMessageBody,
+  module: string = "CORE",
+) => JsonViewServerMessage(requestId, sessionId, body, module);
+
+export const ErrorResponse = (msg: string): ServerToClientError => ({
+  msg,
+  type: "ERROR",
 });
 
 export const LoginSuccess = (vuuServerId: string): VuuLoginSuccessResponse => ({
@@ -87,9 +109,33 @@ export const GetViewPortVisualLinksResponse = (
 
 export const GetViewPortMenusResponse = (
   vpId: string,
-  menu: VuuMenu | VuuMenuItem,
+  menu: VuuMenu,
 ): VuuViewportMenusResponse => ({
   menu,
   type: "VIEW_PORT_MENUS_RESP",
   vpId,
+});
+
+export const TableRowUpdates = (
+  batch: string,
+  isLast: boolean,
+  timestamp: number,
+  rows: RowUpdate[],
+): ServerToClientTableRows => ({
+  batch,
+  isLast,
+  rows,
+  type: "TABLE_ROW",
+  timestamp,
+});
+
+export const ChangeViewPortRangeSuccess = (
+  viewPortId: string,
+  from: number,
+  to: number,
+): VuuViewportRangeResponse => ({
+  type: "CHANGE_VP_RANGE_SUCCESS",
+  viewPortId,
+  from,
+  to,
 });

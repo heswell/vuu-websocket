@@ -5,13 +5,26 @@ import { IProvider, Provider } from "../../provider/Provider";
 import { ColumnValueProvider } from "./ColumnValueProvider";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
-export class RowKeyUpdate {
+export interface RowKeyUpdate {
+  key: string;
+  source: Table | null;
+  isDelete?: boolean;
+}
+
+export class RowKeyUpdateImpl implements RowKeyUpdate {
   constructor(
     public key: string,
-    public source: Table,
+    public source: Table | null,
     public isDelete = false,
   ) {}
 }
+
+export const RowKeyUpdate = (
+  key: string,
+  source: Table | null,
+  isDelete?: boolean,
+): RowKeyUpdate => new RowKeyUpdateImpl(key, source, isDelete);
+
 export interface DataTable {
   columnForName: (columnName: string) => Column;
   columnValueProvider: ColumnValueProvider;

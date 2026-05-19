@@ -33,5 +33,11 @@ export class WebSocketServer {
     console.log(
       `[VUU] Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`,
     );
+
+    // TODO WebSocketserver needs run via LIfecycle container
+    process.on("SIGINT", () => {
+      websocketServer.stop();
+      process.exit();
+    });
   }
 }

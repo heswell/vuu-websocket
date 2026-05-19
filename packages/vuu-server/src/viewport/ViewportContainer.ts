@@ -5,9 +5,9 @@ import type {
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
-import { ISession } from "../server-types";
 import {
   Viewport,
+  ViewPortRange,
   ViewPortSelection,
   ViewPortUpdate,
   ViewPortVisualLink,
@@ -109,6 +109,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       viewPortDef,
     );
 
+    viewport.requestId = requestId;
+
     this.#viewports.set(id, viewport);
     const viewports = this.#sessionViewportMap.get(sessionId);
     if (viewports) {
@@ -122,6 +124,21 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       type: "viewport-created",
     });
     return viewport;
+  }
+
+  changeRange(
+    clientSession: ClientSessionId,
+    vpId: string,
+    range: ViewPortRange,
+  ) {
+    // console.log(`[ViewPortContainer] change range ${range.from} - ${range.to}`);
+
+    const viewport = this.getViewportById(vpId);
+    if (viewport) {
+      viewport.setRange(range);
+    } else {
+      throw Error(`[VuuProtocolHandler] no viewport for id #${vpId}`);
+    }
   }
 
   getViewportById(viewportId: string) {

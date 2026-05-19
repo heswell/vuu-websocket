@@ -5,6 +5,7 @@ import { ServerApi } from "./ServerApi";
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { Channel } from "./ws/Channel";
 import { LoginTokenService } from "./auth/LoginTokenService";
+import { FlowControllerFactory } from "./flowcontrol/FLowController";
 
 export interface ViewServerHandlerFactory {
   create: () => ViewServerHandler;
@@ -16,6 +17,7 @@ export class ViewServerHandlerFactoryImpl implements ViewServerHandlerFactory {
     private sessionContainer: ClientSessionContainer,
     private serverApi: ServerApi,
     private moduleContainer: ModuleContainer,
+    private flowControllerFactory: FlowControllerFactory,
     private vuuServerId: string,
   ) {}
 
@@ -25,6 +27,7 @@ export class ViewServerHandlerFactoryImpl implements ViewServerHandlerFactory {
       this.sessionContainer,
       this.serverApi,
       this.moduleContainer,
+      this.flowControllerFactory,
       this.vuuServerId,
     );
     return new ViewServerHandler(requestProcessor);
@@ -39,12 +42,12 @@ export class ViewServerHandler {
   }
 
   handle(inbound: string, channel: Channel) {
-    console.log(`[ViewServerHandler] handle inbound ${inbound}`);
+    // console.log(`[ViewServerHandler] handle inbound ${inbound}`);
     const viewServerMessage = JSON.parse(inbound) as VuuClientMessage;
     const response = this.processor.handle(viewServerMessage, channel);
     if (response) {
       const serializedResponse = JSON.stringify(response);
-      console.log(`[ViewServerHandler] send outbound  ${serializedResponse}`);
+      // console.log(`[ViewServerHandler] send outbound  ${serializedResponse}`);
       channel.send(serializedResponse);
     }
   }

@@ -4,9 +4,7 @@ import {
   VuuGroupBy,
   VuuRange,
   VuuSort,
-  VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
-import { ISession } from "../server-types";
 import {
   DataView,
   DataViewConfig,
@@ -44,18 +42,58 @@ export function ViewPortSelection(viewPort: Viewport) {
   })(viewPort);
 }
 
-export class ViewPortUpdate {
+export interface ViewPortUpdate {
+  index: number;
+  key: RowKeyUpdate;
+  vpRequestId: string;
+  size: number;
+  table: Table | null; // null for SIZE update
+  ts: number;
+  vp: Viewport;
+  vpUpdate: ViewPortUpdateType;
+}
+export interface ViewPortRowUpdate extends Omit<ViewPortUpdate, "table"> {
+  table: Table;
+}
+
+export const isViewPortRowUpdate = (
+  vpu: ViewPortUpdate,
+): vpu is ViewPortRowUpdate => vpu.vpUpdate === "ROW" && vpu.table !== null;
+
+export class ViewPortUpdateImpl implements ViewPortUpdate {
   constructor(
     public vpRequestId: string,
-    vp: Viewport,
-    table: Table, // rather than scala RowSource
-    key: RowKeyUpdate,
-    index: number,
-    vpUpdate: ViewPortUpdateType,
-    size: number,
-    ts: number,
+    public vp: Viewport,
+    public table: Table | null, // rather than scala RowSource
+    public key: RowKeyUpdate,
+    public index: number,
+    public vpUpdate: ViewPortUpdateType,
+    public size: number,
+    public ts: number,
   ) {}
 }
+
+export const ViewPortUpdate = (
+  vpRequestId: string,
+  vp: Viewport,
+  table: Table | null,
+  key: RowKeyUpdate,
+  index: number,
+  vpUpdate: ViewPortUpdateType,
+  size: number,
+  ts: number,
+): ViewPortUpdate =>
+  new ViewPortUpdateImpl(
+    vpRequestId,
+    vp,
+    table,
+    key,
+    index,
+    vpUpdate,
+    size,
+    ts,
+  );
+
 export interface ViewPortVisualLink {
   childVp: Viewport;
   parentVp: Viewport;
@@ -154,9 +192,51 @@ export const ViewPortVisualLink = (
 ) =>
   new RuntimeViewPortVisualLink(childVp, parentVp, childColumn, parentColumn);
 
+export interface ViewPortRange {
+  contains: (i: number) => boolean;
+  from: number;
+  subtract: (range: ViewPortRange) => ViewPortRange;
+  to: number;
+}
+class ViewPortRangeImpl implements ViewPortRange {
+  constructor(
+    public from: number,
+    public to: number,
+  ) {}
+
+  contains(i: number) {
+    return i >= this.from && i < this.to;
+  }
+
+  subtract(newRange: ViewPortRange) {
+    let from = newRange.from;
+    let to = newRange.to;
+
+    if (newRange.from > this.from && newRange.from < this.to) {
+      from = this.to;
+      to = newRange.to;
+    }
+
+    if (
+      newRange.from < this.from &&
+      newRange.to < this.to &&
+      newRange.to > this.from
+    ) {
+      from = newRange.from;
+      to = this.from;
+    }
+
+    return ViewPortRange(from, to);
+  }
+}
+
+export const ViewPortRange = (from: number, to: number): ViewPortRange =>
+  new ViewPortRangeImpl(from, to);
+
 export class Viewport extends DataView {
   #enabled: boolean = true;
   #clientSessionId: ClientSessionId;
+  #requestId: string = "";
   #outboundQ: PublishQueue<ViewPortUpdate>;
   #viewPortDef: ViewPortDef;
   #viewPortVisualLink?: RuntimeViewPortVisualLink;
@@ -207,6 +287,14 @@ export class Viewport extends DataView {
     return this.#clientSessionId.sessionId;
   }
 
+  get requestId() {
+    return this.#requestId;
+  }
+
+  set requestId(requestId: string) {
+    this.#requestId = requestId;
+  }
+
   get viewPortDef() {
     return this.#viewPortDef;
   }
@@ -244,6 +332,28 @@ export class Viewport extends DataView {
     );
   }
 
+  setRange(range: VuuRange) {
+    const dataResponse = super.setRange(range);
+    const time = Date.now();
+    const { rows, size } = dataResponse;
+    for (const row of rows) {
+      this.#outboundQ.pushHighPriority(
+        ViewPortUpdate(
+          this.#requestId,
+          this,
+          this.table,
+          RowKeyUpdate(row.rowKey, this.table),
+          row.rowIndex,
+          "ROW",
+          size,
+          time,
+        ),
+      );
+    }
+
+    return dataResponse;
+  }
+
   setVisualLink(link: RuntimeViewPortVisualLink) {
     console.log(`[Viewport] setVisualLink`);
     this.#viewPortVisualLink = link;
@@ -258,8 +368,40 @@ export class Viewport extends DataView {
     }
   }
 
+  postDataForCurrentRange() {
+    const { rows, size } = this.getDataForCurrentRange();
+    const time = Date.now();
+    this.#outboundQ.pushHighPriority(
+      ViewPortUpdate(
+        this.#requestId,
+        this,
+        null,
+        RowKeyUpdate("SIZE", null),
+        -1,
+        "SIZE",
+        size,
+        time,
+      ),
+    );
+
+    for (const row of rows) {
+      this.#outboundQ.pushHighPriority(
+        ViewPortUpdate(
+          this.#requestId,
+          this,
+          this.table,
+          RowKeyUpdate(row.rowKey, this.table),
+          row.rowIndex,
+          "ROW",
+          size,
+          time,
+        ),
+      );
+    }
+  }
+
   enqueue(messageBody: ServerMessageBody) {
-    console.log(`[ViewPort] wbqueue message ${messageBody.type}`);
-    this.#outboundQ.push(ViewPortUpdate(messageBody));
+    console.trace(`[ViewPort] queue message ${messageBody.type}`);
+    // this.#outboundQ.push(ViewPortUpdate(messageBody));
   }
 }

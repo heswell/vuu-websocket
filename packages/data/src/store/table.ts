@@ -3,7 +3,11 @@ import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildColumnMap } from "./columnUtils.ts";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
-import type { JoinEventType, JoinTableProvider } from "@heswell/vuu-server";
+import type {
+  Column,
+  JoinEventType,
+  JoinTableProvider,
+} from "@heswell/vuu-server";
 
 // export type TableIndex = Map<string, number>;
 export type TableIndex = Record<string, number | undefined>;
@@ -100,7 +104,7 @@ export class Table extends EventEmitter<TableEvents> {
         return Array.from(set).sort();
       } else {
         throw Error(
-          `Table. getUniqueValuesForColumn only operates on string colmns, ${column} is a ${schemaColumn.serverDataType}`
+          `Table. getUniqueValuesForColumn only operates on string colmns, ${column} is a ${schemaColumn.serverDataType}`,
         );
       }
     } else {
@@ -156,7 +160,7 @@ export class Table extends EventEmitter<TableEvents> {
   sendToJoinSink(
     eventType: JoinEventType,
     rowKey: string,
-    rowData?: VuuDataRow
+    rowData?: VuuDataRow,
   ) {
     if (this.joinProvider?.hasJoins(this.name)) {
       this.joinProvider.sendEvent(this.name, eventType, rowKey, rowData);
@@ -209,5 +213,10 @@ export class Table extends EventEmitter<TableEvents> {
 
   updateRow(/*idx, row, columnMap*/) {
     return null;
+  }
+
+  pullRowAsArray(key: string, columns: Column[]) {
+    const row = this.getRowAtKey(key, true);
+    return columns.map((column) => row[this.columnMap[column.name]]);
   }
 }

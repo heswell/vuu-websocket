@@ -1,13 +1,28 @@
-import { VuuClientMessage, VuuServerMessage } from "@vuu-ui/vuu-protocol-types";
+import {
+  ServerToClientTableRows,
+  VuuClientMessage,
+  VuuServerMessage,
+} from "@vuu-ui/vuu-protocol-types";
 import { Channel } from "./ws/Channel";
 import { PublishQueue } from "../util/PublishQueue";
-import { ViewPortUpdate } from "../viewport/Viewport";
+import { isViewPortRowUpdate, ViewPortUpdate } from "../viewport/Viewport";
 import { VuuUser } from "../core/auths/VuuUser";
 import { ServerApi } from "./ServerApi";
 import { ClientSessionContainer } from "./ClientSessionContainer";
 import { ModuleContainer } from "../core/module/ModuleContainer";
 import { RequestContext } from "./RequestProcessor";
+import {
+  Disconnect,
+  FlowController,
+  SendHeartbeat,
+} from "./flowcontrol/FlowController";
+import { HeartBeat, JsonViewServerMessage, TableRowUpdates } from "./Messages";
+import { RequestId } from "../client/messages/ClientMessage";
+import { RowUpdate } from "./row/RowUpdate";
+import { RowUpdateType } from "./row/RowUpdateType";
+import { withinRange } from "@vuu-ui/vuu-utils";
 
+const EMPTY_ARRAY = [] as const;
 interface InboundMessageHandler {
   handle: (msg: VuuClientMessage) => VuuServerMessage;
 }
@@ -26,12 +41,12 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     private user: VuuUser,
     private session: ClientSessionId,
     private serverApi: ServerApi,
-    // flowController
+    private flowController: FlowController,
     private sessionContainer: ClientSessionContainer,
     private moduleContainer: ModuleContainer,
   ) {}
   handle = (msg: VuuClientMessage) => {
-    console.log(`[DefaultMessageHandler] handle ${JSON.stringify(msg)}`);
+    // console.log(`[DefaultMessageHandler] handle ${JSON.stringify(msg)}`);
 
     const ctx = RequestContext(
       msg.requestId,
@@ -40,12 +55,110 @@ class DefaultMessageHandlerImpl implements MessageHandler {
       this.outboundQueue,
     );
 
-    // flowController.process(msg) sets last time
+    this.flowController.process(msg);
 
     return this.serverApi.process(msg, ctx);
   };
+
+  private sendUpdatesInternal(updates: ViewPortUpdate[], highPriority = false) {
+    if (updates.length) {
+      // console.log(`ASYNC-SVR-OUT: Sending ${updates.length} updates`);
+
+      const formatted = this.formatDataOutbound(updates);
+
+      const json = JSON.stringify(
+        JsonViewServerMessage("", this.session.sessionId, formatted),
+      );
+
+      // console.log(`ASYNC-SVR-OUT: ${json}`);
+
+      this.channel.send(json);
+    }
+  }
+
+  private formatDataOutbound(
+    outbound: ViewPortUpdate[],
+  ): ServerToClientTableRows {
+    const updates = outbound
+      .flatMap((vpu) =>
+        vpu.vpRequestId === vpu.vp.requestId
+          ? this.formatOneRowUpdate(vpu)
+          : undefined,
+      )
+      .filter((vpu) => vpu !== undefined);
+
+    const updateId = RequestId.oneNew();
+
+    return TableRowUpdates(updateId, true, Date.now(), updates);
+  }
+
+  private formatOneRowUpdate(update: ViewPortUpdate): RowUpdate | undefined {
+    if (isViewPortRowUpdate(update)) {
+      //if viewport has changed while we're processing the queue
+      if (!withinRange(update.index, update.vp.range)) {
+        return undefined;
+      }
+
+      const dataToSend = update.table.pullRowAsArray(
+        update.key.key,
+        update.vp.columns,
+      );
+
+      // const isSelected = update.vp.getSelection.includes(update.key.key)
+      //   ? 1
+      //   : 0;
+      const isSelected = 0;
+
+      if (dataToSend.length == 0) {
+        return undefined;
+      } else {
+        return RowUpdate(
+          update.vpRequestId,
+          update.vp.id,
+          update.size,
+          update.index,
+          update.key.key,
+          RowUpdateType.Update,
+          performance.now(),
+          isSelected,
+          dataToSend,
+        );
+      }
+    } else {
+      console.log(`SVR[VP] Size: vpid=${update.vp.id} size=${update.vp.size}`);
+      return RowUpdate(
+        update.vpRequestId,
+        update.vp.id,
+        update.size,
+        update.index,
+        update.key.key,
+        RowUpdateType.SizeOnly,
+        performance.now(),
+        0,
+        EMPTY_ARRAY,
+      );
+    }
+  }
+
   sendUpdates = () => {
-    console.log(`[DefaultMessageHandler] sendUpdates`);
+    const flowControllerOp = this.flowController.shouldSend();
+    if (flowControllerOp === SendHeartbeat) {
+      // console.log(
+      //   `[SESSION] Sending heartbeat to session ${this.session.sessionId}`,
+      // );
+      const json = JSON.stringify(
+        JsonViewServerMessage(
+          "",
+          this.session.sessionId,
+          HeartBeat(Date.now()),
+        ),
+      );
+      this.channel.send(json);
+    } else if (flowControllerOp === Disconnect) {
+    } else if (flowControllerOp.type === "BATCHSIZE") {
+      const updates = this.outboundQueue.popUpTo(flowControllerOp.size);
+      this.sendUpdatesInternal(updates);
+    }
   };
 }
 
@@ -55,7 +168,7 @@ export function DefaultMessageHandler(
   user: VuuUser,
   session: ClientSessionId,
   serverAPi: ServerApi,
-  // flowController
+  flowController: FlowController,
   sessionContainer: ClientSessionContainer,
   moduleContainer: ModuleContainer,
 ): MessageHandler {
@@ -65,6 +178,7 @@ export function DefaultMessageHandler(
     user,
     session,
     serverAPi,
+    flowController,
     sessionContainer,
     moduleContainer,
   );

@@ -14,6 +14,7 @@ import { SessionId } from "../client/messages/ClientMessage";
 import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
 import { JsonViewServerMessage, LoginSuccess } from "./Messages";
 import { ViewPortUpdate } from "../viewport/Viewport";
+import { FlowControllerFactory } from "./flowcontrol/FLowController";
 
 export type RequestContext = {
   queue: PublishQueue<ViewPortUpdate>;
@@ -44,7 +45,7 @@ export class RequestProcessor {
     private clientSessionContainer: ClientSessionContainer,
     private serverApi: ServerApi,
     private moduleContainer: ModuleContainer,
-    // flowControllerFactory
+    private flowControllerFactory: FlowControllerFactory,
     private vuuServerId: string,
   ) {}
 
@@ -104,21 +105,21 @@ export class RequestProcessor {
     sessionId: ClientSessionId,
     user: VuuUser,
   ) =>
-    // const flowController = flowControllerFactory.create(sessionId);
     DefaultMessageHandler(
       channel,
       new OutboundRowPublishQueue(),
       user,
       sessionId,
       this.serverApi,
+      this.flowControllerFactory.create(sessionId),
       this.clientSessionContainer,
       this.moduleContainer,
     );
 
   private handleViewServerMessage(msg: VuuClientMessage, channel: Channel) {
-    console.log(
-      `[RequestProcessor] handleViewServerMessage ${JSON.stringify(msg)}`,
-    );
+    // console.log(
+    //   `[RequestProcessor] handleViewServerMessage ${JSON.stringify(msg)}`,
+    // );
     const sessionId = this.msgToSessionId(msg, channel);
     const handler = this.clientSessionContainer.getHandler(sessionId);
     if (handler) {
