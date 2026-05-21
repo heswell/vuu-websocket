@@ -11,7 +11,7 @@
     "start": "WEBSOCKET_PORT=8090 npm start:all",
     "start:demo": "WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",
     "start:demo:2": "WEBSOCKET_PORT=8095 bun ./scripts/start-demo.ts",
-    "debug:demo": "bun --inspect ./scripts/start-demo.ts",
+    "debug:demo": " WEBSOCKET_PORT=8090 bun --inspect ./scripts/start-demo.ts",
     "start:orders": "bun ./scripts/start-orders.ts",
     "start:prices": "bun ./scripts/start-prices.ts",
     "start:refdata": "bun ./scripts/start-refdata.ts",
@@ -24,11 +24,11 @@
   "license": "ISC",
   "devDependencies": {
     "@types/bun": "1.3.3",
-    "@vuu-ui/vuu-protocol-types": "0.13.76",
+    "@vuu-ui/vuu-protocol-types": "2.1.4",
     "typescript": "^5.5.3"
   },
   "dependencies": {
-    "@vuu-ui/vuu-utils": "0.13.76",
+    "@vuu-ui/vuu-utils": "2.1.4",
     "pure-uuid": "^1.8.1"
   }
 }

@@ -1,5 +1,6 @@
 import { Table } from "@heswell/data";
 import type {
+  RpcResult,
   VuuLinkDescriptor,
   VuuTable,
   VuuViewportCreateRequest,
@@ -228,7 +229,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     rpcName: string,
     params: Record<string, unknown>,
     ctx: RequestContext,
-  ) {
+  ): RpcResult {
     const viewport = this.getViewportById(viewPortId);
     return viewport.viewPortDef.service.processRpcRequest(
       rpcName,

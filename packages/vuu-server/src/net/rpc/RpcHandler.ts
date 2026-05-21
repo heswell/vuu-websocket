@@ -6,12 +6,16 @@ import {
   ViewPortMenuFolder,
   ViewPortMenuItem,
 } from "../../viewport/ViewPortMenu";
+import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 
 export type RpcHandlerFunc = (vuuServer: VuuServer) => RpcHandler;
 
 export class RpcHandler {
-  processRpcRequest(methodName: string, rpcParams: RpcParams): unknown {
-    return undefined;
+  processRpcRequest(rpcName: string, _rpcParams: RpcParams): RpcResult {
+    return {
+      type: "ERROR_RESULT",
+      errorMessage: `rpc service ${rpcName} not implemented`,
+    };
   }
   get menuItems(): ViewPortMenu {
     return EmptyViewPortMenu;

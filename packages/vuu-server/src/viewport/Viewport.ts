@@ -4,6 +4,7 @@ import {
   VuuGroupBy,
   VuuRange,
   VuuSort,
+  VuuViewportChangeRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import {
   DataView,
@@ -22,6 +23,7 @@ import { SelectionEventHandler } from "@heswell/data";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { VuuUser } from "../core/auths/VuuUser";
 import { PublishQueue } from "../util/PublishQueue";
+import { DataResponse } from "@heswell/data/src/store/rowset";
 
 type ViewPortUpdateType = "SIZE" | "ROW";
 export interface ViewPortSelection {
@@ -332,8 +334,33 @@ export class Viewport extends DataView {
     );
   }
 
-  setRange(range: VuuRange) {
-    const dataResponse = super.setRange(range);
+  changeViewport(
+    options: Omit<VuuViewportChangeRequest, "viewPortId">,
+  ): DataResponse | undefined {
+    const dataResponse = super.changeViewport(options);
+    if (dataResponse) {
+      const time = Date.now();
+      const { rows, size } = dataResponse;
+      for (const row of rows) {
+        this.#outboundQ.pushHighPriority(
+          ViewPortUpdate(
+            this.#requestId,
+            this,
+            this.table,
+            RowKeyUpdate(row.rowKey, this.table),
+            row.rowIndex,
+            "ROW",
+            size,
+            time,
+          ),
+        );
+      }
+    }
+    return dataResponse;
+  }
+
+  setRange(range: VuuRange, useDelta?: boolean) {
+    const dataResponse = super.setRange(range, useDelta);
     const time = Date.now();
     const { rows, size } = dataResponse;
     for (const row of rows) {

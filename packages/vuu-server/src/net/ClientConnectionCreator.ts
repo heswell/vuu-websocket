@@ -24,7 +24,7 @@ import { withinRange } from "@vuu-ui/vuu-utils";
 
 const EMPTY_ARRAY = [] as const;
 interface InboundMessageHandler {
-  handle: (msg: VuuClientMessage) => VuuServerMessage;
+  handle: (msg: VuuClientMessage) => VuuServerMessage | void;
 }
 
 interface OutboundMessageHandler {

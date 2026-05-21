@@ -4,6 +4,8 @@ import {
   SelectRowRangeRequest,
   SelectRowRequest,
   ServerMessageBody,
+  ViewportRowRpcContext,
+  ViewportRpcContext,
   VuuClientMessage,
   VuuCreateVisualLink,
   VuuMenu,
@@ -37,15 +39,32 @@ import {
   GetViewPortMenusResponse,
   GetViewPortVisualLinksResponse,
   JsonViewServerMessage,
+  RpcResponseNew,
   VsMsg,
 } from "../net/Messages.ts";
 import { ViewPortRange } from "../viewport/Viewport.ts";
+import { RpcErrorResult } from "../net/rpc/RpcResult.ts";
 
 const vsMsg = (body: ServerMessageBody, ctx: RequestContext) =>
   JsonViewServerMessage(ctx.requestId, ctx.session.sessionId, body);
 
 const errorMsg = (s: String, ctx: RequestContext) =>
   VsMsg(ctx.requestId, ctx.session.sessionId, ErrorResponse(s));
+
+const createErrorRpcResponse = (
+  msg: VuuRpcServiceRequest,
+  errorMessage: string,
+) =>
+  RpcResponseNew(
+    msg.rpcName,
+    RpcErrorResult(errorMessage),
+    {},
+    // ShowNotificationAction(
+    //   NotificationType.Error,
+    //   `Failed to process ${msg.rpcName} request`,
+    //   errorMessage,
+    // ),
+  );
 
 export class CoreServerApiHandler implements ServerApi {
   constructor(
@@ -69,6 +88,10 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processGetViewPortMenusRequest(body, ctx);
       case "CHANGE_VP_RANGE":
         return this.processViewPortRange(body, ctx);
+      case "RPC_REQUEST":
+        return this.processRpcRequest(body, ctx);
+      case "CHANGE_VP":
+        return this.processChangeViewPortRequest(body, ctx);
       // case "GET_TABLE_LIST":
       //   session.enqueue(requestId, {
       //     type: "TABLE_LIST_RESP",
@@ -85,16 +108,12 @@ export class CoreServerApiHandler implements ServerApi {
       //   return this.processCreateVisualLinkRequest(requestId, body, session);
       // case "REMOVE_VISUAL_LINK":
       //   return this.processRemoveVisualLinkRequest(requestId, body, session);
-      // case "CHANGE_VP":
-      //   return this.processChangeViewPortRequest(requestId, body, session);
       // case "SELECT_ROW":
       //   return this.processSelectRowRequest(requestId, body, session);
       // case "DESELECT_ROW":
       //   return this.processDeselectRowRequest(requestId, body, session);
       // case "SELECT_ROW_RANGE":
       //   return this.processSelectRowRangeRequest(requestId, body, session);
-      // case "RPC_REQUEST":
-      //   return this.handleViewportRpcRequest(requestId, body, ctx, session);
       // case "VIEW_PORT_MENUS_SELECT_RPC":
       //   return this.processViewPortMenuSelectionRpcCall(
       //     requestId,
@@ -180,6 +199,18 @@ export class CoreServerApiHandler implements ServerApi {
     }
   }
 
+  private processChangeViewPortRequest(
+    { viewPortId, ...options }: VuuViewportChangeRequest,
+    ctx: RequestContext,
+  ) {
+    const viewport = this.viewPortContainer.getViewportById(viewPortId);
+    try {
+      viewport.changeViewport(options);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   private processGetViewPortVisualLinksRequest(
     { vpId }: VuuViewportVisualLinksRequest,
     ctx: RequestContext,
@@ -214,6 +245,69 @@ export class CoreServerApiHandler implements ServerApi {
     } catch (e) {
       errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
     }
+  }
+
+  private processRpcRequest(msg: VuuRpcServiceRequest, ctx: RequestContext) {
+    if (hasViewPortContext(msg)) {
+      return this.handleViewportRpcRequest(msg, msg.context.viewPortId, ctx);
+    } else {
+      console.warn(
+        `[CoreServerApiHandler] Imvalid context on request ${ctx.requestId}`,
+      );
+      return vsMsg(
+        createErrorRpcResponse(
+          msg,
+          `Failed to process request ${ctx.requestId}`,
+        ),
+        ctx,
+      );
+    }
+  }
+  private handleViewportRpcRequest(
+    msg: VuuRpcServiceRequest<ViewportRpcContext>,
+    viewPortId: string,
+    ctx: RequestContext,
+  ) {
+    try {
+      const rpcResult = this.viewPortContainer.handleRpcRequest(
+        viewPortId,
+        msg.rpcName,
+        msg.params,
+        ctx,
+      );
+
+      if (rpcResult.type === "SUCCESS_RESULT") {
+        return vsMsg(RpcResponseNew(msg.rpcName, rpcResult, {}), ctx);
+      } else {
+        return createErrorRpcResponse(msg, rpcResult.errorMessage);
+      }
+    } catch (e) {
+      return createErrorRpcResponse(
+        msg,
+        `Failed to process request ${ctx.requestId}`,
+      );
+    }
+    // const { rpcName } = rpcRequest;
+
+    // if (hasViewPortContext(rpcRequest)) {
+    //   const result = this.viewPortContainer.handleRpcRequest(
+    //     rpcRequest.context.viewPortId,
+    //     rpcName,
+    //     rpcRequest.params,
+    //     ctx,
+    //   );
+
+    //   session.enqueue(requestId, {
+    //     action: { type: "VP_RPC_SUCCESS" },
+    //     error: null,
+    //     type: "RPC_RESPONSE",
+    //     result: {
+    //       data: result,
+    //       type: "SUCCESS_RESULT",
+    //     },
+    //     rpcName,
+    //   });
+    // }
   }
 
   //--------------------------------------------------
@@ -312,30 +406,6 @@ export class CoreServerApiHandler implements ServerApi {
     });
   }
 
-  private processChangeViewPortRequest(
-    requestId: string,
-    { viewPortId, ...options }: VuuViewportChangeRequest,
-    session: ISession,
-  ) {
-    session.enqueue(requestId, {
-      ...options,
-      type: "CHANGE_VP_SUCCESS",
-      viewPortId,
-    });
-
-    const viewport = this.viewPortContainer.getViewportById(viewPortId);
-    if (viewport) {
-      const dataResponse = viewport.changeViewport(options);
-      if (dataResponse) {
-        const { rows, size, sizeMessageRequired = false } = dataResponse;
-        session.enqueue(
-          "",
-          tableRowsMessageBody(rows, size, viewport.id, sizeMessageRequired),
-        );
-      }
-    }
-  }
-
   private processSelectRowRequest(
     requestId: string,
     { preserveExistingSelection, rowKey, vpId }: SelectRowRequest,
@@ -417,33 +487,5 @@ export class CoreServerApiHandler implements ServerApi {
       type: "VIEW_PORT_MENU_RESP",
       vpId,
     });
-  }
-  private handleViewportRpcRequest(
-    requestId: string,
-    rpcRequest: VuuRpcServiceRequest,
-    ctx: RequestContext,
-    session: ISession,
-  ) {
-    const { rpcName } = rpcRequest;
-
-    if (hasViewPortContext(rpcRequest)) {
-      const result = this.viewPortContainer.handleRpcRequest(
-        rpcRequest.context.viewPortId,
-        rpcName,
-        rpcRequest.params,
-        ctx,
-      );
-
-      session.enqueue(requestId, {
-        action: { type: "VP_RPC_SUCCESS" },
-        error: null,
-        type: "RPC_RESPONSE",
-        result: {
-          data: result,
-          type: "SUCCESS_RESULT",
-        },
-        rpcName,
-      });
-    }
   }
 }

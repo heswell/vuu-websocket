@@ -1,4 +1,5 @@
 import {
+  RpcResult,
   ServerMessageBody,
   ServerToClientError,
   ServerToClientHeartBeat,
@@ -8,6 +9,7 @@ import {
   VuuLoginSuccessResponse,
   VuuMenu,
   VuuMenuItem,
+  VuuRpcServiceResponse,
   VuuTable,
   VuuTableMetaResponse,
   VuuViewportCreateFailResponse,
@@ -138,4 +140,16 @@ export const ChangeViewPortRangeSuccess = (
   viewPortId,
   from,
   to,
+});
+
+export const RpcResponseNew = (
+  rpcName: string,
+  result: RpcResult,
+  // action: UIAction,
+  action: unknown,
+): VuuRpcServiceResponse => ({
+  action,
+  result,
+  rpcName,
+  type: "RPC_RESPONSE",
 });

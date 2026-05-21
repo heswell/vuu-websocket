@@ -3,6 +3,7 @@ import { JoinTableProvider } from "../../provider/JoinTableProvider";
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
+import { ClientSessionId } from "../../net/ClientConnectionCreator";
 
 export class TableContainer {
   constructor(private joinProvider: JoinTableProvider) {
@@ -32,11 +33,14 @@ export class TableContainer {
     }
   }
 
-  createSimpleSessionTable(baseTable: DataTable, sessionId: string) {
+  createSimpleSessionTable(
+    baseTable: DataTable,
+    clientSession: ClientSessionId,
+  ) {
     const table = new InMemSessionDataTable(
-      sessionId,
+      clientSession.sessionId,
       baseTable.tableDef,
-      this.joinProvider
+      this.joinProvider,
     );
     this.#tables.set(table.name, table);
     return table;

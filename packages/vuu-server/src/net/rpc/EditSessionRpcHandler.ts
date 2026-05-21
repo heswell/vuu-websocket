@@ -1,25 +1,31 @@
+import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 import { TableContainer } from "../../core/table/TableContainer";
 import { EditTableRpcHandler } from "./EditTableRpcHandler";
-import { RpcParams, RpcResult } from "./Rpc";
+import { RpcParams } from "./Rpc";
 
 export class EditSessionRpcHandler extends EditTableRpcHandler {
-  enterEditMode = ({
-    namedParams,
-    params,
-    viewPortColumns,
-    vpKeys,
-  }: RpcParams): RpcResult => {
+  beginEditSession = ({ namedParams, viewport, ctx }: RpcParams): RpcResult => {
     console.log(
-      `ENTER_EDIT_MODE ${JSON.stringify(namedParams)} ${JSON.stringify(params)}`,
+      `beginEditSession ${JSON.stringify(namedParams)} ${JSON.stringify(namedParams)}`,
     );
+
+    const baseTable = viewport.dataTable;
+    const sessionTable = this.tableContainer.createSimpleSessionTable(
+      baseTable,
+      ctx.session,
+    );
+    const { module } = sessionTable.schema.table;
     return {
       type: "SUCCESS_RESULT",
-      data: {},
+      data: {
+        table: { module, table: sessionTable.name },
+      },
     };
   };
 
   constructor(tableContainer: TableContainer) {
     super(tableContainer);
-    this.registerRpc("ENTER_EDIT_MODE", this.enterEditMode);
+    console.log(`rpc service available: beginEditSession`);
+    this.registerRpc("beginEditSession", this.beginEditSession);
   }
 }

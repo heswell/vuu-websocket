@@ -1,5 +1,7 @@
 import { ViewPortUpdate } from "../viewport/Viewport";
 
+const NO_DATA = [] as const;
+
 export abstract class PublishQueue<T> {
   abstract push(entry: T): void;
   abstract pushHighPriority(entry: T): void;
@@ -31,7 +33,9 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
 
   private dequeue(): ViewPortUpdate | undefined;
   private dequeue(i: number): ViewPortUpdate[];
-  private dequeue(i?: number): ViewPortUpdate | ViewPortUpdate[] | undefined {
+  private dequeue(
+    i?: number,
+  ): ViewPortUpdate | readonly ViewPortUpdate[] | undefined {
     // console.log(
     //   `[OutboundRowPublishQueue] dequeue ${i} length = ${this.length})`,
     // );
@@ -65,6 +69,8 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
         return this.highPriorityQueue
           .splice(0, hpCount)
           .concat(this.queue.splice(0, this.queue.length));
+      } else {
+        return NO_DATA;
       }
     }
   }

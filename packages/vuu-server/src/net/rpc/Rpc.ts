@@ -1,7 +1,6 @@
-import { SortSet } from "@heswell/data";
-import { Column } from "../../api/TableDef";
 import { Viewport } from "../../viewport/Viewport";
 import { RequestContext } from "../RequestProcessor";
+import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 
 export type RpcParams<T = Record<string, unknown>> = {
   namedParams: T;
@@ -24,5 +23,4 @@ export function RpcParams<T = Record<string, unknown>>(
   return new RpcParamsImpl<T>(namedParams, viewport, ctx);
 }
 
-export type RpcResult = {};
 export type RpcFunction = (params: RpcParams) => RpcResult;

@@ -2,11 +2,12 @@ import { RpcHandler } from "./RpcHandler";
 import type { RpcFunction, RpcParams } from "./Rpc";
 import { ViewPortTypeaheadRpcHandler } from "../../core/module/typeahead/ViewPortTypeaheadRpcHandler";
 import { TableContainer } from "../../core/table/TableContainer";
+import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 
 export class DefaultRpcHandler extends RpcHandler {
   #rpcHandlerMap = new Map<string, RpcFunction>();
 
-  constructor(tableContainer: TableContainer) {
+  constructor(protected tableContainer: TableContainer) {
     super();
     new ViewPortTypeaheadRpcHandler(this, tableContainer);
   }
@@ -18,7 +19,7 @@ export class DefaultRpcHandler extends RpcHandler {
     this.#rpcHandlerMap.set(functionName, handlerFunc);
   }
 
-  processRpcRequest(rpcName: string, rpcParams: RpcParams) {
+  processRpcRequest(rpcName: string, rpcParams: RpcParams): RpcResult {
     const rpcHandler = this.#rpcHandlerMap.get(rpcName);
     if (rpcHandler) {
       return rpcHandler(rpcParams);
