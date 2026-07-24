@@ -11,16 +11,16 @@ import { ServerApi } from "./ServerApi";
 import { ClientSessionContainer } from "./ClientSessionContainer";
 import { ModuleContainer } from "../core/module/ModuleContainer";
 import { RequestContext } from "./RequestProcessor";
-import {
-  Disconnect,
-  FlowController,
-  SendHeartbeat,
-} from "./flowcontrol/FlowController";
 import { HeartBeat, JsonViewServerMessage, TableRowUpdates } from "./Messages";
 import { RequestId } from "../client/messages/ClientMessage";
 import { RowUpdate } from "./row/RowUpdate";
 import { RowUpdateType } from "./row/RowUpdateType";
 import { withinRange } from "@vuu-ui/vuu-utils";
+import {
+  Disconnect,
+  FlowController,
+  SendHeartbeat,
+} from "./flowcontrol/FlowController";
 
 const EMPTY_ARRAY = [] as const;
 interface InboundMessageHandler {
@@ -104,10 +104,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         update.vp.columns,
       );
 
-      // const isSelected = update.vp.getSelection.includes(update.key.key)
-      //   ? 1
-      //   : 0;
-      const isSelected = 0;
+      const isSelected = update.vp.selectedKeys.has(update.key.key) ? 1 : 0;
 
       if (dataToSend.length == 0) {
         return undefined;
@@ -155,11 +152,19 @@ class DefaultMessageHandlerImpl implements MessageHandler {
       );
       this.channel.send(json);
     } else if (flowControllerOp === Disconnect) {
+      return this.disconnect();
     } else if (flowControllerOp.type === "BATCHSIZE") {
       const updates = this.outboundQueue.popUpTo(flowControllerOp.size);
       this.sendUpdatesInternal(updates);
     }
   };
+
+  private disconnect() {
+    console.log(`[SESSION] Disconnecting session ${this.session.sessionId}`);
+    this.serverApi.disconnect(this.session);
+    this.sessionContainer.remove(this.user, this.session);
+    this.channel.close();
+  }
 }
 
 export function DefaultMessageHandler(

@@ -14,7 +14,7 @@ import { SessionId } from "../client/messages/ClientMessage";
 import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
 import { JsonViewServerMessage, LoginSuccess } from "./Messages";
 import { ViewPortUpdate } from "../viewport/Viewport";
-import { FlowControllerFactory } from "./flowcontrol/FLowController";
+import { FlowControllerFactory } from "./flowcontrol/FlowController";
 
 export type RequestContext = {
   queue: PublishQueue<ViewPortUpdate>;

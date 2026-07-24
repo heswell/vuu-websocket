@@ -1,6 +1,5 @@
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import {
-  ServerMessageBody,
   VuuAggregation,
   VuuFilter,
   VuuGroupBy,
@@ -23,6 +22,7 @@ import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
 import { tableRowsMessageBody } from "./responseUtils.ts";
 import logger from "../logger.ts";
+import { DataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable.ts";
 
 const EmptyFilter: Readonly<VuuFilter> = { filter: "" };
 
@@ -44,7 +44,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   #columnMap: ColumnMap;
   #columns: string[];
   #id: string;
-  #table: Table;
+  #table: DataTable;
   #updateQueue: UpdateQueue;
 
   private _vuuFilter: VuuFilter = EmptyFilter;
@@ -52,7 +52,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   constructor(
     id: string,
-    table: Table,
+    table: DataTable,
     { range, ...config }: DataViewConfig,
     updateQueue = new UpdateQueue(),
   ) {
@@ -68,7 +68,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
       // visualLink: config.visualLink || this.#config.visualLink,
     };
 
-    console.log(`DataView columns = ${this.#config.columns.join(",")}`);
+    console.log(`[DataView] columns = ${this.#config.columns.join(",")}`);
 
     this.#table = table;
     this.#updateQueue = updateQueue;
@@ -96,7 +96,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   }
 
   destroy() {
-    console.log(`destroy view`);
+    console.log(`[DateView] destroy`);
     this.#table?.removeListener("rowUpdated", this.rowUpdated);
     this.#table?.removeListener("rowInserted", this.rowInserted);
     this.#table?.removeListener("rowDeleted", this.rowDeleted);
@@ -142,20 +142,11 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
   };
 
-  private rowUpdated: RowUpdateHandler = (idx, vuuDataRow) => {
-    const { rowSet } = this;
-    const dataResponse = rowSet.update(idx, vuuDataRow);
-    if (dataResponse) {
-      if (rowSet instanceof RowSet) {
-        const { rows, size } = dataResponse;
-        this.enqueue(tableRowsMessageBody(rows, size, this.#id, false));
-      } /* else {
-        result.forEach((rowUpdate) => {
-          _updateQueue?.update(rowUpdate);
-        });
-      }*/
-    }
-  };
+  protected rowUpdated: RowUpdateHandler = (
+    idx,
+    vuuDataRow,
+  ): void | DataResponse =>
+    this.postDataResponse(this.rowSet.update(idx, vuuDataRow));
 
   getData() {
     return this.rowSet;
@@ -365,7 +356,7 @@ export default class DataView extends EventEmitter<DataViewEvents> {
     }
   }
 
-  protected enqueue(_messageBody: ServerMessageBody) {
-    console.log(`DataView enqueue should be overridden`);
+  postDataResponse(dataResponse: DataResponse | void) {
+    console.log("this should be overridden");
   }
 }

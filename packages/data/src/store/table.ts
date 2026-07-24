@@ -35,7 +35,7 @@ export class Table extends EventEmitter<TableEvents> {
   #index: TableIndex = {};
 
   public columnMap: ColumnMap;
-  #rows: VuuDataRow[] = [];
+  public rows: VuuDataRow[] = [];
   public status: "ready" | null = null;
   public readonly schema: TableSchema;
 
@@ -57,10 +57,6 @@ export class Table extends EventEmitter<TableEvents> {
     return this.schema.columns;
   }
 
-  get rows() {
-    return this.#rows;
-  }
-
   get index() {
     return this.#index;
   }
@@ -78,7 +74,7 @@ export class Table extends EventEmitter<TableEvents> {
   }
 
   rowAt(rowIdx: number) {
-    return this.#rows[rowIdx];
+    return this.rows[rowIdx];
   }
 
   getUniqueValuesForColumn(column: string, pattern?: string) {
@@ -112,15 +108,10 @@ export class Table extends EventEmitter<TableEvents> {
     }
   }
 
-  update(rowIdx: number, row: VuuDataRow, clientInitiated = false) {
-    if (clientInitiated) {
-      setTimeout(() => {
-        // we delay this so that confirmation is sent to client before row update
-        this.emit("rowUpdated", rowIdx, row);
-      }, 15);
-    } else {
-      this.emit("rowUpdated", rowIdx, row);
-    }
+  update(rowIdx: number, row: VuuDataRow) {
+    row[this.columnMap.vuuLastUpdateTimestamp] = Date.now();
+    this.rows[rowIdx] = row;
+    this.emit("rowUpdated", rowIdx, row);
     return true;
   }
 
@@ -147,9 +138,22 @@ export class Table extends EventEmitter<TableEvents> {
 
   insert(row: VuuDataRow, emitEvent = true) {
     const indexOfKeyValue = this.columnMap[this.primaryKey];
+    const indexOfVuuCreatedTimestamp = this.columnMap.vuuCreatedTimestamp;
+
     const key = row[indexOfKeyValue] as string;
     const rowIdx = this.rows.push(row) - 1;
     this.#index[key.toString()] = rowIdx;
+
+    if (
+      indexOfVuuCreatedTimestamp !== undefined &&
+      !row[indexOfVuuCreatedTimestamp]
+    ) {
+      const ts = Date.now();
+      row[indexOfVuuCreatedTimestamp] = row[
+        this.columnMap.vuuUpdatedTimestamp
+      ] = ts;
+    }
+
     if (emitEvent) {
       this.emit("rowInserted", rowIdx, row);
     }

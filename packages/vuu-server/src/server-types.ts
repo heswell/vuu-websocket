@@ -42,13 +42,6 @@ export interface ServerConfig {
   DataTables?: DataTableDefinition[];
   TableService?: DataTableAPI;
 }
-
-export interface ServerMessagingConfig {
-  CLIENT_UPDATE_FREQUENCY?: number;
-  HEARTBEAT_FREQUENCY?: number;
-  PRIORITY_UPDATE_FREQUENCY?: number;
-}
-
 export interface ConfiguredService {
   configure: (props: ServerConfig) => Promise<void>;
 }

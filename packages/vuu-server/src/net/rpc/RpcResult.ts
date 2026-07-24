@@ -5,7 +5,11 @@ export const RpcSuccessResult = (data: unknown): RpcResultSuccess => ({
   type: "SUCCESS_RESULT",
 });
 
-export const RpcErrorResult = (errorMessage: string): RpcResultError => ({
+export const RpcErrorResult = (
+  errorMessage: string,
+  data?: unknown,
+): RpcResultError => ({
+  data,
   errorMessage,
   type: "ERROR_RESULT",
 });

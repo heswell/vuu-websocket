@@ -1,19 +1,18 @@
 import { uuid } from "@vuu-ui/vuu-utils";
-import { VuuWebSocketOptions } from "../../core/VuuServerOptions";
+import { sslEnabled, VuuWebSocketOptions } from "../../core/VuuServerOptions";
 import { type ViewServerHandlerFactory } from "../ViewServerHandler";
 import { BunWebSocketConnectionHandler } from "./BunWebSocketConnectionHandler";
 
-const WS_PORT = process.env.WEBSOCKET_PORT ?? 8090;
-
 export class WebSocketServer {
   constructor(
-    { certPath, ...options }: VuuWebSocketOptions,
+    { sslOptions, wsPort, ...options }: VuuWebSocketOptions,
     factory: ViewServerHandlerFactory,
   ) {
+
     const websocketServer = Bun.serve({
-      certFile: `${certPath}/cert.pem`,
-      keyFile: `${certPath}/key.pem`,
-      port: WS_PORT,
+      certFile: sslEnabled(sslOptions) ? sslOptions.certPath : undefined,
+      keyFile: sslEnabled(sslOptions) ? sslOptions.keyPath : undefined,
+      port: wsPort,
 
       async fetch(req, server) {
         const sessionId = uuid();

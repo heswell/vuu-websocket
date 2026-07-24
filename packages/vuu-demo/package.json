@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build": "etsc",
-    "build:vuu": "node ../../scripts/build.mjs"
+    "build:vuu": "node ../../scripts/build.mjs",
+    "setup:keycloak": "bun ./scripts/setup-keycloak.ts"
   },
   "types": "src/index.ts",
   "author": "heswell",

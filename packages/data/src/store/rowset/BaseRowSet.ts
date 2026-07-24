@@ -95,7 +95,7 @@ export abstract class BaseRowSet {
   }
 
   clear() {
-    console.log("clear rowset");
+    console.log("[BaseRowset] clear");
   }
 
   protected get indexOfKeyField() {

@@ -16,7 +16,6 @@ class LoginTokenServiceImpl implements LoginTokenService {
   login(msg: VuuLoginRequest) {
     console.log(`[LoginTokenService] login ${JSON.stringify(msg)}`);
     return VuuUser("steve");
-    throw Error("[LoginTokenService] login not implemented");
   }
 }
 

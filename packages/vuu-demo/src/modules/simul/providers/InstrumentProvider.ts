@@ -18,6 +18,8 @@ export class InstrumentProvider extends RemoteProvider {
         "isin",
         "lotSize",
         "ric",
+        "vuuCreatedTimestamp",
+        "vuuUpdatedTimestamp",
       ],
       resource: "instruments",
       remoteResourceMessageType,

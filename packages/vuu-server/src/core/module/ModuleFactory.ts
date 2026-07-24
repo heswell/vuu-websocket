@@ -13,14 +13,15 @@ import { ProviderContainer } from "../../provider/ProviderContainer";
 import { ViewPortDef } from "../../api/ViewPortDef";
 import { TableContainer } from "../table/TableContainer";
 import { RpcHandlerFunc } from "../../net/rpc/RpcHandler";
+import { DataTable } from "../table/InMemDataTable";
 
 export type TableDefTuple = [TableDef, ProviderFactory];
 
 export type ServiceFactory = (
-  table: Table,
+  table: DataTable,
   provider: Provider,
   providerContainer: ProviderContainer,
-  tableContainer: TableContainer
+  tableContainer: TableContainer,
 ) => ViewPortDef;
 
 export interface TableDefs {
@@ -36,14 +37,14 @@ export interface TableDefs {
 export function TableDefs(
   realizedTableDefs: TableDef[],
   tableDefs: TableDefTuple[],
-  joinDefs: TableJoinFactory[]
+  joinDefs: TableJoinFactory[],
 ): TableDefs {
   return {
     add: (tableDef: TableDef, providerFactory: ProviderFactory) =>
       TableDefs(
         realizedTableDefs,
         tableDefs.concat([[tableDef, providerFactory]]),
-        joinDefs
+        joinDefs,
       ),
 
     addJoin: (joinDef: TableJoinFactory) =>
@@ -72,7 +73,7 @@ export function TableDefs(
         throw Error(
           `Table ${tableName} could not be found in [${this.realizedTableDefs
             .map((td) => td.name)
-            .join(",")}]`
+            .join(",")}]`,
         );
       }
     },
@@ -83,13 +84,13 @@ function ModuleFactoryNode(
   tableDefs: TableDefs,
   rpcHandlers: RpcHandlerFunc[],
   viewPortDefs: Map<string, ServiceFactory>,
-  moduleName: string
+  moduleName: string,
 ) {
   return {
     addTable: (
       tableDef: TableDef,
       providerFactory: ProviderFactory,
-      serviceFactory?: ServiceFactory
+      serviceFactory?: ServiceFactory,
     ) => {
       if (serviceFactory) {
         viewPortDefs.set(tableDef.name, serviceFactory);
@@ -98,7 +99,7 @@ function ModuleFactoryNode(
         tableDefs.add(tableDef, providerFactory),
         rpcHandlers,
         viewPortDefs,
-        moduleName
+        moduleName,
       );
     },
     addJoinTable: (func: TableJoinFactory) =>
@@ -106,12 +107,12 @@ function ModuleFactoryNode(
         tableDefs.addJoin(func),
         rpcHandlers,
         viewPortDefs,
-        moduleName
+        moduleName,
       ),
     addSessionTable: (
       tableDef: TableDef,
       providerFactory: ProviderFactory = () => NullProvider,
-      serviceFactory?: ServiceFactory
+      serviceFactory?: ServiceFactory,
     ) => {
       if (serviceFactory) {
         viewPortDefs.set(tableDef.name, serviceFactory);
@@ -120,7 +121,7 @@ function ModuleFactoryNode(
         tableDefs.add(tableDef, providerFactory),
         rpcHandlers,
         viewPortDefs,
-        moduleName
+        moduleName,
       );
     },
 
@@ -129,7 +130,7 @@ function ModuleFactoryNode(
         tableDefs,
         rpcHandlers.concat(rpcFunc),
         viewPortDefs,
-        moduleName
+        moduleName,
       ),
 
     asModule(): ViewServerModule {
@@ -152,14 +153,14 @@ function ModuleFactoryNode(
       return new (class extends ViewServerModule {
         getProviderForTable(table: Table): IProvider {
           const tableProviderTuple = baseTables.find(
-            ([{ name }]) => name === table.name
+            ([{ name }]) => name === table.name,
           );
           if (tableProviderTuple) {
             const [, providerFactory] = tableProviderTuple;
             return providerFactory(table);
           } else {
             throw Error(
-              `[ViewServerModule] getProviderForTable, no baseTable ${table.name}`
+              `[ViewServerModule] getProviderForTable, no baseTable ${table.name}`,
             );
           }
         }

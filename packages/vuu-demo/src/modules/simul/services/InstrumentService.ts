@@ -6,6 +6,7 @@ import {
   ProviderContainer,
   TableContainer,
 } from "@heswell/vuu-server";
+import { DataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
 import {
   SelectionViewPortMenuItem,
   ViewPortMenu,
@@ -14,18 +15,12 @@ import { VuuMenu, VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
 export class InstrumentService extends EditSessionRpcHandler {
   constructor(
-    table: Table,
+    table: DataTable,
     providerContainer: ProviderContainer,
     tableContainer: TableContainer,
   ) {
     super(tableContainer);
-    console.log("=======> Instrument Service created", {
-      tableContainer,
-    });
-  }
-
-  handleRpcCall(rpcMessage: VuuRpcServiceRequest) {
-    console.log(`rpc message received`);
+    console.log("[InstrumentService] constructor", );
   }
 
   private editRows = () => {

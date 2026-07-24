@@ -1,5 +1,8 @@
-import {
+import type {
   RpcResult,
+  DeselectRowSuccess as VuuDeselectRowSuccess,
+  SelectRowSuccess as VuuSelectRowSuccess,
+  SelectRowRangeSuccess as VuuSelectRowRangeSuccess,
   ServerMessageBody,
   ServerToClientError,
   ServerToClientHeartBeat,
@@ -152,4 +155,31 @@ export const RpcResponseNew = (
   result,
   rpcName,
   type: "RPC_RESPONSE",
+});
+
+export const SelectRowSuccess = (
+  vpId: string,
+  selectedRowCount: number,
+): VuuSelectRowSuccess => ({
+  selectedRowCount,
+  type: "SELECT_ROW_SUCCESS",
+  vpId,
+});
+
+export const DeselectRowSuccess = (
+  vpId: string,
+  selectedRowCount: number,
+): VuuDeselectRowSuccess => ({
+  selectedRowCount,
+  type: "DESELECT_ROW_SUCCESS",
+  vpId,
+});
+
+export const SelectRowRangeSuccess = (
+  vpId: string,
+  selectedRowCount: number,
+): VuuSelectRowRangeSuccess => ({
+  selectedRowCount,
+  type: "SELECT_ROW_RANGE_SUCCESS",
+  vpId,
 });

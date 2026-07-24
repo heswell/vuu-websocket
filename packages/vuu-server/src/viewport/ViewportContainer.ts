@@ -23,7 +23,7 @@ import { SelectionViewPortMenuItem } from "./ViewPortMenu";
 import { RequestContext } from "../net/RequestProcessor";
 import { VuuUser } from "../core/auths/VuuUser";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
-import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
+import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
 
 export type ViewportCreationEvent = {
@@ -59,11 +59,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     this.#viewPortDefinitions.set(tableName, viewPortDefFunc);
   }
 
-  getViewPortDefinition(table: Table) {
+  // Note: feels wrong that this gets calles on GET_TABLE_META request
+  getViewPortDefinition(table: DataTable) {
     const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
     if (viewPortDefFunc) {
       console.log(
-        `[ViewportContainer] getViewPortDefinition this is where the ViewPortDef gets called, should create service`,
+        `[ViewportContainer] getViewPortDefinition ${table.name}, instantiate ViewPortDef`,
       );
       return viewPortDefFunc(
         table,
@@ -79,8 +80,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  private getViewPortDefinitionCreator(table: Table) {
-    return this.#viewPortDefinitions.get(table.name);
+  private getViewPortDefinitionCreator(table: DataTable) {
+    return this.#viewPortDefinitions.get(table.tableDef.name);
   }
 
   get viewportCount() {
@@ -92,11 +93,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     user: VuuUser,
     clientSessionId: ClientSessionId,
     outboundQueue: PublishQueue<ViewPortUpdate>,
-    table: Table,
+    table: DataTable,
     { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest,
   ) {
     const { sessionId } = clientSessionId;
     const id = ViewPortId.oneNew();
+    console.log(`[ViewportContainer] create vp ${id}, table ${table.name}`)
     const viewPortDef = this.getViewPortDefinition(table);
     const viewport = new Viewport(
       id,
@@ -176,16 +178,18 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  removeViewportsForSession(sessionId: string) {
+  removeForSession(clientSessionId: ClientSessionId) {
     console.log(
-      `[ViewportContainer] close all viewports for session ${sessionId}`,
+      `[ViewportContainer] close all viewports for session ${clientSessionId}`,
     );
-    for (const viewPort of this.listViewportsForSession(sessionId)) {
+    for (const viewPort of this.listViewportsForSession(
+      clientSessionId.sessionId,
+    )) {
       this.removeViewport(viewPort.id);
     }
   }
 
-  disableViewport(viewportId: string) {
+  disableViewport(viewportId: string, clientSessionId: ClientSessionId) {
     console.log(`[ViewportContainer] disableViewport ${viewportId}`);
     const viewport = this.getViewportById(viewportId);
     if (viewport.enabled) {
@@ -196,7 +200,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       );
     }
   }
-  enableViewport(viewportId: string) {
+  enableViewport(viewportId: string, clientSessionId: ClientSessionId) {
     console.log(`[ViewportContainer] enableViewport ${viewportId}`);
     const viewport = this.getViewportById(viewportId);
     if (!viewport.enabled) {
@@ -238,21 +242,33 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   selectRow(
+    clientSessionId: ClientSessionId,
     viewPortId: string,
     rowKey: string,
     preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
-    return viewport.selectRow(rowKey, preserveExistingSelection);
+    const { selectedRowCount } = viewport.selectRow(
+      rowKey,
+      preserveExistingSelection,
+    );
+
+    return selectedRowCount;
   }
 
   deselectRow(
+    clientSessionId: ClientSessionId,
     viewPortId: string,
     rowKey: string,
     preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
-    return viewport.deselectRow(rowKey, preserveExistingSelection);
+    const { selectedRowCount } = viewport.deselectRow(
+      rowKey,
+      preserveExistingSelection,
+    );
+
+    return selectedRowCount;
   }
 
   selectRowRange(
@@ -262,11 +278,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
-    return viewport.selectRowRange(
+    const { selectedRowCount } = viewport.selectRowRange(
       fromRowKey,
       toRowKey,
       preserveExistingSelection,
     );
+    return selectedRowCount;
   }
 
   linkViewPorts(

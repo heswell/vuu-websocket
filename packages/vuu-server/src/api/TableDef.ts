@@ -1,11 +1,11 @@
-import { VuuLink, VuuTable } from "@vuu-ui/vuu-protocol-types";
+import { VuuColumnDataType, VuuTable } from "@vuu-ui/vuu-protocol-types";
 
 import { ViewServerModule } from "../core/module/VsModule";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
 export type Column = {
   name: string;
-  dataType: "string" | "double" | "int" | "long" | "boolean";
+  dataType: VuuColumnDataType;
 };
 
 export const columnUtils = {
@@ -25,14 +25,14 @@ class LinkImpl implements Link {
   constructor(
     public fromColumn: string,
     public toTable: string,
-    public toColumn: string
+    public toColumn: string,
   ) {}
 }
 
 export const Link = (
   fromColumn: string,
   toTable: string,
-  toColumn: string
+  toColumn: string,
 ): Link => new LinkImpl(fromColumn, toTable, toColumn);
 
 class VisualLinksImpl {
@@ -62,6 +62,19 @@ export interface TableDef extends TableDefConfig {
   asVuuTable: VuuTable;
 }
 export interface SessionTableDef extends TableDef {}
+
+export const schemaToSessionTableDef = (
+  tableDef: TableDef,
+): SessionTableDef => ({
+  ...tableDef,
+  schema: {
+    ...tableDef.schema,
+    columns: tableDef.schema.columns.concat({
+      name: "vuuMsg",
+      serverDataType: "string",
+    }),
+  },
+});
 
 class TableDefImpl implements TableDef {
   columns: Column[];
@@ -117,7 +130,7 @@ class TableDefImpl implements TableDef {
 export const TableDef = (
   options: Omit<TableDefConfig, "links"> & {
     links?: VisualLinks;
-  }
+  },
 ): TableDef => {
   const { links = VisualLinks(), ...rest } = options;
   return new TableDefImpl({ ...rest, links });
@@ -126,7 +139,7 @@ export const TableDef = (
 export const SessionTableDef = (
   options: Omit<TableDefConfig, "links"> & {
     links?: VisualLinks;
-  }
+  },
 ): SessionTableDef => {
   const { links = VisualLinks(), ...rest } = options;
   return new TableDefImpl({ ...rest, links });
@@ -142,14 +155,14 @@ export class JoinSpecImpl implements JoinSpec {
   constructor(
     public left: string,
     public right: string,
-    public type: JoinType
+    public type: JoinType,
   ) {}
 }
 
 export function JoinSpec(
   left: string,
   right: string,
-  type: JoinType
+  type: JoinType,
 ): JoinSpec {
   return new JoinSpecImpl(left, right, type);
 }
@@ -160,15 +173,20 @@ export interface Join {
 }
 
 export class JoinImpl implements Join {
-  constructor(public table: TableDef, public joinSpec: JoinSpec) {}
+  constructor(
+    public table: TableDef,
+    public joinSpec: JoinSpec,
+  ) {}
 }
 
 export function Join(table: TableDef, joinSpec: JoinSpec): Join {
   return new JoinImpl(table, joinSpec);
 }
 
-export interface JoinTableDefConfig
-  extends Omit<TableDefConfig, "columns" | "keyField"> {
+export interface JoinTableDefConfig extends Omit<
+  TableDefConfig,
+  "columns" | "keyField"
+> {
   baseTable: TableDef;
   joinColumns: Column[];
   joins: Join;
@@ -182,7 +200,7 @@ export interface JoinTableDef extends TableDef {
 }
 
 export const isJoinTableDef = (
-  tableDef: TableDef | JoinTableDef
+  tableDef: TableDef | JoinTableDef,
 ): tableDef is JoinTableDef => tableDef instanceof JoinTableDefImpl;
 
 class JoinTableDefImpl extends TableDefImpl implements JoinTableDef {

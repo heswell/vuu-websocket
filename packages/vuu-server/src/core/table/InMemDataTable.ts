@@ -4,6 +4,9 @@ import { Column, TableDef } from "../../api/TableDef";
 import { IProvider, Provider } from "../../provider/Provider";
 import { ColumnValueProvider } from "./ColumnValueProvider";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { ColumnMap } from "@vuu-ui/vuu-utils";
+import { InMemSessionDataTable } from "./InMemSessionDataTable";
+import { TableSchema } from "@vuu-ui/vuu-data-types";
 
 export interface RowKeyUpdate {
   key: string;
@@ -27,10 +30,17 @@ export const RowKeyUpdate = (
 
 export interface DataTable {
   columnForName: (columnName: string) => Column;
+  columnMap: ColumnMap;
   columnValueProvider: ColumnValueProvider;
+  getRowAtKey(key: string, throwIfMissing?: true): VuuDataRow;
+  getRowAtKey(key: string, throwIfMissing: false): VuuDataRow | undefined;
   provider: IProvider | undefined;
+  name: string;
+  rowIndexAtKey: (key: string) => number;
   rows: VuuDataRow[];
+  schema: TableSchema;
   tableDef: TableDef;
+  update: (rowIndex: number, row: VuuDataRow, column?: string) => void;
 }
 
 export class InMemDataTable extends Table implements DataTable {

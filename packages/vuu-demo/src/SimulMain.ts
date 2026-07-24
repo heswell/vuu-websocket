@@ -2,6 +2,10 @@ import {
   VuuServerConfig,
   VuuServer,
   LifecycleContainer,
+  VuuWebSocketOptions,
+  ConfigFactory,
+  Config,
+  VuuSslByCertAndKey,
 } from "@heswell/vuu-server";
 import { PricesModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
@@ -24,11 +28,13 @@ export default function main() {
 
   const loginTokenService = LoginTokenService();
 
+  const defaultConfig = ConfigFactory.load();
+
   const lifecycle = new LifecycleContainer();
 
   const config = VuuServerConfig(
+    createWebSocketOptions(defaultConfig),
     httpServerOptions,
-    webSocketOptions,
     loginTokenService,
   )
     .withModule(PricesModule())
@@ -41,4 +47,23 @@ export default function main() {
   const vuuServer = new VuuServer(config, lifecycle);
 
   lifecycle.start();
+}
+
+
+const ConfigKeys  = {
+   sslEnabled : "vuu.ssl",
+   certPath : "vuu.certPath",
+   keyPath : "vuu.keyPath",
+} as const;
+
+function createWebSocketOptions(c: Config): VuuWebSocketOptions {
+  const options = VuuWebSocketOptions()
+      .withUri("websocket")
+      .withWsPort(8090);
+
+  if (c.getBoolean(ConfigKeys.sslEnabled)) {
+    return options.withSsl(VuuSslByCertAndKey(c.getPath(ConfigKeys.certPath), c.getPath(ConfigKeys.keyPath)))
+  } else {
+    return options.withSslDisabled()
+  }
 }

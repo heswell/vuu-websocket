@@ -18,7 +18,7 @@ export class RpcHandler {
     };
   }
   get menuItems(): ViewPortMenu {
-    return EmptyViewPortMenu;
+    return new EmptyViewPortMenu();
   }
 
   get menuMap() {

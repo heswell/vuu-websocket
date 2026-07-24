@@ -1,5 +1,4 @@
 import {
-  ServerMessageBody,
   VuuFilter,
   VuuGroupBy,
   VuuRange,
@@ -9,6 +8,7 @@ import {
 import {
   DataView,
   DataViewConfig,
+  RowUpdateHandler,
   Table,
   tableRowsMessageBody,
 } from "@heswell/data";
@@ -24,6 +24,7 @@ import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { VuuUser } from "../core/auths/VuuUser";
 import { PublishQueue } from "../util/PublishQueue";
 import { DataResponse } from "@heswell/data/src/store/rowset";
+import { isSessionDataTable } from "../core/table/InMemSessionDataTable";
 
 type ViewPortUpdateType = "SIZE" | "ROW";
 export interface ViewPortSelection {
@@ -250,7 +251,7 @@ export class Viewport extends DataView {
     outboundQ: PublishQueue<ViewPortUpdate>,
     structuralFields: ViewPortStructuralFields,
     range: VuuRange,
-    table: Table,
+    table: DataTable,
     config: DataViewConfig,
     // in scala, this is passed with config as 'structural'
     viewPortDef: ViewPortDef,
@@ -274,7 +275,7 @@ export class Viewport extends DataView {
   }
 
   get dataTable() {
-    if (isDataTable(this.table)) {
+    if (isDataTable(this.table) || isSessionDataTable(this.table)) {
       return this.table as DataTable;
     } else {
       throw Error(`[Viewport] table is not a DataTable`);
@@ -315,11 +316,15 @@ export class Viewport extends DataView {
   }
 
   selectRow(rowKey: string, preserveExistingSelection: boolean) {
-    return super.selectRow(rowKey, preserveExistingSelection);
+    const dataResponse = super.selectRow(rowKey, preserveExistingSelection);
+    this.postDataResponse(dataResponse);
+    return dataResponse;
   }
 
   deselectRow(rowKey: string, preserveExistingSelection: boolean) {
-    return super.deselectRow(rowKey, preserveExistingSelection);
+    const dataResponse = super.deselectRow(rowKey, preserveExistingSelection);
+    this.postDataResponse(dataResponse);
+    return dataResponse;
   }
 
   selectRowRange(
@@ -327,57 +332,26 @@ export class Viewport extends DataView {
     toRowKey: string,
     preserveExistingSelection: boolean,
   ) {
-    return super.selectRowRange(
+    const dataResponse = super.selectRowRange(
       fromRowKey,
       toRowKey,
       preserveExistingSelection,
     );
+    this.postDataResponse(dataResponse);
+    return dataResponse;
   }
 
   changeViewport(
     options: Omit<VuuViewportChangeRequest, "viewPortId">,
   ): DataResponse | undefined {
     const dataResponse = super.changeViewport(options);
-    if (dataResponse) {
-      const time = Date.now();
-      const { rows, size } = dataResponse;
-      for (const row of rows) {
-        this.#outboundQ.pushHighPriority(
-          ViewPortUpdate(
-            this.#requestId,
-            this,
-            this.table,
-            RowKeyUpdate(row.rowKey, this.table),
-            row.rowIndex,
-            "ROW",
-            size,
-            time,
-          ),
-        );
-      }
-    }
+    this.postDataResponse(dataResponse);
     return dataResponse;
   }
 
   setRange(range: VuuRange, useDelta?: boolean) {
     const dataResponse = super.setRange(range, useDelta);
-    const time = Date.now();
-    const { rows, size } = dataResponse;
-    for (const row of rows) {
-      this.#outboundQ.pushHighPriority(
-        ViewPortUpdate(
-          this.#requestId,
-          this,
-          this.table,
-          RowKeyUpdate(row.rowKey, this.table),
-          row.rowIndex,
-          "ROW",
-          size,
-          time,
-        ),
-      );
-    }
-
+    this.postDataResponse(dataResponse);
     return dataResponse;
   }
 
@@ -397,38 +371,43 @@ export class Viewport extends DataView {
 
   postDataForCurrentRange() {
     const { rows, size } = this.getDataForCurrentRange();
-    const time = Date.now();
-    this.#outboundQ.pushHighPriority(
-      ViewPortUpdate(
-        this.#requestId,
-        this,
-        null,
-        RowKeyUpdate("SIZE", null),
-        -1,
-        "SIZE",
-        size,
-        time,
-      ),
-    );
-
-    for (const row of rows) {
-      this.#outboundQ.pushHighPriority(
-        ViewPortUpdate(
-          this.#requestId,
-          this,
-          this.table,
-          RowKeyUpdate(row.rowKey, this.table),
-          row.rowIndex,
-          "ROW",
-          size,
-          time,
-        ),
-      );
-    }
+    this.postDataResponse({ rows, size, sizeMessageRequired: true });
   }
 
-  enqueue(messageBody: ServerMessageBody) {
-    console.trace(`[ViewPort] queue message ${messageBody.type}`);
-    // this.#outboundQ.push(ViewPortUpdate(messageBody));
+  postDataResponse(dataResponse: DataResponse | void) {
+    if (dataResponse && this.#enabled) {
+      const { size, rows, sizeMessageRequired } = dataResponse;
+      const time = Date.now();
+
+      if (sizeMessageRequired) {
+        this.#outboundQ.pushHighPriority(
+          ViewPortUpdate(
+            this.#requestId,
+            this,
+            null,
+            RowKeyUpdate("SIZE", null),
+            -1,
+            "SIZE",
+            size,
+            time,
+          ),
+        );
+      }
+
+      for (const row of rows) {
+        this.#outboundQ.pushHighPriority(
+          ViewPortUpdate(
+            this.#requestId,
+            this,
+            this.table,
+            RowKeyUpdate(row.rowKey, this.table),
+            row.rowIndex,
+            "ROW",
+            size,
+            time,
+          ),
+        );
+      }
+    }
   }
 }

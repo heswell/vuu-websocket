@@ -75,10 +75,6 @@ export function projectColumns(
   columns?: string[],
   columnMap?: ColumnMap
 ): MultiRowProjectorFactory {
-  console.log({
-    columns: columns?.join(","),
-    columnMap: JSON.stringify(columnMap),
-  });
 
   if (columns === undefined && columnMap === undefined) {
     return (selected: Set<string>, vpSize: number) =>
