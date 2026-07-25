@@ -9,9 +9,10 @@
   "scripts": {
     "start:all": "bun ./scripts/start-all.ts",
     "start": "WEBSOCKET_PORT=8090 npm start:all",
-    "start:demo": "WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",
-    "start:demo:2": "WEBSOCKET_PORT=8095 bun ./scripts/start-demo.ts",
-    "debug:demo": " WEBSOCKET_PORT=8090 bun --inspect ./scripts/start-demo.ts",
+    "start:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",
+    "start:portal": "VUU_APP=vuu-portal WEBSOCKET_PORT=8090 bun ./scripts/start-portal.ts",
+    "start:demo:2": "VUU_APP=vuu-demo WEBSOCKET_PORT=8095 bun ./scripts/start-demo.ts",
+    "debug:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun --inspect ./scripts/start-demo.ts",
     "start:orders": "bun ./scripts/start-orders.ts",
     "start:prices": "bun ./scripts/start-prices.ts",
     "start:refdata": "bun ./scripts/start-refdata.ts",

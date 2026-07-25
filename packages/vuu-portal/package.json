@@ -1,0 +1,22 @@
+{
+  "name": "@heswell/vuu-portal",
+  "version": "1.0.0",
+  "description": "VUU portal server with Keycloak admin module",
+  "type": "module",
+  "main": "dist/src/PortalMain.js",
+  "module": "src/PortalMain.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "etsc",
+    "build:vuu": "node ../../scripts/build.mjs"
+  },
+  "author": "heswell",
+  "license": "MIT",
+  "dependencies": {
+    "@heswell/vuu-server": "3.0.0",
+    "pino": "9.6.0"
+  }
+}

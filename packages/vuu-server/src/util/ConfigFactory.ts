@@ -139,6 +139,17 @@ function resolveConfigPath(explicitPath?: string): string {
     return resolved;
   }
 
+  const appName = process.env.VUU_APP?.trim();
+  if (appName) {
+    const appConfigPath = findApplicationConfForApp(process.cwd(), appName);
+    if (appConfigPath) {
+      return appConfigPath;
+    }
+    throw new Error(
+      `Unable to locate application.conf for VUU_APP='${appName}'. Expected '${path.join("packages", appName, "application.conf")}' from '${process.cwd()}', or set VUU_CONFIG_FILE explicitly.`,
+    );
+  }
+
   const directPath = path.resolve(process.cwd(), "application.conf");
   if (fs.existsSync(directPath)) {
     return directPath;
@@ -150,8 +161,16 @@ function resolveConfigPath(explicitPath?: string): string {
   }
 
   throw new Error(
-    "Unable to locate application.conf. Set VUU_CONFIG_FILE or pass a path to ConfigFactory.load().",
+    "Unable to locate application.conf. Set VUU_CONFIG_FILE, set VUU_APP, or pass a path to ConfigFactory.load().",
   );
+}
+
+function findApplicationConfForApp(
+  rootDir: string,
+  appName: string,
+): string | undefined {
+  const candidate = path.join(rootDir, "packages", appName, "application.conf");
+  return fs.existsSync(candidate) ? candidate : undefined;
 }
 
 function findSingleApplicationConf(rootDir: string): string | undefined {
