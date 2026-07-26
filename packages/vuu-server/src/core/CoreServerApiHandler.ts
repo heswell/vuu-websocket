@@ -9,6 +9,7 @@ import {
   VuuCreateVisualLink,
   VuuRemoveVisualLink,
   VuuRpcServiceRequest,
+  VuuTableListRequest,
   VuuTableMetaRequest,
   VuuViewportChangeRequest,
   VuuViewportCreateRequest,
@@ -27,6 +28,7 @@ import {
   CreateViewPortSuccess,
   DeselectRowSuccess,
   ErrorResponse,
+  GetTableListResponse,
   GetTableMetaResponse,
   GetViewPortMenusResponse,
   GetViewPortVisualLinksResponse,
@@ -82,6 +84,8 @@ export class CoreServerApiHandler implements ServerApi {
         break;
       case "GET_TABLE_META":
         return this.processGetTableMetaRequest(body, ctx);
+      case "GET_TABLE_LIST":
+        return this.processGetTableListRequest(body, ctx);
       case "CREATE_VP":
         return this.processCreateViewPortRequest(body, ctx);
       case "GET_VP_VISUAL_LINKS":
@@ -106,12 +110,6 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processDeselectRowRequest(body, ctx);
       case "SELECT_ROW_RANGE":
         return this.processSelectRowRangeRequest(body, ctx);
-      // case "GET_TABLE_LIST":
-      //   session.enqueue(requestId, {
-      //     type: "TABLE_LIST_RESP",
-      //     tables: this.tableContainer.getDefinedTables(),
-      //   });
-      //   break;
       // case "CREATE_VISUAL_LINK":
       //   return this.processCreateVisualLinkRequest(requestId, body, session);
       // case "REMOVE_VISUAL_LINK":
@@ -151,6 +149,18 @@ export class CoreServerApiHandler implements ServerApi {
       );
       return vsMsg(tableMetaResponseBody, ctx);
     } else {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
+  }
+
+  private processGetTableListRequest(
+    _: VuuTableListRequest,
+    ctx: RequestContext,
+  ) {
+    try {
+      const tables = this.tableContainer.getDefinedTables();
+      return vsMsg(GetTableListResponse(tables), ctx);
+    } catch (e) {
       return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
     }
   }
