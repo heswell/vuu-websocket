@@ -186,7 +186,7 @@ export class Table extends EventEmitter<TableEvents> {
 
   // TODO what do we do about rowIndex values when we remove ?
   delete(key: string) {
-    if (this.#index[key]) {
+    if (this.#index[key] !== undefined) {
       const rowIdx = this.#index[key];
       if (typeof rowIdx === "number" && rowIdx !== -1) {
         this.#index[key] = undefined;

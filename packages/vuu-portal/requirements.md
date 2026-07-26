@@ -137,7 +137,16 @@ Module must register exactly these base tables:
 The module must include one join table:
 - user_group_roles joining users, groups, and roles
 
-No custom RPC handlers are required.
+Module must expose edit RPC services for Keycloak admin operations via ViewPortDef service wiring.
+
+Required RPC names:
+- addUser
+- addRole
+- addGroup
+- addRoleToGroup
+- addUserToGroup
+
+The KeycloakAdmin module should attach a dedicated RPC service (similar to InstrumentService wiring in vuu-demo) to at least one admin table viewport so these RPCs are invokable from VUU clients.
 
 ## Table Definitions
 
@@ -259,6 +268,39 @@ A shared KeycloakAdminClient should encapsulate:
 - authenticated request handling
 - seeded entity retrieval
 - helper calls for user groups, group role mappings, and user/group/role join expansion
+- edit helpers for addUser, addRole, addGroup, addRoleToGroup, addUserToGroup
+
+## Keycloak Edit RPC Requirements
+
+The module must support create/assignment operations by invoking Keycloak Admin REST APIs directly (rather than mutating only in-memory VUU rows):
+
+- addUser -> create Keycloak user
+- addRole -> create realm role
+- addGroup -> create realm group
+- addRoleToGroup -> assign realm role mapping to a group
+- addUserToGroup -> add user membership to a group
+
+RPC behavior:
+- validate required inputs and return ERROR_RESULT with explicit message on invalid/missing params
+- map Keycloak HTTP errors to deterministic RPC errors
+- return SUCCESS_RESULT only when Keycloak confirms the operation
+- do not use silent fallbacks or partial success responses
+
+Table update behavior after successful edit RPC:
+- refresh users, groups, roles, and user_group_roles from Keycloak
+- updates must be driven from Keycloak as source of truth (no write-only local upserts)
+- refresh should preserve schema ordering and vuu timestamp/msg conventions
+
+## Multi-Server Consistency Requirements
+
+Because more than one vuu-portal server may be running, each instance must reconcile with Keycloak on a regular interval so all servers converge on the same user/group/role state.
+
+Required behavior:
+- introduce periodic Keycloak reconciliation in each portal instance
+- refresh all KEYCLOAK_ADMIN tables on each cycle
+- continue to support immediate post-RPC refresh on the server that handled the edit call
+- interval must be configurable (for example: vuu.keycloak.sync.intervalMs) with a safe default suitable for local/dev
+- failures in one refresh cycle must be surfaced in logs and retried on next cycle
 
 ## Project File Structure
 Required minimum structure:
@@ -271,10 +313,12 @@ Required minimum structure:
 - src/modules/keycloak-admin/KeycloakAdminModule.ts
 - src/modules/keycloak-admin/KeycloakAdminTableDefs.ts
 - src/modules/keycloak-admin/KeycloakAdminClient.ts
+- src/modules/keycloak-admin/services/KeycloakAdminService.ts
 - src/modules/keycloak-admin/providers/KeycloakUsersProvider.ts
 - src/modules/keycloak-admin/providers/KeycloakGroupsProvider.ts
 - src/modules/keycloak-admin/providers/KeycloakRolesProvider.ts
 - src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider.ts
+- src/modules/keycloak-admin/KeycloakAdminRefreshCoordinator.ts
 
 ## Workspace Integration
 Create root start script file:
@@ -299,9 +343,39 @@ A recreation is complete when:
 10. in both auth modes, /api/authn returns tokens in the exact Scala VUU format used by websocket login.
 11. realm-not-found or auth failures produce clear startup errors.
 12. code remains aligned with existing vuu-server/vuu-demo style and module patterns.
+13. KEYCLOAK_ADMIN edit RPCs addUser, addRole, addGroup, addRoleToGroup, and addUserToGroup are available and invoke Keycloak Admin APIs.
+14. after successful edit RPC call, all KEYCLOAK_ADMIN tables refresh from Keycloak source of truth.
+15. when multiple portal servers are running, periodic reconciliation updates each server's KEYCLOAK_ADMIN tables within configured sync interval.
+
+## Implementation Plan (Edit Admin Tables)
+
+1. RPC service wiring
+- add KeycloakAdminService extending existing rpc handler patterns
+- wire service through ModuleFactory addTable(...) serviceFactory/ViewPortDef
+- register addUser, addRole, addGroup, addRoleToGroup, addUserToGroup RPC functions
+
+2. Keycloak client edit API support
+- add REST helper methods in KeycloakAdminClient for required create/assignment operations
+- add helper lookups for name/id resolution needed by role/group/user assignments
+- normalize error mapping so RPC layer returns clear deterministic failures
+
+3. Refresh orchestration
+- implement a refresh coordinator that can reload all KEYCLOAK_ADMIN providers on demand
+- invoke coordinator after successful edit RPC operations
+- ensure refresh updates users/groups/roles/user_group_roles coherently in one cycle
+
+4. Multi-server convergence
+- add periodic refresh scheduler in vuu-portal startup/module wiring
+- make sync interval configurable via application.conf
+- keep scheduler idempotent and resilient to transient Keycloak failures
+
+5. Validation and readiness
+- confirm RPC request/response shapes follow vuu-server conventions
+- confirm table data reflects Keycloak after create/assignment operations
+- confirm independent portal instances converge after periodic refresh
 
 ## Non-Goals
-- editing Keycloak data from VUU
 - creating realms/clients in Keycloak
 - adding extra modules, extra join tables beyond user_group_roles, or RPC menu actions
 - adding additional REST resources beyond POST /api/authn in this phase
+- update/delete semantics for users, groups, roles, and memberships in this phase

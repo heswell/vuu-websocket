@@ -24,7 +24,9 @@ import {
 
 const EMPTY_ARRAY = [] as const;
 interface InboundMessageHandler {
-  handle: (msg: VuuClientMessage) => VuuServerMessage | void;
+  handle: (
+    msg: VuuClientMessage,
+  ) => VuuServerMessage | Promise<VuuServerMessage | void> | void;
 }
 
 interface OutboundMessageHandler {
@@ -45,7 +47,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     private sessionContainer: ClientSessionContainer,
     private moduleContainer: ModuleContainer,
   ) {}
-  handle = (msg: VuuClientMessage) => {
+  handle = async (msg: VuuClientMessage) => {
     // console.log(`[DefaultMessageHandler] handle ${JSON.stringify(msg)}`);
 
     const ctx = RequestContext(

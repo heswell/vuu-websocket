@@ -21,7 +21,8 @@ export const BunWebSocketConnectionHandler = (
       ws: ServerWebSocket<WebsocketData>,
       msg: string | Buffer,
     ) => {
-      viewserverHandler.handle(msg as string, ws);
+      // Added by Copilot for issue #10: await async RPC/service handling completion.
+      await viewserverHandler.handle(msg as string, ws);
     },
     drain: (ws: ServerWebSocket) => {
       console.log("WebSocket backpressure: ");

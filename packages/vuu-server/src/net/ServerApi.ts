@@ -5,5 +5,5 @@ export interface ServerApi {
   process: (
     msg: VuuClientMessage,
     ctx: RequestContext,
-  ) => VuuServerMessage | void;
+  ) => VuuServerMessage | Promise<VuuServerMessage | void> | void;
 }

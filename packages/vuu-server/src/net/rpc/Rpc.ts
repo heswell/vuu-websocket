@@ -23,4 +23,6 @@ export function RpcParams<T = Record<string, unknown>>(
   return new RpcParamsImpl<T>(namedParams, viewport, ctx);
 }
 
-export type RpcFunction = (params: RpcParams) => RpcResult;
+export type RpcFunction = (
+  params: RpcParams,
+) => RpcResult | Promise<RpcResult>;

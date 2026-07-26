@@ -233,7 +233,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     rpcName: string,
     params: Record<string, unknown>,
     ctx: RequestContext,
-  ): RpcResult {
+  ): RpcResult | Promise<RpcResult> {
     const viewport = this.getViewportById(viewPortId);
     return viewport.viewPortDef.service.processRpcRequest(
       rpcName,

@@ -1,5 +1,6 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
 import { KeycloakAdminClient } from "../KeycloakAdminClient";
+import { reconcileTableRows } from "./reconcileTableRows";
 
 export class KeycloakUserGroupRolesProvider extends Provider {
   async load(_: TableContainer) {
@@ -12,6 +13,8 @@ export class KeycloakUserGroupRolesProvider extends Provider {
     const seededGroupIds = new Set(groups.map((group) => group.id));
     const seededRoleIds = new Set(roles.map((role) => role.id));
 
+    const rows: (string | number)[][] = [];
+
     for (const user of users) {
       const userGroups = await client.listGroupsForUser(user.id);
       const seededUserGroups = userGroups.filter((group) => seededGroupIds.has(group.id));
@@ -23,7 +26,7 @@ export class KeycloakUserGroupRolesProvider extends Provider {
         for (const role of seededGroupRoles) {
           const id = `${user.id}:${group.id}:${role.id}`;
           const timestamp = Date.now();
-          this.table.upsert([
+          rows.push([
             id,
             user.username,
             user.email ?? "",
@@ -39,6 +42,7 @@ export class KeycloakUserGroupRolesProvider extends Provider {
         }
       }
     }
+    reconcileTableRows(this.table, rows);
 
     this.loaded = true;
   }

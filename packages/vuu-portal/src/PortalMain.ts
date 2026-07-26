@@ -12,11 +12,14 @@ import {
 } from "@heswell/vuu-server";
 import { createAuthnProvider } from "./auth/createAuthnProvider";
 import { KeycloakAdminModule } from "./modules/keycloak-admin";
+import { LifeCycleRunner } from "@heswell/vuu-server/src/toolbox/thread/LifeCycleRunner";
+import { installKeycloakAdminRefreshCoordinator } from "./modules/keycloak-admin/KeycloakAdminRefreshCoordinator";
 
 const ConfigKeys = {
   sslEnabled: "vuu.ssl",
   certPath: "vuu.certPath",
   keyPath: "vuu.keyPath",
+  keycloakSyncIntervalMs: "vuu.keycloak.sync.intervalMs",
 } as const;
 
 function createWebSocketOptions(config: Config): VuuWebSocketOptions {
@@ -51,7 +54,28 @@ export default function main() {
   ).withModule(KeycloakAdminModule());
 
   // Constructing VuuServer starts providers and websocket endpoint.
-  new VuuServer(config, lifecycle);
+  const vuuServer = new VuuServer(config, lifecycle);
+  const refreshCoordinator = installKeycloakAdminRefreshCoordinator(
+    vuuServer.tableContainer,
+    vuuServer.providers,
+  );
+  const syncIntervalMs = defaultConfig.getNumber(
+    ConfigKeys.keycloakSyncIntervalMs,
+    10_000,
+  );
+  lifecycle.apply(
+    new LifeCycleRunner(
+      "keycloak-admin-refresh",
+      () => {
+        void refreshCoordinator.refreshAll("scheduled").catch((error) => {
+          console.error(
+            `[PortalMain] keycloak admin refresh failed: ${(error as Error).message}`,
+          );
+        });
+      },
+      syncIntervalMs,
+    ),
+  );
 
   lifecycle.start();
 }

@@ -31,6 +31,10 @@ export class VuuServer {
 
   private vuuServerId = uuid();
 
+  get providers() {
+    return this.providerContainer;
+  }
+
   constructor(
     { loginTokenService, modules, ...config }: VuuServerConfig,
     lifecycle: LifecycleContainer,
