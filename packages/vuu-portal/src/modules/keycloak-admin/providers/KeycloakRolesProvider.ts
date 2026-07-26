@@ -3,11 +3,19 @@ import { KeycloakAdminClient } from "../KeycloakAdminClient";
 
 export class KeycloakRolesProvider extends Provider {
   async load(_: TableContainer) {
-    const client = await KeycloakAdminClient.createFromEnv();
+    const client = await KeycloakAdminClient.createFromConfig();
     const roles = await client.listSeedRoles();
 
     for (const role of roles) {
-      this.table.upsert([role.id, role.name, role.description ?? ""]);
+      const timestamp = Date.now();
+      this.table.upsert([
+        role.id,
+        role.name,
+        role.description ?? "",
+        timestamp,
+        timestamp,
+        "",
+      ]);
     }
 
     this.loaded = true;

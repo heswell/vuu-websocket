@@ -6,7 +6,7 @@ Create a new package named vuu-portal that runs a VUU server similar to vuu-demo
 The service must:
 - start a VUU websocket server
 - register exactly one VUU module named KEYCLOAK_ADMIN
-- expose three base tables: users, groups, roles
+- expose users, groups, roles, and one join table for user/group/role mappings
 - load table data from Keycloak realm metadata
 
 ## Package Scope
@@ -67,7 +67,7 @@ Authentication:
 - support Keycloak-backed authentication as the default mode
 - login flow must validate credentials against Keycloak and establish a portal session/token
 - authenticated identity must include username and mapped authorizations
-- when VUU_AUTH_MODE=keycloak, POST /api/authn must return a Scala-compatible VUU auth token
+- when vuu.auth.mode=keycloak, POST /api/authn must return a Scala-compatible VUU auth token
 - token semantics, field names, encoding, and parsing behavior must match Scala VUU exactly
 - user role/authorization information may be included or resolved as required by Scala-compatible token semantics
 - support an alternative permissive auth provider mode for local/dev compatibility that authenticates any user credentials
@@ -78,17 +78,17 @@ Authorization:
 - role/authorization mapping must be consistent with Scala VUU auth semantics
 
 Configuration for auth:
-- KEYCLOAK_URL (default http://localhost:8080)
-- KEYCLOAK_REALM (default vuu)
-- KEYCLOAK_ADMIN_USERNAME (default admin)
-- KEYCLOAK_ADMIN_PASSWORD (default admin)
-- KEYCLOAK_CLIENT_ID (default portal)
-- KEYCLOAK_CLIENT_SECRET (optional for confidential client)
-- VUU_AUTH_MODE with values keycloak or none (default keycloak)
-- VUU_AUTH_MODE with values keycloak or permissive (default keycloak)
+- vuu.auth.mode with values keycloak or permissive (default keycloak)
+- KeycloakAdmin settings must be read from application.conf using the vuu.keycloak prefix:
+- vuu.keycloak.url (default http://localhost:8080)
+- vuu.keycloak.realm (default vuu)
+- vuu.keycloak.adminUsername (default admin)
+- vuu.keycloak.adminPassword (default admin)
+- vuu.keycloak.clientId (default portal)
+- vuu.keycloak.clientSecret (optional for confidential client)
 
 Alternative provider requirements:
-- when VUU_AUTH_MODE=permissive, /api/authn must accept any non-empty username/password pair
+- when vuu.auth.mode=permissive, /api/authn must accept any non-empty username/password pair
 - permissive mode must construct a stable authenticated principal using the supplied username
 - permissive mode must return a token/session payload in the exact Scala-compatible /api/authn token format
 - permissive mode is for local development/test only and must be clearly documented as non-production
@@ -116,20 +116,35 @@ The package application.conf must define:
 - vuu.certPath
 - vuu.keyPath
 - vuu.ssl
+- vuu.keycloak.url
+- vuu.keycloak.realm
+- vuu.keycloak.adminUsername
+- vuu.keycloak.adminPassword
+- vuu.keycloak.clientId
+- vuu.keycloak.clientSecret (optional)
+- vuu.auth.mode
 
 ## Module Requirements
 Create module namespace:
 - KEYCLOAK_ADMIN
 
-Module must register exactly three base tables:
+Module must register exactly these base tables:
 - users
 - groups
 - roles
+- user_group_roles
 
-No join tables are required.
+The module must include one join table:
+- user_group_roles joining users, groups, and roles
+
 No custom RPC handlers are required.
 
 ## Table Definitions
+
+All VUU tables in this module must include:
+- vuuCreatedTimestamp: long
+- vuuUpdatedTimestamp: long
+- vuuMsg: string
 
 ### users
 Columns:
@@ -137,11 +152,12 @@ Columns:
 - username: string
 - email: string
 - enabled: string
-- groups: string
+- vuuCreatedTimestamp: long
+- vuuUpdatedTimestamp: long
+- vuuMsg: string
 
 Behavior:
 - one row per Keycloak user
-- groups column contains comma-separated group names
 
 ### groups
 Columns:
@@ -149,6 +165,9 @@ Columns:
 - name: string
 - path: string
 - roles: string
+- vuuCreatedTimestamp: long
+- vuuUpdatedTimestamp: long
+- vuuMsg: string
 
 Behavior:
 - one row per Keycloak group
@@ -159,20 +178,40 @@ Columns:
 - id: string (keyField)
 - name: string
 - description: string
+- vuuCreatedTimestamp: long
+- vuuUpdatedTimestamp: long
+- vuuMsg: string
 
 Behavior:
 - one row per Keycloak realm role
+
+### user_group_roles
+Columns:
+- id: string (keyField)
+- username: string
+- email: string
+- enabled: string
+- group_id: string
+- group_name: string
+- role_id: string
+- role_name: string
+- vuuCreatedTimestamp: long
+- vuuUpdatedTimestamp: long
+- vuuMsg: string
+
+Behavior:
+- one row per resolved user/group/role relationship
+- username/email/enabled must mirror the corresponding values from the joined users table row
+- group_name must mirror the name from the joined groups table row for group_id
+- role_name must mirror the name from the joined roles table row for role_id
+- includes only valid mappings where each referenced user, group, and role exists in seeded scope
 
 ## Data Source Requirements
 Providers must load from Keycloak Admin API.
 
 ### Authentication
 - Obtain admin token from master realm token endpoint using admin-cli password grant.
-- Env variables:
-- KEYCLOAK_URL (default http://localhost:8080)
-- KEYCLOAK_REALM (default vuu)
-- KEYCLOAK_ADMIN_USERNAME (default admin)
-- KEYCLOAK_ADMIN_PASSWORD (default admin)
+- Credentials and realm configuration must be read from application.conf keys under vuu.keycloak.*
 
 ### Realm Verification
 - Validate realm exists before loading table data.
@@ -203,10 +242,11 @@ Expected role set:
 - users.admin
 
 ## Provider Requirements
-Implement three providers extending vuu-server Provider:
+Implement providers extending vuu-server Provider:
 - KeycloakUsersProvider
 - KeycloakGroupsProvider
 - KeycloakRolesProvider
+- KeycloakUserGroupRolesProvider
 
 Each provider must:
 - fetch relevant Keycloak data
@@ -218,7 +258,7 @@ A shared KeycloakAdminClient should encapsulate:
 - token acquisition
 - authenticated request handling
 - seeded entity retrieval
-- helper calls for user groups and group role mappings
+- helper calls for user groups, group role mappings, and user/group/role join expansion
 
 ## Project File Structure
 Required minimum structure:
@@ -234,6 +274,7 @@ Required minimum structure:
 - src/modules/keycloak-admin/providers/KeycloakUsersProvider.ts
 - src/modules/keycloak-admin/providers/KeycloakGroupsProvider.ts
 - src/modules/keycloak-admin/providers/KeycloakRolesProvider.ts
+- src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider.ts
 
 ## Workspace Integration
 Create root start script file:
@@ -250,8 +291,8 @@ A recreation is complete when:
 2. ConfigFactory resolves application.conf via VUU_APP.
 3. VUU server starts and logs websocket listener.
 4. KEYCLOAK_ADMIN module is registered.
-5. users, groups, roles tables are created.
-6. providers load data from Keycloak and populate rows.
+5. users, groups, roles, and user_group_roles tables are created.
+6. providers load data from Keycloak and populate rows, including user/group/role joins.
 7. REST endpoint POST /api/authn is available and Scala-compatible.
 8. websocket/session access uses auth output from /api/authn with Scala-compatible semantics.
 9. both auth modes are supported: keycloak (default) and permissive.
@@ -262,5 +303,5 @@ A recreation is complete when:
 ## Non-Goals
 - editing Keycloak data from VUU
 - creating realms/clients in Keycloak
-- adding extra modules, joins, or RPC menu actions
+- adding extra modules, extra join tables beyond user_group_roles, or RPC menu actions
 - adding additional REST resources beyond POST /api/authn in this phase
