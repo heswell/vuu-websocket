@@ -46,7 +46,7 @@ const failure = (errorMessage: string): RpcResult => ({
 const ensureRequiredNonEmptyString = (
   value: unknown,
   fieldName: string,
-: string => {
+): string => {
   if (value === undefined) {
     throw new Error(`Missing required RPC param "${fieldName}"`);
   }
