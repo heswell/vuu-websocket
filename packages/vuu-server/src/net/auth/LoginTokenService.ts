@@ -1,21 +1,27 @@
 import { VuuLoginRequest } from "@vuu-ui/vuu-protocol-types";
+import { uuid } from "@vuu-ui/vuu-utils";
 import { VuuUser } from "../../core/auths/VuuUser";
 
 export interface LoginTokenService {
-  getToken: () => string;
+  getToken: (vuuUser: VuuUser) => string;
   login: (msg: VuuLoginRequest) => VuuUser;
 }
 
 class LoginTokenServiceImpl implements LoginTokenService {
-  constructor() {}
+  #userTokens = new Map<string, VuuUser>();
 
-  getToken() {
-    return "token";
+  getToken(vuuUser: VuuUser) {
+    const token = `${btoa(JSON.stringify(vuuUser))}.${uuid()}`;
+    this.#userTokens.set(token, vuuUser);
+    return token;
   }
 
   login(msg: VuuLoginRequest) {
-    console.log(`[LoginTokenService] login ${JSON.stringify(msg)}`);
-    return VuuUser("steve");
+    const vuuUser = this.#userTokens.get(msg.token);
+    if (!vuuUser) {
+      throw new Error("Invalid token");
+    }
+    return vuuUser;
   }
 }
 

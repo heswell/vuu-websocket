@@ -19,6 +19,7 @@ import { WebSocketServer } from "../net/ws/WebSocketServer";
 import { LifeCycleRunner } from "../toolbox/thread/LifeCycleRunner";
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
 import { FlowControllerFactory } from "../net/flowcontrol/FLowController";
+import { RestServer } from "../net/http/RestServer";
 
 export class VuuServer {
   protected providerContainer: ProviderContainer;
@@ -77,6 +78,10 @@ export class VuuServer {
     this.moduleContainer.start();
 
     new WebSocketServer(config.webSocketOptions, factory);
+
+    if (config.httpServerOptions.requestHandler) {
+      new RestServer(config.webSocketOptions, config.httpServerOptions);
+    }
 
     const handlerRunner = new LifeCycleRunner(
       "sessionRunner",

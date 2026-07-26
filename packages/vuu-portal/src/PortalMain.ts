@@ -1,13 +1,16 @@
 import {
   Config,
   ConfigFactory,
+  createAuthnHttpHandler,
+  HttpServerOptions,
   LifecycleContainer,
+  LoginTokenService,
   VuuServer,
   VuuServerConfig,
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { LoginTokenService } from "@heswell/vuu-server/src/net/auth/LoginTokenService";
+import { createAuthnProvider } from "./auth/createAuthnProvider";
 import { KeycloakAdminModule } from "./modules/keycloak-admin";
 
 const ConfigKeys = {
@@ -32,9 +35,13 @@ function createWebSocketOptions(config: Config): VuuWebSocketOptions {
 }
 
 export default function main() {
-  const httpServerOptions = {};
-  const loginTokenService = LoginTokenService();
   const defaultConfig = ConfigFactory.load();
+  const authnProvider = createAuthnProvider(defaultConfig);
+  const loginTokenService = LoginTokenService();
+  const httpServerOptions: HttpServerOptions = {
+    httpsPort: 8443,
+    requestHandler: createAuthnHttpHandler(authnProvider, loginTokenService),
+  };
   const lifecycle = new LifecycleContainer();
 
   const config = VuuServerConfig(

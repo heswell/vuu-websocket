@@ -28,3 +28,8 @@ export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRE
 export { LifecycleContainer } from "./toolbox/thread/LifecycleContainer";
 export { ConfigFactory } from "./util/ConfigFactory";
 export type { Config } from "./util/ConfigFactory";
+export { LoginTokenService } from "./net/auth/LoginTokenService";
+export { createAuthnHttpHandler } from "./net/auth/AuthnHttpHandler";
+export { PermissiveAuthnProvider } from "./net/auth/AuthnProvider";
+export type { AuthnProvider } from "./net/auth/AuthnProvider";
+export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";

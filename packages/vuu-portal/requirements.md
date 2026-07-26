@@ -16,6 +16,16 @@ The service must:
 - Module entry: src/index.ts (default export of PortalMain)
 - Config file: application.conf in package root
 
+## Implementation Placement Requirements
+To preserve parity with original Scala VUU server patterns:
+- REST service and auth implementation code must live only in either:
+- packages/vuu-portal
+- packages/vuu-server
+- Do not place portal REST/auth implementation logic in unrelated packages.
+- Prefer adding shared protocol/auth/server primitives in vuu-server when they are reusable across apps.
+- Keep vuu-portal focused on app composition, module wiring, and portal-specific configuration.
+- Naming, request/response shapes, and flow structure should follow existing vuu-server conventions and Scala VUU behavior as closely as possible.
+
 ## Dependencies
 The package must depend on:
 - @heswell/vuu-server
@@ -31,6 +41,64 @@ No additional Keycloak SDK is required; use Keycloak admin REST endpoints via fe
 - Start lifecycle after server construction.
 - Websocket URI should be websocket.
 - Websocket port should default to 8090 unless overridden by existing server options/patterns.
+
+## REST Support Requirements
+The portal service must expose a lightweight HTTP REST surface alongside websocket support.
+
+Required endpoints:
+- POST /api/authn
+
+Endpoint behavior:
+- POST /api/authn accepts username/password and returns an auth token payload used by the portal client.
+- Endpoint shape and behavior must maintain 100% compatibility with the Scala VUU server implementation.
+- the token returned by /api/authn must be exactly the same format as Scala VUU server output.
+- this token is the one the client must send to VUU server when establishing the websocket connection.
+
+REST response requirements:
+- return application/json for all success and error payloads
+- include clear error message fields for failures
+- use HTTP status codes consistently: 200, 400, 401, 403, 500
+- include Access-Control-Allow-Origin for local web client usage
+
+## Auth Support Requirements
+Authentication and authorization must be explicit and configurable.
+
+Authentication:
+- support Keycloak-backed authentication as the default mode
+- login flow must validate credentials against Keycloak and establish a portal session/token
+- authenticated identity must include username and mapped authorizations
+- when VUU_AUTH_MODE=keycloak, POST /api/authn must return a Scala-compatible VUU auth token
+- token semantics, field names, encoding, and parsing behavior must match Scala VUU exactly
+- user role/authorization information may be included or resolved as required by Scala-compatible token semantics
+- support an alternative permissive auth provider mode for local/dev compatibility that authenticates any user credentials
+- permissive mode behavior must mirror Scala AuthenticatorFromUserList-style development flow: accept the supplied username and issue a valid portal auth response
+
+Authorization:
+- enforce authentication for websocket/session flows after successful /api/authn login
+- role/authorization mapping must be consistent with Scala VUU auth semantics
+
+Configuration for auth:
+- KEYCLOAK_URL (default http://localhost:8080)
+- KEYCLOAK_REALM (default vuu)
+- KEYCLOAK_ADMIN_USERNAME (default admin)
+- KEYCLOAK_ADMIN_PASSWORD (default admin)
+- KEYCLOAK_CLIENT_ID (default portal)
+- KEYCLOAK_CLIENT_SECRET (optional for confidential client)
+- VUU_AUTH_MODE with values keycloak or none (default keycloak)
+- VUU_AUTH_MODE with values keycloak or permissive (default keycloak)
+
+Alternative provider requirements:
+- when VUU_AUTH_MODE=permissive, /api/authn must accept any non-empty username/password pair
+- permissive mode must construct a stable authenticated principal using the supplied username
+- permissive mode must return a token/session payload in the exact Scala-compatible /api/authn token format
+- permissive mode is for local development/test only and must be clearly documented as non-production
+
+Token/session behavior:
+- requests without valid auth return 401
+- requests with insufficient authorization return 403
+- token/session expiry must be handled with deterministic error responses
+- websocket session establishment must validate the /api/authn token using Scala-compatible rules
+- token validation must fail closed when token structure or required fields do not match Scala-compatible format
 
 ## Configuration Requirements
 Config loading must use ConfigFactory.load() with no explicit path argument.
@@ -184,11 +252,15 @@ A recreation is complete when:
 4. KEYCLOAK_ADMIN module is registered.
 5. users, groups, roles tables are created.
 6. providers load data from Keycloak and populate rows.
-7. realm-not-found or auth failures produce clear startup errors.
-8. code remains aligned with existing vuu-server/vuu-demo style and module patterns.
+7. REST endpoint POST /api/authn is available and Scala-compatible.
+8. websocket/session access uses auth output from /api/authn with Scala-compatible semantics.
+9. both auth modes are supported: keycloak (default) and permissive.
+10. in both auth modes, /api/authn returns tokens in the exact Scala VUU format used by websocket login.
+11. realm-not-found or auth failures produce clear startup errors.
+12. code remains aligned with existing vuu-server/vuu-demo style and module patterns.
 
 ## Non-Goals
 - editing Keycloak data from VUU
 - creating realms/clients in Keycloak
 - adding extra modules, joins, or RPC menu actions
-- replacing existing auth/token flows in vuu-server
+- adding additional REST resources beyond POST /api/authn in this phase
