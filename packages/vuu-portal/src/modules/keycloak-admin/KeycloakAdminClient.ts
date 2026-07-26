@@ -1,3 +1,5 @@
+import { ConfigFactory } from "@heswell/vuu-server";
+
 export const SEEDED_USERNAMES = [
   "trader1",
   "trader2",
@@ -43,6 +45,15 @@ type KeycloakRole = {
   description?: string;
 };
 
+const KeycloakConfigKeys = {
+  url: "vuu.keycloak.url",
+  realm: "vuu.keycloak.realm",
+  adminUsername: "vuu.keycloak.adminUsername",
+  adminPassword: "vuu.keycloak.adminPassword",
+  clientId: "vuu.keycloak.clientId",
+  clientSecret: "vuu.keycloak.clientSecret",
+} as const;
+
 export class KeycloakAdminClient {
   private constructor(
     private readonly baseUrl: string,
@@ -50,21 +61,26 @@ export class KeycloakAdminClient {
     private readonly token: string,
   ) {}
 
-  static async createFromEnv() {
-    const baseUrl = (process.env.KEYCLOAK_URL ?? "http://localhost:8080").replace(
-      /\/$/,
-      "",
-    );
-    const realm = process.env.KEYCLOAK_REALM ?? "vuu";
-    const adminUsername = process.env.KEYCLOAK_ADMIN_USERNAME ?? "admin";
-    const adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
+  static async createFromConfig() {
+    const config = ConfigFactory.load();
+    const baseUrl = config
+      .getString(KeycloakConfigKeys.url, "http://localhost:8080")
+      .replace(/\/$/, "");
+    const realm = config.getString(KeycloakConfigKeys.realm, "vuu");
+    const adminUsername = config.getString(KeycloakConfigKeys.adminUsername, "admin");
+    const adminPassword = config.getString(KeycloakConfigKeys.adminPassword, "admin");
+    const clientId = config.getString(KeycloakConfigKeys.clientId, "admin-cli");
+    const clientSecret = config.getString(KeycloakConfigKeys.clientSecret, "");
 
     const body = new URLSearchParams({
       grant_type: "password",
-      client_id: "admin-cli",
+      client_id: clientId,
       username: adminUsername,
       password: adminPassword,
     });
+    if (clientSecret) {
+      body.set("client_secret", clientSecret);
+    }
 
     const response = await fetch(
       `${baseUrl}/realms/master/protocol/openid-connect/token`,
@@ -115,19 +131,25 @@ export class KeycloakAdminClient {
   }
 
   async listGroupNamesForUser(userId: string) {
-    const groups = await this.requestJson<KeycloakGroup[]>(
-      this.realmUrl(`/users/${encodeURIComponent(userId)}/groups?briefRepresentation=true&max=200`),
-    );
+    const groups = await this.listGroupsForUser(userId);
     return groups.map((group) => group.name).sort();
   }
 
   async listRoleNamesForGroup(groupId: string) {
-    const roles = await this.requestJson<KeycloakRole[]>(
-      this.realmUrl(
-        `/groups/${encodeURIComponent(groupId)}/role-mappings/realm`,
-      ),
-    );
+    const roles = await this.listRolesForGroup(groupId);
     return roles.map((role) => role.name).sort();
+  }
+
+  async listGroupsForUser(userId: string) {
+    return this.requestJson<KeycloakGroup[]>(
+      this.realmUrl(`/users/${encodeURIComponent(userId)}/groups?briefRepresentation=true&max=200`),
+    );
+  }
+
+  async listRolesForGroup(groupId: string) {
+    return this.requestJson<KeycloakRole[]>(
+      this.realmUrl(`/groups/${encodeURIComponent(groupId)}/role-mappings/realm`),
+    );
   }
 
   private async findUserByUsername(username: string) {
