@@ -14,6 +14,7 @@ import type {
   VuuMenuItem,
   VuuRpcServiceResponse,
   VuuTable,
+  VuuTableListResponse,
   VuuTableMetaResponse,
   VuuViewportCreateFailResponse,
   VuuViewportCreateRequest,
@@ -76,6 +77,11 @@ export const GetTableMetaResponse = (
   key,
   table,
   type: "TABLE_META_RESP",
+});
+
+export const GetTableListResponse = (tables: VuuTable[]): VuuTableListResponse => ({
+  tables,
+  type: "TABLE_LIST_RESP",
 });
 
 export const CreateViewPortSuccess = (
