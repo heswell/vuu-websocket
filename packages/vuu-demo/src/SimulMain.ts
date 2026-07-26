@@ -6,12 +6,12 @@ import {
   ConfigFactory,
   Config,
   VuuSslByCertAndKey,
+  LoginTokenService,
 } from "@heswell/vuu-server";
 import { PricesModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
 import { TestModule } from "./modules/test/TestModule";
-import { LoginTokenService } from "@heswell/vuu-server/src/net/auth/LoginTokenService";
 // import { EditableModule } from "./modules/editable";
 // import { PermissionModule } from "./modules/permission";
 // import { BasketModule } from "./modules/baskets";

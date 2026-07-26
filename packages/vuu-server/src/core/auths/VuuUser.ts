@@ -17,3 +17,16 @@ export const VuuUser = (username: string): VuuUser => {
   const now = Date.now();
   return new VuuUserImpl(username, new Date(now + ONE_MINUTE), []);
 };
+
+export const VuuUserWithAuthorizations = (
+  username: string,
+  authorizations: string[] = [],
+  expiry?: Date,
+): VuuUser => {
+  const now = Date.now();
+  return new VuuUserImpl(
+    username,
+    expiry ?? new Date(now + ONE_MINUTE),
+    authorizations,
+  );
+};

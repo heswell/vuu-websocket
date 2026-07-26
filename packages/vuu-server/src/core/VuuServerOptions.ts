@@ -1,7 +1,15 @@
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { ViewServerModule } from "./module/VsModule";
 
-export type HttpServerOptions = {};
+export type HttpRequestHandler = (
+  req: Request,
+  url: URL,
+) => Promise<Response | undefined> | Response | undefined;
+
+export type HttpServerOptions = {
+  httpsPort?: number;
+  requestHandler?: HttpRequestHandler;
+};
 
 export interface VuuWebSocketOptions  {
   maxSessionsPerUser?: number;

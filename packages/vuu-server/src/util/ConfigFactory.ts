@@ -209,11 +209,58 @@ function parseConfigFile(filePath: string): Map<string, ConfigValue> {
     }
 
     const key = trimmed.slice(0, separatorIndex).trim();
-    const rawValue = trimmed.slice(separatorIndex + 1).trim();
+    const rawValue = stripInlineComment(trimmed.slice(separatorIndex + 1)).trim();
     values.set(key, parseValue(rawValue));
   }
 
   return values;
+}
+
+function stripInlineComment(input: string): string {
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (!inDoubleQuote && ch === "'") {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (!inSingleQuote && ch === '"') {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (inSingleQuote || inDoubleQuote) {
+      continue;
+    }
+
+    const prev = i > 0 ? input[i - 1] : " ";
+    const prevIsWhitespace = /\s/.test(prev);
+
+    if (ch === "#" && prevIsWhitespace) {
+      return input.slice(0, i).trimEnd();
+    }
+
+    if (ch === "/" && input[i + 1] === "/" && prevIsWhitespace) {
+      return input.slice(0, i).trimEnd();
+    }
+  }
+
+  return input;
 }
 
 function parseValue(rawValue: string): ConfigValue {

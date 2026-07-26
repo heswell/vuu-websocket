@@ -25,6 +25,7 @@ export class WebSocketServer {
           // if the upgrade succeeds
           return undefined;
         }
+        return new Response("Not found", { status: 404 });
       },
       websocket: BunWebSocketConnectionHandler(options, factory.create()),
     });
