@@ -77,7 +77,7 @@ export class CoreServerApiHandler implements ServerApi {
     private providers: ProviderContainer,
   ) {}
 
-  process({ requestId, body }: VuuClientMessage, ctx: RequestContext) {
+  async process({ requestId, body }: VuuClientMessage, ctx: RequestContext) {
     switch (body.type) {
       case "HB_RESP":
         // do nothing
@@ -259,7 +259,10 @@ export class CoreServerApiHandler implements ServerApi {
     }
   }
 
-  private processRpcRequest(msg: VuuRpcServiceRequest, ctx: RequestContext) {
+  private async processRpcRequest(
+    msg: VuuRpcServiceRequest,
+    ctx: RequestContext,
+  ) {
     if (hasViewPortContext(msg)) {
       console.log(`[CoreServerApiHandler] RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`)
       return this.handleViewportRpcRequest(msg, msg.context.viewPortId, ctx);
@@ -276,13 +279,13 @@ export class CoreServerApiHandler implements ServerApi {
       );
     }
   }
-  private handleViewportRpcRequest(
+  private async handleViewportRpcRequest(
     msg: VuuRpcServiceRequest<ViewportRpcContext>,
     viewPortId: string,
     ctx: RequestContext,
   ) {
     try {
-      const rpcResult = this.viewPortContainer.handleRpcRequest(
+      const rpcResult = await this.viewPortContainer.handleRpcRequest(
         viewPortId,
         msg.rpcName,
         msg.params,

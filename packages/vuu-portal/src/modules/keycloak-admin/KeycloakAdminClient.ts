@@ -54,6 +54,36 @@ const KeycloakConfigKeys = {
   clientSecret: "vuu.keycloak.clientSecret",
 } as const;
 
+type UserRef = {
+  userId?: string;
+  username?: string;
+};
+
+type GroupRef = {
+  groupId?: string;
+  groupName?: string;
+};
+
+type RoleRef = {
+  roleId?: string;
+  roleName?: string;
+};
+
+type AddUserParams = {
+  username: string;
+  email?: string;
+  enabled?: boolean;
+};
+
+type AddRoleParams = {
+  name: string;
+  description?: string;
+};
+
+type AddGroupParams = {
+  name: string;
+};
+
 export class KeycloakAdminClient {
   private constructor(
     private readonly baseUrl: string,
@@ -109,6 +139,70 @@ export class KeycloakAdminClient {
     return client;
   }
 
+  async addUser({ username, email, enabled = true }: AddUserParams) {
+    await this.requestNoContent(this.realmUrl("/users"), {
+      method: "POST",
+      body: JSON.stringify({
+        username,
+        email,
+        enabled,
+      }),
+      expectedStatuses: [201, 204],
+    });
+  }
+
+  async addRole({ name, description = "" }: AddRoleParams) {
+    await this.requestNoContent(this.realmUrl("/roles"), {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        description,
+      }),
+      expectedStatuses: [201, 204],
+    });
+  }
+
+  async addGroup({ name }: AddGroupParams) {
+    await this.requestNoContent(this.realmUrl("/groups"), {
+      method: "POST",
+      body: JSON.stringify({ name }),
+      expectedStatuses: [201, 204],
+    });
+  }
+
+  async addRoleToGroup(groupRef: GroupRef, roleRef: RoleRef) {
+    const group = await this.resolveGroup(groupRef);
+    const role = await this.resolveRole(roleRef);
+    await this.requestNoContent(
+      this.realmUrl(`/groups/${encodeURIComponent(group.id)}/role-mappings/realm`),
+      {
+        method: "POST",
+        body: JSON.stringify([
+          {
+            id: role.id,
+            name: role.name,
+            description: role.description ?? "",
+          },
+        ]),
+        expectedStatuses: [204],
+      },
+    );
+  }
+
+  async addUserToGroup(userRef: UserRef, groupRef: GroupRef) {
+    const user = await this.resolveUser(userRef);
+    const group = await this.resolveGroup(groupRef);
+    await this.requestNoContent(
+      this.realmUrl(
+        `/users/${encodeURIComponent(user.id)}/groups/${encodeURIComponent(group.id)}`,
+      ),
+      {
+        method: "PUT",
+        expectedStatuses: [204],
+      },
+    );
+  }
+
   async listSeedUsers() {
     const users = await Promise.all(
       SEEDED_USERNAMES.map((username) => this.findUserByUsername(username)),
@@ -149,6 +243,66 @@ export class KeycloakAdminClient {
   async listRolesForGroup(groupId: string) {
     return this.requestJson<KeycloakRole[]>(
       this.realmUrl(`/groups/${encodeURIComponent(groupId)}/role-mappings/realm`),
+    );
+  }
+
+  private async resolveUser({ userId, username }: UserRef) {
+    if (userId) {
+      return this.requestJson<KeycloakUser>(
+        this.realmUrl(`/users/${encodeURIComponent(userId)}`),
+      );
+    }
+
+    if (!username) {
+      throw new Error("Expected userId or username");
+    }
+
+    const user = await this.findUserByUsername(username);
+    if (!user) {
+      throw new Error(`Keycloak user not found: ${username}`);
+    }
+    return user;
+  }
+
+  private async resolveGroup({ groupId, groupName }: GroupRef) {
+    if (groupId) {
+      return this.requestJson<KeycloakGroup>(
+        this.realmUrl(`/groups/${encodeURIComponent(groupId)}`),
+      );
+    }
+
+    if (!groupName) {
+      throw new Error("Expected groupId or groupName");
+    }
+
+    const groups = await this.requestJson<KeycloakGroup[]>(
+      this.realmUrl(
+        `/groups?search=${encodeURIComponent(groupName)}&briefRepresentation=true&max=200`,
+      ),
+    );
+    const group = groups.find((candidate) => candidate.name === groupName);
+    if (!group) {
+      throw new Error(`Keycloak group not found: ${groupName}`);
+    }
+    return group;
+  }
+
+  private async resolveRole({ roleId, roleName }: RoleRef) {
+    if (roleId) {
+      const allRoles = await this.requestJson<KeycloakRole[]>(this.realmUrl("/roles"));
+      const role = allRoles.find((candidate) => candidate.id === roleId);
+      if (!role) {
+        throw new Error(`Keycloak role not found for id: ${roleId}`);
+      }
+      return role;
+    }
+
+    if (!roleName) {
+      throw new Error("Expected roleId or roleName");
+    }
+
+    return this.requestJson<KeycloakRole>(
+      this.realmUrl(`/roles/${encodeURIComponent(roleName)}`),
     );
   }
 
@@ -198,6 +352,30 @@ export class KeycloakAdminClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  private async requestNoContent(
+    url: string,
+    options: {
+      body?: string;
+      expectedStatuses: number[];
+      method: "POST" | "PUT" | "DELETE";
+    },
+  ) {
+    const response = await fetch(url, {
+      method: options.method,
+      body: options.body,
+      headers: {
+        ...this.headers,
+      },
+    });
+
+    if (!options.expectedStatuses.includes(response.status)) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Keycloak request failed for ${url}: ${response.status} ${response.statusText}${body ? ` - ${body}` : ""}`,
+      );
+    }
   }
 
   private get headers() {

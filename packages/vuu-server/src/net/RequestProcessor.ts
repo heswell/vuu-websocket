@@ -49,7 +49,7 @@ export class RequestProcessor {
     private vuuServerId: string,
   ) {}
 
-  handle(msg: VuuClientMessage, channel: Channel) {
+  async handle(msg: VuuClientMessage, channel: Channel) {
     if (msg.body.type === "LOGIN") {
       try {
         const vuuUser = this.loginTokenService.login(msg.body);
@@ -116,7 +116,10 @@ export class RequestProcessor {
       this.moduleContainer,
     );
 
-  private handleViewServerMessage(msg: VuuClientMessage, channel: Channel) {
+  private async handleViewServerMessage(
+    msg: VuuClientMessage,
+    channel: Channel,
+  ) {
     // console.log(
     //   `[RequestProcessor] handleViewServerMessage ${JSON.stringify(msg)}`,
     // );

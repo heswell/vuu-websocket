@@ -41,10 +41,10 @@ export class ViewServerHandler {
     console.log("closing session on disconnect");
   }
 
-  handle(inbound: string, channel: Channel) {
+  async handle(inbound: string, channel: Channel) {
     // console.log(`[ViewServerHandler] handle inbound ${inbound}`);
     const viewServerMessage = JSON.parse(inbound) as VuuClientMessage;
-    const response = this.processor.handle(viewServerMessage, channel);
+    const response = await this.processor.handle(viewServerMessage, channel);
     if (response) {
       const serializedResponse = JSON.stringify(response);
       // console.log(`[ViewServerHandler] send outbound  ${serializedResponse}`);

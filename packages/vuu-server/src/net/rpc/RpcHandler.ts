@@ -11,7 +11,10 @@ import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 export type RpcHandlerFunc = (vuuServer: VuuServer) => RpcHandler;
 
 export class RpcHandler {
-  processRpcRequest(rpcName: string, _rpcParams: RpcParams): RpcResult {
+  processRpcRequest(
+    rpcName: string,
+    _rpcParams: RpcParams,
+  ): RpcResult | Promise<RpcResult> {
     return {
       type: "ERROR_RESULT",
       errorMessage: `rpc service ${rpcName} not implemented`,
