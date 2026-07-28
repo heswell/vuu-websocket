@@ -44,6 +44,7 @@ export const rolesTable = TableDef({
 export const userGroupRolesTable = TableDef({
   columns: [
     { name: "id", dataType: "string" },
+    { name: "user_id", dataType: "string" },
     { name: "username", dataType: "string" },
     { name: "email", dataType: "string" },
     { name: "enabled", dataType: "string" },

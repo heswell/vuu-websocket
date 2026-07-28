@@ -28,6 +28,7 @@ export class KeycloakUserGroupRolesProvider extends Provider {
           const timestamp = Date.now();
           rows.push([
             id,
+            user.id,
             user.username,
             user.email ?? "",
             `${user.enabled ?? false}`,
