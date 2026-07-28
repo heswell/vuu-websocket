@@ -1,10 +1,12 @@
 import { Column, ModuleFactory, ViewPortDef } from "@heswell/vuu-server";
 import {
+  groupRolesTable,
   groupsTable,
   rolesTable,
   userGroupRolesTable,
   usersTable,
 } from "./KeycloakAdminTableDefs";
+import { KeycloakGroupRolesProvider } from "./providers/KeycloakGroupRolesProvider";
 import { KeycloakGroupsProvider } from "./providers/KeycloakGroupsProvider";
 import { KeycloakRolesProvider } from "./providers/KeycloakRolesProvider";
 import { KeycloakUserGroupRolesProvider } from "./providers/KeycloakUserGroupRolesProvider";
@@ -27,5 +29,6 @@ export const KeycloakAdminModule = () =>
     )
     .addTable(groupsTable, (table) => new KeycloakGroupsProvider(table))
     .addTable(rolesTable, (table) => new KeycloakRolesProvider(table))
+    .addTable(groupRolesTable, (table) => new KeycloakGroupRolesProvider(table))
     .addTable(userGroupRolesTable, (table) => new KeycloakUserGroupRolesProvider(table))
     .asModule();
