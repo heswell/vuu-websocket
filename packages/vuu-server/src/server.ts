@@ -6,6 +6,7 @@ import path from "path";
 import { type Authenticator } from "./net/auth/Authenticator";
 import { AuthenticatorWithUserList } from "./net/auth/AuthenticatorWithUserList";
 import loginTokenService from "./net/LoginTokenService";
+import { ConfigFactory } from "./util/ConfigFactory";
 
 const PRIORITY_UPDATE_FREQUENCY = 20;
 const CLIENT_UPDATE_FREQUENCY = 120;
@@ -17,7 +18,9 @@ const msgConfig: ServerMessagingConfig = {
   PRIORITY_UPDATE_FREQUENCY,
 };
 
-const WS_PORT = process.env.WEBSOCKET_PORT ?? 8090;
+const CONFIG_KEYS = {
+  port: "vuu.port",
+} as const;
 
 export interface WebsocketData {
   sessionId: string;
@@ -30,11 +33,13 @@ const authenticator: Authenticator = new AuthenticatorWithUserList(
 
 export default async function start(vuuServer: VuuServer) {
   const certsPath = path.join(import.meta.dir, "../certs");
+  const config = ConfigFactory.load();
+  const websocketPort = config.getNumber(CONFIG_KEYS.port, 8091);
 
   const websocketServer = Bun.serve({
     certFile: `${certsPath}/cert.pem`,
     keyFile: `${certsPath}/key.pem`,
-    port: WS_PORT,
+    port: websocketPort,
 
     async fetch(req, server) {
       const sessionId = uuid();

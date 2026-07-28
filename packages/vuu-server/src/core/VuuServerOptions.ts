@@ -48,7 +48,7 @@ class VuuWebSocketOptionsImpl implements  VuuWebSocketOptions {
   withUri = (uri: string) => VuuWebSocketOptions(this.wsPort, uri, this.sslOptions, this.maxSessionsPerUser);
 }
 
-export const VuuWebSocketOptions = (wsPort = 8090, 
+export const VuuWebSocketOptions = (wsPort = 8091, 
     uri = "/websocket", 
     sslOptions: VuuSSLOptions = "ssl-disabled",
     maxSessionsPerUser = 1) : VuuWebSocketOptions =>

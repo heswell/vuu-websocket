@@ -19,11 +19,14 @@ const ConfigKeys = {
   sslEnabled: "vuu.ssl",
   certPath: "vuu.certPath",
   keyPath: "vuu.keyPath",
+  port: "vuu.port",
   keycloakSyncIntervalMs: "vuu.keycloak.sync.intervalMs",
 } as const;
 
 function createWebSocketOptions(config: Config): VuuWebSocketOptions {
-  const options = VuuWebSocketOptions().withUri("websocket").withWsPort(8090);
+  const options = VuuWebSocketOptions()
+    .withUri("websocket")
+    .withWsPort(config.getNumber(ConfigKeys.port, 8091));
 
   if (config.getBoolean(ConfigKeys.sslEnabled)) {
     return options.withSsl(
