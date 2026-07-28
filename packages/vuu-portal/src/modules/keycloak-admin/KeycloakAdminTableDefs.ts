@@ -41,6 +41,19 @@ export const rolesTable = TableDef({
   name: "roles",
 });
 
+export const groupRolesTable = TableDef({
+  columns: [
+    { name: "id", dataType: "string" },
+    { name: "group_id", dataType: "string" },
+    { name: "group_name", dataType: "string" },
+    { name: "role_id", dataType: "string" },
+    { name: "role_name", dataType: "string" },
+    ...VUU_AUDIT_COLUMNS,
+  ],
+  keyField: "id",
+  name: "group_roles",
+});
+
 export const userGroupRolesTable = TableDef({
   columns: [
     { name: "id", dataType: "string" },
