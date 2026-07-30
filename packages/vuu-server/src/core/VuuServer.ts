@@ -78,7 +78,14 @@ export class VuuServer {
     );
 
     // TODO do we need these ?
-    this.providerContainer.start(this.tableContainer);
+    const providerStartRunner = new LifeCycleRunner(
+      "providerStart",
+      async () => {
+        await this.providerContainer.start(this.tableContainer);
+      },
+      0,
+    );
+    lifecycle.apply(providerStartRunner);
     this.moduleContainer.start();
 
     new WebSocketServer(config.webSocketOptions, factory);

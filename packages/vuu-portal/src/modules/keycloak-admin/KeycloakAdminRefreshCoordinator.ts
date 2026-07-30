@@ -4,6 +4,7 @@ const KEYCLOAK_ADMIN_TABLES = [
   "users",
   "groups",
   "roles",
+  "group_roles",
   "user_group_roles",
 ] as const;
 

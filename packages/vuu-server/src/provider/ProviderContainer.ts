@@ -30,10 +30,18 @@ export class ProviderContainer {
     }
   }
 
-  start(tableContainer: TableContainer) {
+  async start(tableContainer: TableContainer) {
     console.log(`[ProviderContainer] start`);
-    this.#providersByTable.forEach(([, provider]) => {
-      provider.load(tableContainer);
+    const loadPromises: Promise<void>[] = [];
+    this.#providersByTable.forEach(([table, provider]) => {
+      const loadPromise = Promise.resolve(provider.load(tableContainer))
+        .catch((error) => {
+          console.error(
+            `[ProviderContainer] failed to load provider for table ${table.name}: ${(error as Error).message}`,
+          );
+        });
+      loadPromises.push(loadPromise);
     });
+    await Promise.all(loadPromises);
   }
 }
