@@ -6,6 +6,9 @@ import {
   Provider,
   VuuServer,
   TableContainer,
+  LifecycleContainer,
+  LoginTokenService,
+  VuuWebSocketOptions,
 } from "@heswell/vuu-server";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
@@ -83,20 +86,20 @@ export const defaultProviderProps = {
   startEmpty: false,
 };
 
-export function startTestModule(providerProps?: ProviderProps) {
+export async function startTestModule(providerProps?: ProviderProps) {
   const httpServerOptions = {};
-  const webSocketOptions = {
-    webSocketPort: process.env.WEBSOCKET_PORT ?? 8091,
-  };
+  const webSocketOptions = VuuWebSocketOptions().withWsPort(0);
+  const lifecycle = new LifecycleContainer();
 
   const config = VuuServerConfig(
+    webSocketOptions,
     httpServerOptions,
-    webSocketOptions
+    LoginTokenService(),
   ).withModule(TestModule(providerProps));
 
-  const vuuServer = new MockVuuServer(config);
+  const vuuServer = new MockVuuServer(config, lifecycle);
 
-  vuuServer.start();
+  await lifecycle.start();
 
-  return vuuServer;
+  return { lifecycle, vuuServer };
 }

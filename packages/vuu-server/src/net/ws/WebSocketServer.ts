@@ -1,21 +1,35 @@
-import { uuid } from "@vuu-ui/vuu-utils";
 import { sslEnabled, VuuWebSocketOptions } from "../../core/VuuServerOptions";
 import { type ViewServerHandlerFactory } from "../ViewServerHandler";
 import { BunWebSocketConnectionHandler } from "./BunWebSocketConnectionHandler";
 
 export class WebSocketServer {
-  constructor(
-    { sslOptions, wsPort, ...options }: VuuWebSocketOptions,
-    factory: ViewServerHandlerFactory,
-  ) {
+  #server: Bun.Server<unknown> | undefined;
 
-    const websocketServer = Bun.serve({
-      certFile: sslEnabled(sslOptions) ? sslOptions.certPath : undefined,
-      keyFile: sslEnabled(sslOptions) ? sslOptions.keyPath : undefined,
+  constructor(
+    private readonly webSocketOptions: VuuWebSocketOptions,
+    private readonly factory: ViewServerHandlerFactory,
+  ) {}
+
+  get port() {
+    return this.#server?.port;
+  }
+
+  start() {
+    if (this.#server) {
+      return;
+    }
+    const { sslOptions, wsPort, ...options } = this.webSocketOptions;
+    this.#server = Bun.serve({
       port: wsPort,
+      tls: sslEnabled(sslOptions)
+        ? {
+            cert: Bun.file(sslOptions.certPath),
+            key: Bun.file(sslOptions.keyPath),
+          }
+        : undefined,
 
       async fetch(req, server) {
-        const sessionId = uuid();
+        const sessionId = crypto.randomUUID();
         console.log(
           `[VUU:server] websocket upgrade request sessionId ${sessionId}`,
         );
@@ -27,17 +41,20 @@ export class WebSocketServer {
         }
         return new Response("Not found", { status: 404 });
       },
-      websocket: BunWebSocketConnectionHandler(options, factory.create()),
+      websocket: BunWebSocketConnectionHandler(options, this.factory.create()),
     });
 
     console.log(
-      `[VUU] Websocket listening on ${websocketServer.hostname}:${websocketServer.port}`,
+      `[VUU] Websocket listening on ${this.#server.hostname}:${this.#server.port}`,
     );
+  }
 
-    // TODO WebSocketserver needs run via LIfecycle container
-    process.on("SIGINT", () => {
-      websocketServer.stop();
-      process.exit();
-    });
+  async stop() {
+    const server = this.#server;
+    if (!server) {
+      return;
+    }
+    this.#server = undefined;
+    await server.stop(true);
   }
 }

@@ -1,0 +1,2 @@
+[test]
+preload = ["./packages/vuu-server/__tests__/setup.ts"]

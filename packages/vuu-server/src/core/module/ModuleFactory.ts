@@ -111,7 +111,7 @@ function ModuleFactoryNode(
       ),
     addSessionTable: (
       tableDef: TableDef,
-      providerFactory: ProviderFactory = () => NullProvider,
+      providerFactory: ProviderFactory = (table) => new NullProvider(table),
       serviceFactory?: ServiceFactory,
     ) => {
       if (serviceFactory) {

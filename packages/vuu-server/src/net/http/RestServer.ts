@@ -7,10 +7,22 @@ import {
 const DEFAULT_REST_HTTPS_PORT = 8443;
 
 export class RestServer {
+  #server: Bun.Server<unknown> | undefined;
+
   constructor(
-    { sslOptions }: VuuWebSocketOptions,
-    { requestHandler, httpsPort = DEFAULT_REST_HTTPS_PORT }: HttpServerOptions,
-  ) {
+    private readonly webSocketOptions: VuuWebSocketOptions,
+    private readonly httpServerOptions: HttpServerOptions,
+  ) {}
+
+  start() {
+    if (this.#server) {
+      return;
+    }
+    const { sslOptions } = this.webSocketOptions;
+    const {
+      requestHandler,
+      httpsPort = DEFAULT_REST_HTTPS_PORT,
+    } = this.httpServerOptions;
     if (!requestHandler) {
       return;
     }
@@ -21,10 +33,12 @@ export class RestServer {
       );
     }
 
-    const restServer = Bun.serve({
-      certFile: sslOptions.certPath,
-      keyFile: sslOptions.keyPath,
+    this.#server = Bun.serve({
       port: httpsPort,
+      tls: {
+        cert: Bun.file(sslOptions.certPath),
+        key: Bun.file(sslOptions.keyPath),
+      },
       async fetch(req) {
         const url = new URL(req.url);
         const response = await requestHandler(req, url);
@@ -37,11 +51,16 @@ export class RestServer {
     });
 
     console.log(
-      `[VUU] REST listening on https://${restServer.hostname}:${restServer.port}`,
+      `[VUU] REST listening on https://${this.#server.hostname}:${this.#server.port}`,
     );
+  }
 
-    process.on("SIGINT", () => {
-      restServer.stop();
-    });
+  async stop() {
+    const server = this.#server;
+    if (!server) {
+      return;
+    }
+    this.#server = undefined;
+    await server.stop(true);
   }
 }

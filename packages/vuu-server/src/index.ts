@@ -1,16 +1,21 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
 export type { TableContainer } from "./core/table/TableContainer";
-export type { ProviderContainer } from "./provider/ProviderContainer";
-export { Provider, RemoteProvider } from "./provider/Provider";
+export { ProviderContainer } from "./provider/ProviderContainer";
+export { NullProvider, Provider, RemoteProvider } from "./provider/Provider";
+export type {
+  IProvider,
+  ProviderFactory,
+  RemoteResourceLoad,
+} from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
 export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
-export type {
+export {
   JoinTableProvider,
-  JoinEventType,
 } from "./provider/JoinTableProvider";
+export type { JoinEventType } from "./provider/JoinTableProvider";
 export type {
   DataTableDefinition,
   TableColumn,
@@ -25,7 +30,8 @@ export { NoAction } from "./viewport/ViewPortAction";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
 export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";
-export { LifecycleContainer } from "./toolbox/thread/LifecycleContainer";
+export * from "./toolbox/thread/LifecycleContainer";
+export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";
 export { ConfigFactory } from "./util/ConfigFactory";
 export type { Config } from "./util/ConfigFactory";
 export { LoginTokenService } from "./net/auth/LoginTokenService";

@@ -61,6 +61,10 @@ export class ViewServerModule {
     console.log(`[Module] start #${this.#name}`);
   }
 
+  async stop() {
+    console.log(`[Module] stop #${this.#name}`);
+  }
+
   get tableDefs() {
     return this.#tableDefs;
   }

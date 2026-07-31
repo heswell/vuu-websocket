@@ -1,3 +1,3 @@
 import start from "@heswell/vuu-portal";
 
-start();
+await start();

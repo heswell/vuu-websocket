@@ -30,60 +30,91 @@ export const loadTableFromRemoteResource = async ({
   resource,
   url,
   table,
+  signal,
 }: {
   columns?: string[];
   remoteResourceMessageType?: RemoteResourceMessageType[];
   resource: string;
+  signal?: AbortSignal;
   table: Table;
   url: string;
 }) => {
   const requestSnapshot = remoteResourceMessageType.includes("snapshot");
   const requestInserts = remoteResourceMessageType.includes("insert");
   const requestUpdates = remoteResourceMessageType.includes("update");
-  let { promise, resolve, reject } = Promise.withResolvers<number>();
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
   let socketStatus: "init" | "open" | "closed" | "data-load-complete" = "init";
-  try {
+  let socket: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let terminal = false;
+
+  const close = () => {
+    terminal = true;
+    if (reconnectTimer !== undefined) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+    }
+    socket?.close();
+    socket = null;
+    signal?.removeEventListener("abort", close);
+    if (signal?.aborted && socketStatus !== "data-load-complete") {
+      reject(
+        new Error(
+          `[service-utils:loadTableFromRemoteResource] aborted ${resource} at ${url}`,
+        ),
+      );
+    }
+  };
+
+  signal?.addEventListener("abort", close, { once: true });
+  if (signal?.aborted) {
+    close();
+    return promise;
+  }
+
+  const connect = () => {
+    if (signal?.aborted) {
+      return;
+    }
     console.log(
       `[service-utils:loadTableFromRemoteResource] connect to ${url} (${resource} service)`
     );
-    // const socketTimeout = setTimeout(() => {
-    //   if (socketStatus === "init") {
-    //     console.log("no connection after 5 seconds, closing socket");
-    //     socket.close();
-    //   }
-    // }, 5000);
 
-    let socket: WebSocket | null = new WebSocket(url);
+    socket = new WebSocket(url);
 
     socket.addEventListener("message", (evt) => {
-      const message = JSON.parse(evt.data as string) as ResourceMessage;
+      if (terminal || signal?.aborted) {
+        return;
+      }
+      try {
+        const message = JSON.parse(evt.data as string) as ResourceMessage;
 
-      if (message.type === "snapshot-count") {
-        console.log(
-          `[service-utils:loadTableFromRemoteResource] final snapshot  ${message.count} ${resource} rows received`
-        );
-        socketStatus = "data-load-complete";
+        if (message.type === "snapshot-count") {
+          console.log(
+            `[service-utils:loadTableFromRemoteResource] final snapshot  ${message.count} ${resource} rows received`,
+          );
+          socketStatus = "data-load-complete";
 
-        if (!requestUpdates && !requestInserts) {
-          socket?.close();
+          if (!requestUpdates && !requestInserts) {
+            socket?.close();
+          }
+          resolve(message.count);
+        } else if (message.type === "snapshot-batch") {
+          for (const row of message.rows) {
+            table.insert(row);
+          }
+        } else if (message.type === "insert") {
+          table.insert(message.row);
+        } else if (message.type === "inserts") {
+          console.log(`inserts received`);
+        } else {
+          throw Error(
+            `[service-utils] unexpected message from remote resource service`,
+          );
         }
-        // Promise is resolved when initial data load completes, updates, inserts and deletes,
-        // if requested, continue to be processed.
-        // TODO - in which case we should also return a 'stop' command
-        resolve(message.count);
-      } else if (message.type === "snapshot-batch") {
-        for (const row of message.rows) {
-          table.insert(row);
-        }
-      } else if (message.type === "insert") {
-        table.insert(message.row);
-      } else if (message.type === "inserts") {
-        console.log(`inserts received`);
-      } else {
-        console.log({ message });
-        throw Error(
-          `[service-utils] unexpected message from remote resource service`
-        );
+      } catch (error: unknown) {
+        close();
+        reject(error);
       }
     });
 
@@ -94,16 +125,16 @@ export const loadTableFromRemoteResource = async ({
       );
       if (requestSnapshot && requestInserts) {
         socket?.send(
-          JSON.stringify({ type: "subscription", columns, resource })
+          JSON.stringify({ type: "subscription", columns, resource }),
         );
       } else if (requestSnapshot) {
         socket?.send(JSON.stringify({ type: "snapshot", columns, resource }));
       }
     });
 
-    socket.addEventListener("error", (evt) => {
-      console.log(
-        `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url} `
+    socket.addEventListener("error", () => {
+      console.error(
+        `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url}`,
       );
     });
     socket.addEventListener("close", () => {
@@ -113,17 +144,23 @@ export const loadTableFromRemoteResource = async ({
         `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`
       );
       socket = null;
-      if (socketStatus !== "data-load-complete") {
-        setTimeout(() => {
-          loadTableFromRemoteResource({ columns, resource, url, table });
-        }, 1000);
+      if (
+        socketStatus !== "data-load-complete" &&
+        !signal?.aborted &&
+        !terminal
+      ) {
+        reconnectTimer = setTimeout(connect, 1000);
       }
     });
-  } catch (err) {
+  };
+
+  try {
+    connect();
+  } catch (error: unknown) {
     console.log(
-      `[service-utils:loadTableFromRemoteResource] unable to connect to ${url}`
+      `[service-utils:loadTableFromRemoteResource] unable to connect to ${url}`,
     );
-    reject(err);
+    reject(error);
   }
 
   return promise;

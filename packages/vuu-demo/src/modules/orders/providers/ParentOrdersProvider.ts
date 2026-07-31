@@ -7,14 +7,20 @@ let messageCount = 0;
 
 export class ParentOrdersProvider extends Provider {
   #loadPromise: Promise<void> | undefined;
-  async load() {
+  #socket: WebSocket | undefined;
+  #loadSettled = false;
+  #rejectLoad: ((reason?: unknown) => void) | undefined;
+
+  load() {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
+        this.#rejectLoad = reject;
         console.log(
           `[ORDERS:module:OrdersProvider] load parent orders, subscribing to orders service on ${ordersServiceUrl}`
         );
         try {
           const socket = new WebSocket(ordersServiceUrl);
+          this.#socket = socket;
           socket.addEventListener("message", (evt) => {
             const serviceMessage = JSON.parse(evt.data as string) as
               | ResourceMessage
@@ -44,6 +50,8 @@ export class ParentOrdersProvider extends Provider {
                   `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${serviceMessage.count} rows loaded`
                 );
                 this.loaded = true;
+                this.#loadSettled = true;
+                this.#rejectLoad = undefined;
                 resolve();
                 // } else if (orderServiceMessage.type === "insert") {
                 //   this.table.upsert(orderServiceMessage.data);
@@ -63,18 +71,41 @@ export class ParentOrdersProvider extends Provider {
               JSON.stringify({ type: "subscribe", resource: "parentOrders" })
             );
           });
+          socket.addEventListener("error", () => {
+            this.failLoad(
+              new Error(
+                `[ORDERS:module:OrdersProvider] unable to connect to ${ordersServiceUrl}`,
+              ),
+            );
+          });
+          socket.addEventListener("close", () => {
+            this.failLoad(
+              new Error(
+                `[ORDERS:module:OrdersProvider] websocket closed before initial snapshot`,
+              ),
+            );
+          });
         } catch (err) {
-          reject(err);
+          this.failLoad(err);
         }
-
-        resolve();
       });
+    }
+    return this.#loadPromise;
+  }
 
-      return this.#loadPromise;
-    } else {
-      throw Error(
-        "[ORDERS:module:OrdersProvider] load has already been called"
-      );
+  doStop() {
+    this.failLoad(
+      new Error("[ORDERS:module:OrdersProvider] stopped before initial snapshot"),
+    );
+    this.#socket?.close();
+    this.#socket = undefined;
+  }
+
+  private failLoad(error: unknown) {
+    if (!this.#loadSettled) {
+      this.#loadSettled = true;
+      this.#rejectLoad?.(error);
+      this.#rejectLoad = undefined;
     }
   }
 }

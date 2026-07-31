@@ -8,16 +8,21 @@ let messageCount = 0;
 
 export class PricesProvider extends Provider {
   #loadPromise: Promise<void> | undefined;
+  #socket: WebSocket | undefined;
+  #loadSettled = false;
+  #rejectLoad: ((reason?: unknown) => void) | undefined;
 
   constructor(table: Table) {
     super(table);
   }
 
-  async load() {
+  load() {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
+        this.#rejectLoad = reject;
         try {
           const socket = new WebSocket(priceServiceUrl);
+          this.#socket = socket;
           socket.addEventListener("message", (evt) => {
             const serviceMessage = JSON.parse(evt.data as string) as
               | ResourceMessage
@@ -45,6 +50,8 @@ export class PricesProvider extends Provider {
                 //   `[PRICES:module:PricesProvider] snapshot received, ${priceServiceMessage.count} rows loaded`
                 // );
                 this.loaded = true;
+                this.#loadSettled = true;
+                this.#rejectLoad = undefined;
                 resolve();
                 // } else if (orderServiceMessage.type === "insert") {
                 //   this.table.upsert(orderServiceMessage.data);
@@ -57,12 +64,19 @@ export class PricesProvider extends Provider {
             }
           });
           socket.addEventListener("error", (event) => {
-            logger.info(
-              `[PRICES:module:PricesProvider] error subscribing to all prices`
+            this.failLoad(
+              new Error(
+                `[PRICES:module:PricesProvider] error subscribing to all prices`,
+              ),
             );
           });
           socket.addEventListener("close", (event) => {
             logger.info(`[PRICES:module:PricesProvider] websocket closed`);
+            this.failLoad(
+              new Error(
+                `[PRICES:module:PricesProvider] websocket closed before initial snapshot`,
+              ),
+            );
           });
           socket.addEventListener("open", (event) => {
             console.log(
@@ -76,16 +90,26 @@ export class PricesProvider extends Provider {
           console.log(
             `[PRICES:module:PricesProvider] unable to connect to ${priceServiceUrl}`
           );
-          reject(err);
+          this.failLoad(err);
         }
-
-        resolve();
       });
-      return this.#loadPromise;
-    } else {
-      throw Error(
-        "[PRICES:module:PricesProvider] load has already been called"
-      );
+    }
+    return this.#loadPromise;
+  }
+
+  doStop() {
+    this.failLoad(
+      new Error("[PRICES:module:PricesProvider] stopped before initial snapshot"),
+    );
+    this.#socket?.close();
+    this.#socket = undefined;
+  }
+
+  private failLoad(error: unknown) {
+    if (!this.#loadSettled) {
+      this.#loadSettled = true;
+      this.#rejectLoad?.(error);
+      this.#rejectLoad = undefined;
     }
   }
 }

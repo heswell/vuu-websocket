@@ -2,6 +2,7 @@ import { Table } from "@heswell/data";
 import { JoinTable } from "../core/table/JoinTable";
 import { JoinTableDef } from "../api/TableDef";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { DefaultLifecycleEnabled } from "../toolbox/thread/LifecycleContainer";
 
 export type JoinEventType = "insert" | "update" | "delete";
 
@@ -9,8 +10,11 @@ class JoinDefToJoinTable {
   constructor(public joinDef: JoinTableDef, public table: JoinTable) {}
 }
 
-export class JoinTableProvider {
+export class JoinTableProvider extends DefaultLifecycleEnabled {
+  readonly lifecycleId = "vuuJoinTableProvider";
+
   constructor() {
+    super();
     console.log("create JoinTableProvider");
   }
 

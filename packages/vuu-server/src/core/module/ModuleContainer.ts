@@ -13,9 +13,29 @@ export class ModuleContainer {
     this.#modules.set(module.name, module);
   }
 
-  public start() {
+  public async start() {
     console.log(`[ModuleContainer] start ${this.#modules.size} modules`);
-    this.#modules.forEach((module) => module.start());
+    for (const module of this.#modules.values()) {
+      await module.start();
+    }
+  }
+
+  public async stop() {
+    console.log(`[ModuleContainer] stop ${this.#modules.size} modules`);
+    const errors: unknown[] = [];
+    for (const module of [...this.#modules.values()].toReversed()) {
+      try {
+        await module.stop();
+      } catch (error: unknown) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) {
+      throw errors[0];
+    }
+    if (errors.length > 1) {
+      throw new AggregateError(errors, "[ModuleContainer] stop failed");
+    }
   }
 
   get(name: string) {

@@ -1,5 +1,5 @@
 import { Table } from "@heswell/data";
-import { Module, Provider } from "@heswell/vuu-server";
+import { Provider, TableContainer } from "@heswell/vuu-server";
 import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { getRandom, random } from "../../../utils";
 import { accounts } from "../../../reference-data/accounts";
@@ -15,11 +15,11 @@ export class ParentOrdersProvider extends Provider {
   constructor(table: Table) {
     super(table);
   }
-  async load(module: Module) {
+  async load(tableContainer: TableContainer) {
     const {
       columnMap: { currency, exchange, ric },
       rows: instruments,
-    } = module.getTable("instruments");
+    } = tableContainer.getTable<Table>("instruments");
 
     const row: Record<string, VuuRowDataItemType> = {};
 

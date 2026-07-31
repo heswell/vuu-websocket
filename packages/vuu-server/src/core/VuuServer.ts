@@ -13,15 +13,16 @@ import { TableContainer } from "./table/TableContainer";
 import { CoreServerApiHandler } from "./CoreServerApiHandler";
 import { isDataTable } from "./table/InMemDataTable";
 import { ViewServerHandlerFactoryImpl } from "../net/ViewServerHandler";
-import { uuid } from "@vuu-ui/vuu-utils";
 import { ClientSessionContainer } from "../net/ClientSessionContainer";
 import { WebSocketServer } from "../net/ws/WebSocketServer";
 import { LifeCycleRunner } from "../toolbox/thread/LifeCycleRunner";
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
-import { FlowControllerFactory } from "../net/flowcontrol/FLowController";
+import { FlowControllerFactory } from "../net/flowcontrol/FlowController";
 import { RestServer } from "../net/http/RestServer";
+import { DefaultLifecycleEnabled } from "../toolbox/thread/LifecycleContainer";
 
-export class VuuServer {
+export class VuuServer extends DefaultLifecycleEnabled {
+  readonly lifecycleId = "vuuServer";
   protected providerContainer: ProviderContainer;
   public joinProvider: JoinTableProvider;
   public tableContainer: TableContainer;
@@ -29,16 +30,23 @@ export class VuuServer {
   public viewPortContainer: ViewportContainer;
   public moduleContainer: ModuleContainer;
 
-  private vuuServerId = uuid();
+  private vuuServerId = crypto.randomUUID();
+  readonly #webSocketServer: WebSocketServer;
+  readonly #restServer: RestServer | undefined;
 
   get providers() {
     return this.providerContainer;
   }
 
+  get webSocketPort() {
+    return this.#webSocketServer.port;
+  }
+
   constructor(
     { loginTokenService, modules, ...config }: VuuServerConfig,
-    lifecycle: LifecycleContainer,
+    private readonly lifecycle: LifecycleContainer,
   ) {
+    super();
     const flowControllerFactory: FlowControllerFactory =
       new FlowControllerFactory();
     // config.clientConnection.hasHeartbeat,
@@ -51,7 +59,11 @@ export class VuuServer {
 
     this.tableContainer = new TableContainer(this.joinProvider);
 
-    this.providerContainer = new ProviderContainer(this.joinProvider);
+    this.providerContainer = new ProviderContainer(
+      this.joinProvider,
+      this.tableContainer,
+      lifecycle,
+    );
 
     this.viewPortContainer = new ViewportContainer(
       this.tableContainer,
@@ -77,29 +89,49 @@ export class VuuServer {
       this.vuuServerId,
     );
 
-    // TODO do we need these ?
-    const providerStartRunner = new LifeCycleRunner(
-      "providerStart",
-      async () => {
-        await this.providerContainer.start(this.tableContainer);
-      },
-      0,
+    this.#webSocketServer = new WebSocketServer(
+      config.webSocketOptions,
+      factory,
     );
-    lifecycle.apply(providerStartRunner);
-    this.moduleContainer.start();
+    this.#restServer = config.httpServerOptions.requestHandler
+      ? new RestServer(config.webSocketOptions, config.httpServerOptions)
+      : undefined;
 
-    new WebSocketServer(config.webSocketOptions, factory);
-
-    if (config.httpServerOptions.requestHandler) {
-      new RestServer(config.webSocketOptions, config.httpServerOptions);
-    }
+    lifecycle.apply(this).dependsOn(this.providerContainer);
 
     const handlerRunner = new LifeCycleRunner(
       "sessionRunner",
       () => sessionContainer.runOnce(),
       60,
     );
-    lifecycle.apply(handlerRunner);
+    lifecycle.apply(handlerRunner).dependsOn(this);
+  }
+
+  async doStart() {
+    await this.moduleContainer.start();
+    this.#webSocketServer.start();
+    this.#restServer?.start();
+  }
+
+  async doStop() {
+    const errors: unknown[] = [];
+    for (const stop of [
+      () => this.#restServer?.stop(),
+      () => this.#webSocketServer.stop(),
+      () => this.moduleContainer.stop(),
+    ]) {
+      try {
+        await stop();
+      } catch (error: unknown) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) {
+      throw errors[0];
+    }
+    if (errors.length > 1) {
+      throw new AggregateError(errors, "[VuuServer] stop failed");
+    }
   }
 
   private createTable(tableDef: TableDef) {
