@@ -86,6 +86,7 @@ Configuration for auth:
 - vuu.keycloak.adminPassword (default admin)
 - vuu.keycloak.clientId (default portal)
 - vuu.keycloak.clientSecret (optional for confidential client)
+- vuu.keycloak.allowSelfSignedCert (default false; local development only)
 
 Alternative provider requirements:
 - when vuu.auth.mode=permissive, /api/authn must accept any non-empty username/password pair
