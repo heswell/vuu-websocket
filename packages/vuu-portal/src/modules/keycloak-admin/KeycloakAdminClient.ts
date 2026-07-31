@@ -26,6 +26,12 @@ export const SEEDED_GROUP_NAMES = [
 
 type TokenResponse = { access_token?: string };
 
+type BunFetchInit = RequestInit & {
+  tls?: {
+    rejectUnauthorized?: boolean;
+  };
+};
+
 type KeycloakUser = {
   id: string;
   username: string;
@@ -52,6 +58,7 @@ const KeycloakConfigKeys = {
   adminPassword: "vuu.keycloak.adminPassword",
   clientId: "vuu.keycloak.clientId",
   clientSecret: "vuu.keycloak.clientSecret",
+  allowSelfSignedCert: "vuu.keycloak.allowSelfSignedCert",
 } as const;
 
 type UserRef = {
@@ -89,6 +96,7 @@ export class KeycloakAdminClient {
     private readonly baseUrl: string,
     private readonly realm: string,
     private readonly token: string,
+    private readonly allowSelfSignedCert: boolean,
   ) {}
 
   static async createFromConfig() {
@@ -101,6 +109,10 @@ export class KeycloakAdminClient {
     const adminPassword = config.getString(KeycloakConfigKeys.adminPassword, "admin");
     const clientId = config.getString(KeycloakConfigKeys.clientId, "admin-cli");
     const clientSecret = config.getString(KeycloakConfigKeys.clientSecret, "");
+    const allowSelfSignedCert = config.getBoolean(
+      KeycloakConfigKeys.allowSelfSignedCert,
+      false,
+    );
 
     const body = new URLSearchParams({
       grant_type: "password",
@@ -112,7 +124,7 @@ export class KeycloakAdminClient {
       body.set("client_secret", clientSecret);
     }
 
-    const response = await fetch(
+    const response = await keycloakFetch(
       `${baseUrl}/realms/master/protocol/openid-connect/token`,
       {
         method: "POST",
@@ -121,6 +133,7 @@ export class KeycloakAdminClient {
         },
         body,
       },
+      allowSelfSignedCert,
     );
 
     if (!response.ok) {
@@ -134,7 +147,12 @@ export class KeycloakAdminClient {
       throw new Error("Keycloak token response missing access_token");
     }
 
-    const client = new KeycloakAdminClient(baseUrl, realm, tokenResponse.access_token);
+    const client = new KeycloakAdminClient(
+      baseUrl,
+      realm,
+      tokenResponse.access_token,
+      allowSelfSignedCert,
+    );
     await client.assertRealmExists();
     return client;
   }
@@ -320,9 +338,13 @@ export class KeycloakAdminClient {
   }
 
   private async assertRealmExists() {
-    const response = await fetch(this.realmUrl(""), {
-      headers: this.headers,
-    });
+    const response = await keycloakFetch(
+      this.realmUrl(""),
+      {
+        headers: this.headers,
+      },
+      this.allowSelfSignedCert,
+    );
 
     if (response.status === 404) {
       throw new Error(`Keycloak realm not found: ${this.realm}`);
@@ -336,13 +358,17 @@ export class KeycloakAdminClient {
   }
 
   private async requestJson<T>(url: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        ...this.headers,
-        ...(init.headers ?? {}),
+    const response = await keycloakFetch(
+      url,
+      {
+        ...init,
+        headers: {
+          ...this.headers,
+          ...(init.headers ?? {}),
+        },
       },
-    });
+      this.allowSelfSignedCert,
+    );
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
@@ -362,13 +388,17 @@ export class KeycloakAdminClient {
       method: "POST" | "PUT" | "DELETE";
     },
   ) {
-    const response = await fetch(url, {
-      method: options.method,
-      body: options.body,
-      headers: {
-        ...this.headers,
+    const response = await keycloakFetch(
+      url,
+      {
+        method: options.method,
+        body: options.body,
+        headers: {
+          ...this.headers,
+        },
       },
-    });
+      this.allowSelfSignedCert,
+    );
 
     if (!options.expectedStatuses.includes(response.status)) {
       const body = await response.text().catch(() => "");
@@ -384,4 +414,20 @@ export class KeycloakAdminClient {
       "Content-Type": "application/json",
     };
   }
+}
+
+function keycloakFetch(
+  url: string,
+  init: RequestInit,
+  allowSelfSignedCert: boolean,
+) {
+  const requestInit: BunFetchInit = { ...init };
+  if (url.startsWith("https://") && allowSelfSignedCert) {
+    requestInit.tls = {
+      ...(requestInit.tls ?? {}),
+      rejectUnauthorized: false,
+    };
+  }
+
+  return fetch(url, requestInit);
 }
