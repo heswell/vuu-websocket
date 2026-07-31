@@ -43,7 +43,10 @@ export class KeycloakAuthnProvider implements AuthnProvider {
       .getString(KeycloakAuthnConfigKeys.url, "http://localhost:8080")
       .replace(/\/$/, "");
     this.realm = config.getString(KeycloakAuthnConfigKeys.realm, "vuu");
-    this.clientId = config.getString(KeycloakAuthnConfigKeys.clientId, "portal");
+    this.clientId = config.getString(
+      KeycloakAuthnConfigKeys.clientId,
+      "vuu-portal",
+    );
     this.clientSecret = config.getString(
       KeycloakAuthnConfigKeys.clientSecret,
       "",

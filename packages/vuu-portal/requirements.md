@@ -81,7 +81,7 @@ Configuration for auth:
 - vuu.auth.mode with values keycloak or permissive (default keycloak)
 - vuu.auth.cors.allowedOrigin (default http://localhost:5002)
 - Keycloak portal authentication settings:
-- vuu.auth.keycloak.clientId (default portal)
+- vuu.auth.keycloak.clientId (default vuu-portal)
 - vuu.auth.keycloak.clientSecret (optional for confidential client)
 - KeycloakAdmin settings must be read from application.conf using the vuu.keycloak prefix:
 - vuu.keycloak.url (default http://localhost:8080)
