@@ -7,6 +7,7 @@
     "packages/**"
   ],
   "scripts": {
+    "keycloak:users": "bun ./scripts/keycloak-users.ts",
     "start:all": "bun ./scripts/start-all.ts",
     "start": "WEBSOCKET_PORT=8090 npm start:all",
     "start:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",

@@ -21,14 +21,23 @@ type UserRepresentation = {
   enabled?: boolean;
 };
 
-const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "http://localhost:8080").replace(
+const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "https://localhost:8080").replace(
   /\/$/,
   "",
 );
+const allowSelfSignedCert =
+  (process.env.KEYCLOAK_ALLOW_SELF_SIGNED_CERT ?? "true").toLowerCase() === "true";
+const useInsecureTls = keycloakBaseUrl.startsWith("https://") && allowSelfSignedCert;
 const realm = process.env.KEYCLOAK_REALM ?? "vuu";
 const adminUsername = process.env.KEYCLOAK_ADMIN_USERNAME ?? "admin";
 const adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
 const userPassword = process.env.KEYCLOAK_USER_PASSWORD ?? "password";
+
+type BunFetchInit = RequestInit & {
+  tls?: {
+    rejectUnauthorized?: boolean;
+  };
+};
 
 const users = [
   { username: "trader1", email: "trader1@vuu.com", groups: ["BASKET_TRADE"] },
@@ -55,6 +64,12 @@ const groupRoleNames: Record<string, readonly string[]> = {
 };
 
 async function main() {
+  if (useInsecureTls) {
+    console.warn(
+      "[keycloak] TLS certificate verification is disabled (KEYCLOAK_ALLOW_SELF_SIGNED_CERT=true)",
+    );
+  }
+
   const accessToken = await getAdminAccessToken();
   const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -105,7 +120,7 @@ async function getAdminAccessToken() {
     password: adminPassword,
   });
 
-  const response = await fetch(
+  const response = await keycloakFetch(
     `${keycloakBaseUrl}/realms/master/protocol/openid-connect/token`,
     {
       method: "POST",
@@ -131,7 +146,7 @@ async function getAdminAccessToken() {
 }
 
 async function ensureRealmExists(headers: Record<string, string>) {
-  const response = await fetch(`${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}`, {
+  const response = await keycloakFetch(`${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}`, {
     headers,
   });
 
@@ -322,7 +337,7 @@ async function addUserToGroup(
 }
 
 async function getOptional<T>(url: string, headers: Record<string, string>) {
-  const response = await fetch(url, { headers });
+  const response = await keycloakFetch(url, { headers });
   if (response.status === 404) {
     return undefined;
   }
@@ -347,7 +362,7 @@ async function requestJson<T>(
   url: string,
   init: RequestInit,
 ): Promise<T> {
-  const response = await fetch(url, init);
+  const response = await keycloakFetch(url, init);
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new Error(
@@ -362,9 +377,21 @@ async function requestJson<T>(
   return (await response.json()) as T;
 }
 
+async function keycloakFetch(url: string, init: RequestInit = {}) {
+  const requestInit: BunFetchInit = { ...init };
+  if (useInsecureTls) {
+    requestInit.tls = {
+      ...(requestInit.tls ?? {}),
+      rejectUnauthorized: false,
+    };
+  }
+
+  return fetch(url, requestInit);
+}
+
 await main().catch((error: unknown) => {
   console.error(error);
   process.exitCode = 1;
 });
 
-export {};
+export { };
