@@ -82,7 +82,7 @@ Configuration for auth:
 - vuu.auth.cors.allowedOrigin (default http://localhost:5002)
 - Keycloak portal authentication settings:
 - vuu.auth.keycloak.clientId (default vuu-portal)
-- vuu.auth.keycloak.clientSecret (optional for confidential client)
+- vuu.auth.keycloak.clientSecret (required; the confidential client secret used for login and token introspection)
 - KeycloakAdmin settings must be read from application.conf using the vuu.keycloak prefix:
 - vuu.keycloak.url (default http://localhost:8080)
 - vuu.keycloak.realm (default vuu)
@@ -92,6 +92,11 @@ Configuration for auth:
 - vuu.keycloak.clientId (default admin-cli)
 - vuu.keycloak.clientSecret (optional for confidential client)
 - vuu.keycloak.allowSelfSignedCert (default false; local development only)
+
+Keycloak portal client provisioning:
+- vuu-portal must be configured as a confidential client with `client-secret` authentication and a secret matching vuu.auth.keycloak.clientSecret
+- vuu-portal must enable direct access grants for the server-side username/password login flow
+- service accounts are not required because the provider authenticates directly to the token and introspection endpoints with the client secret
 
 Alternative provider requirements:
 - when vuu.auth.mode=permissive, /api/authn must accept any non-empty username/password pair
@@ -129,7 +134,7 @@ The package application.conf must define:
 - vuu.keycloak.clientId
 - vuu.keycloak.clientSecret (optional)
 - vuu.auth.keycloak.clientId
-- vuu.auth.keycloak.clientSecret (optional)
+- vuu.auth.keycloak.clientSecret
 - vuu.auth.mode
 
 ## Module Requirements

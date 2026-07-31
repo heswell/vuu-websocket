@@ -21,6 +21,12 @@ type UserRepresentation = {
   enabled?: boolean;
 };
 
+type ClientRepresentation = {
+  id: string;
+  clientId: string;
+  [key: string]: unknown;
+};
+
 const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "https://localhost:8080").replace(
   /\/$/,
   "",
@@ -32,6 +38,9 @@ const realm = process.env.KEYCLOAK_REALM ?? "vuu";
 const adminUsername = process.env.KEYCLOAK_ADMIN_USERNAME ?? "admin";
 const adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
 const userPassword = process.env.KEYCLOAK_USER_PASSWORD ?? "password";
+const portalClientId = process.env.KEYCLOAK_PORTAL_CLIENT_ID ?? "vuu-portal";
+const portalClientSecret =
+  process.env.KEYCLOAK_PORTAL_CLIENT_SECRET ?? "vuu-portal-secret";
 
 type BunFetchInit = RequestInit & {
   tls?: {
@@ -77,6 +86,7 @@ async function main() {
   };
 
   await ensureRealmExists(headers);
+  await ensurePortalAuthClient(headers);
 
   const roles = new Map<string, RoleRepresentation>();
   for (const roleName of roleNames) {
@@ -109,6 +119,55 @@ async function main() {
 
   console.log(
     `[keycloak] seeded realm ${realm} with ${users.length} users, ${roleNames.length} roles and ${Object.keys(groupRoleNames).length} groups`,
+  );
+}
+
+async function ensurePortalAuthClient(headers: Record<string, string>) {
+  if (!portalClientSecret) {
+    throw new Error("KEYCLOAK_PORTAL_CLIENT_SECRET must not be empty");
+  }
+
+  const clients = await requestJson<ClientRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients?clientId=${encodeURIComponent(portalClientId)}`,
+    { headers },
+  );
+  const existing = clients.find((client) => client.clientId === portalClientId);
+  const clientConfig = {
+    clientId: portalClientId,
+    name: "VUU Portal Server",
+    enabled: true,
+    publicClient: false,
+    clientAuthenticatorType: "client-secret",
+    secret: portalClientSecret,
+    directAccessGrantsEnabled: true,
+    standardFlowEnabled: false,
+    implicitFlowEnabled: false,
+    serviceAccountsEnabled: false,
+  };
+
+  if (existing) {
+    const current = await requestJson<ClientRepresentation>(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(existing.id)}`,
+      { headers },
+    );
+    await requestJson<void>(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(existing.id)}`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ ...current, ...clientConfig }),
+      },
+    );
+    return;
+  }
+
+  await requestJson<void>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(clientConfig),
+    },
   );
 }
 
@@ -266,6 +325,7 @@ async function upsertUser(
     email,
     enabled: true,
     emailVerified: true,
+    requiredActions: [],
   };
 
   if (!existing) {
@@ -370,7 +430,7 @@ async function requestJson<T>(
     );
   }
 
-  if (response.status === 204) {
+  if (response.status === 201 || response.status === 204) {
     return undefined as T;
   }
 
