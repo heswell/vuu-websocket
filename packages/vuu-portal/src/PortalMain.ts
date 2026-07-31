@@ -20,6 +20,7 @@ const ConfigKeys = {
   certPath: "vuu.certPath",
   keyPath: "vuu.keyPath",
   port: "vuu.port",
+  authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   keycloakSyncIntervalMs: "vuu.keycloak.sync.intervalMs",
 } as const;
 
@@ -46,7 +47,12 @@ export default async function main() {
   const loginTokenService = LoginTokenService();
   const httpServerOptions: HttpServerOptions = {
     httpsPort: 8443,
-    requestHandler: createAuthnHttpHandler(authnProvider, loginTokenService),
+    requestHandler: createAuthnHttpHandler(authnProvider, loginTokenService, {
+      allowedOrigin: defaultConfig.getString(
+        ConfigKeys.authCorsAllowedOrigin,
+        "http://localhost:5002",
+      ),
+    }),
   };
   const lifecycle = new LifecycleContainer();
 
