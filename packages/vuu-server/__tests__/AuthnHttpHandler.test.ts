@@ -1,15 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import { VuuUserWithAuthorizations } from "../src/core/auths/VuuUser";
+import {
+  VuuUser,
+  VuuUserWithAuthorizations,
+} from "../src/core/auths/VuuUser";
 import { createAuthnHttpHandler } from "../src/net/auth/AuthnHttpHandler";
 import { LoginTokenService } from "../src/net/auth/LoginTokenService";
 
 const CLIENT_ORIGIN = "http://localhost:5002";
 
-function createHandler() {
+function createHandler(
+  authenticateBearerToken?: (token: string) => Promise<VuuUser>,
+) {
   return createAuthnHttpHandler(
     {
       authenticate: async (username) =>
         VuuUserWithAuthorizations(username, []),
+      authenticateBearerToken,
     },
     LoginTokenService(),
     { allowedOrigin: CLIENT_ORIGIN },
@@ -57,6 +63,54 @@ describe("AuthnHttpHandler CORS", () => {
       "vuu-auth-token",
     );
     expect(response?.headers.get("vuu-auth-token")).not.toBeNull();
+    expect(await response?.json()).toEqual({
+      token: response?.headers.get("vuu-auth-token"),
+    });
+  });
+
+  test("authenticates a bearer token in preference to submitted credentials", async () => {
+    const authenticateBearerToken = async (token: string) =>
+      VuuUserWithAuthorizations("keycloak-user", ["portal.admin"]);
+    const request = new Request("https://localhost:8443/api/authn", {
+      headers: {
+        Authorization: "Bearer: keycloak-issued-jwt",
+        Origin: CLIENT_ORIGIN,
+      },
+    });
+
+    const response = await createHandler(authenticateBearerToken)(
+      request,
+      new URL(request.url),
+    );
+
+    expect(response?.status).toBe(200);
+    const vuuToken = response?.headers.get("vuu-auth-token");
+    expect(vuuToken).not.toBeNull();
+    const [payload] = vuuToken!.split(".");
+    expect(JSON.parse(Buffer.from(payload, "base64url").toString())).toMatchObject(
+      {
+        name: "keycloak-user",
+        authorizations: ["portal.admin"],
+      },
+    );
+  });
+
+  test("does not fall back to credentials when a bearer token is invalid", async () => {
+    const request = new Request("https://localhost:8443/api/authn", {
+      method: "POST",
+      headers: {
+        Authorization: "not-a-bearer-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username: "admin", password: "admin" }),
+    });
+
+    const response = await createHandler()(request, new URL(request.url));
+
+    expect(response?.status).toBe(401);
+    expect(await response?.json()).toMatchObject({
+      error: "Authentication failed",
+    });
   });
 
   test("does not allow an unconfigured origin", async () => {
