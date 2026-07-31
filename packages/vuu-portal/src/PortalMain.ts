@@ -72,6 +72,6 @@ export default async function main() {
   );
   lifecycle.apply(refreshRunner).dependsOn(vuuServer);
 
-  lifecycle.installShutdownHooks();
+  lifecycle.autoShutdownHook();
   await lifecycle.start();
 }

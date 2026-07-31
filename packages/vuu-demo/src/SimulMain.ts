@@ -46,7 +46,7 @@ export default async function main() {
 
   new VuuServer(config, lifecycle);
 
-  lifecycle.installShutdownHooks();
+  lifecycle.autoShutdownHook();
   await lifecycle.start();
 }
 

@@ -237,6 +237,10 @@ export class LifecycleContainer {
     return () => this.removeShutdownHooks();
   }
 
+  autoShutdownHook() {
+    this.installShutdownHooks();
+  }
+
   removeShutdownHooks() {
     for (const [signal, hook] of this.#shutdownHooks) {
       process.removeListener(signal, hook);

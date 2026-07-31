@@ -42,6 +42,34 @@ class TestComponent extends DefaultLifecycleEnabled {
 }
 
 describe("LifecycleContainer", () => {
+  test("orders a diamond once and ignores duplicate components and edges", async () => {
+    const lifecycle = new LifecycleContainer();
+    const events: string[] = [];
+    const root = new TestComponent("root", events);
+    const left = new TestComponent("left", events);
+    const right = new TestComponent("right", events);
+    const leaf = new TestComponent("leaf", events);
+
+    lifecycle.apply(root).dependsOn(left, right);
+    lifecycle.apply(left).dependsOn(leaf, leaf);
+    lifecycle.apply(right).dependsOn(leaf);
+    lifecycle.apply(root);
+
+    await lifecycle.start();
+
+    expect(events).toEqual([
+      "initialize:leaf",
+      "initialize:left",
+      "initialize:right",
+      "initialize:root",
+      "start:leaf",
+      "start:left",
+      "start:right",
+      "start:root",
+    ]);
+    await lifecycle.destroy();
+  });
+
   test("awaits dependencies first and tears down in reverse deterministic order", async () => {
     const lifecycle = new LifecycleContainer();
     const events: string[] = [];
@@ -207,5 +235,17 @@ describe("LifecycleContainer", () => {
 
     lifecycle.removeShutdownHooks();
     expect(process.listenerCount("SIGTERM")).toBe(before);
+  });
+
+  test("retains the Scala autoShutdownHook API", () => {
+    const lifecycle = new LifecycleContainer();
+    const beforeInt = process.listenerCount("SIGINT");
+    const beforeTerm = process.listenerCount("SIGTERM");
+
+    lifecycle.autoShutdownHook();
+    expect(process.listenerCount("SIGINT")).toBe(beforeInt + 1);
+    expect(process.listenerCount("SIGTERM")).toBe(beforeTerm + 1);
+
+    lifecycle.removeShutdownHooks();
   });
 });
