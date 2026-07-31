@@ -1,8 +1,17 @@
 import {
   AuthnProvider,
+  Config,
+  ConfigFactory,
   VuuUser,
   VuuUserWithAuthorizations,
 } from "@heswell/vuu-server";
+
+const KeycloakConfigKeys = {
+  url: "vuu.keycloak.url",
+  realm: "vuu.keycloak.realm",
+  clientId: "vuu.keycloak.clientId",
+  clientSecret: "vuu.keycloak.clientSecret",
+} as const;
 
 type KeycloakTokenResponse = {
   access_token?: string;
@@ -21,16 +30,22 @@ type KeycloakTokenPayload = {
 };
 
 export class KeycloakAuthnProvider implements AuthnProvider {
-  private readonly baseUrl = (process.env.KEYCLOAK_URL ?? "http://localhost:8080").replace(
-    /\/$/,
-    "",
-  );
+  private readonly baseUrl: string;
 
-  private readonly realm = process.env.KEYCLOAK_REALM ?? "vuu";
+  private readonly realm: string;
 
-  private readonly clientId = process.env.KEYCLOAK_CLIENT_ID ?? "portal";
+  private readonly clientId: string;
 
-  private readonly clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
+  private readonly clientSecret: string;
+
+  constructor(config: Config = ConfigFactory.load()) {
+    this.baseUrl = config
+      .getString(KeycloakConfigKeys.url, "http://localhost:8080")
+      .replace(/\/$/, "");
+    this.realm = config.getString(KeycloakConfigKeys.realm, "vuu");
+    this.clientId = config.getString(KeycloakConfigKeys.clientId, "portal");
+    this.clientSecret = config.getString(KeycloakConfigKeys.clientSecret, "");
+  }
 
   async authenticate(username: string, password: string): Promise<VuuUser> {
     const body = new URLSearchParams({
