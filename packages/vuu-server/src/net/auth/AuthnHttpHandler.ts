@@ -1,9 +1,8 @@
 import { LoginTokenService } from "./LoginTokenService";
 import { AuthnProvider } from "./AuthnProvider";
 
-const BASE_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
+export type AuthnHttpHandlerOptions = {
+  allowedOrigin?: string;
 };
 
 type Credentials = {
@@ -14,17 +13,20 @@ type Credentials = {
 export function createAuthnHttpHandler(
   provider: AuthnProvider,
   loginTokenService: LoginTokenService,
+  { allowedOrigin = "*" }: AuthnHttpHandlerOptions = {},
 ) {
   return async (req: Request, url: URL) => {
     if (url.pathname !== "/api/authn") {
       return undefined;
     }
 
+    const corsHeaders = createCorsHeaders(req, allowedOrigin);
+
     if (req.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: {
-          ...BASE_HEADERS,
+          ...corsHeaders,
           "Access-Control-Allow-Headers": "Content-Type, vuu-auth-token",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
@@ -37,7 +39,7 @@ export function createAuthnHttpHandler(
         {
           status: 405,
           headers: {
-            ...BASE_HEADERS,
+            ...corsHeaders,
             "Content-Type": "application/json",
           },
         },
@@ -58,7 +60,7 @@ export function createAuthnHttpHandler(
           {
             status: 400,
             headers: {
-              ...BASE_HEADERS,
+              ...corsHeaders,
               "Content-Type": "application/json",
             },
           },
@@ -71,7 +73,7 @@ export function createAuthnHttpHandler(
       return new Response(null, {
         status: 200,
         headers: {
-          ...BASE_HEADERS,
+          ...corsHeaders,
           "vuu-auth-token": token,
         },
       });
@@ -87,11 +89,34 @@ export function createAuthnHttpHandler(
         {
           status: 401,
           headers: {
-            ...BASE_HEADERS,
+            ...corsHeaders,
             "Content-Type": "application/json",
           },
         },
       );
     }
+  };
+}
+
+function createCorsHeaders(req: Request, allowedOrigin: string) {
+  const requestOrigin = req.headers.get("Origin");
+  const allowRequestOrigin =
+    allowedOrigin === "*" || requestOrigin === allowedOrigin;
+
+  return {
+    ...(allowRequestOrigin
+      ? {
+          "Access-Control-Allow-Origin":
+            allowedOrigin === "*" ? "*" : allowedOrigin,
+        }
+      : {}),
+    ...(allowedOrigin === "*"
+      ? {}
+      : {
+          "Access-Control-Allow-Credentials": "true",
+          Vary: "Origin",
+        }),
+    "Access-Control-Expose-Headers": "vuu-auth-token",
+    "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
   };
 }
