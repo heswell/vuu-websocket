@@ -54,6 +54,7 @@ type KeycloakRole = {
 const KeycloakConfigKeys = {
   url: "vuu.keycloak.url",
   realm: "vuu.keycloak.realm",
+  adminRealm: "vuu.keycloak.adminRealm",
   adminUsername: "vuu.keycloak.adminUsername",
   adminPassword: "vuu.keycloak.adminPassword",
   clientId: "vuu.keycloak.clientId",
@@ -105,6 +106,7 @@ export class KeycloakAdminClient {
       .getString(KeycloakConfigKeys.url, "http://localhost:8080")
       .replace(/\/$/, "");
     const realm = config.getString(KeycloakConfigKeys.realm, "vuu");
+    const adminRealm = config.getString(KeycloakConfigKeys.adminRealm, "master");
     const adminUsername = config.getString(KeycloakConfigKeys.adminUsername, "admin");
     const adminPassword = config.getString(KeycloakConfigKeys.adminPassword, "admin");
     const clientId = config.getString(KeycloakConfigKeys.clientId, "admin-cli");
@@ -125,7 +127,7 @@ export class KeycloakAdminClient {
     }
 
     const response = await keycloakFetch(
-      `${baseUrl}/realms/master/protocol/openid-connect/token`,
+      `${baseUrl}/realms/${encodeURIComponent(adminRealm)}/protocol/openid-connect/token`,
       {
         method: "POST",
         headers: {
