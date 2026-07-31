@@ -82,9 +82,10 @@ Configuration for auth:
 - KeycloakAdmin settings must be read from application.conf using the vuu.keycloak prefix:
 - vuu.keycloak.url (default http://localhost:8080)
 - vuu.keycloak.realm (default vuu)
+- vuu.keycloak.adminRealm (default master)
 - vuu.keycloak.adminUsername (default admin)
 - vuu.keycloak.adminPassword (default admin)
-- vuu.keycloak.clientId (default portal)
+- vuu.keycloak.clientId (default admin-cli)
 - vuu.keycloak.clientSecret (optional for confidential client)
 - vuu.keycloak.allowSelfSignedCert (default false; local development only)
 
