@@ -19,7 +19,7 @@ import path from "path";
 
 const certPath = path.join(import.meta.dir, "../certs");
 
-export default function main() {
+export default async function main() {
   const httpServerOptions = {};
   const webSocketOptions = {
     certPath,
@@ -44,9 +44,10 @@ export default function main() {
   // .withModule(PermissionModule())
   // .withModule(BasketModule());
 
-  const vuuServer = new VuuServer(config, lifecycle);
+  new VuuServer(config, lifecycle);
 
-  lifecycle.start();
+  lifecycle.autoShutdownHook();
+  await lifecycle.start();
 }
 
 

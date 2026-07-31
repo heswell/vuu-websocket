@@ -1,112 +1,242 @@
 import { describe, expect, test } from "bun:test";
-import { websocketConnectionHandler } from "@heswell/vuu-server";
+import { Table } from "@heswell/data";
+import { loadTableFromRemoteResource } from "../../service-utils/src/resource-loader";
+import { TableDef } from "../src/api/TableDef";
+import { VuuServer } from "../src/core/VuuServer";
+import {
+  VuuServerConfig,
+  VuuWebSocketOptions,
+} from "../src/core/VuuServerOptions";
+import { ModuleFactory } from "../src/core/module/ModuleFactory";
+import { ViewServerModule } from "../src/core/module/VsModule";
+import { LoginTokenService } from "../src/net/auth/LoginTokenService";
+import {
+  NullProvider,
+  Provider,
+  RemoteResourceLoad,
+  RemoteProvider,
+} from "../src/provider/Provider";
+import { LifecycleContainer } from "../src/toolbox/thread/LifecycleContainer";
 
-import { startTestModule } from "./TestVuuServer";
-import { VuuRange, VuuServerMessage } from "@vuu-ui/vuu-protocol-types";
+const tableDef = (name: string) =>
+  TableDef({
+    columns: [{ name: "id", dataType: "string" }],
+    joinFields: "id",
+    keyField: "id",
+    name,
+  });
 
-class MockWebSocket {
-  constructor(private handler: any) {}
-  data = {
-    sessionId: "sess-001",
-  };
-  send(message: string) {
-    const vuuMessage = JSON.parse(message) as VuuServerMessage;
-    if (vuuMessage.body.type === "HB") {
-      this.handler.message(
-        this,
-        JSON.stringify({ body: { type: "HB_RESP", td: Date.now() } })
-      );
-    } else if (vuuMessage.body.type === "TABLE_ROW") {
-      console.table(vuuMessage.body.rows);
-    } else {
-      console.log(`SEND ${vuuMessage.body.type}`);
-    }
+const serverConfig = (
+  module: ViewServerModule,
+) =>
+  VuuServerConfig(
+    VuuWebSocketOptions().withWsPort(0),
+    {},
+    LoginTokenService(),
+  ).withModule(module);
+
+describe("VuuServer lifecycle", () => {
+  test("waits for providers before opening endpoints, loads once, refreshes explicitly, and shuts down", async () => {
+    const providerReady = Promise.withResolvers<void>();
+    let provider: RecordingProvider | undefined;
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("LIFECYCLE_READINESS")
+      .addTable(tableDef("readiness"), (table) => {
+        provider = new RecordingProvider(table, () => providerReady.promise);
+        return provider;
+      })
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    expect(server.webSocketPort).toBeUndefined();
+    const startup = lifecycle.start();
+    await Bun.sleep(1);
+    expect(provider?.loadCount).toBe(1);
+    expect(server.webSocketPort).toBeUndefined();
+
+    providerReady.resolve();
+    await startup;
+    const port = server.webSocketPort;
+    expect(port).toBeNumber();
+    expect((await fetch(`http://127.0.0.1:${port}`)).status).toBe(404);
+    expect(provider?.loaded).toBe(true);
+
+    await provider?.load(server.tableContainer);
+    expect(provider?.loadCount).toBe(2);
+
+    await lifecycle.destroy();
+    expect(provider?.stopCount).toBe(1);
+    expect(server.webSocketPort).toBeUndefined();
+    await expect(fetch(`http://127.0.0.1:${port}`)).rejects.toThrow();
+  });
+
+  test("surfaces provider failure and rolls back without opening an endpoint", async () => {
+    let provider: RecordingProvider | undefined;
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("LIFECYCLE_FAILURE")
+      .addTable(tableDef("failure"), (table) => {
+        provider = new RecordingProvider(table, async () => {
+          throw new Error("provider failed");
+        });
+        return provider;
+      })
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    await expect(lifecycle.start()).rejects.toThrow("provider failed");
+    expect(server.webSocketPort).toBeUndefined();
+    expect(provider?.stopCount).toBe(1);
+    await lifecycle.destroy();
+  });
+
+  test("stops providers in reverse registration order", async () => {
+    const stops: string[] = [];
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("LIFECYCLE_REVERSE")
+      .addTable(
+        tableDef("first"),
+        (table) => new RecordingProvider(table, async () => {}, stops),
+      )
+      .addTable(
+        tableDef("second"),
+        (table) => new RecordingProvider(table, async () => {}, stops),
+      )
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    await lifecycle.start();
+    await lifecycle.destroy();
+
+    expect(stops).toEqual(["second", "first"]);
+  });
+
+  test("creates independent null providers for session tables", () => {
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("NULL_PROVIDER_IDENTITY")
+      .addSessionTable(tableDef("session-one"))
+      .addSessionTable(tableDef("session-two"))
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    const first = server.providers.getProviderForTable("session-one");
+    const second = server.providers.getProviderForTable("session-two");
+    expect(first).toBeInstanceOf(NullProvider);
+    expect(second).toBeInstanceOf(NullProvider);
+    expect(first).not.toBe(second);
+  });
+
+  test("reuses a RemoteProvider load promise and aborts its resource on shutdown", async () => {
+    const resourceLoad = Promise.withResolvers<number>();
+    let resourceSignal: AbortSignal | undefined;
+    let provider: TestRemoteProvider | undefined;
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("REMOTE_PROVIDER_RESOURCE")
+      .addTable(tableDef("remote"), (table) => {
+        provider = new TestRemoteProvider(table, ({ signal }) => {
+          resourceSignal = signal;
+          return resourceLoad.promise;
+        });
+        return provider;
+      })
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    const startup = lifecycle.start();
+    await Bun.sleep(1);
+    const firstLoad = provider?.load(server.tableContainer);
+    const secondLoad = provider?.load(server.tableContainer);
+    expect(firstLoad).toBe(secondLoad);
+
+    resourceLoad.resolve(1);
+    await startup;
+    expect(resourceSignal?.aborted).toBe(false);
+    await lifecycle.destroy();
+    expect(resourceSignal?.aborted).toBe(true);
+  });
+
+  test("cancels a remote provider that is still loading during shutdown", async () => {
+    let resourceSignal: AbortSignal | undefined;
+    let provider: TestRemoteProvider | undefined;
+    const lifecycle = new LifecycleContainer();
+    const module = ModuleFactory.withNameSpace("REMOTE_PROVIDER_CANCELLATION")
+      .addTable(tableDef("remote-cancellation"), (table) => {
+        provider = new TestRemoteProvider(table, ({ signal }) => {
+          resourceSignal = signal;
+          return new Promise<number>((_, reject) => {
+            signal?.addEventListener(
+              "abort",
+              () => reject(new Error("resource aborted")),
+              { once: true },
+            );
+          });
+        });
+        return provider;
+      })
+      .asModule();
+    const server = new VuuServer(serverConfig(module), lifecycle);
+
+    const startup = lifecycle.start();
+    await Bun.sleep(1);
+    const firstLoad = provider?.load(server.tableContainer);
+    const secondLoad = provider?.load(server.tableContainer);
+    expect(firstLoad).toBe(secondLoad);
+
+    const shutdown = lifecycle.destroy();
+    const [startupResult, shutdownResult] = await Promise.allSettled([
+      startup,
+      shutdown,
+    ]);
+    expect(startupResult.status).toBe("rejected");
+    expect(shutdownResult.status).toBe("fulfilled");
+    expect(resourceSignal?.aborted).toBe(true);
+    expect(server.webSocketPort).toBeUndefined();
+
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await expect(
+      loadTableFromRemoteResource({
+        resource: "remote-cancellation",
+        signal: preAborted.signal,
+        table: server.tableContainer.getTable("remote-cancellation"),
+        url: "ws://unused",
+      }),
+    ).rejects.toThrow("aborted remote-cancellation");
+  });
+});
+
+class RecordingProvider extends Provider {
+  loadCount = 0;
+  stopCount = 0;
+
+  constructor(
+    table: Table,
+    private readonly loader: () => Promise<void>,
+    private readonly stops?: string[],
+  ) {
+    super(table);
+  }
+
+  async load() {
+    this.loadCount += 1;
+    await this.loader();
+  }
+
+  doStop() {
+    this.stopCount += 1;
+    this.stops?.push(this.table.name);
   }
 }
 
-const LOGIN_MSG = {
-  requestId: "req-001",
-  body: { token: "toke-001", type: "LOGIN", user: "steve" },
-};
-const range_0_10: VuuRange = { from: 0, to: 10 };
-const instrumentsTable = { module: "TEST", table: "instruments" };
-const SORT_CCY = { sortDefs: [{ column: "currency", sortType: "A" }] };
+class TestRemoteProvider extends RemoteProvider {
+  constructor(table: Table, loader: RemoteResourceLoad) {
+    super(table, loader);
+  }
 
-describe("VuuServer", () => {
-  test("simple single table load with updates, simple viewport", async () => {
-    const { promise, resolve } = Promise.withResolvers();
-    const vuuServer = startTestModule({ startEmpty: true });
-    const handler = websocketConnectionHandler({});
-    const ws: any = new MockWebSocket(handler);
-    handler.open(ws);
-
-    // prettier-ignore
-    {
-        handler.message( ws, JSON.stringify(LOGIN_MSG));
-        handler.message( ws, JSON.stringify({ body: { range: range_0_10, table: instrumentsTable, type: "CREATE_VP" } }));
-    }
-
-    setTimeout(() => {
-      const provider = vuuServer.getProvider("instruments");
-
-      // prettier-ignore
-      provider.loadTest([
-        [ "AAA L", "USD", "AAA Incorporated", "NASDAQ", "ABCDE0000", 1009, "AAA.N" ],
-        [ "BBB L", "GBP", "BBB Incorporated", "NASDAQ", "BCDEF0000", 1008, "BBB.N" ],
-        [ "CCC L", "CHF", "CCC Incorporated", "NASDAQ", "CDEFG0000", 1007, "CCC.N" ],
-        [ "DDD L", "USD", "DDD Incorporated", "NASDAQ", "DEFGH0000", 1006, "DDD.N" ],
-        [ "EEE L", "HKD", "EEE Incorporated", "NASDAQ", "EFGHI0000", 1005, "EEE.N" ],
-        [ "FFF L", "SEK", "FFF Incorporated", "NASDAQ", "FGHIJ0000", 1004, "FFF.N" ],
-        [ "GGG L", "EUR", "GGG Incorporated", "NASDAQ", "GHIJK0000", 1003, "GGG.N" ],
-        [ "HHH L", "EUR", "HHH Incorporated", "NASDAQ", "HIJKL0000", 1002, "HHH.N" ],
-        [ "III L", "GBP", "III Incorporated", "NASDAQ", "IJKLM0000", 1001, "III.N" ],
-        [ "JJJ L", "USD", "JJJ Incorporated", "NASDAQ", "JKLMN0000", 1000, "JJJ.N" ]        
-      ])
-
-      setTimeout(() => {
-        // prettier-ignore
-        provider.update([
-        [ "AAA L", "USD", "AAA Incorporated", "NASDAQ", "ABCDE0000", 1019, "AAA.N" ],
-        [ "DDD L", "USD", "DDD Incorporated", "NASDAQ", "DEFGH0000", 1021, "DDD.N" ],
-        [ "III L", "GBP", "III Incorporated", "NASDAQ", "IJKLM0000", 1056, "III.N" ]
-      ]);
-      }, 300);
-
-      setTimeout(() => {
-        resolve();
-      }, 500);
-    }, 1000);
-
-    return promise;
-  });
-
-  test("simple single table load with updates, sorted viewport", async () => {
-    const { promise, resolve } = Promise.withResolvers();
-    const vuuServer = startTestModule();
-    const handler = websocketConnectionHandler({});
-    const ws: any = new MockWebSocket(handler);
-    handler.open(ws);
-
-    // prettier-ignore
-    {
-        handler.message( ws, JSON.stringify(LOGIN_MSG));
-        handler.message( ws, JSON.stringify({ body: { range: range_0_10, table: instrumentsTable, sort: SORT_CCY, type: "CREATE_VP" } }));
-    }
-
-    setTimeout(() => {
-      const provider = vuuServer.getProvider("instruments");
-      // prettier-ignore
-      provider.update([
-        [ "AAA L", "USD", "AAA Incorporated", "NASDAQ", "ABCDE0000", 1019, "AAA.N" ],
-        [ "DDD L", "USD", "DDD Incorporated", "NASDAQ", "DEFGH0000", 1021, "DDD.N" ],
-        [ "III L", "GBP", "III Incorporated", "NASDAQ", "IJKLM0000", 1056, "III.N" ]
-      ]);
-
-      setTimeout(() => {
-        resolve();
-      }, 500);
-    }, 1000);
-
-    return promise;
-  });
-});
+  remoteServiceDetails() {
+    return {
+      columns: ["id"],
+      resource: "remote",
+      url: "ws://unused",
+    };
+  }
+}

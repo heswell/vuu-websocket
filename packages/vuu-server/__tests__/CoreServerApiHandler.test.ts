@@ -30,7 +30,7 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
     };
     const handler = await createHandler(tableContainer);
 
-    const response = handler.process(
+    const response = await handler.process(
       {
         requestId: "req-1",
         sessionId: "sess-1",
@@ -58,7 +58,7 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
     };
     const handler = await createHandler(tableContainer);
 
-    const response = handler.process(
+    const response = await handler.process(
       {
         requestId: "req-2",
         sessionId: "sess-1",

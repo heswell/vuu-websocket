@@ -3,8 +3,13 @@ import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { type TableContainer } from "../core/table/TableContainer";
 import { loadTableFromRemoteResource } from "@heswell/service-utils";
 import { RemoteResourceMessageType } from "@heswell/service-utils/src/resource-loader";
+import {
+  DefaultLifecycleEnabled,
+  LifecycleEnabled,
+} from "../toolbox/thread/LifecycleContainer";
 
-export interface IProvider {
+export interface IProvider extends LifecycleEnabled {
+  bind: (tableContainer: TableContainer) => void;
   load: (tableContainer: TableContainer) => Promise<void>;
   loaded: boolean;
   table: Table;
@@ -49,21 +54,21 @@ export const setRandomBidAskSizeUpdate = (bidAsk: BidAskSize) => {
 
 export type ProviderFactory = (table: Table) => IProvider;
 
-export const NullProvider: IProvider = {
-  load: function (tableContainer: TableContainer): Promise<void> {
-    // nothing to see here
-    return Promise.resolve(undefined);
-  },
-  loaded: false,
-  table: undefined,
-};
-
-export abstract class Provider implements IProvider {
+export abstract class Provider
+  extends DefaultLifecycleEnabled
+  implements IProvider
+{
   #loaded = false;
-  #table: Table;
+  #tableContainer: TableContainer | undefined;
+  readonly lifecycleId: string;
+
   constructor(table: Table) {
+    super();
     this.#table = table;
+    this.lifecycleId = `provider-${table.name}`;
   }
+
+  readonly #table: Table;
 
   get table() {
     return this.#table;
@@ -76,6 +81,28 @@ export abstract class Provider implements IProvider {
   // TODO will this ever be set to false ?
   set loaded(loaded: boolean) {
     this.#loaded = loaded;
+  }
+
+  bind(tableContainer: TableContainer) {
+    if (
+      this.#tableContainer !== undefined &&
+      this.#tableContainer !== tableContainer
+    ) {
+      throw new Error(
+        `[Provider:${this.table.name}] cannot bind to a second TableContainer`,
+      );
+    }
+    this.#tableContainer = tableContainer;
+  }
+
+  async doStart() {
+    if (!this.#tableContainer) {
+      throw new Error(
+        `[Provider:${this.table.name}] must be bound before it is started`,
+      );
+    }
+    await this.load(this.#tableContainer);
+    this.loaded = true;
   }
 
   abstract load(tableContainer: TableContainer): Promise<void>;
@@ -92,31 +119,58 @@ export abstract class Provider implements IProvider {
   }
 }
 
+export class NullProvider extends Provider {
+  async load() {}
+}
+
+export type RemoteResourceLoad = typeof loadTableFromRemoteResource;
+
 export abstract class RemoteProvider extends Provider {
   #loadPromise: Promise<void> | undefined;
+  readonly #abortController = new AbortController();
 
-  async load(_: TableContainer) {
-    if (this.#loadPromise === undefined) {
-      const { columns, remoteResourceMessageType, resource, url } =
-        this.remoteServiceDetails();
-      const start = performance.now();
-      const count = await loadTableFromRemoteResource({
-        columns,
-        resource,
-        remoteResourceMessageType,
-        url,
-        table: this.table,
-      });
-      const end = performance.now();
-      console.log(
-        `[module:SIMUL:RemoteProvider] initial snapshot loaded, ${count} ${resource} inserted [${
-          end - start
-        }ms]`
-      );
-    } else {
-      throw Error("[module:SIMUL:RemoteProvider] load has already been called");
-    }
+  constructor(
+    table: Table,
+    private readonly resourceLoader: RemoteResourceLoad = loadTableFromRemoteResource,
+  ) {
+    super(table);
   }
+
+  load(_: TableContainer) {
+    if (this.#loadPromise === undefined) {
+      this.#loadPromise = this.loadRemoteResource();
+    }
+    return this.#loadPromise;
+  }
+
+  private async loadRemoteResource() {
+    const { columns, remoteResourceMessageType, resource, url } =
+      this.remoteServiceDetails();
+    const start = performance.now();
+    const count = await this.resourceLoader({
+      columns,
+      resource,
+      remoteResourceMessageType,
+      url,
+      table: this.table,
+      signal: this.#abortController.signal,
+    });
+    const end = performance.now();
+    console.log(
+      `[RemoteProvider] initial snapshot loaded, ${count} ${resource} inserted [${
+        end - start
+      }ms]`,
+    );
+  }
+
+  requestStop() {
+    this.#abortController.abort();
+  }
+
+  doStop() {
+    this.requestStop();
+  }
+
   abstract remoteServiceDetails(): {
     columns: string[];
     remoteResourceMessageType?: RemoteResourceMessageType[];

@@ -11,6 +11,40 @@ export type RemoteResourceUpdateType = "insert" | "update" | "delete";
 
 export type RemoteResourceMessageType = RemoteResourceUpdateType | "snapshot";
 
+type RemoveSocketListener = () => void;
+
+export interface RemoteResourceSocket {
+  onClose(listener: (event: Event) => void): RemoveSocketListener;
+  onError(listener: (event: Event) => void): RemoveSocketListener;
+  onMessage(listener: (event: MessageEvent) => void): RemoveSocketListener;
+  onOpen(listener: (event: Event) => void): RemoveSocketListener;
+  close(): void;
+  send(data: string): void;
+}
+
+export type RemoteResourceSocketFactory = (
+  url: string,
+) => RemoteResourceSocket;
+
+const defaultSocketFactory: RemoteResourceSocketFactory = (url) => {
+  const socket = new WebSocket(url);
+  const listen = <K extends keyof WebSocketEventMap>(
+    type: K,
+    listener: (event: WebSocketEventMap[K]) => void,
+  ) => {
+    socket.addEventListener(type, listener);
+    return () => socket.removeEventListener(type, listener);
+  };
+  return {
+    close: () => socket.close(),
+    onClose: (listener) => listen("close", listener),
+    onError: (listener) => listen("error", listener),
+    onMessage: (listener) => listen("message", listener),
+    onOpen: (listener) => listen("open", listener),
+    send: (data) => socket.send(data),
+  };
+};
+
 // TODO make this a class with a loadSNapshot method, to give client finer grained control
 export class RemoteResourceLoader {
   constructor(private table: Table, private url: string) {
@@ -30,100 +64,151 @@ export const loadTableFromRemoteResource = async ({
   resource,
   url,
   table,
+  signal,
+  socketFactory = defaultSocketFactory,
 }: {
   columns?: string[];
   remoteResourceMessageType?: RemoteResourceMessageType[];
   resource: string;
+  signal?: AbortSignal;
+  socketFactory?: RemoteResourceSocketFactory;
   table: Table;
   url: string;
 }) => {
   const requestSnapshot = remoteResourceMessageType.includes("snapshot");
   const requestInserts = remoteResourceMessageType.includes("insert");
   const requestUpdates = remoteResourceMessageType.includes("update");
-  let { promise, resolve, reject } = Promise.withResolvers<number>();
-  let socketStatus: "init" | "open" | "closed" | "data-load-complete" = "init";
+  const { promise, resolve, reject } = Promise.withResolvers<number>();
+  let ready = false;
+  let socket: RemoteResourceSocket | undefined;
+  let terminal = false;
+  const removeListeners: RemoveSocketListener[] = [];
+
+  const terminate = (closeSocket: boolean) => {
+    if (terminal) {
+      return;
+    }
+    terminal = true;
+    for (const removeListener of removeListeners.splice(0)) {
+      removeListener();
+    }
+    signal?.removeEventListener("abort", abort);
+    if (closeSocket) {
+      socket?.close();
+    }
+    socket = undefined;
+  };
+
+  const fail = (error: unknown, closeSocket = true) => {
+    if (!terminal) {
+      terminate(closeSocket);
+      if (!ready) {
+        reject(error);
+      }
+    }
+  };
+
+  const abort = () => {
+    fail(
+      new Error(
+        `[service-utils:loadTableFromRemoteResource] aborted ${resource} at ${url}`,
+      ),
+    );
+  };
+
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) {
+    abort();
+    return promise;
+  }
+
   try {
     console.log(
-      `[service-utils:loadTableFromRemoteResource] connect to ${url} (${resource} service)`
+      `[service-utils:loadTableFromRemoteResource] connect to ${url} (${resource} service)`,
     );
-    // const socketTimeout = setTimeout(() => {
-    //   if (socketStatus === "init") {
-    //     console.log("no connection after 5 seconds, closing socket");
-    //     socket.close();
-    //   }
-    // }, 5000);
+    socket = socketFactory(url);
 
-    let socket: WebSocket | null = new WebSocket(url);
+    removeListeners.push(
+      socket.onMessage((evt) => {
+        if (terminal || signal?.aborted) {
+        return;
+        }
+        try {
+        const message = JSON.parse(evt.data as string) as ResourceMessage;
 
-    socket.addEventListener("message", (evt) => {
-      const message = JSON.parse(evt.data as string) as ResourceMessage;
-
-      if (message.type === "snapshot-count") {
+        if (message.type === "snapshot-count") {
+          console.log(
+            `[service-utils:loadTableFromRemoteResource] final snapshot ${message.count} ${resource} rows received`,
+          );
+          ready = true;
+          resolve(message.count);
+          if (!requestUpdates && !requestInserts) {
+            terminate(true);
+          }
+        } else if (message.type === "snapshot-batch") {
+          for (const row of message.rows) {
+            table.insert(row);
+          }
+        } else if (message.type === "insert") {
+          table.insert(message.row);
+        } else if (message.type === "inserts") {
+          console.log(`inserts received`);
+        } else {
+          fail(
+            new Error(
+              `[service-utils] unexpected message from remote resource service`,
+            ),
+          );
+        }
+        } catch (error: unknown) {
+        fail(error);
+        }
+      }),
+      socket.onOpen(() => {
+        if (terminal) {
+        return;
+        }
         console.log(
-          `[service-utils:loadTableFromRemoteResource] final snapshot  ${message.count} ${resource} rows received`
+        `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`,
         );
-        socketStatus = "data-load-complete";
-
-        if (!requestUpdates && !requestInserts) {
-          socket?.close();
-        }
-        // Promise is resolved when initial data load completes, updates, inserts and deletes,
-        // if requested, continue to be processed.
-        // TODO - in which case we should also return a 'stop' command
-        resolve(message.count);
-      } else if (message.type === "snapshot-batch") {
-        for (const row of message.rows) {
-          table.insert(row);
-        }
-      } else if (message.type === "insert") {
-        table.insert(message.row);
-      } else if (message.type === "inserts") {
-        console.log(`inserts received`);
-      } else {
-        console.log({ message });
-        throw Error(
-          `[service-utils] unexpected message from remote resource service`
-        );
-      }
-    });
-
-    socket.addEventListener("open", () => {
-      socketStatus = "open";
-      console.log(
-        `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`
-      );
-      if (requestSnapshot && requestInserts) {
+        if (requestSnapshot && requestInserts) {
         socket?.send(
-          JSON.stringify({ type: "subscription", columns, resource })
+          JSON.stringify({ type: "subscription", columns, resource }),
         );
-      } else if (requestSnapshot) {
-        socket?.send(JSON.stringify({ type: "snapshot", columns, resource }));
-      }
-    });
-
-    socket.addEventListener("error", (evt) => {
-      console.log(
-        `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url} `
-      );
-    });
-    socket.addEventListener("close", () => {
-      // TODO what if we lose connection after we've received snapshot ? We would want to ask for all
-      // updates since last received
-      console.log(
-        `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`
-      );
-      socket = null;
-      if (socketStatus !== "data-load-complete") {
-        setTimeout(() => {
-          loadTableFromRemoteResource({ columns, resource, url, table });
-        }, 1000);
-      }
-    });
-  } catch (err) {
-    console.log(
-      `[service-utils:loadTableFromRemoteResource] unable to connect to ${url}`
+        } else if (requestSnapshot) {
+        socket?.send(
+          JSON.stringify({ type: "snapshot", columns, resource }),
+        );
+        }
+      }),
+      socket.onError(() => {
+        console.error(
+        `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url}`,
+        );
+        fail(
+        new Error(
+          `[service-utils:loadTableFromRemoteResource] connection error ${resource} at ${url}`,
+        ),
+        );
+      }),
+      socket.onClose(() => {
+        console.log(
+        `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`,
+        );
+        if (ready) {
+        terminate(false);
+        } else {
+        fail(
+          new Error(
+            `[service-utils:loadTableFromRemoteResource] connection closed before initial snapshot ${resource} at ${url}`,
+          ),
+          false,
+        );
+        }
+      }),
     );
-    reject(err);
+  } catch (error: unknown) {
+    fail(error);
   }
 
   return promise;
