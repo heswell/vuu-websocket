@@ -38,12 +38,16 @@ export class LifeCycleRunner extends DefaultLifecycleEnabled {
   }
 
   async doStop() {
+    this.requestStop();
+    await this.#activeRun;
+  }
+
+  requestStop() {
     this.#isRunning = false;
     if (this.#intervalId !== undefined) {
       clearTimeout(this.#intervalId);
       this.#intervalId = undefined;
     }
-    await this.#activeRun;
   }
 
   async doDestroy() {

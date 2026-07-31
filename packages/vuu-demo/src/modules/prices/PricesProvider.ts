@@ -98,6 +98,10 @@ export class PricesProvider extends Provider {
   }
 
   doStop() {
+    this.requestStop();
+  }
+
+  requestStop() {
     this.failLoad(
       new Error("[PRICES:module:PricesProvider] stopped before initial snapshot"),
     );

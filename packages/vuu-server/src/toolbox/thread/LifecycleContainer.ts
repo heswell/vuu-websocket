@@ -7,6 +7,7 @@ export interface LifecycleEnabled {
   doStop(): LifecycleCallbackResult;
   doInitialize(): LifecycleCallbackResult;
   doDestroy(): LifecycleCallbackResult;
+  requestStop?(): void;
   readonly lifecycleId: string;
 }
 
@@ -20,6 +21,8 @@ export abstract class DefaultLifecycleEnabled implements LifecycleEnabled {
   doStop(): LifecycleCallbackResult {}
 
   doDestroy(): LifecycleCallbackResult {}
+
+  requestStop() {}
 }
 
 type ComponentState =
@@ -78,7 +81,7 @@ export class LifecycleContainer {
   #shutdownPromise: Promise<void> | undefined;
   #shutdownHooks = new Map<NodeSignal, () => void>();
   #startupCancellationRequested = false;
-  #startupCancellation: Promise<void> | undefined;
+  #startupCancellationError: unknown;
 
   apply(component: LifecycleEnabled) {
     if (this.#state !== "idle") {
@@ -146,10 +149,7 @@ export class LifecycleContainer {
       return this.#transition;
     }
     if (this.#state === "starting" && this.#transition) {
-      return this.#transition.then(
-        () => this.stop(),
-        () => undefined,
-      );
+      return this.cancelStartup(false);
     }
 
     this.#state = "stopping";
@@ -171,29 +171,7 @@ export class LifecycleContainer {
       );
     }
     if (this.#state === "starting" && this.#transition) {
-      this.#startupCancellationRequested = true;
-      this.#startupCancellation ??= this.stopStartingComponents();
-      const startup = this.#transition;
-      return Promise.allSettled([startup, this.#startupCancellation]).then(
-        async ([startupResult, cancellationResult]) => {
-          const errors: unknown[] = [];
-          try {
-            await this.destroy();
-          } catch (error: unknown) {
-            errors.push(error);
-          }
-          if (
-            startupResult.status === "rejected" &&
-            !(startupResult.reason instanceof LifecycleStartupCancelledError)
-          ) {
-            errors.push(startupResult.reason);
-          }
-          if (cancellationResult.status === "rejected") {
-            errors.push(cancellationResult.reason);
-          }
-          this.throwCleanupErrors("destroy", errors);
-        },
-      );
+      return this.cancelStartup(true);
     }
 
     this.#state = "destroying";
@@ -316,12 +294,14 @@ export class LifecycleContainer {
         registration.state = "initializing";
         await registration.component.doInitialize();
         registration.state = "initialized";
+        if (this.#startupCancellationRequested) {
+          throw new LifecycleStartupCancelledError(undefined);
+        }
       }
       for (const registration of ordered) {
         registration.state = "starting";
         await registration.component.doStart();
         if (this.#startupCancellationRequested) {
-          await this.#startupCancellation;
           throw new LifecycleStartupCancelledError(undefined);
         }
         registration.state = "started";
@@ -394,22 +374,58 @@ export class LifecycleContainer {
     this.throwCleanupErrors("stop", errors);
   }
 
-  private async stopStartingComponents() {
+  private requestStartupCancellation() {
     const errors: unknown[] = [];
     for (const registration of this.teardownOrder()) {
       if (
+        registration.state === "initializing" ||
         registration.state === "starting" ||
         registration.state === "started"
       ) {
-        await this.invokeForCleanup(
-          registration,
-          "doStop",
-          "stopped",
-          errors,
-        );
+        try {
+          registration.component.requestStop?.();
+        } catch (error: unknown) {
+          errors.push(error);
+        }
       }
     }
     this.throwCleanupErrors("stop", errors);
+  }
+
+  private cancelStartup(destroyAfter: boolean) {
+    if (!this.#startupCancellationRequested) {
+      this.#startupCancellationRequested = true;
+      try {
+        this.requestStartupCancellation();
+      } catch (error: unknown) {
+        this.#startupCancellationError = error;
+      }
+    }
+    const startup = this.#transition;
+    if (!startup) {
+      return destroyAfter ? this.destroy() : this.stop();
+    }
+
+    return Promise.allSettled([startup]).then(async ([startupResult]) => {
+      const errors: unknown[] = [];
+      if (destroyAfter) {
+        try {
+          await this.destroy();
+        } catch (error: unknown) {
+          errors.push(error);
+        }
+      }
+      if (
+        startupResult.status === "rejected" &&
+        !(startupResult.reason instanceof LifecycleStartupCancelledError)
+      ) {
+        errors.push(startupResult.reason);
+      }
+      if (this.#startupCancellationError !== undefined) {
+        errors.push(this.#startupCancellationError);
+      }
+      this.throwCleanupErrors(destroyAfter ? "destroy" : "stop", errors);
+    });
   }
 
   private async destroyComponents() {

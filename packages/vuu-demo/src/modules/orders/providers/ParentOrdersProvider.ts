@@ -94,6 +94,10 @@ export class ParentOrdersProvider extends Provider {
   }
 
   doStop() {
+    this.requestStop();
+  }
+
+  requestStop() {
     this.failLoad(
       new Error("[ORDERS:module:OrdersProvider] stopped before initial snapshot"),
     );

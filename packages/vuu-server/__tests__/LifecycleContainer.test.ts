@@ -15,6 +15,7 @@ class TestComponent extends DefaultLifecycleEnabled {
       start?: Hook;
       stop?: Hook;
       destroy?: Hook;
+      requestStop?: () => void;
     } = {},
   ) {
     super();
@@ -38,6 +39,10 @@ class TestComponent extends DefaultLifecycleEnabled {
   async doDestroy() {
     this.events.push(`destroy:${this.lifecycleId}`);
     await this.hooks.destroy?.();
+  }
+
+  requestStop() {
+    this.hooks.requestStop?.();
   }
 }
 
@@ -193,13 +198,14 @@ describe("LifecycleContainer", () => {
         startEntered.resolve();
         await releaseStart.promise;
       },
+      requestStop: () => releaseStart.resolve(),
       stop: async () => {
         events.push("stop-begin");
-        releaseStart.resolve();
         await releaseStop.promise;
         events.push("stop-end");
       },
     });
+
     lifecycle.apply(component);
 
     const startup = lifecycle.start();
@@ -221,6 +227,125 @@ describe("LifecycleContainer", () => {
       "stop:component",
       "stop-begin",
       "stop-end",
+      "destroy:component",
+    ]);
+  });
+
+  test("stops a resource acquired after startup cancellation", async () => {
+    const lifecycle = new LifecycleContainer();
+    const events: string[] = [];
+    const startEntered = Promise.withResolvers<void>();
+    const releaseStart = Promise.withResolvers<void>();
+    let resourceOpen = false;
+    const component = new TestComponent("component", events, {
+      start: async () => {
+        startEntered.resolve();
+        await releaseStart.promise;
+        resourceOpen = true;
+        events.push("resource-open");
+      },
+      requestStop: () => {
+        events.push("cancel-requested");
+        releaseStart.resolve();
+      },
+      stop: () => {
+        expect(resourceOpen).toBe(true);
+        resourceOpen = false;
+        events.push("resource-closed");
+      },
+    });
+
+    lifecycle.apply(component);
+
+    const startup = lifecycle.start();
+    await startEntered.promise;
+    const shutdown = lifecycle.destroy();
+    const [startupResult, shutdownResult] = await Promise.allSettled([
+      startup,
+      shutdown,
+    ]);
+
+    expect(startupResult.status).toBe("rejected");
+    expect(shutdownResult.status).toBe("fulfilled");
+    expect(resourceOpen).toBe(false);
+    expect(events).toEqual([
+      "initialize:component",
+      "start:component",
+      "cancel-requested",
+      "resource-open",
+      "stop:component",
+      "resource-closed",
+      "destroy:component",
+    ]);
+  });
+
+  test("stop requests cooperative cancellation during startup", async () => {
+    const lifecycle = new LifecycleContainer();
+    const events: string[] = [];
+    const startEntered = Promise.withResolvers<void>();
+    const releaseStart = Promise.withResolvers<void>();
+    const component = new TestComponent("component", events, {
+      start: async () => {
+        startEntered.resolve();
+        await releaseStart.promise;
+      },
+      requestStop: () => {
+        events.push("cancel-requested");
+        releaseStart.resolve();
+      },
+    });
+
+    lifecycle.apply(component);
+
+    const startup = lifecycle.start();
+    await startEntered.promise;
+    const stop = lifecycle.stop();
+    const [startupResult, stopResult] = await Promise.allSettled([
+      startup,
+      stop,
+    ]);
+
+    expect(startupResult.status).toBe("rejected");
+    expect(stopResult.status).toBe("fulfilled");
+    expect(events).toEqual([
+      "initialize:component",
+      "start:component",
+      "cancel-requested",
+      "stop:component",
+      "destroy:component",
+    ]);
+  });
+
+  test("does not enter start after cancellation during initialization", async () => {
+    const lifecycle = new LifecycleContainer();
+    const events: string[] = [];
+    const initializeEntered = Promise.withResolvers<void>();
+    const releaseInitialize = Promise.withResolvers<void>();
+    const component = new TestComponent("component", events, {
+      initialize: async () => {
+        initializeEntered.resolve();
+        await releaseInitialize.promise;
+      },
+      requestStop: () => {
+        events.push("cancel-requested");
+        releaseInitialize.resolve();
+      },
+    });
+    lifecycle.apply(component);
+
+    const startup = lifecycle.start();
+    await initializeEntered.promise;
+    const shutdown = lifecycle.destroy();
+    const [startupResult, shutdownResult] = await Promise.allSettled([
+      startup,
+      shutdown,
+    ]);
+
+    expect(startupResult.status).toBe("rejected");
+    expect(shutdownResult.status).toBe("fulfilled");
+    expect(events).toEqual([
+      "initialize:component",
+      "cancel-requested",
       "destroy:component",
     ]);
   });

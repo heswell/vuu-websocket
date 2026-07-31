@@ -163,8 +163,12 @@ export abstract class RemoteProvider extends Provider {
     );
   }
 
-  doStop() {
+  requestStop() {
     this.#abortController.abort();
+  }
+
+  doStop() {
+    this.requestStop();
   }
 
   abstract remoteServiceDetails(): {
