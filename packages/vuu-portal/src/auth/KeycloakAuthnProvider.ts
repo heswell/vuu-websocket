@@ -51,6 +51,11 @@ export class KeycloakAuthnProvider implements AuthnProvider {
       KeycloakAuthnConfigKeys.clientSecret,
       "",
     );
+    if (!this.clientSecret) {
+      throw new Error(
+        "vuu.auth.keycloak.clientSecret must be configured for Keycloak token introspection",
+      );
+    }
   }
 
   async authenticate(username: string, password: string): Promise<VuuUser> {
