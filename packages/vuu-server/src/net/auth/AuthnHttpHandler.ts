@@ -27,13 +27,14 @@ export function createAuthnHttpHandler(
         status: 204,
         headers: {
           ...corsHeaders,
-          "Access-Control-Allow-Headers": "Content-Type, vuu-auth-token",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers":
+            "Authorization, Content-Type, vuu-auth-token",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         },
       });
     }
 
-    if (req.method !== "POST") {
+    if (req.method !== "GET" && req.method !== "POST") {
       return new Response(
         JSON.stringify({ error: "Method not allowed", path: "/api/authn" }),
         {
@@ -47,33 +48,17 @@ export function createAuthnHttpHandler(
     }
 
     try {
-      const body = (await req.json()) as Credentials;
-      const username = body.username?.trim();
-      const password = body.password;
-
-      if (!username || !password) {
-        console.warn(
-          `[AuthnHttpHandler] Authentication failed: missing username/password for /api/authn`,
-        );
-        return new Response(
-          JSON.stringify({ error: "username and password are required" }),
-          {
-            status: 400,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-      }
-
-      const vuuUser = await provider.authenticate(username, password);
+      const authorization = req.headers.get("Authorization");
+      const vuuUser = authorization
+        ? await authenticateBearerToken(provider, authorization)
+        : await authenticateCredentials(provider, req);
       const token = loginTokenService.getToken(vuuUser);
 
-      return new Response(null, {
+      return new Response(JSON.stringify({ token }), {
         status: 200,
         headers: {
           ...corsHeaders,
+          "Content-Type": "application/json",
           "vuu-auth-token": token,
         },
       });
@@ -96,6 +81,48 @@ export function createAuthnHttpHandler(
       );
     }
   };
+}
+
+async function authenticateBearerToken(
+  provider: AuthnProvider,
+  authorization: string,
+) {
+  const token = parseBearerToken(authorization);
+  if (!provider.authenticateBearerToken) {
+    throw new Error("Bearer token authentication is not configured");
+  }
+
+  return provider.authenticateBearerToken(token);
+}
+
+async function authenticateCredentials(provider: AuthnProvider, req: Request) {
+  if (req.method !== "POST") {
+    throw new Error("username and password must be submitted with POST");
+  }
+
+  const body = (await req.json()) as Credentials;
+  const username = body.username?.trim();
+  const password = body.password;
+
+  if (!username || !password) {
+    throw new Error("username and password are required");
+  }
+
+  return provider.authenticate(username, password);
+}
+
+function parseBearerToken(authorization: string) {
+  const match = /^Bearer:?\s+(.+)$/i.exec(authorization);
+  if (!match) {
+    throw new Error("Authorization header must contain a bearer token");
+  }
+
+  const token = match[1].trim();
+  if (!token) {
+    throw new Error("Authorization header must contain a bearer token");
+  }
+
+  return token;
 }
 
 function createCorsHeaders(req: Request, allowedOrigin: string) {

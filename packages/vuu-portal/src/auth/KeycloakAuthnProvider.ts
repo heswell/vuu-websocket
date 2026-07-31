@@ -9,7 +9,9 @@ type KeycloakTokenResponse = {
 };
 
 type KeycloakTokenPayload = {
+  active?: boolean;
   preferred_username?: string;
+  username?: string;
   exp?: number;
   realm_access?: {
     roles?: string[];
@@ -64,12 +66,55 @@ export class KeycloakAuthnProvider implements AuthnProvider {
       throw new Error("Keycloak response did not include access_token");
     }
 
-    const payload = parseJwtPayload(token.access_token);
-    const authorizations = extractAuthorizations(payload, this.clientId);
-    const resolvedUser = payload.preferred_username ?? username;
-    const expiry = payload.exp ? new Date(payload.exp * 1000) : undefined;
+    return this.createVuuUser(parseJwtPayload(token.access_token), username);
+  }
 
-    return VuuUserWithAuthorizations(resolvedUser, authorizations, expiry);
+  async authenticateBearerToken(token: string): Promise<VuuUser> {
+    const body = new URLSearchParams({
+      token,
+      client_id: this.clientId,
+    });
+    if (this.clientSecret) {
+      body.set("client_secret", this.clientSecret);
+    }
+
+    const response = await fetch(
+      `${this.baseUrl}/realms/${encodeURIComponent(this.realm)}/protocol/openid-connect/token/introspect`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        `Keycloak token validation failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const payload = (await response.json()) as KeycloakTokenPayload;
+    if (!payload.active) {
+      throw new Error("Keycloak token is inactive");
+    }
+
+    return this.createVuuUser(payload);
+  }
+
+  private createVuuUser(payload: KeycloakTokenPayload, fallbackUsername?: string) {
+    const resolvedUser =
+      payload.preferred_username ?? payload.username ?? fallbackUsername;
+    if (!resolvedUser) {
+      throw new Error("Keycloak token did not include a username");
+    }
+
+    const expiry = payload.exp ? new Date(payload.exp * 1000) : undefined;
+    return VuuUserWithAuthorizations(
+      resolvedUser,
+      extractAuthorizations(payload, this.clientId),
+      expiry,
+    );
   }
 }
 

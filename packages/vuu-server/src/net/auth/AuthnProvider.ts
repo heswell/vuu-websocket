@@ -3,6 +3,7 @@ import { VuuUserWithAuthorizations } from "../../core/auths/VuuUser";
 
 export interface AuthnProvider {
   authenticate: (username: string, password: string) => Promise<VuuUser>;
+  authenticateBearerToken?: (token: string) => Promise<VuuUser>;
 }
 
 export class PermissiveAuthnProvider implements AuthnProvider {
