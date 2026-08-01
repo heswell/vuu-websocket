@@ -1,5 +1,6 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
 export type { TableContainer } from "./core/table/TableContainer";
+export type { DataTable } from "./core/table/InMemDataTable";
 export { ProviderContainer } from "./provider/ProviderContainer";
 export { NullProvider, Provider, RemoteProvider } from "./provider/Provider";
 export type {
@@ -38,4 +39,5 @@ export { LoginTokenService } from "./net/auth/LoginTokenService";
 export { createAuthnHttpHandler } from "./net/auth/AuthnHttpHandler";
 export { PermissiveAuthnProvider } from "./net/auth/AuthnProvider";
 export type { AuthnProvider } from "./net/auth/AuthnProvider";
+export { KeycloakAuthnProvider } from "./net/auth/KeycloakAuthnProvider";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";

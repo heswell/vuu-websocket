@@ -1,0 +1,219 @@
+import {
+  AuthnProvider,
+  DataTable,
+  HttpRequestHandler,
+  TableContainer,
+} from "@heswell/vuu-server";
+
+const MODULE_REGISTRY_PATH = "/module-registry";
+
+type ModuleRecord = {
+  id: number;
+  name: string;
+  title: string;
+  description: string;
+  version: number;
+  enabled: boolean;
+  location: string;
+  mfComponent: string;
+  mfScope: string;
+  mfUrl: string;
+};
+
+type ModulePermission = {
+  moduleId: number;
+  role: string;
+};
+
+type ModuleUser = {
+  moduleId: number;
+  username: string;
+};
+
+export function createModuleRegistryHttpHandler(
+  authnProvider: AuthnProvider,
+  getTableContainer: () => TableContainer,
+): HttpRequestHandler {
+  return async (request, url) => {
+    if (url.pathname !== MODULE_REGISTRY_PATH) {
+      return undefined;
+    }
+    if (request.method !== "GET") {
+      return jsonResponse({ error: "Method not allowed" }, 405);
+    }
+
+    try {
+      const user = await authenticateRequest(authnProvider, request);
+      const tableContainer = getTableContainer();
+      const modules = readModules(tableContainer.getTable<DataTable>("modules"));
+      const modulePermissions = readModulePermissions(
+        tableContainer.getTable<DataTable>("modulePermissions"),
+      );
+      const moduleUsers = readModuleUsers(
+        tableContainer.getTable<DataTable>("moduleUsers"),
+      );
+
+      return jsonResponse({
+        modules: selectModules(
+          modules,
+          modulePermissions,
+          moduleUsers,
+          user.name,
+          user.authorizations,
+        ),
+      });
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        console.warn(
+          `[ModuleRegistry] Authentication failed: ${error.message}`,
+        );
+        return jsonResponse({ error: "Authentication failed" }, 401);
+      }
+
+      console.error(
+        `[ModuleRegistry] Failed to resolve modules: ${(error as Error).message}`,
+      );
+      return jsonResponse({ error: "Unable to resolve modules" }, 500);
+    }
+  };
+}
+
+async function authenticateRequest(authnProvider: AuthnProvider, request: Request) {
+  const authorization = request.headers.get("Authorization");
+  const token = authorization && parseBearerToken(authorization);
+  if (!token || !authnProvider.authenticateBearerToken) {
+    throw new AuthenticationError("Bearer authentication is not configured");
+  }
+
+  try {
+    const user = await authnProvider.authenticateBearerToken(token);
+    if (user.expiry.getTime() <= Date.now()) {
+      throw new Error("Bearer token is expired");
+    }
+    return user;
+  } catch (error) {
+    throw new AuthenticationError((error as Error).message);
+  }
+}
+
+function parseBearerToken(authorization: string) {
+  const match = /^Bearer:?\s+(.+)$/i.exec(authorization);
+  if (!match || !match[1].trim()) {
+    throw new AuthenticationError(
+      "Authorization header must contain a bearer token",
+    );
+  }
+  return match[1].trim();
+}
+
+function readModules(table: DataTable): ModuleRecord[] {
+  return table.rows.map((row) => ({
+    id: numberValue(table, row, "id"),
+    name: stringValue(table, row, "name"),
+    title: stringValue(table, row, "title"),
+    description: stringValue(table, row, "description"),
+    version: numberValue(table, row, "version"),
+    enabled: booleanValue(table, row, "enabled"),
+    location: stringValue(table, row, "location"),
+    mfComponent: stringValue(table, row, "mfComponent"),
+    mfScope: stringValue(table, row, "mfScope"),
+    mfUrl: stringValue(table, row, "mfUrl"),
+  }));
+}
+
+function readModulePermissions(table: DataTable): ModulePermission[] {
+  return table.rows.map((row) => ({
+    moduleId: numberValue(table, row, "module_id"),
+    role: stringValue(table, row, "role"),
+  }));
+}
+
+function readModuleUsers(table: DataTable): ModuleUser[] {
+  return table.rows.map((row) => ({
+    moduleId: numberValue(table, row, "module_id"),
+    username: stringValue(table, row, "username"),
+  }));
+}
+
+function selectModules(
+  modules: ModuleRecord[],
+  modulePermissions: ModulePermission[],
+  moduleUsers: ModuleUser[],
+  username: string,
+  authorizations: string[],
+) {
+  const permittedModuleIds = new Set<number>();
+  const roles = new Set(authorizations);
+
+  modulePermissions.forEach(({ moduleId, role }) => {
+    if (roles.has(role)) {
+      permittedModuleIds.add(moduleId);
+    }
+  });
+  moduleUsers.forEach(({ moduleId, username: permittedUsername }) => {
+    if (username === permittedUsername) {
+      permittedModuleIds.add(moduleId);
+    }
+  });
+
+  const latestByName = new Map<string, ModuleRecord>();
+  modules.forEach((module) => {
+    if (!module.enabled || !permittedModuleIds.has(module.id)) {
+      return;
+    }
+
+    const current = latestByName.get(module.name);
+    if (
+      !current ||
+      module.version > current.version ||
+      (module.version === current.version && module.id > current.id)
+    ) {
+      latestByName.set(module.name, module);
+    }
+  });
+
+  return [...latestByName.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+}
+
+function stringValue(table: DataTable, row: unknown[], column: string) {
+  const value = row[columnIndex(table, column)];
+  if (typeof value !== "string") {
+    throw new Error(`Expected ${table.name}.${column} to be a string`);
+  }
+  return value;
+}
+
+function numberValue(table: DataTable, row: unknown[], column: string) {
+  const value = row[columnIndex(table, column)];
+  if (typeof value !== "number") {
+    throw new Error(`Expected ${table.name}.${column} to be a number`);
+  }
+  return value;
+}
+
+function booleanValue(table: DataTable, row: unknown[], column: string) {
+  const value = row[columnIndex(table, column)];
+  if (typeof value !== "boolean") {
+    throw new Error(`Expected ${table.name}.${column} to be a boolean`);
+  }
+  return value;
+}
+
+function columnIndex(table: DataTable, column: string) {
+  const index = table.tableDef.columns.findIndex(({ name }) => name === column);
+  if (index === -1) {
+    throw new Error(`Table ${table.name} does not contain ${column}`);
+  }
+  return index;
+}
+
+function jsonResponse(body: object, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+class AuthenticationError extends Error {}
