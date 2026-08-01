@@ -71,12 +71,12 @@ export default async function main() {
     ConfigKeys.keycloakSyncIntervalMs,
     10_000,
   );
-  const refreshRunner = new LifeCycleRunner(
-    "keycloak-admin-refresh",
-    () => refreshCoordinator.refreshAll("scheduled"),
-    syncIntervalMs,
-  );
-  lifecycle.apply(refreshRunner).dependsOn(vuuServer);
+  // const refreshRunner = new LifeCycleRunner(
+  //   "keycloak-admin-refresh",
+  //   () => refreshCoordinator.refreshAll("scheduled"),
+  //   syncIntervalMs,
+  // );
+  // lifecycle.apply(refreshRunner).dependsOn(vuuServer);
 
   lifecycle.autoShutdownHook();
   await lifecycle.start();

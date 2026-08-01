@@ -28,7 +28,7 @@ export function createAuthnHttpHandler(
         headers: {
           ...corsHeaders,
           "Access-Control-Allow-Headers":
-            "Authorization, Content-Type, vuu-auth-token",
+            "Authorization, Content-Type",
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         },
       });
@@ -133,16 +133,16 @@ function createCorsHeaders(req: Request, allowedOrigin: string) {
   return {
     ...(allowRequestOrigin
       ? {
-          "Access-Control-Allow-Origin":
-            allowedOrigin === "*" ? "*" : allowedOrigin,
-        }
+        "Access-Control-Allow-Origin":
+          allowedOrigin === "*" ? "*" : allowedOrigin,
+      }
       : {}),
     ...(allowedOrigin === "*"
       ? {}
       : {
-          "Access-Control-Allow-Credentials": "true",
-          Vary: "Origin",
-        }),
+        "Access-Control-Allow-Credentials": "true",
+        Vary: "Origin",
+      }),
     "Access-Control-Expose-Headers": "vuu-auth-token",
     "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
   };
