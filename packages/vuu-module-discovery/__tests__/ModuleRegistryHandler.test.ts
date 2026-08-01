@@ -156,6 +156,31 @@ describe("module registry handler", () => {
     expect(response?.status).toBe(401);
   });
 
+  test("includes CORS headers on successful requests", async () => {
+    const handler = createModuleRegistryHttpHandler(
+      authenticatedProvider(["module-admin:view"]),
+      () => vuuServer.tableContainer,
+      { allowedOrigin: "http://localhost:5002" },
+    );
+    const request = new Request("https://localhost:8443/module-registry", {
+      headers: {
+        Authorization: "Bearer token",
+        Origin: "http://localhost:5002",
+      },
+    });
+
+    const response = await handler(request, new URL(request.url));
+
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get("Access-Control-Allow-Origin")).toBe(
+      "http://localhost:5002",
+    );
+    expect(response?.headers.get("Access-Control-Allow-Credentials")).toBe(
+      "true",
+    );
+    expect(response?.headers.get("Vary")).toBe("Origin");
+  });
+
   function requestModules(authorizations: string[], username = "test-user") {
     const handler = createModuleRegistryHttpHandler(
       authenticatedProvider(authorizations, username),

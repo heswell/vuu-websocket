@@ -89,19 +89,23 @@ export function createModuleRegistryHttpHandler(
           user.name,
           user.authorizations,
         ),
-      });
+      }, 200, corsHeaders);
     } catch (error) {
       if (error instanceof AuthenticationError) {
         console.warn(
           `[ModuleRegistry] Authentication failed: ${error.message}`,
         );
-        return jsonResponse({ error: "Authentication failed" }, 401);
+        return jsonResponse(
+          { error: "Authentication failed" },
+          401,
+          corsHeaders,
+        );
       }
 
       console.error(
         `[ModuleRegistry] Failed to resolve modules: ${(error as Error).message}`,
       );
-      return jsonResponse({ error: "Unable to resolve modules" }, 500);
+      return jsonResponse({ error: "Unable to resolve modules" }, 500, corsHeaders);
     }
   };
 }
@@ -237,10 +241,17 @@ function columnIndex(table: DataTable, column: string) {
   return index;
 }
 
-function jsonResponse(body: object, status = 200) {
+function jsonResponse(
+  body: object,
+  status = 200,
+  corsHeaders: Record<string, string> = {},
+) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
   });
 }
 
