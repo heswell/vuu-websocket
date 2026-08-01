@@ -33,7 +33,7 @@ type ModuleUser = {
 };
 
 export function createModuleRegistryHttpHandler(
-  authnProvider: AuthProvider,
+  authProvider: AuthProvider,
   getTableContainer: () => TableContainer,
   { allowedOrigin = "*" }: HttpHandlerOptions = {},
 
@@ -52,7 +52,7 @@ export function createModuleRegistryHttpHandler(
           ...corsHeaders,
           "Access-Control-Allow-Headers":
             "Authorization, Content-Type",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
         },
       });
     }
@@ -71,7 +71,7 @@ export function createModuleRegistryHttpHandler(
     }
 
     try {
-      const user = await authenticateRequest(authnProvider, req);
+      const user = await authenticateRequest(authProvider, req);
       const tableContainer = getTableContainer();
       const modules = readModules(tableContainer.getTable<DataTable>("modules"));
       const modulePermissions = readModulePermissions(
@@ -106,15 +106,15 @@ export function createModuleRegistryHttpHandler(
   };
 }
 
-async function authenticateRequest(authnProvider: AuthProvider, request: Request) {
+async function authenticateRequest(authProvider: AuthProvider, request: Request) {
   const authorization = request.headers.get("Authorization");
   const token = authorization && parseBearerToken(authorization);
-  if (!token || !authnProvider.authenticateBearerToken) {
+  if (!token || !authProvider.authenticateBearerToken) {
     throw new AuthenticationError("Bearer authentication is not configured");
   }
 
   try {
-    const user = await authnProvider.authenticateBearerToken(token);
+    const user = await authProvider.authenticateBearerToken(token);
     if (user.expiry.getTime() <= Date.now()) {
       throw new Error("Bearer token is expired");
     }

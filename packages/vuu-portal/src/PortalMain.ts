@@ -43,11 +43,11 @@ function createWebSocketOptions(config: Config): VuuWebSocketOptions {
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
-  const authnProvider = createAuthProvider(defaultConfig);
+  const authProvider = createAuthProvider(defaultConfig);
   const loginTokenService = LoginTokenService();
   const httpServerOptions: HttpServerOptions = {
     httpsPort: 8443,
-    requestHandler: createHttpHandler(authnProvider, loginTokenService, {
+    requestHandler: createHttpHandler(authProvider, loginTokenService, {
       allowedOrigin: defaultConfig.getString(
         ConfigKeys.authCorsAllowedOrigin,
         "http://localhost:5002",

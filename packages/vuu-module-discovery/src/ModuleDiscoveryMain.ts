@@ -22,21 +22,27 @@ const ConfigKeys = {
 } as const;
 
 export default async function main() {
-  const config = ConfigFactory.load();
+  const defaultConfig = ConfigFactory.load();
   const lifecycle = new LifecycleContainer();
-  const authnProvider = new KeycloakAuthProvider(config);
+  const authProvider = new KeycloakAuthProvider(defaultConfig);
   let vuuServer: VuuServer | undefined;
 
   const serverConfig = VuuServerConfig(
-    createWebSocketOptions(config),
+    createWebSocketOptions(defaultConfig),
     {
-      httpsPort: config.getNumber(ConfigKeys.registryPort, 8443),
-      requestHandler: createModuleRegistryHttpHandler(authnProvider, () => {
+      httpsPort: defaultConfig.getNumber(ConfigKeys.registryPort, 8443),
+      requestHandler: createModuleRegistryHttpHandler(authProvider, () => {
         if (!vuuServer) {
           throw new Error("Module-discovery server has not been initialized");
         }
         return vuuServer.tableContainer;
+      }, {
+        allowedOrigin: defaultConfig.getString(
+          ConfigKeys.authCorsAllowedOrigin,
+          "http://localhost:5002",
+        ),
       }),
+
     },
     LoginTokenService(),
   ).withModule(ModuleDiscoveryModule());

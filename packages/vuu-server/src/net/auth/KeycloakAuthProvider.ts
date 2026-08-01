@@ -82,6 +82,8 @@ export class KeycloakAuthProvider implements AuthProvider {
       body.set("client_secret", this.clientSecret);
     }
 
+    console.log(body.toJSON())
+
     const response = await fetch(
       `${this.baseUrl}/realms/${encodeURIComponent(this.realm)}/protocol/openid-connect/token/introspect`,
       {
