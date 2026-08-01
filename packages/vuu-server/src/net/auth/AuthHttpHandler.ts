@@ -1,7 +1,8 @@
 import { LoginTokenService } from "./LoginTokenService";
-import { AuthnProvider } from "./AuthnProvider";
+import { AuthProvider } from "./AuthProvider";
+import { HttpRequestHandler } from "../../core/VuuServerOptions";
 
-export type AuthnHttpHandlerOptions = {
+export type HttpHandlerOptions = {
   allowedOrigin?: string;
 };
 
@@ -10,12 +11,12 @@ type Credentials = {
   password?: string;
 };
 
-export function createAuthnHttpHandler(
-  provider: AuthnProvider,
+export function createHttpHandler(
+  authProvider: AuthProvider,
   loginTokenService: LoginTokenService,
-  { allowedOrigin = "*" }: AuthnHttpHandlerOptions = {},
-) {
-  return async (req: Request, url: URL) => {
+  { allowedOrigin = "*" }: HttpHandlerOptions = {},
+): HttpRequestHandler {
+  return async (req, url) => {
     if (url.pathname !== "/api/authn") {
       return undefined;
     }
@@ -50,8 +51,8 @@ export function createAuthnHttpHandler(
     try {
       const authorization = req.headers.get("Authorization");
       const vuuUser = authorization
-        ? await authenticateBearerToken(provider, authorization)
-        : await authenticateCredentials(provider, req);
+        ? await authenticateBearerToken(authProvider, authorization)
+        : await authenticateCredentials(authProvider, req);
       const token = loginTokenService.getToken(vuuUser);
 
       return new Response(JSON.stringify({ token }), {
@@ -64,7 +65,7 @@ export function createAuthnHttpHandler(
       });
     } catch (error) {
       console.warn(
-        `[AuthnHttpHandler] Authentication failed for /api/authn: ${(error as Error).message}`,
+        `[AuthHttpHandler] Authentication failed for /api/authn: ${(error as Error).message}`,
       );
       return new Response(
         JSON.stringify({
@@ -84,7 +85,7 @@ export function createAuthnHttpHandler(
 }
 
 async function authenticateBearerToken(
-  provider: AuthnProvider,
+  provider: AuthProvider,
   authorization: string,
 ) {
   const token = parseBearerToken(authorization);
@@ -95,7 +96,7 @@ async function authenticateBearerToken(
   return provider.authenticateBearerToken(token);
 }
 
-async function authenticateCredentials(provider: AuthnProvider, req: Request) {
+async function authenticateCredentials(provider: AuthProvider, req: Request) {
   if (req.method !== "POST") {
     throw new Error("username and password must be submitted with POST");
   }
@@ -125,7 +126,7 @@ function parseBearerToken(authorization: string) {
   return token;
 }
 
-function createCorsHeaders(req: Request, allowedOrigin: string) {
+export function createCorsHeaders(req: Request, allowedOrigin: string) {
   const requestOrigin = req.headers.get("Origin");
   const allowRequestOrigin =
     allowedOrigin === "*" || requestOrigin === allowedOrigin;

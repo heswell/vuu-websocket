@@ -1,13 +1,13 @@
 import { VuuUser } from "../../core/auths/VuuUser";
 import { VuuUserWithAuthorizations } from "../../core/auths/VuuUser";
 
-export interface AuthnProvider {
+export interface AuthProvider {
   authenticate: (username: string, password: string) => Promise<VuuUser>;
   authenticateBearerToken?: (token: string) => Promise<VuuUser>;
 }
 
-export class PermissiveAuthnProvider implements AuthnProvider {
-  constructor(private users: Array<[string, string]> = []) {}
+export class PermissiveAuthProvider implements AuthProvider {
+  constructor(private users: Array<[string, string]> = []) { }
 
   async authenticate(username: string, password: string): Promise<VuuUser> {
     if (!username || !password) {

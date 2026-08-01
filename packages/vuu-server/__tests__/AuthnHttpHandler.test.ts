@@ -3,7 +3,7 @@ import {
   VuuUser,
   VuuUserWithAuthorizations,
 } from "../src/core/auths/VuuUser";
-import { createAuthnHttpHandler } from "../src/net/auth/AuthnHttpHandler";
+import { createHttpHandler } from "../src/net/auth/AuthHttpHandler";
 import { LoginTokenService } from "../src/net/auth/LoginTokenService";
 
 const CLIENT_ORIGIN = "http://localhost:5002";
@@ -11,7 +11,7 @@ const CLIENT_ORIGIN = "http://localhost:5002";
 function createHandler(
   authenticateBearerToken?: (token: string) => Promise<VuuUser>,
 ) {
-  return createAuthnHttpHandler(
+  return createHttpHandler(
     {
       authenticate: async (username) =>
         VuuUserWithAuthorizations(username, []),

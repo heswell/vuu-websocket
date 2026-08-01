@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
-  AuthnProvider,
+  AuthProvider,
   LifecycleContainer,
   LoginTokenService,
   VuuServer,
@@ -172,7 +172,7 @@ describe("module registry handler", () => {
 function authenticatedProvider(
   authorizations: string[],
   username = "test-user",
-): AuthnProvider {
+): AuthProvider {
   return {
     authenticate: async (name) => VuuUserWithAuthorizations(name),
     authenticateBearerToken: async () =>

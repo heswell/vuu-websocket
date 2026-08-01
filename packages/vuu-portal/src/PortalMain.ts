@@ -1,7 +1,7 @@
 import {
   Config,
   ConfigFactory,
-  createAuthnHttpHandler,
+  createHttpHandler as createHttpHandler,
   HttpServerOptions,
   LifecycleContainer,
   LoginTokenService,
@@ -10,7 +10,7 @@ import {
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { createAuthnProvider } from "./auth/createAuthnProvider";
+import { createAuthProvider } from "./auth/createAuthProvider";
 import { KeycloakAdminModule } from "./modules/keycloak-admin";
 import { LifeCycleRunner } from "@heswell/vuu-server";
 import { installKeycloakAdminRefreshCoordinator } from "./modules/keycloak-admin/KeycloakAdminRefreshCoordinator";
@@ -43,11 +43,11 @@ function createWebSocketOptions(config: Config): VuuWebSocketOptions {
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
-  const authnProvider = createAuthnProvider(defaultConfig);
+  const authnProvider = createAuthProvider(defaultConfig);
   const loginTokenService = LoginTokenService();
   const httpServerOptions: HttpServerOptions = {
     httpsPort: 8443,
-    requestHandler: createAuthnHttpHandler(authnProvider, loginTokenService, {
+    requestHandler: createHttpHandler(authnProvider, loginTokenService, {
       allowedOrigin: defaultConfig.getString(
         ConfigKeys.authCorsAllowedOrigin,
         "http://localhost:5002",

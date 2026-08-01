@@ -1,7 +1,7 @@
 import {
   Config,
   ConfigFactory,
-  KeycloakAuthnProvider,
+  KeycloakAuthProvider,
   LifecycleContainer,
   LoginTokenService,
   VuuServer,
@@ -17,13 +17,14 @@ const ConfigKeys = {
   certPath: "vuu.certPath",
   keyPath: "vuu.keyPath",
   port: "vuu.port",
+  authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   registryPort: "vuu.moduleRegistry.port",
 } as const;
 
 export default async function main() {
   const config = ConfigFactory.load();
   const lifecycle = new LifecycleContainer();
-  const authnProvider = new KeycloakAuthnProvider(config);
+  const authnProvider = new KeycloakAuthProvider(config);
   let vuuServer: VuuServer | undefined;
 
   const serverConfig = VuuServerConfig(
@@ -52,10 +53,10 @@ function createWebSocketOptions(config: Config): VuuWebSocketOptions {
 
   return config.getBoolean(ConfigKeys.sslEnabled)
     ? options.withSsl(
-        VuuSslByCertAndKey(
-          config.getPath(ConfigKeys.certPath),
-          config.getPath(ConfigKeys.keyPath),
-        ),
-      )
+      VuuSslByCertAndKey(
+        config.getPath(ConfigKeys.certPath),
+        config.getPath(ConfigKeys.keyPath),
+      ),
+    )
     : options.withSslDisabled();
 }

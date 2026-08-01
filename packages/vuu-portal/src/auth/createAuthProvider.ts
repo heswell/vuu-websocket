@@ -1,28 +1,28 @@
 import {
-  AuthnProvider,
+  AuthProvider,
   Config,
-  PermissiveAuthnProvider,
+  PermissiveAuthProvider,
 } from "@heswell/vuu-server";
-import { KeycloakAuthnProvider } from "./KeycloakAuthnProvider";
+import { KeycloakAuthProvider } from "@heswell/vuu-server";
 
 const AuthConfigKeys = {
   mode: "vuu.auth.mode",
   permissiveUsers: "vuu.auth.permissive.users",
 } as const;
 
-export function createAuthnProvider(config: Config): AuthnProvider {
+export function createAuthProvider(config: Config): AuthProvider {
   const mode = config
     .getString(AuthConfigKeys.mode, process.env.VUU_AUTH_MODE ?? "keycloak")
     .toLowerCase();
 
   if (mode === "permissive") {
-    return new PermissiveAuthnProvider(
+    return new PermissiveAuthProvider(
       parsePermissiveUsers(config.getString(AuthConfigKeys.permissiveUsers, "")),
     );
   }
 
   if (mode === "keycloak") {
-    return new KeycloakAuthnProvider();
+    return new KeycloakAuthProvider();
   }
 
   throw new Error(

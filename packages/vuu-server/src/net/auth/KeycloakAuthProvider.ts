@@ -1,8 +1,8 @@
 import { VuuUser, VuuUserWithAuthorizations } from "../../core/auths/VuuUser";
 import { Config, ConfigFactory } from "../../util/ConfigFactory";
-import { AuthnProvider } from "./AuthnProvider";
+import { AuthProvider } from "./AuthProvider";
 
-const KeycloakAuthnConfigKeys = {
+const KeycloakAuthConfigKeys = {
   url: "vuu.keycloak.url",
   realm: "vuu.keycloak.realm",
   clientId: "vuu.auth.keycloak.clientId",
@@ -23,7 +23,7 @@ type KeycloakTokenPayload = {
   groups?: string[];
 };
 
-export class KeycloakAuthnProvider implements AuthnProvider {
+export class KeycloakAuthProvider implements AuthProvider {
   private readonly baseUrl: string;
   private readonly realm: string;
   private readonly clientId: string;
@@ -31,15 +31,15 @@ export class KeycloakAuthnProvider implements AuthnProvider {
 
   constructor(config: Config = ConfigFactory.load()) {
     this.baseUrl = config
-      .getString(KeycloakAuthnConfigKeys.url, "http://localhost:8080")
+      .getString(KeycloakAuthConfigKeys.url, "http://localhost:8080")
       .replace(/\/$/, "");
-    this.realm = config.getString(KeycloakAuthnConfigKeys.realm, "vuu");
+    this.realm = config.getString(KeycloakAuthConfigKeys.realm, "vuu");
     this.clientId = config.getString(
-      KeycloakAuthnConfigKeys.clientId,
+      KeycloakAuthConfigKeys.clientId,
       "vuu-portal",
     );
     this.clientSecret = config.getString(
-      KeycloakAuthnConfigKeys.clientSecret,
+      KeycloakAuthConfigKeys.clientSecret,
       "",
     );
   }

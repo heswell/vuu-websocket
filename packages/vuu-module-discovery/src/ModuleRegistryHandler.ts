@@ -1,6 +1,8 @@
 import {
-  AuthnProvider,
+  AuthProvider,
+  createCorsHeaders,
   DataTable,
+  HttpHandlerOptions,
   HttpRequestHandler,
   TableContainer,
 } from "@heswell/vuu-server";
@@ -31,19 +33,45 @@ type ModuleUser = {
 };
 
 export function createModuleRegistryHttpHandler(
-  authnProvider: AuthnProvider,
+  authnProvider: AuthProvider,
   getTableContainer: () => TableContainer,
+  { allowedOrigin = "*" }: HttpHandlerOptions = {},
+
 ): HttpRequestHandler {
-  return async (request, url) => {
+  return async (req, url) => {
     if (url.pathname !== MODULE_REGISTRY_PATH) {
       return undefined;
     }
-    if (request.method !== "GET") {
-      return jsonResponse({ error: "Method not allowed" }, 405);
+
+    const corsHeaders = createCorsHeaders(req, allowedOrigin);
+
+    if (req.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          ...corsHeaders,
+          "Access-Control-Allow-Headers":
+            "Authorization, Content-Type",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        },
+      });
+    }
+
+    if (req.method !== "GET") {
+      return new Response(
+        JSON.stringify({ error: "Method not allowed", path: MODULE_REGISTRY_PATH }),
+        {
+          status: 405,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
     }
 
     try {
-      const user = await authenticateRequest(authnProvider, request);
+      const user = await authenticateRequest(authnProvider, req);
       const tableContainer = getTableContainer();
       const modules = readModules(tableContainer.getTable<DataTable>("modules"));
       const modulePermissions = readModulePermissions(
@@ -78,7 +106,7 @@ export function createModuleRegistryHttpHandler(
   };
 }
 
-async function authenticateRequest(authnProvider: AuthnProvider, request: Request) {
+async function authenticateRequest(authnProvider: AuthProvider, request: Request) {
   const authorization = request.headers.get("Authorization");
   const token = authorization && parseBearerToken(authorization);
   if (!token || !authnProvider.authenticateBearerToken) {
@@ -216,4 +244,4 @@ function jsonResponse(body: object, status = 200) {
   });
 }
 
-class AuthenticationError extends Error {}
+class AuthenticationError extends Error { }
