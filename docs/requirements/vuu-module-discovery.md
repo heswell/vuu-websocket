@@ -73,6 +73,27 @@ existing Vuu sample modules. It must preserve table definitions and provider
 boundaries so that persistent providers can be introduced without changing
 the public table contract.
 
+### Initial Preloaded Modules
+
+Preload the following enabled module rows when the module-discovery server
+starts. These rows establish the initial registry data available for
+role-authorized users.
+
+| id | name | title | description | version | enabled | location | mfComponent | mfScope | mfUrl |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `1` | `module-admin` | Manage remote modules | Create new remote module, update existing modules | `1` | `true` | `/Modules/Manage Modules` | `ModuleAdmin` | `ModuleAdmin` | `http://localhost:5008` |
+| `2` | `user-admin` | Manage users | Add, remove and update users | `1` | `true` | `/Users/Manage Users` | `UserAdmin` | `UserAdmin` | `http://localhost:5009` |
+
+Preload the corresponding role grants in `modulePermissions`. There are no
+initial `moduleUsers` rows.
+
+| id | module_id | role |
+| --- | --- | --- |
+| `1` | `1` | `module-admin:view` |
+| `2` | `1` | `module-admin:edit` |
+| `3` | `2` | `user-admin:view` |
+| `4` | `2` | `user-admin:edit` |
+
 ## Vuu Module Service
 
 1. Register all three tables in a `ModuleFactory` module.
