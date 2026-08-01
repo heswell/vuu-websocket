@@ -174,6 +174,16 @@ function selectModules(
   username: string,
   authorizations: string[],
 ) {
+
+
+  console.log(`selectModules
+      authorizations: ${authorizations.join(",")}
+    `)
+  console.table(modulePermissions);
+  console.table(moduleUsers)
+  console.table(modules)
+
+
   const permittedModuleIds = new Set<number>();
   const roles = new Set(authorizations);
 

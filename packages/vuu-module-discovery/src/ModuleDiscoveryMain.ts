@@ -9,7 +9,7 @@ import {
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { ModuleDiscoveryModule } from "./ModuleDiscoveryModule";
+import { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 import { createModuleRegistryHttpHandler } from "./ModuleRegistryHandler";
 
 const ConfigKeys = {
