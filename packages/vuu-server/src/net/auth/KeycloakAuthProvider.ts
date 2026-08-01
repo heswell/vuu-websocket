@@ -7,7 +7,14 @@ const KeycloakAuthConfigKeys = {
   realm: "vuu.keycloak.realm",
   clientId: "vuu.auth.keycloak.clientId",
   clientSecret: "vuu.auth.keycloak.clientSecret",
+  allowSelfSignedCert: "vuu.keycloak.allowSelfSignedCert",
 } as const;
+
+type BunFetchInit = RequestInit & {
+  tls?: {
+    rejectUnauthorized?: boolean;
+  };
+};
 
 type KeycloakTokenResponse = {
   access_token?: string;
@@ -28,6 +35,7 @@ export class KeycloakAuthProvider implements AuthProvider {
   private readonly realm: string;
   private readonly clientId: string;
   private readonly clientSecret: string;
+  private readonly allowSelfSignedCert: boolean;
 
   constructor(config: Config = ConfigFactory.load()) {
     this.baseUrl = config
@@ -42,6 +50,10 @@ export class KeycloakAuthProvider implements AuthProvider {
       KeycloakAuthConfigKeys.clientSecret,
       "",
     );
+    this.allowSelfSignedCert = config.getBoolean(
+      KeycloakAuthConfigKeys.allowSelfSignedCert,
+      false,
+    );
   }
 
   async authenticate(username: string, password: string): Promise<VuuUser> {
@@ -55,7 +67,7 @@ export class KeycloakAuthProvider implements AuthProvider {
       body.set("client_secret", this.clientSecret);
     }
 
-    const response = await fetch(
+    const response = await this.keycloakFetch(
       `${this.baseUrl}/realms/${encodeURIComponent(this.realm)}/protocol/openid-connect/token`,
       {
         method: "POST",
@@ -82,9 +94,7 @@ export class KeycloakAuthProvider implements AuthProvider {
       body.set("client_secret", this.clientSecret);
     }
 
-    console.log(body.toJSON())
-
-    const response = await fetch(
+    const response = await this.keycloakFetch(
       `${this.baseUrl}/realms/${encodeURIComponent(this.realm)}/protocol/openid-connect/token/introspect`,
       {
         method: "POST",
@@ -103,6 +113,18 @@ export class KeycloakAuthProvider implements AuthProvider {
       throw new Error("Keycloak token is inactive");
     }
     return this.createVuuUser(payload);
+  }
+
+  private keycloakFetch(url: string, init: RequestInit) {
+    const requestInit: BunFetchInit = { ...init };
+    if (url.startsWith("https://") && this.allowSelfSignedCert) {
+      requestInit.tls = {
+        ...(requestInit.tls ?? {}),
+        rejectUnauthorized: false,
+      };
+    }
+
+    return fetch(url, requestInit);
   }
 
   private createVuuUser(payload: KeycloakTokenPayload, fallbackUsername?: string) {
