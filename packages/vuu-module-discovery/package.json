@@ -1,0 +1,21 @@
+{
+  "name": "@heswell/vuu-module-discovery",
+  "version": "1.0.0",
+  "description": "Vuu server for module-federation discovery",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "etsc",
+    "build:vuu": "node ../../scripts/build.mjs"
+  },
+  "author": "heswell",
+  "license": "MIT",
+  "dependencies": {
+    "@heswell/vuu-server": "3.0.0"
+  }
+}
