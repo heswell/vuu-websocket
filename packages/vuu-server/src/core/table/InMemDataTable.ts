@@ -32,8 +32,11 @@ export interface DataTable {
   columnForName: (columnName: string) => Column;
   columnMap: ColumnMap;
   columnValueProvider: ColumnValueProvider;
+  delete: (key: string) => void;
   getRowAtKey(key: string, throwIfMissing?: true): VuuDataRow;
   getRowAtKey(key: string, throwIfMissing: false): VuuDataRow | undefined;
+  indexOfKeyField: number;
+  insert: (row: VuuDataRow, emitEvent?: boolean) => void;
   provider: IProvider | undefined;
   name: string;
   rowIndexAtKey: (key: string) => number;
@@ -41,6 +44,7 @@ export interface DataTable {
   schema: TableSchema;
   tableDef: TableDef;
   update: (rowIndex: number, row: VuuDataRow, column?: string) => void;
+  upsert: (row: VuuDataRow, emitEvent?: boolean) => void;
 }
 
 export class InMemDataTable extends Table implements DataTable {
