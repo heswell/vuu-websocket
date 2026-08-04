@@ -18,39 +18,23 @@ import { installKeycloakAdminRefreshCoordinator } from "./modules/keycloak-admin
 const ConfigKeys = {
   sslEnabled: "vuu.ssl",
   certPath: "vuu.certPath",
+  httpsPort: "vuu.https.port",
   keyPath: "vuu.keyPath",
-  port: "vuu.port",
+  websocketPort: "vuu.websocket.port",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   keycloakSyncIntervalMs: "vuu.keycloak.sync.intervalMs",
 } as const;
 
-function createWebSocketOptions(config: Config): VuuWebSocketOptions {
-  const options = VuuWebSocketOptions()
-    .withUri("websocket")
-    .withWsPort(config.getNumber(ConfigKeys.port, 8091));
-
-  if (config.getBoolean(ConfigKeys.sslEnabled)) {
-    return options.withSsl(
-      VuuSslByCertAndKey(
-        config.getPath(ConfigKeys.certPath),
-        config.getPath(ConfigKeys.keyPath),
-      ),
-    );
-  }
-
-  return options.withSslDisabled();
-}
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
   const authProvider = createAuthProvider(defaultConfig);
   const loginTokenService = LoginTokenService();
   const httpServerOptions: HttpServerOptions = {
-    httpsPort: 8443,
+    httpsPort: defaultConfig.getNumber(ConfigKeys.httpsPort, 8443),
     requestHandler: createHttpHandler(authProvider, loginTokenService, {
       allowedOrigin: defaultConfig.getString(
-        ConfigKeys.authCorsAllowedOrigin,
-        "http://localhost:5002",
+        ConfigKeys.authCorsAllowedOrigin
       ),
     }),
   };
@@ -80,4 +64,21 @@ export default async function main() {
 
   lifecycle.autoShutdownHook();
   await lifecycle.start();
+}
+
+function createWebSocketOptions(config: Config): VuuWebSocketOptions {
+  const options = VuuWebSocketOptions()
+    .withUri("websocket")
+    .withWsPort(config.getNumber(ConfigKeys.websocketPort, 8091));
+
+  if (config.getBoolean(ConfigKeys.sslEnabled)) {
+    return options.withSsl(
+      VuuSslByCertAndKey(
+        config.getPath(ConfigKeys.certPath),
+        config.getPath(ConfigKeys.keyPath),
+      ),
+    );
+  }
+
+  return options.withSslDisabled();
 }

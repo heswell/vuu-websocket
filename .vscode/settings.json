@@ -25,5 +25,6 @@
         "statusBar.debuggingBackground": "#f14e02",
         "statusBar.debuggingForeground": "#e7e7e7"
     },
-    "peacock.color": "#f14e02"
+    "peacock.color": "#f14e02",
+     "workbench.experimental.modernUI": false
 }

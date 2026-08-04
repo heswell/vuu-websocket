@@ -34,7 +34,7 @@ const modules = [
     "/Users/Manage Users",
     "UserAdmin",
     "UserAdmin",
-    "http://localhost:5009",
+    "http://localhost:5007",
   ],
 ];
 

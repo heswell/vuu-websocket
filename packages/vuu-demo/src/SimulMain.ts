@@ -51,17 +51,17 @@ export default async function main() {
 }
 
 
-const ConfigKeys  = {
-   sslEnabled : "vuu.ssl",
-   certPath : "vuu.certPath",
-   keyPath : "vuu.keyPath",
-   port: "vuu.port",
+const ConfigKeys = {
+  sslEnabled: "vuu.ssl",
+  certPath: "vuu.certPath",
+  keyPath: "vuu.keyPath",
+  websocketPort: "vuu.websocket.port",
 } as const;
 
 function createWebSocketOptions(c: Config): VuuWebSocketOptions {
   const options = VuuWebSocketOptions()
-      .withUri("websocket")
-      .withWsPort(c.getNumber(ConfigKeys.port, 8091));
+    .withUri("websocket")
+    .withWsPort(c.getNumber(ConfigKeys.port, 8091));
 
   if (c.getBoolean(ConfigKeys.sslEnabled)) {
     return options.withSsl(VuuSslByCertAndKey(c.getPath(ConfigKeys.certPath), c.getPath(ConfigKeys.keyPath)))
