@@ -1,6 +1,7 @@
 import { Table } from "@heswell/data";
 import { JoinTableDef } from "../../api/TableDef";
 import { JoinTableProvider } from "../../provider/JoinTableProvider";
+import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
 export class JoinTable extends Table {
   constructor(
@@ -44,12 +45,25 @@ export class JoinTable extends Table {
 
   rowAt(rowIdx: number) {
     const baseRow = this.baseTable.rowAt(rowIdx);
-    const key = baseRow[this.baseTable.indexOfKeyField] as string;
-    const joinIndex = this.joinTable.rowIndexAtKey(key);
+    const { left, right } = this.tableDef.joins.joinSpec;
+    const joinValue = baseRow[this.baseTable.columnMap[left]];
+    const rightColumnIndex = this.joinTable.columnMap[right];
+    const joinIndex =
+      rightColumnIndex === this.joinTable.indexOfKeyField
+        ? this.joinTable.rowIndexAtKey(String(joinValue))
+        : this.joinTable.rows.findIndex(
+            (row) => row[rightColumnIndex] === joinValue,
+          );
+    const joinRow = this.joinTable.rowAt(joinIndex);
 
-    const joinRow = this.joinTable
-      .rowAt(joinIndex)
-      ?.toSpliced(this.joinTable.indexOfKeyField, 1);
-    return baseRow.concat(joinRow);
+    return this.tableDef.joinColumns.map(({ name }) => {
+      const baseColumnIndex = this.baseTable.columnMap[name];
+      if (baseColumnIndex !== undefined) {
+        return baseRow[baseColumnIndex];
+      }
+
+      const joinColumnIndex = this.joinTable.columnMap[name];
+      return joinRow?.[joinColumnIndex] ?? null;
+    }) as VuuDataRow;
   }
 }
