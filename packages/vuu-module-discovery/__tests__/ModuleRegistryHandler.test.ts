@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
-  AuthProvider,
+  BearerTokenAuthProvider,
+  composeHttpHandlers,
+  createAuthHttpHandler,
   LifecycleContainer,
   LoginTokenService,
   VuuServer,
@@ -181,6 +183,36 @@ describe("module registry handler", () => {
     expect(response?.headers.get("Vary")).toBe("Origin");
   });
 
+  test("composes authentication and module-registry endpoints", async () => {
+    const provider = authenticatedProvider(["module-admin:view"]);
+    const handler = composeHttpHandlers(
+      createAuthHttpHandler(
+        { bearerToken: provider },
+        LoginTokenService(),
+        { path: "/remote/auth" },
+      ),
+      createModuleRegistryHttpHandler(
+        provider,
+        () => vuuServer.tableContainer,
+      ),
+    );
+    const authRequest = new Request("https://localhost:8443/remote/auth", {
+      method: "POST",
+      headers: { Authorization: "Bearer keycloak-token" },
+    });
+    const registryRequest = new Request(
+      "https://localhost:8443/module-registry",
+      { headers: { Authorization: "Bearer keycloak-token" } },
+    );
+
+    expect(
+      (await handler(authRequest, new URL(authRequest.url)))?.status,
+    ).toBe(200);
+    expect(
+      (await handler(registryRequest, new URL(registryRequest.url)))?.status,
+    ).toBe(200);
+  });
+
   function requestModules(authorizations: string[], username = "test-user") {
     const handler = createModuleRegistryHttpHandler(
       authenticatedProvider(authorizations, username),
@@ -197,9 +229,8 @@ describe("module registry handler", () => {
 function authenticatedProvider(
   authorizations: string[],
   username = "test-user",
-): AuthProvider {
+): BearerTokenAuthProvider {
   return {
-    authenticate: async (name) => VuuUserWithAuthorizations(name),
     authenticateBearerToken: async () =>
       VuuUserWithAuthorizations(username, authorizations),
   };

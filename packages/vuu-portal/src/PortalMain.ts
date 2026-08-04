@@ -1,7 +1,7 @@
 import {
   Config,
   ConfigFactory,
-  createHttpHandler as createHttpHandler,
+  createAuthHttpHandler,
   HttpServerOptions,
   LifecycleContainer,
   LoginTokenService,
@@ -22,9 +22,9 @@ const ConfigKeys = {
   keyPath: "vuu.keyPath",
   websocketPort: "vuu.websocket.port",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
+  authPath: "vuu.auth.path",
   keycloakSyncIntervalMs: "vuu.keycloak.sync.intervalMs",
 } as const;
-
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
@@ -32,10 +32,12 @@ export default async function main() {
   const loginTokenService = LoginTokenService();
   const httpServerOptions: HttpServerOptions = {
     httpsPort: defaultConfig.getNumber(ConfigKeys.httpsPort, 8443),
-    requestHandler: createHttpHandler(authProvider, loginTokenService, {
+    requestHandler: createAuthHttpHandler(authProvider, loginTokenService, {
       allowedOrigin: defaultConfig.getString(
-        ConfigKeys.authCorsAllowedOrigin
+        ConfigKeys.authCorsAllowedOrigin,
+        "http://localhost:5002",
       ),
+      path: defaultConfig.getString(ConfigKeys.authPath, "/api/authn"),
     }),
   };
   const lifecycle = new LifecycleContainer();
