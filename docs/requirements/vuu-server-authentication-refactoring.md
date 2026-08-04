@@ -88,7 +88,7 @@ flowchart LR
     Keycloak -->|"subject access token"| Browser
 
     Browser -->|"subject token"| PortalAuth
-    PortalAuth -->|"introspect"| Keycloak
+   PortalAuth -->|"introspect / exchange for portal client"| Keycloak
     PortalAuth --> PortalLoginTokens
     PortalLoginTokens -->|"portal VUU token"| Browser
     Browser -->|"LOGIN portal VUU token"| PortalWs
@@ -243,8 +243,8 @@ The shared implementation MUST support these policies:
 | `exchange-if-needed` | Use the incoming token when correctly scoped; otherwise exchange it for a token scoped to the server client |
 | `always-exchange` | Always perform token exchange and use the resulting token claims |
 
-Production defaults SHOULD be `require-audience` for the portal and
-`exchange-if-needed` for remote-module servers.
+Production defaults SHOULD be `exchange-if-needed` for both portal and
+remote-module servers, with per-server client IDs and audiences.
 
 ### 7.3 Token exchange for a remote client
 
@@ -275,7 +275,33 @@ The subject and exchanged Keycloak tokens MUST be held only for the duration of
 the request. Neither token is stored in `LoginTokenService` or returned in the
 response.
 
-### 7.4 Resulting VUU identity
+### 7.4 Keycloak client topology and bootstrap
+
+The realm bootstrap MUST support a shared public browser client plus multiple
+confidential server clients.
+
+Minimum local topology:
+
+- public client: `vuu-portal`;
+- confidential client: `vuu-portal-server`; and
+- confidential client: `vuu-module-discovery-server`.
+
+The bootstrap process MUST be extensible so additional server clients can be
+added without duplicating client-creation logic.
+
+For each confidential server client, bootstrap MUST:
+
+- create the client when missing (or update when present);
+- enable standard token exchange (`standard.token.exchange.enabled=true`);
+- keep the client confidential with service-account capability; and
+- retrieve or rotate the client secret via Keycloak Admin API as needed.
+
+For the public `vuu-portal` client, bootstrap MUST ensure every configured
+server client is included in access-token audience via audience protocol
+mappers. This allows each backend server client to exchange the subject token
+for its own scoped token under `exchange-if-needed`.
+
+### 7.5 Resulting VUU identity
 
 The VUU login token MUST be issued from the validated claims of:
 
@@ -501,6 +527,7 @@ During migration, the public VUU WebSocket protocol and the successful
 ### 14.2 Portal tests
 
 - SSO access-token exchange succeeds in Keycloak mode;
+- a fresh `vuu-portal` token includes every configured server client in `aud`;
 - demo credentials succeed only in an explicitly enabled demo mode;
 - demo credentials are rejected in Keycloak-only mode;
 - invalid Keycloak authentication never falls back to permissive
@@ -520,6 +547,14 @@ During migration, the public VUU WebSocket protocol and the successful
 - existing username, role, disabled-module, version, and tie-break rules remain
   unchanged; and
 - username/password authentication is rejected.
+
+### 14.4 Keycloak bootstrap script tests
+
+- bootstrap creates or updates all configured confidential server clients;
+- each server client has `standard.token.exchange.enabled=true`;
+- `vuu-portal` has audience mappers for all configured server clients; and
+- adding a new server client entry to the list produces the expected client and
+   audience mapping without additional bespoke code.
 
 ## 15. Acceptance criteria
 
@@ -545,3 +580,6 @@ During migration, the public VUU WebSocket protocol and the successful
 11. Each application can override the authentication endpoint with
     `vuu.auth.path` in `application.conf`; when omitted, the path is
     `/api/authn`.
+12. Keycloak bootstrap creates a public portal client plus all configured
+   confidential server clients, enables standard token exchange for each
+   server client, and maps all server clients into portal token audiences.

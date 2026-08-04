@@ -43,7 +43,7 @@ flowchart LR
     Keycloak -->|"Keycloak access token"| Browser
 
     Browser -->|"access token"| PortalAuth
-    PortalAuth -->|"introspection"| Keycloak
+   PortalAuth -->|"introspection / token exchange"| Keycloak
     PortalAuth --> PortalTokens
     PortalTokens -->|"portal VUU token"| Browser
     Browser -->|"LOGIN"| PortalWs
@@ -245,8 +245,8 @@ The resulting authorization set is de-duplicated from:
 | `exchange-if-needed` | Use a correctly scoped token; otherwise exchange it |
 | `always-exchange` | Exchange every incoming token |
 
-Portal is configured with `require-audience`. Module-discovery is configured
-with `exchange-if-needed` and its own client ID.
+Portal and module-discovery are both configured with
+`exchange-if-needed` and distinct server client IDs.
 
 ### Token exchange
 
@@ -264,6 +264,36 @@ fail closed; the provider does not fall back to the unscoped token.
 
 Incoming and exchanged Keycloak tokens exist only during the request. They are
 not returned or stored in `LoginTokenService`.
+
+### Keycloak client structure
+
+The local realm bootstrap script creates one public browser client and one or
+more confidential server clients:
+
+- public client: `vuu-portal`;
+- confidential server client: `vuu-portal-server`; and
+- confidential server client: `vuu-module-discovery-server`.
+
+This structure supports browser SSO with server-side audience enforcement and
+token exchange:
+
+- browser users authenticate against the public `vuu-portal` client;
+- each VUU backend authenticates to Keycloak with its own confidential client
+   and client secret;
+- each server client enables standard token exchange via
+   `attributes["standard.token.exchange.enabled"] = "true"`; and
+- `vuu-portal` includes every server client in access-token audience via
+   `oidc-audience-mapper` protocol mappers.
+
+Because all server clients are configured as token audiences on `vuu-portal`,
+an incoming portal token can be exchanged by each backend into a
+server-scoped token when required by `exchange-if-needed`.
+
+To add another backend in future, add its client ID to the
+`SERVER_CLIENT_NAMES` list in `scripts/keycloak-realm-client.ts` and rerun the
+script. The script creates or updates the client, enables standard token
+exchange, and ensures the new client is included in `vuu-portal` token
+audiences.
 
 ## VUU login tokens and WebSocket sessions
 

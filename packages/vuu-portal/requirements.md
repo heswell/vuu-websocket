@@ -80,9 +80,15 @@ Authorization:
 Configuration for auth:
 - vuu.auth.mode with values keycloak or permissive (default keycloak)
 - vuu.auth.cors.allowedOrigin (default http://localhost:5002)
-- Keycloak portal authentication settings:
-- vuu.auth.keycloak.clientId (default vuu-portal)
-- vuu.auth.keycloak.clientSecret (optional for confidential client)
+- Keycloak portal authentication settings (server-side bearer validation/exchange):
+- vuu.auth.keycloak.clientId (default vuu-portal-server)
+- vuu.auth.keycloak.clientSecret (required when token exchange is enabled)
+- vuu.auth.keycloak.audience (default vuu-portal-server)
+- vuu.auth.keycloak.audiencePolicy (require-audience, exchange-if-needed, always-exchange)
+- vuu.auth.keycloak.tokenExchangeEnabled (default false; must be true for exchange policies)
+- portal production/default flow should use exchange-if-needed so public-client tokens can be exchanged for server-scoped tokens
+- the public Keycloak client vuu-portal must include all backend server clients in token audience (aud), including at least vuu-portal-server and vuu-module-discovery-server
+- bootstrap/client-provisioning scripts should be extensible for additional server clients and should ensure audience mappers are configured on vuu-portal for each server client
 - KeycloakAdmin settings must be read from application.conf using the vuu.keycloak prefix:
 - vuu.keycloak.url (default http://localhost:8080)
 - vuu.keycloak.realm (default vuu)
@@ -130,6 +136,9 @@ The package application.conf must define:
 - vuu.keycloak.clientSecret (optional)
 - vuu.auth.keycloak.clientId
 - vuu.auth.keycloak.clientSecret (optional)
+- vuu.auth.keycloak.audience
+- vuu.auth.keycloak.audiencePolicy
+- vuu.auth.keycloak.tokenExchangeEnabled
 - vuu.auth.mode
 
 ## Module Requirements

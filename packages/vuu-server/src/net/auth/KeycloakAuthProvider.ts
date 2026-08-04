@@ -98,12 +98,11 @@ export class KeycloakAuthProvider implements BearerTokenAuthProvider {
   async authenticateBearerToken(token: string): Promise<VuuUser> {
     const subjectPayload = await this.introspect(token);
     this.validateIdentity(subjectPayload);
-
     const shouldExchange =
       this.audiencePolicy === "always-exchange" ||
       (this.audiencePolicy === "exchange-if-needed" &&
         !hasAudience(subjectPayload, this.audience));
-
+    console.log(`should exchange ${shouldExchange}`)
     if (shouldExchange) {
       const exchangedToken = await this.exchangeToken(token);
       const exchangedPayload = await this.introspect(exchangedToken);
@@ -130,6 +129,7 @@ export class KeycloakAuthProvider implements BearerTokenAuthProvider {
         body,
       },
     );
+
     if (!response.ok) {
       if (response.status >= 500) {
         throw new AuthenticationUnavailableError(
@@ -195,6 +195,7 @@ export class KeycloakAuthProvider implements BearerTokenAuthProvider {
 
   private requireAudience(payload: KeycloakTokenPayload) {
     if (!hasAudience(payload, this.audience)) {
+      console.log(`Keycloak token is not scoped to audience '${this.audience}'`)
       throw new Error(
         `Keycloak token is not scoped to audience '${this.audience}'`,
       );

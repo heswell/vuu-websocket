@@ -17,11 +17,11 @@ import { createModuleRegistryHttpHandler } from "./ModuleRegistryHandler";
 const ConfigKeys = {
   sslEnabled: "vuu.ssl",
   certPath: "vuu.certPath",
+  httpsPort: "vuu.https.port",
   keyPath: "vuu.keyPath",
   websocketPort: "vuu.websocket.port",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   authPath: "vuu.auth.path",
-  registryPort: "vuu.moduleRegistry.port",
 } as const;
 
 export default async function main() {
@@ -34,7 +34,7 @@ export default async function main() {
   const serverConfig = VuuServerConfig(
     createWebSocketOptions(defaultConfig),
     {
-      httpsPort: defaultConfig.getNumber(ConfigKeys.registryPort, 8443),
+      httpsPort: defaultConfig.getNumber(ConfigKeys.httpsPort, 8444),
       requestHandler: composeHttpHandlers(
         createAuthHttpHandler(
           { bearerToken: authProvider },

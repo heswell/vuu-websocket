@@ -6,7 +6,10 @@ const ADMIN_USER = "admin";
 const ADMIN_PASSWORD = "admin";
 const REALM_NAME = "vuu";
 const CLIENT_NAME = "vuu-portal";
-const SERVER_CLIENT_NAME = "vuu-portal-server";
+const SERVER_CLIENT_NAMES = [
+  "vuu-portal-server",
+  "vuu-module-discovery-server",
+] as const;
 const CLIENT_PORT = 5002;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
 const ALLOW_SELF_SIGNED_CERT =
@@ -133,102 +136,34 @@ async function main() {
     }
     console.log(`ℹ️  ${CLIENT_NAME} internal ID: ${portalClient.id}\n`);
 
-    // Step 4: Create confidential server client for token introspection
-    console.log(`4️⃣  Creating confidential client '${SERVER_CLIENT_NAME}'...`);
-    const serverClientResponse = await keycloakFetch(
-      `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          clientId: SERVER_CLIENT_NAME,
-          name: "Vuu Portal Server",
-          enabled: true,
-          protocol: "openid-connect",
-          publicClient: false,
-          bearerOnly: false,
-          standardFlowEnabled: false,
-          implicitFlowEnabled: false,
-          directAccessGrantsEnabled: false,
-          serviceAccountsEnabled: true,
-          frontchannelLogout: false,
-        }),
-      }
+    // Ensure portal-issued access tokens include all server clients as audiences.
+    console.log(
+      `3️⃣a Enabling server audiences on '${CLIENT_NAME}' tokens...`
     );
-
-    if (serverClientResponse.status === 409) {
-      console.log("⚠️  Confidential server client already exists\n");
-    } else if (serverClientResponse.ok) {
-      console.log("✅ Confidential server client created\n");
-    } else {
-      const errorData = await serverClientResponse.text();
-      throw new Error(
-        `Failed to create confidential server client: ${serverClientResponse.status} ${errorData}`
-      );
-    }
-
-    // Step 5: Lookup the confidential client and print its secret.
-    console.log(`5️⃣  Fetching secret for '${SERVER_CLIENT_NAME}'...`);
-    const serverClientLookupResponse = await keycloakFetch(
-      `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients?clientId=${encodeURIComponent(
-        SERVER_CLIENT_NAME
-      )}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
+    await ensurePortalClientIncludesServerAudiences(
+      token,
+      portalClient.id,
+      SERVER_CLIENT_NAMES,
     );
+    console.log("✅ Audience mapper configured\n");
 
-    if (!serverClientLookupResponse.ok) {
-      const errorData = await serverClientLookupResponse.text();
-      throw new Error(
-        `Failed to lookup confidential server client: ${serverClientLookupResponse.status} ${errorData}`
-      );
+    // Step 4: Create or update confidential server clients.
+    console.log("4️⃣  Creating/updating confidential server clients...");
+    const serverClientSecrets: Array<{ clientId: string; secret: string }> = [];
+    for (const serverClientName of SERVER_CLIENT_NAMES) {
+      const secret = await ensureServerClient(token, serverClientName);
+      serverClientSecrets.push({ clientId: serverClientName, secret });
     }
-
-    const serverClients = (await serverClientLookupResponse.json()) as Array<{
-      id?: string;
-    }>;
-    const serverClient = serverClients[0];
-    if (!serverClient?.id) {
-      throw new Error("Confidential server client not found after create");
-    }
-
-    const secretResponse = await keycloakFetch(
-      `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${serverClient.id}/client-secret`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!secretResponse.ok) {
-      const errorData = await secretResponse.text();
-      throw new Error(
-        `Failed to fetch confidential server client secret: ${secretResponse.status} ${errorData}`
-      );
-    }
-
-    const secretData = (await secretResponse.json()) as { value?: string };
-    if (!secretData.value) {
-      throw new Error("Confidential server client secret missing from response");
-    }
-    console.log(`✅ ${SERVER_CLIENT_NAME} secret: ${secretData.value}\n`);
+    console.log("✅ Confidential server clients ready\n");
 
     // Success
     console.log("🎉 Setup complete!");
     console.log(`Realm: ${REALM_NAME}`);
     console.log(`Client: ${CLIENT_NAME}`);
-    console.log(`Server Client: ${SERVER_CLIENT_NAME}`);
+    console.log(`Server Clients: ${SERVER_CLIENT_NAMES.join(", ")}`);
+    for (const serverClient of serverClientSecrets) {
+      console.log(`✅ ${serverClient.clientId} secret: ${serverClient.secret}`);
+    }
     console.log(`Portal URL: ${CLIENT_URL}`);
     console.log(
       `\nAccess admin console at: ${KEYCLOAK_URL}/admin/`
@@ -274,4 +209,250 @@ async function lookupClientByClientId(token: string, clientId: string) {
 
   const clients = (await response.json()) as Array<{ id?: string }>;
   return clients[0];
+}
+
+async function ensureStandardTokenExchangeEnabled(
+  token: string,
+  internalClientId: string,
+) {
+  const getResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!getResponse.ok) {
+    const errorData = await getResponse.text();
+    throw new Error(
+      `Failed to load client '${internalClientId}' for update: ${getResponse.status} ${errorData}`
+    );
+  }
+
+  const clientRepresentation = (await getResponse.json()) as {
+    attributes?: Record<string, string>;
+    [key: string]: unknown;
+  };
+
+  clientRepresentation.attributes = {
+    ...(clientRepresentation.attributes ?? {}),
+    "standard.token.exchange.enabled": "true",
+  };
+
+  const updateResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(clientRepresentation),
+    }
+  );
+
+  if (!updateResponse.ok) {
+    const errorData = await updateResponse.text();
+    throw new Error(
+      `Failed to enable token exchange for client '${internalClientId}': ${updateResponse.status} ${errorData}`
+    );
+  }
+}
+
+async function ensurePortalClientIncludesServerAudience(
+  token: string,
+  internalClientId: string,
+  serverClientName: string,
+) {
+  const getResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!getResponse.ok) {
+    const errorData = await getResponse.text();
+    throw new Error(
+      `Failed to load portal client '${internalClientId}' for update: ${getResponse.status} ${errorData}`
+    );
+  }
+
+  type ProtocolMapper = {
+    name?: string;
+    protocol?: string;
+    protocolMapper?: string;
+    consentRequired?: boolean;
+    config?: Record<string, string>;
+    [key: string]: unknown;
+  };
+
+  const clientRepresentation = (await getResponse.json()) as {
+    protocolMappers?: ProtocolMapper[];
+    [key: string]: unknown;
+  };
+
+  const mapperTemplate: ProtocolMapper = {
+    name: `audience-${serverClientName}`,
+    protocol: "openid-connect",
+    protocolMapper: "oidc-audience-mapper",
+    consentRequired: false,
+    config: {
+      "included.client.audience": serverClientName,
+      "id.token.claim": "false",
+      "access.token.claim": "true",
+      "introspection.token.claim": "true",
+    },
+  };
+
+  const currentMappers = clientRepresentation.protocolMappers ?? [];
+  const mapperIndex = currentMappers.findIndex(
+    (mapper) =>
+      mapper.protocolMapper === "oidc-audience-mapper" &&
+      mapper.config?.["included.client.audience"] === serverClientName,
+  );
+
+  if (mapperIndex >= 0) {
+    const existingMapper = currentMappers[mapperIndex];
+    currentMappers[mapperIndex] = {
+      ...existingMapper,
+      ...mapperTemplate,
+      config: {
+        ...(existingMapper.config ?? {}),
+        ...(mapperTemplate.config ?? {}),
+      },
+    };
+  } else {
+    currentMappers.push(mapperTemplate);
+  }
+
+  clientRepresentation.protocolMappers = currentMappers;
+
+  const updateResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(clientRepresentation),
+    }
+  );
+
+  if (!updateResponse.ok) {
+    const errorData = await updateResponse.text();
+    throw new Error(
+      `Failed to configure audience mapper for client '${internalClientId}': ${updateResponse.status} ${errorData}`
+    );
+  }
+}
+
+async function ensurePortalClientIncludesServerAudiences(
+  token: string,
+  internalClientId: string,
+  serverClientNames: readonly string[],
+) {
+  for (const serverClientName of serverClientNames) {
+    await ensurePortalClientIncludesServerAudience(
+      token,
+      internalClientId,
+      serverClientName,
+    );
+  }
+}
+
+async function ensureServerClient(token: string, serverClientName: string) {
+  console.log(`   • Creating confidential client '${serverClientName}'...`);
+  const createResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clientId: serverClientName,
+        name: serverClientName,
+        enabled: true,
+        protocol: "openid-connect",
+        publicClient: false,
+        bearerOnly: false,
+        standardFlowEnabled: false,
+        implicitFlowEnabled: false,
+        directAccessGrantsEnabled: false,
+        serviceAccountsEnabled: true,
+        frontchannelLogout: false,
+        attributes: {
+          "standard.token.exchange.enabled": "true",
+        },
+      }),
+    }
+  );
+
+  if (createResponse.status === 409) {
+    console.log(`   • '${serverClientName}' already exists`);
+  } else if (createResponse.ok) {
+    console.log(`   • '${serverClientName}' created`);
+  } else {
+    const errorData = await createResponse.text();
+    throw new Error(
+      `Failed to create confidential server client '${serverClientName}': ${createResponse.status} ${errorData}`
+    );
+  }
+
+  const serverClient = await lookupClientByClientId(token, serverClientName);
+  if (!serverClient?.id) {
+    throw new Error(
+      `Confidential server client '${serverClientName}' not found after create`
+    );
+  }
+
+  console.log(`   • Enabling standard token exchange for '${serverClientName}'...`);
+  await ensureStandardTokenExchangeEnabled(token, serverClient.id);
+
+  console.log(`   • Fetching secret for '${serverClientName}'...`);
+  return await fetchClientSecret(token, serverClient.id, serverClientName);
+}
+
+async function fetchClientSecret(
+  token: string,
+  internalClientId: string,
+  clientId: string,
+) {
+  const secretResponse = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}/client-secret`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (!secretResponse.ok) {
+    const errorData = await secretResponse.text();
+    throw new Error(
+      `Failed to fetch confidential server client secret for '${clientId}': ${secretResponse.status} ${errorData}`
+    );
+  }
+
+  const secretData = (await secretResponse.json()) as { value?: string };
+  if (!secretData.value) {
+    throw new Error(
+      `Confidential server client secret missing from response for '${clientId}'`
+    );
+  }
+
+  return secretData.value;
 }
