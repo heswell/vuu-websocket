@@ -1,5 +1,8 @@
 import {
-  AuthProvider,
+  authenticateBearerRequest,
+  AuthenticationError as SharedAuthenticationError,
+  AuthenticationUnavailableError,
+  BearerTokenAuthProvider,
   createCorsHeaders,
   DataTable,
   HttpHandlerOptions,
@@ -33,10 +36,9 @@ type ModuleUser = {
 };
 
 export function createModuleRegistryHttpHandler(
-  authProvider: AuthProvider,
+  authProvider: BearerTokenAuthProvider,
   getTableContainer: () => TableContainer,
   { allowedOrigin = "*" }: HttpHandlerOptions = {},
-
 ): HttpRequestHandler {
   return async (req, url) => {
     if (url.pathname !== MODULE_REGISTRY_PATH) {
@@ -59,7 +61,10 @@ export function createModuleRegistryHttpHandler(
 
     if (req.method !== "GET") {
       return new Response(
-        JSON.stringify({ error: "Method not allowed", path: MODULE_REGISTRY_PATH }),
+        JSON.stringify({
+          error: "Method not allowed",
+          path: MODULE_REGISTRY_PATH,
+        }),
         {
           status: 405,
           headers: {
@@ -71,7 +76,7 @@ export function createModuleRegistryHttpHandler(
     }
 
     try {
-      const user = await authenticateRequest(authProvider, req);
+      const user = await authenticateBearerRequest(authProvider, req);
       const tableContainer = getTableContainer();
       const modules = readModules(tableContainer.getTable<DataTable>("modules"));
       const modulePermissions = readModulePermissions(
@@ -91,13 +96,18 @@ export function createModuleRegistryHttpHandler(
         ),
       }, 200, corsHeaders);
     } catch (error) {
-      if (error instanceof AuthenticationError) {
+      if (error instanceof SharedAuthenticationError) {
         console.warn(
           `[ModuleRegistry] Authentication failed: ${error.message}`,
         );
+        const unavailable = error instanceof AuthenticationUnavailableError;
         return jsonResponse(
-          { error: "Authentication failed" },
-          401,
+          {
+            error: unavailable
+              ? "Authentication service unavailable"
+              : "Authentication failed",
+          },
+          unavailable ? 503 : 401,
           corsHeaders,
         );
       }
@@ -108,34 +118,6 @@ export function createModuleRegistryHttpHandler(
       return jsonResponse({ error: "Unable to resolve modules" }, 500, corsHeaders);
     }
   };
-}
-
-async function authenticateRequest(authProvider: AuthProvider, request: Request) {
-  const authorization = request.headers.get("Authorization");
-  const token = authorization && parseBearerToken(authorization);
-  if (!token || !authProvider.authenticateBearerToken) {
-    throw new AuthenticationError("Bearer authentication is not configured");
-  }
-
-  try {
-    const user = await authProvider.authenticateBearerToken(token);
-    if (user.expiry.getTime() <= Date.now()) {
-      throw new Error("Bearer token is expired");
-    }
-    return user;
-  } catch (error) {
-    throw new AuthenticationError((error as Error).message);
-  }
-}
-
-function parseBearerToken(authorization: string) {
-  const match = /^Bearer:?\s+(.+)$/i.exec(authorization);
-  if (!match || !match[1].trim()) {
-    throw new AuthenticationError(
-      "Authorization header must contain a bearer token",
-    );
-  }
-  return match[1].trim();
 }
 
 function readModules(table: DataTable): ModuleRecord[] {
@@ -254,5 +236,3 @@ function jsonResponse(
     },
   });
 }
-
-class AuthenticationError extends Error { }

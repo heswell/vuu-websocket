@@ -1,12 +1,27 @@
 import { VuuUser } from "../../core/auths/VuuUser";
 import { VuuUserWithAuthorizations } from "../../core/auths/VuuUser";
 
-export interface AuthProvider {
+export interface CredentialAuthProvider {
   authenticate: (username: string, password: string) => Promise<VuuUser>;
-  authenticateBearerToken?: (token: string) => Promise<VuuUser>;
 }
 
-export class PermissiveAuthProvider implements AuthProvider {
+export interface BearerTokenAuthProvider {
+  authenticateBearerToken: (token: string) => Promise<VuuUser>;
+}
+
+export interface AuthenticationProviders {
+  bearerToken?: BearerTokenAuthProvider;
+  credentials?: CredentialAuthProvider;
+}
+
+/**
+ * Compatibility type for consumers that provide both authentication methods.
+ */
+export interface AuthProvider extends CredentialAuthProvider {
+  authenticateBearerToken?: BearerTokenAuthProvider["authenticateBearerToken"];
+}
+
+export class PermissiveAuthProvider implements CredentialAuthProvider {
   constructor(private users: Array<[string, string]> = []) { }
 
   async authenticate(username: string, password: string): Promise<VuuUser> {

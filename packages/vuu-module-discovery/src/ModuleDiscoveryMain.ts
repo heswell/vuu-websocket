@@ -1,6 +1,8 @@
 import {
   Config,
   ConfigFactory,
+  composeHttpHandlers,
+  createAuthHttpHandler,
   KeycloakAuthProvider,
   LifecycleContainer,
   LoginTokenService,
@@ -18,6 +20,7 @@ const ConfigKeys = {
   keyPath: "vuu.keyPath",
   port: "vuu.port",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
+  authPath: "vuu.auth.path",
   registryPort: "vuu.moduleRegistry.port",
 } as const;
 
@@ -25,26 +28,45 @@ export default async function main() {
   const defaultConfig = ConfigFactory.load();
   const lifecycle = new LifecycleContainer();
   const authProvider = new KeycloakAuthProvider(defaultConfig);
+  const loginTokenService = LoginTokenService();
   let vuuServer: VuuServer | undefined;
 
   const serverConfig = VuuServerConfig(
     createWebSocketOptions(defaultConfig),
     {
       httpsPort: defaultConfig.getNumber(ConfigKeys.registryPort, 8443),
-      requestHandler: createModuleRegistryHttpHandler(authProvider, () => {
-        if (!vuuServer) {
-          throw new Error("Module-discovery server has not been initialized");
-        }
-        return vuuServer.tableContainer;
-      }, {
-        allowedOrigin: defaultConfig.getString(
-          ConfigKeys.authCorsAllowedOrigin,
-          "http://localhost:5002",
+      requestHandler: composeHttpHandlers(
+        createAuthHttpHandler(
+          { bearerToken: authProvider },
+          loginTokenService,
+          {
+            allowedOrigin: defaultConfig.getString(
+              ConfigKeys.authCorsAllowedOrigin,
+              "http://localhost:5002",
+            ),
+            path: defaultConfig.getString(ConfigKeys.authPath, "/api/authn"),
+          },
         ),
-      }),
-
+        createModuleRegistryHttpHandler(
+          authProvider,
+          () => {
+            if (!vuuServer) {
+              throw new Error(
+                "Module-discovery server has not been initialized",
+              );
+            }
+            return vuuServer.tableContainer;
+          },
+          {
+            allowedOrigin: defaultConfig.getString(
+              ConfigKeys.authCorsAllowedOrigin,
+              "http://localhost:5002",
+            ),
+          },
+        ),
+      ),
     },
-    LoginTokenService(),
+    loginTokenService,
   ).withModule(ModuleDiscoveryModule());
 
   vuuServer = new VuuServer(serverConfig, lifecycle);

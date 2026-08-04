@@ -36,8 +36,31 @@ export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";
 export { ConfigFactory } from "./util/ConfigFactory";
 export type { Config } from "./util/ConfigFactory";
 export { LoginTokenService } from "./net/auth/LoginTokenService";
-export { createCorsHeaders, createHttpHandler, type HttpHandlerOptions } from "./net/auth/AuthHttpHandler";
+export {
+  createAuthHttpHandler,
+  createCorsHeaders,
+  createHttpHandler,
+  type HttpHandlerOptions,
+} from "./net/auth/AuthHttpHandler";
 export { PermissiveAuthProvider } from "./net/auth/AuthProvider";
-export type { AuthProvider } from "./net/auth/AuthProvider";
-export { KeycloakAuthProvider } from "./net/auth/KeycloakAuthProvider";
+export type {
+  AuthenticationProviders,
+  AuthProvider,
+  BearerTokenAuthProvider,
+  CredentialAuthProvider,
+} from "./net/auth/AuthProvider";
+export {
+  authenticateBearerRequest,
+  parseBearerToken,
+} from "./net/auth/BearerTokenAuthentication";
+export {
+  AuthenticationError,
+  AuthenticationUnavailableError,
+  InvalidAuthenticationRequestError,
+} from "./net/auth/AuthenticationErrors";
+export {
+  KeycloakAuthProvider,
+  type KeycloakAudiencePolicy,
+} from "./net/auth/KeycloakAuthProvider";
+export { composeHttpHandlers } from "./net/http/composeHttpHandlers";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";
