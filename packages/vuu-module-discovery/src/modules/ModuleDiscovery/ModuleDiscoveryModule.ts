@@ -34,15 +34,15 @@ const modules = [
     "/Users/Manage Users",
     "UserAdmin",
     "UserAdmin",
-    "http://localhost:5009",
+    "http://localhost:5007",
   ],
 ];
 
 const modulePermissions = [
-  [1, 1, "module-admin:view"],
-  [2, 1, "module-admin:edit"],
-  [3, 2, "user-admin:view"],
-  [4, 2, "user-admin:edit"],
+  [1, 1, "modules.view"],
+  [2, 1, "modules.edit"],
+  [3, 2, "users.view"],
+  [4, 2, "users.admin"],
 ];
 
 export const ModuleDiscoveryModule = () =>

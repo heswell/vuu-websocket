@@ -10,7 +10,7 @@ import {
   VuuUserWithAuthorizations,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { ModuleDiscoveryModule } from "../src/ModuleDiscoveryModule";
+import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 import { createModuleRegistryHttpHandler } from "../src/ModuleRegistryHandler";
 
 describe("module registry handler", () => {

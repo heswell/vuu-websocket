@@ -1,3 +1,3 @@
 export { default } from "./ModuleDiscoveryMain";
-export { ModuleDiscoveryModule } from "./ModuleDiscoveryModule";
+export { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 export { createModuleRegistryHttpHandler } from "./ModuleRegistryHandler";

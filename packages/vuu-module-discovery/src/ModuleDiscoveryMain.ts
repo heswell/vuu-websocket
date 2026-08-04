@@ -11,14 +11,14 @@ import {
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { ModuleDiscoveryModule } from "./ModuleDiscoveryModule";
+import { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 import { createModuleRegistryHttpHandler } from "./ModuleRegistryHandler";
 
 const ConfigKeys = {
   sslEnabled: "vuu.ssl",
   certPath: "vuu.certPath",
   keyPath: "vuu.keyPath",
-  port: "vuu.port",
+  websocketPort: "vuu.websocket.port",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   authPath: "vuu.auth.path",
   registryPort: "vuu.moduleRegistry.port",
@@ -77,7 +77,7 @@ export default async function main() {
 function createWebSocketOptions(config: Config): VuuWebSocketOptions {
   const options = VuuWebSocketOptions()
     .withUri("websocket")
-    .withWsPort(config.getNumber(ConfigKeys.port, 8091));
+    .withWsPort(config.getNumber(ConfigKeys.websocketPort, 8091));
 
   return config.getBoolean(ConfigKeys.sslEnabled)
     ? options.withSsl(

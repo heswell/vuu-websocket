@@ -19,7 +19,7 @@ const msgConfig: ServerMessagingConfig = {
 };
 
 const CONFIG_KEYS = {
-  port: "vuu.port",
+  websocketPort: "vuu.websocket.port",
 } as const;
 
 export interface WebsocketData {
@@ -34,7 +34,7 @@ const authenticator: Authenticator = new AuthenticatorWithUserList(
 export default async function start(vuuServer: VuuServer) {
   const certsPath = path.join(import.meta.dir, "../certs");
   const config = ConfigFactory.load();
-  const websocketPort = config.getNumber(CONFIG_KEYS.port, 8091);
+  const websocketPort = config.getNumber(CONFIG_KEYS.websocketPort, 8091);
 
   const websocketServer = Bun.serve({
     certFile: `${certsPath}/cert.pem`,
