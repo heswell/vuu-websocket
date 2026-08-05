@@ -149,8 +149,7 @@ requesting user is allowed to discover.
    `username`.
 4. Resolve the caller's authorization set from:
    - realm roles (`realm_access.roles`);
-   - roles for the configured client
-     (`resource_access[clientId].roles`); and
+   - roles for every client represented in `resource_access`; and
    - Keycloak groups, consistent with the existing portal authorization
      extraction.
 5. A missing, malformed, inactive, expired, or otherwise unvalidated token

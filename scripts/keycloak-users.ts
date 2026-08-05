@@ -8,6 +8,11 @@ type RoleRepresentation = {
   containerId?: string;
 };
 
+type ClientRepresentation = {
+  id: string;
+  clientId: string;
+};
+
 type GroupRepresentation = {
   id: string;
   name: string;
@@ -42,12 +47,25 @@ type BunFetchInit = RequestInit & {
 const users = [
   { username: "trader1", email: "trader1@vuu.com", groups: ["BASKET_TRADE"] },
   { username: "trader2", email: "trader2@vuu.com", groups: ["BASKET_TRADE"] },
-  { username: "dev1", email: "dev1@vuu.com", groups: ["DATA_VIEW", "USERS_VIEW"] },
-  { username: "dev2", email: "dev2@vuu.com", groups: ["DATA_VIEW", "USERS_VIEW"] },
-  { username: "admin", email: "admin@vuu.com", groups: ["USERS_ADMIN"] },
+  {
+    username: "admin",
+    email: "admin@vuu.com",
+    groups: ["MODULES_ADMIN", "USERS_ADMIN"],
+  },
 ] as const;
 
-const roleNames = [
+const clientRoles = {
+  "vuu-portal-server": [],
+  "vuu-module-discovery-server": [
+    "modules.view",
+    "modules.edit",
+    "users.view",
+    "users.admin",
+  ],
+  "vuu-basket-trading-server": ["basket.view", "basket.trade"],
+} as const;
+
+const legacyRealmRoleNames = [
   "basket.view",
   "basket.trade",
   "data.view",
@@ -55,12 +73,38 @@ const roleNames = [
   "users.admin",
 ] as const;
 
-const groupRoleNames: Record<string, readonly string[]> = {
-  BASKET_VIEW: ["basket.view"],
-  BASKET_TRADE: ["basket.view", "basket.trade"],
-  DATA_VIEW: ["data.view"],
-  USERS_VIEW: ["users.view"],
-  USERS_ADMIN: ["users.view", "users.admin"],
+const obsoleteClientRoles = {
+  "vuu-portal-server": ["data.view"],
+} as const;
+
+const obsoleteGroupNames = ["DATA_VIEW", "DASTA_VIEW"] as const;
+const obsoleteUsernames = ["dev1", "dev2"] as const;
+
+type ClientId = keyof typeof clientRoles;
+type ClientRoleRef = {
+  clientId: ClientId;
+  roleName: string;
+};
+
+const groupRoles: Record<string, readonly ClientRoleRef[]> = {
+  BASKET_VIEW: [
+    { clientId: "vuu-basket-trading-server", roleName: "basket.view" },
+  ],
+  BASKET_TRADE: [
+    { clientId: "vuu-basket-trading-server", roleName: "basket.view" },
+    { clientId: "vuu-basket-trading-server", roleName: "basket.trade" },
+  ],
+  MODULES_ADMIN: [
+    { clientId: "vuu-module-discovery-server", roleName: "modules.view" },
+    { clientId: "vuu-module-discovery-server", roleName: "modules.edit" },
+  ],
+  USERS_VIEW: [
+    { clientId: "vuu-module-discovery-server", roleName: "users.view" },
+  ],
+  USERS_ADMIN: [
+    { clientId: "vuu-module-discovery-server", roleName: "users.view" },
+    { clientId: "vuu-module-discovery-server", roleName: "users.admin" },
+  ],
 };
 
 async function main() {
@@ -78,24 +122,41 @@ async function main() {
 
   await ensureRealmExists(headers);
 
+  const clients = new Map<ClientId, ClientRepresentation>();
   const roles = new Map<string, RoleRepresentation>();
-  for (const roleName of roleNames) {
-    const role = await ensureRole(roleName, headers);
-    roles.set(roleName, role);
+  for (const [clientId, roleNames] of Object.entries(clientRoles) as [
+    ClientId,
+    readonly string[],
+  ][]) {
+    const client = await getClient(clientId, headers);
+    clients.set(clientId, client);
+    for (const roleName of roleNames) {
+      const role = await ensureClientRole(client, roleName, headers);
+      roles.set(roleKey(clientId, roleName), role);
+    }
   }
+  await removeObsoleteClientRoles(clients, headers);
+  await ensureDiscoveryClientRoleScopes(clients, roles, headers);
+  await removeLegacyRealmRoles(headers);
+  await removeObsoleteGroups(headers);
+  await removeObsoleteUsers(headers);
 
   const groups = new Map<string, GroupRepresentation>();
-  for (const groupName of Object.keys(groupRoleNames)) {
+  for (const groupName of Object.keys(groupRoles)) {
     const group = await ensureGroup(groupName, headers);
     groups.set(groupName, group);
   }
 
-  for (const [groupName, roleNamesForGroup] of Object.entries(groupRoleNames)) {
-    await ensureGroupRealmRoles(
-      groups.get(groupName)!,
-      roleNamesForGroup.map((roleName) => roles.get(roleName)!),
-      headers,
-    );
+  for (const [groupName, roleRefs] of Object.entries(groupRoles)) {
+    const rolesByClient = Map.groupBy(roleRefs, ({ clientId }) => clientId);
+    for (const [clientId, clientRoleRefs] of rolesByClient) {
+      await ensureGroupClientRoles(
+        groups.get(groupName)!,
+        clients.get(clientId)!,
+        clientRoleRefs.map(({ roleName }) => roles.get(roleKey(clientId, roleName))!),
+        headers,
+      );
+    }
   }
 
   for (const user of users) {
@@ -108,7 +169,7 @@ async function main() {
   }
 
   console.log(
-    `[keycloak] seeded realm ${realm} with ${users.length} users, ${roleNames.length} roles and ${Object.keys(groupRoleNames).length} groups`,
+    `[keycloak] seeded realm ${realm} with ${users.length} users, ${roles.size} client roles and ${Object.keys(groupRoles).length} groups`,
   );
 }
 
@@ -163,9 +224,31 @@ async function ensureRealmExists(headers: Record<string, string>) {
   }
 }
 
-async function ensureRole(name: string, headers: Record<string, string>) {
+async function getClient(
+  clientId: ClientId,
+  headers: Record<string, string>,
+) {
+  const clients = await requestJson<ClientRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients?clientId=${encodeURIComponent(clientId)}`,
+    { headers },
+  );
+  const client = clients.find((candidate) => candidate.clientId === clientId);
+  if (!client) {
+    throw new Error(
+      `Client ${clientId} was not found in realm ${realm}. Run keycloak:realm first.`,
+    );
+  }
+  return client;
+}
+
+async function ensureClientRole(
+  client: ClientRepresentation,
+  name: string,
+  headers: Record<string, string>,
+) {
+  const rolesUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/roles`;
   const existing = await getOptional<RoleRepresentation>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(name)}`,
+    `${rolesUrl}/${encodeURIComponent(name)}`,
     headers,
   );
 
@@ -174,7 +257,7 @@ async function ensureRole(name: string, headers: Record<string, string>) {
   }
 
   await requestJson(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles`,
+    rolesUrl,
     {
       method: "POST",
       headers,
@@ -183,11 +266,155 @@ async function ensureRole(name: string, headers: Record<string, string>) {
   );
 
   const created = await getRequired<RoleRepresentation>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(name)}`,
+    `${rolesUrl}/${encodeURIComponent(name)}`,
     headers,
   );
 
   return created;
+}
+
+function roleKey(clientId: ClientId, roleName: string) {
+  return `${clientId}:${roleName}`;
+}
+
+async function ensureDiscoveryClientRoleScopes(
+  clients: Map<ClientId, ClientRepresentation>,
+  roles: Map<string, RoleRepresentation>,
+  headers: Record<string, string>,
+) {
+  const discoveryClientId: ClientId = "vuu-module-discovery-server";
+  const discoveryClient = clients.get(discoveryClientId);
+  if (!discoveryClient) {
+    throw new Error(`Client ${discoveryClientId} was not loaded`);
+  }
+
+  for (const [sourceClientId, roleNames] of Object.entries(clientRoles) as [
+    ClientId,
+    readonly string[],
+  ][]) {
+    if (sourceClientId === discoveryClientId) {
+      continue;
+    }
+
+    const sourceClient = clients.get(sourceClientId);
+    if (!sourceClient) {
+      throw new Error(`Client ${sourceClientId} was not loaded`);
+    }
+
+    const scopedRoles = roleNames.map((roleName) => {
+      const role = roles.get(roleKey(sourceClientId, roleName));
+      if (!role) {
+        throw new Error(
+          `Role ${roleName} was not loaded for client ${sourceClientId}`,
+        );
+      }
+      return role;
+    });
+    await ensureClientRoleScopes(
+      discoveryClient,
+      sourceClient,
+      scopedRoles,
+      headers,
+    );
+  }
+}
+
+async function ensureClientRoleScopes(
+  client: ClientRepresentation,
+  roleOwner: ClientRepresentation,
+  roles: RoleRepresentation[],
+  headers: Record<string, string>,
+) {
+  const mappingsUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/scope-mappings/clients/${encodeURIComponent(roleOwner.id)}`;
+  const currentRoles = await requestJson<RoleRepresentation[]>(mappingsUrl, {
+    headers,
+  });
+  const currentRoleNames = new Set(currentRoles.map(({ name }) => name));
+  const missingRoles = roles.filter(({ name }) => !currentRoleNames.has(name));
+  if (missingRoles.length === 0) {
+    return;
+  }
+
+  await requestJson(mappingsUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(missingRoles),
+  });
+}
+
+async function removeObsoleteClientRoles(
+  clients: Map<ClientId, ClientRepresentation>,
+  headers: Record<string, string>,
+) {
+  for (const [clientId, roleNames] of Object.entries(obsoleteClientRoles) as [
+    ClientId,
+    readonly string[],
+  ][]) {
+    const client = clients.get(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} was not loaded`);
+    }
+    for (const roleName of roleNames) {
+      const roleUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/roles/${encodeURIComponent(roleName)}`;
+      const existing = await getOptional<RoleRepresentation>(roleUrl, headers);
+      if (existing) {
+        await requestJson(roleUrl, {
+          method: "DELETE",
+          headers,
+        });
+      }
+    }
+  }
+}
+
+async function removeLegacyRealmRoles(headers: Record<string, string>) {
+  for (const roleName of legacyRealmRoleNames) {
+    const roleUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(roleName)}`;
+    const existing = await getOptional<RoleRepresentation>(roleUrl, headers);
+    if (existing) {
+      await requestJson(roleUrl, {
+        method: "DELETE",
+        headers,
+      });
+    }
+  }
+}
+
+async function removeObsoleteGroups(headers: Record<string, string>) {
+  const groups = await requestJson<GroupRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
+    { headers },
+  );
+  for (const groupName of obsoleteGroupNames) {
+    const group = groups.find(({ name }) => name === groupName);
+    if (group) {
+      await requestJson(
+        `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}`,
+        {
+          method: "DELETE",
+          headers,
+        },
+      );
+    }
+  }
+}
+
+async function removeObsoleteUsers(headers: Record<string, string>) {
+  for (const username of obsoleteUsernames) {
+    const users = await requestJson<UserRepresentation[]>(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users?username=${encodeURIComponent(username)}&exact=true`,
+      { headers },
+    );
+    for (const user of users) {
+      await requestJson(
+        `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(user.id)}`,
+        {
+          method: "DELETE",
+          headers,
+        },
+      );
+    }
+  }
 }
 
 async function ensureGroup(name: string, headers: Record<string, string>) {
@@ -223,13 +450,15 @@ async function ensureGroup(name: string, headers: Record<string, string>) {
   return created;
 }
 
-async function ensureGroupRealmRoles(
+async function ensureGroupClientRoles(
   group: GroupRepresentation,
+  client: ClientRepresentation,
   roles: RoleRepresentation[],
   headers: Record<string, string>,
 ) {
+  const mappingsUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}/role-mappings/clients/${encodeURIComponent(client.id)}`;
   const currentRoles = await requestJson<RoleRepresentation[]>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}/role-mappings/realm`,
+    mappingsUrl,
     { headers },
   );
 
@@ -241,7 +470,7 @@ async function ensureGroupRealmRoles(
   }
 
   await requestJson(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}/role-mappings/realm`,
+    mappingsUrl,
     {
       method: "POST",
       headers,
