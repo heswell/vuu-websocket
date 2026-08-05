@@ -7,17 +7,17 @@ import {
 } from "../src";
 
 describe("VuuServerApplication", () => {
-  test("builds configured websocket options", () => {
+  test("builds websocket options from application config", () => {
     const options = createConfiguredWebSocketOptions(
       createConfig({
         "vuu.ssl": false,
-        "vuu.websocket.port": 9001,
+        "vuu.websocket.port": 8093,
       }),
       8091,
     );
 
     expect(options.uri).toBe("websocket");
-    expect(options.wsPort).toBe(9001);
+    expect(options.wsPort).toBe(8093);
     expect(options.sslOptions).toBe("ssl-disabled");
   });
 
