@@ -6,7 +6,6 @@ import {
 import {
   modulePermissionsTable,
   modulesTable,
-  moduleUsersTable,
 } from "./ModuleDiscoveryTableDefs";
 import { ModuleDiscoveryProvider } from "./ModuleDiscoveryProvider";
 import { ModuleDiscoveryService } from "./ModuleDiscoveryService";
@@ -20,9 +19,13 @@ const modules = [
     1,
     true,
     "/Modules/Manage Modules",
+    "/modules/admin",
     "ModuleAdmin",
     "ModuleAdmin",
     "http://localhost:5008",
+    "module",
+    "wss://localhost:8092/websocket",
+    "https://localhost:8444/api/authn"
   ],
   [
     2,
@@ -32,9 +35,29 @@ const modules = [
     1,
     true,
     "/Users/Manage Users",
+    "/users/admin",
     "UserAdmin",
     "UserAdmin",
     "http://localhost:5007",
+    "portal",
+    "",
+    ""
+  ],
+  [
+    3,
+    "basket-trading",
+    "Basket trading",
+    "Basket Trading",
+    1,
+    true,
+    "/Trading/Baskets",
+    "/basket/trade",
+    "VuuBasketTradingFeature",
+    "basketTrading",
+    "http://localhost:5005",
+    "basket",
+    "wss://localhost:8093/websocket",
+    "https://localhost:8445/api/authn",
   ],
 ];
 
@@ -43,6 +66,8 @@ const modulePermissions = [
   [2, 1, "modules.edit"],
   [3, 2, "users.view"],
   [4, 2, "users.admin"],
+  [5, 3, "basket.view"],
+  [6, 3, "basket.trade"],
 ];
 
 export const ModuleDiscoveryModule = () =>
@@ -62,9 +87,5 @@ export const ModuleDiscoveryModule = () =>
     .addTable(
       modulePermissionsTable,
       (table) => new ModuleDiscoveryProvider(table, modulePermissions),
-    )
-    .addTable(
-      moduleUsersTable,
-      (table) => new ModuleDiscoveryProvider(table, []),
     )
     .asModule();

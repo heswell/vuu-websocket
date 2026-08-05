@@ -11,6 +11,12 @@ import {
 } from "@heswell/vuu-server";
 
 const MODULE_REGISTRY_PATH = "/module-registry";
+interface RemoteModuleConnection {
+  connectionId: string;
+  restUrl?: string;
+  websocketUrl?: string;
+}
+
 
 type ModuleRecord = {
   id: number;
@@ -20,9 +26,11 @@ type ModuleRecord = {
   version: number;
   enabled: boolean;
   location: string;
+  path: string;
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
+  vuu: RemoteModuleConnection;
 };
 
 type ModulePermission = {
@@ -129,9 +137,15 @@ function readModules(table: DataTable): ModuleRecord[] {
     version: numberValue(table, row, "version"),
     enabled: booleanValue(table, row, "enabled"),
     location: stringValue(table, row, "location"),
+    path: stringValue(table, row, "path"),
     mfComponent: stringValue(table, row, "mfComponent"),
     mfScope: stringValue(table, row, "mfScope"),
     mfUrl: stringValue(table, row, "mfUrl"),
+    vuu: {
+      connectionId: stringValue(table, row, "vuuConnectionId"),
+      restUrl: stringValue(table, row, "vuuRestUrl") || undefined,
+      websocketUrl: stringValue(table, row, "vuuWebsocketUrl") || undefined,
+    }
   }));
 }
 

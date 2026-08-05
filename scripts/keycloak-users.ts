@@ -50,7 +50,7 @@ const users = [
   {
     username: "admin",
     email: "admin@vuu.com",
-    groups: ["MODULES_ADMIN", "USERS_ADMIN"],
+    groups: ["MODULES_ADMIN", "USERS_ADMIN", "BASKET_TRADE"],
   },
 ] as const;
 
@@ -62,14 +62,6 @@ const clientRoles = {
   ],
   "vuu-basket-trading-server": ["basket.view", "basket.trade"],
 } as const;
-
-const legacyRealmRoleNames = [
-  "basket.view",
-  "basket.trade",
-  "data.view",
-  "users.view",
-  "users.admin",
-] as const;
 
 type ClientId = keyof typeof clientRoles;
 type ClientRoleRef = {

@@ -9,9 +9,13 @@ export const modulesTable = TableDef({
     { name: "version", dataType: "int" },
     { name: "enabled", dataType: "boolean" },
     { name: "location", dataType: "string" },
+    { name: "path", dataType: "string" },
     { name: "mfComponent", dataType: "string" },
     { name: "mfScope", dataType: "string" },
     { name: "mfUrl", dataType: "string" },
+    { name: "vuuConnectionId", dataType: "string" },
+    { name: "vuuWebsocketUrl", dataType: "string" },
+    { name: "vuuRestUrl", dataType: "string" },
   ],
   keyField: "id",
   name: "modules",
@@ -25,14 +29,4 @@ export const modulePermissionsTable = TableDef({
   ],
   keyField: "id",
   name: "modulePermissions",
-});
-
-export const moduleUsersTable = TableDef({
-  columns: [
-    { name: "id", dataType: "int" },
-    { name: "module_id", dataType: "int" },
-    { name: "username", dataType: "string" },
-  ],
-  keyField: "id",
-  name: "moduleUsers",
 });
