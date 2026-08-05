@@ -1,3 +1,4 @@
-import start from "@heswell/vuu-portal";
+import "./server-runtime";
 
+const { default: start } = await import("@heswell/vuu-portal");
 await start();

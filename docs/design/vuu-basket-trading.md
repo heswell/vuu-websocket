@@ -24,6 +24,12 @@ npm run start:basket-trading
 The script sets `VUU_APP=vuu-basket-trading`, loads the package's
 `application.conf`, and starts the standard `VuuServer` lifecycle.
 
+The application exposes:
+
+- the VUU websocket endpoint on port `8093` by default; and
+- the Keycloak-backed authentication endpoint at `POST /api/authn` over HTTPS
+  on port `8445` by default.
+
 ## Package Structure
 
 ```text
@@ -53,9 +59,36 @@ packages/vuu-basket-trading/
         BasketTradingService.ts
 ```
 
-`BasketTradingMain.ts` composes the websocket options, login token service,
-module, server, and lifecycle. TLS is optional and controlled through the
-normal VUU configuration keys. The default websocket port is `8093`.
+`BasketTradingMain.ts` creates a `KeycloakAuthProvider` and delegates common
+server composition to `createVuuServerApplication` from `vuu-server`. That
+shared bootstrap configures TLS, websocket and HTTPS ports, the login-token
+service, `/api/authn`, modules, and lifecycle startup.
+
+TLS is enabled for basket trading because the VUU REST server serves HTTPS
+only. The package uses its checked-in development certificate by default;
+deployments must provide their own certificate and key paths.
+
+The public portal client includes `vuu-basket-trading-server` in its token
+audience. Basket authentication therefore uses `require-audience` and does not
+require token exchange or a checked-in client secret.
+
+## Shared Server Bootstrap
+
+`createVuuServerApplication` centralizes the entrypoint pattern shared by
+`vuu-portal`, `vuu-module-discovery`, and `vuu-basket-trading`:
+
+1. create configuration-driven websocket and TLS options;
+2. create a lifecycle and login-token service;
+3. install the configurable `/api/authn` handler;
+4. compose optional application-specific HTTPS handlers;
+5. register application modules;
+6. construct the `VuuServer`; and
+7. install the shutdown hook and start the lifecycle.
+
+Portal supplies its configurable Keycloak/permissive provider. Module discovery
+supplies Keycloak plus its `/module-registry` handler. Basket trading supplies
+Keycloak and no additional HTTPS handlers, so `/api/authn` is its only HTTPS
+application endpoint.
 
 ## Module Composition
 
@@ -262,5 +295,5 @@ bun test packages/vuu-basket-trading/__tests__/BasketModule.test.ts \
 - Data is in memory and is not persisted across server restarts.
 - Price rows are deterministic local fixtures rather than a live market feed.
 - `addConstituent` is registered but not implemented.
-- No order-management integration, authentication policy, or basket-trading UI
-  is included in this package.
+- No order-management integration or basket-trading UI is included in this
+  package.
