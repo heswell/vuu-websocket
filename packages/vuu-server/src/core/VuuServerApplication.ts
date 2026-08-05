@@ -88,12 +88,7 @@ export function createVuuServerApplication({
     ...(additionalHttpHandlers?.(context) ?? []),
   ];
   const httpServerOptions: HttpServerOptions = {
-    httpsPort: getConfiguredPort(
-      config,
-      ConfigKeys.httpsPort,
-      "HTTPS_PORT",
-      defaultHttpsPort,
-    ),
+    httpsPort: config.getNumber(ConfigKeys.httpsPort, defaultHttpsPort),
     requestHandler:
       handlers.length === 1 ? handlers[0] : composeHttpHandlers(...handlers),
   };
@@ -131,12 +126,7 @@ export function createConfiguredWebSocketOptions(
   const options = VuuWebSocketOptions()
     .withUri("websocket")
     .withWsPort(
-      getConfiguredPort(
-        config,
-        ConfigKeys.websocketPort,
-        "WEBSOCKET_PORT",
-        defaultWebSocketPort,
-      ),
+      config.getNumber(ConfigKeys.websocketPort, defaultWebSocketPort),
     );
 
   return config.getBoolean(ConfigKeys.sslEnabled, false)
@@ -147,24 +137,4 @@ export function createConfiguredWebSocketOptions(
         ),
       )
     : options.withSslDisabled();
-}
-
-function getConfiguredPort(
-  config: Config,
-  configKey: string,
-  environmentKey: string,
-  defaultPort: number,
-) {
-  const environmentValue = process.env[environmentKey];
-  if (environmentValue === undefined) {
-    return config.getNumber(configKey, defaultPort);
-  }
-
-  const port = Number(environmentValue);
-  if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-    throw new Error(
-      `Environment variable ${environmentKey} has invalid port '${environmentValue}'`,
-    );
-  }
-  return port;
 }
