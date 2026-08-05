@@ -30,6 +30,7 @@ describe("KeycloakAuthProvider", () => {
     expect(user.authorizations).toEqual([
       "realm-role",
       "client-role",
+      "cross-client-role",
       "/test-group",
     ]);
     expect(requests).toHaveLength(1);
@@ -161,6 +162,7 @@ function activeTokenResponse(audience: string, exp = futureExpiry()) {
       realm_access: { roles: ["realm-role"] },
       resource_access: {
         "portal-client": { roles: ["client-role"] },
+        "basket-client": { roles: ["cross-client-role"] },
       },
       groups: ["/test-group"],
     }),

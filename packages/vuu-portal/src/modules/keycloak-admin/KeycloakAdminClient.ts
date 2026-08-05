@@ -3,15 +3,14 @@ import { ConfigFactory } from "@heswell/vuu-server";
 export const SEEDED_USERNAMES = [
   "trader1",
   "trader2",
-  "dev1",
-  "dev2",
   "admin",
 ] as const;
 
 export const SEEDED_ROLE_NAMES = [
   "basket.view",
   "basket.trade",
-  "data.view",
+  "modules.view",
+  "modules.edit",
   "users.view",
   "users.admin",
 ] as const;
@@ -19,7 +18,7 @@ export const SEEDED_ROLE_NAMES = [
 export const SEEDED_GROUP_NAMES = [
   "BASKET_VIEW",
   "BASKET_TRADE",
-  "DATA_VIEW",
+  "MODULES_ADMIN",
   "USERS_VIEW",
   "USERS_ADMIN",
 ] as const;

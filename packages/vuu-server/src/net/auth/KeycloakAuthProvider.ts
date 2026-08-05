@@ -227,7 +227,7 @@ export class KeycloakAuthProvider implements BearerTokenAuthProvider {
 
     return VuuUserWithAuthorizations(
       username,
-      extractAuthorizations(payload, this.clientId),
+      extractAuthorizations(payload),
       new Date(payload.exp! * 1000),
     );
   }
@@ -255,14 +255,14 @@ function hasAudience(payload: KeycloakTokenPayload, audience: string) {
   return audiences.includes(audience);
 }
 
-function extractAuthorizations(
-  payload: KeycloakTokenPayload,
-  clientId: string,
-): string[] {
+function extractAuthorizations(payload: KeycloakTokenPayload): string[] {
+  const clientRoles = Object.values(payload.resource_access ?? {}).flatMap(
+    ({ roles }) => roles ?? [],
+  );
   return Array.from(
     new Set([
       ...(payload.realm_access?.roles ?? []),
-      ...(payload.resource_access?.[clientId]?.roles ?? []),
+      ...clientRoles,
       ...(payload.groups ?? []),
     ]),
   );

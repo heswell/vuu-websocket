@@ -249,21 +249,20 @@ The module should display only seeded entities associated with the local setup.
 Expected user set:
 - trader1
 - trader2
-- dev1
-- dev2
 - admin
 
 Expected group set:
 - BASKET_VIEW
 - BASKET_TRADE
-- DATA_VIEW
+- MODULES_ADMIN
 - USERS_VIEW
 - USERS_ADMIN
 
 Expected role set:
 - basket.view
 - basket.trade
-- data.view
+- modules.view
+- modules.edit
 - users.view
 - users.admin
 
