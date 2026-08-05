@@ -73,13 +73,6 @@ const legacyRealmRoleNames = [
   "users.admin",
 ] as const;
 
-const obsoleteClientRoles = {
-  "vuu-portal-server": ["data.view"],
-} as const;
-
-const obsoleteGroupNames = ["DATA_VIEW", "DASTA_VIEW"] as const;
-const obsoleteUsernames = ["dev1", "dev2"] as const;
-
 type ClientId = keyof typeof clientRoles;
 type ClientRoleRef = {
   clientId: ClientId;
@@ -135,11 +128,7 @@ async function main() {
       roles.set(roleKey(clientId, roleName), role);
     }
   }
-  await removeObsoleteClientRoles(clients, headers);
   await ensureDiscoveryClientRoleScopes(clients, roles, headers);
-  await removeLegacyRealmRoles(headers);
-  await removeObsoleteGroups(headers);
-  await removeObsoleteUsers(headers);
 
   const groups = new Map<string, GroupRepresentation>();
   for (const groupName of Object.keys(groupRoles)) {
@@ -340,81 +329,6 @@ async function ensureClientRoleScopes(
     headers,
     body: JSON.stringify(missingRoles),
   });
-}
-
-async function removeObsoleteClientRoles(
-  clients: Map<ClientId, ClientRepresentation>,
-  headers: Record<string, string>,
-) {
-  for (const [clientId, roleNames] of Object.entries(obsoleteClientRoles) as [
-    ClientId,
-    readonly string[],
-  ][]) {
-    const client = clients.get(clientId);
-    if (!client) {
-      throw new Error(`Client ${clientId} was not loaded`);
-    }
-    for (const roleName of roleNames) {
-      const roleUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/roles/${encodeURIComponent(roleName)}`;
-      const existing = await getOptional<RoleRepresentation>(roleUrl, headers);
-      if (existing) {
-        await requestJson(roleUrl, {
-          method: "DELETE",
-          headers,
-        });
-      }
-    }
-  }
-}
-
-async function removeLegacyRealmRoles(headers: Record<string, string>) {
-  for (const roleName of legacyRealmRoleNames) {
-    const roleUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(roleName)}`;
-    const existing = await getOptional<RoleRepresentation>(roleUrl, headers);
-    if (existing) {
-      await requestJson(roleUrl, {
-        method: "DELETE",
-        headers,
-      });
-    }
-  }
-}
-
-async function removeObsoleteGroups(headers: Record<string, string>) {
-  const groups = await requestJson<GroupRepresentation[]>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
-    { headers },
-  );
-  for (const groupName of obsoleteGroupNames) {
-    const group = groups.find(({ name }) => name === groupName);
-    if (group) {
-      await requestJson(
-        `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}`,
-        {
-          method: "DELETE",
-          headers,
-        },
-      );
-    }
-  }
-}
-
-async function removeObsoleteUsers(headers: Record<string, string>) {
-  for (const username of obsoleteUsernames) {
-    const users = await requestJson<UserRepresentation[]>(
-      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users?username=${encodeURIComponent(username)}&exact=true`,
-      { headers },
-    );
-    for (const user of users) {
-      await requestJson(
-        `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(user.id)}`,
-        {
-          method: "DELETE",
-          headers,
-        },
-      );
-    }
-  }
 }
 
 async function ensureGroup(name: string, headers: Record<string, string>) {
