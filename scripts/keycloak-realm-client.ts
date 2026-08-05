@@ -9,6 +9,7 @@ const CLIENT_NAME = "vuu-portal";
 const SERVER_CLIENT_NAMES = [
   "vuu-portal-server",
   "vuu-module-discovery-server",
+  "vuu-basket-trading-server",
 ] as const;
 const CLIENT_PORT = 5002;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
