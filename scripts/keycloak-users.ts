@@ -55,12 +55,10 @@ const users = [
 ] as const;
 
 const clientRoles = {
-  "vuu-portal-server": [],
+  "vuu-portal-server": ["users.view", "users.admin"],
   "vuu-module-discovery-server": [
     "modules.view",
     "modules.edit",
-    "users.view",
-    "users.admin",
   ],
   "vuu-basket-trading-server": ["basket.view", "basket.trade"],
 } as const;
@@ -92,11 +90,11 @@ const groupRoles: Record<string, readonly ClientRoleRef[]> = {
     { clientId: "vuu-module-discovery-server", roleName: "modules.edit" },
   ],
   USERS_VIEW: [
-    { clientId: "vuu-module-discovery-server", roleName: "users.view" },
+    { clientId: "vuu-portal-server", roleName: "users.view" },
   ],
   USERS_ADMIN: [
-    { clientId: "vuu-module-discovery-server", roleName: "users.view" },
-    { clientId: "vuu-module-discovery-server", roleName: "users.admin" },
+    { clientId: "vuu-portal-server", roleName: "users.view" },
+    { clientId: "vuu-portal-server", roleName: "users.admin" },
   ],
 };
 
@@ -128,7 +126,7 @@ async function main() {
       roles.set(roleKey(clientId, roleName), role);
     }
   }
-  await ensureDiscoveryClientRoleScopes(clients, roles, headers);
+  await ensureTokenClientRoleScopes(clients, roles, headers);
 
   const groups = new Map<string, GroupRepresentation>();
   for (const groupName of Object.keys(groupRoles)) {
@@ -214,7 +212,7 @@ async function ensureRealmExists(headers: Record<string, string>) {
 }
 
 async function getClient(
-  clientId: ClientId,
+  clientId: string,
   headers: Record<string, string>,
 ) {
   const clients = await requestJson<ClientRepresentation[]>(
@@ -266,7 +264,7 @@ function roleKey(clientId: ClientId, roleName: string) {
   return `${clientId}:${roleName}`;
 }
 
-async function ensureDiscoveryClientRoleScopes(
+async function ensureTokenClientRoleScopes(
   clients: Map<ClientId, ClientRepresentation>,
   roles: Map<string, RoleRepresentation>,
   headers: Record<string, string>,
@@ -276,35 +274,37 @@ async function ensureDiscoveryClientRoleScopes(
   if (!discoveryClient) {
     throw new Error(`Client ${discoveryClientId} was not loaded`);
   }
+  const portalClient = await getClient("vuu-portal", headers);
 
-  for (const [sourceClientId, roleNames] of Object.entries(clientRoles) as [
-    ClientId,
-    readonly string[],
-  ][]) {
-    if (sourceClientId === discoveryClientId) {
-      continue;
-    }
-
-    const sourceClient = clients.get(sourceClientId);
-    if (!sourceClient) {
-      throw new Error(`Client ${sourceClientId} was not loaded`);
-    }
-
-    const scopedRoles = roleNames.map((roleName) => {
-      const role = roles.get(roleKey(sourceClientId, roleName));
-      if (!role) {
-        throw new Error(
-          `Role ${roleName} was not loaded for client ${sourceClientId}`,
-        );
+  for (const tokenClient of [portalClient, discoveryClient]) {
+    for (const [sourceClientId, roleNames] of Object.entries(clientRoles) as [
+      ClientId,
+      readonly string[],
+    ][]) {
+      const sourceClient = clients.get(sourceClientId);
+      if (!sourceClient) {
+        throw new Error(`Client ${sourceClientId} was not loaded`);
       }
-      return role;
-    });
-    await ensureClientRoleScopes(
-      discoveryClient,
-      sourceClient,
-      scopedRoles,
-      headers,
-    );
+      if (sourceClient.id === tokenClient.id) {
+        continue;
+      }
+
+      const scopedRoles = roleNames.map((roleName) => {
+        const role = roles.get(roleKey(sourceClientId, roleName));
+        if (!role) {
+          throw new Error(
+            `Role ${roleName} was not loaded for client ${sourceClientId}`,
+          );
+        }
+        return role;
+      });
+      await ensureClientRoleScopes(
+        tokenClient,
+        sourceClient,
+        scopedRoles,
+        headers,
+      );
+    }
   }
 }
 
