@@ -1,3 +1,4 @@
-import start from "@heswell/vuu-module-discovery";
+import "./server-runtime";
 
+const { default: start } = await import("@heswell/vuu-module-discovery");
 await start();

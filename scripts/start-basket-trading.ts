@@ -1,3 +1,4 @@
-import start from "@heswell/vuu-basket-trading";
+import "./server-runtime";
 
+const { default: start } = await import("@heswell/vuu-basket-trading");
 await start();
