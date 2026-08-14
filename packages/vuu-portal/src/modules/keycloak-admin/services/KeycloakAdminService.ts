@@ -1,4 +1,7 @@
-import { DefaultRpcHandler, type TableContainer } from "@heswell/vuu-server";
+import {
+  CreateSessionTableRpcHandler,
+  type TableContainer,
+} from "@heswell/vuu-server";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 import { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
 import { KeycloakAdminClient } from "../KeycloakAdminClient";
@@ -69,7 +72,7 @@ const getOptionalNonEmptyString = (
 const toErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-export class KeycloakAdminService extends DefaultRpcHandler {
+export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   constructor(tableContainer: TableContainer) {
     super(tableContainer);
     this.registerRpc("addUser", this.addUser);

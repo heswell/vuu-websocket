@@ -3,6 +3,11 @@ import { VuuColumnDataType, VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { ViewServerModule } from "../core/module/VsModule";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
+export type Column = {
+  name: string;
+  dataType: VuuColumnDataType;
+};
+
 export const VUU_DEFAULT_COLUMNS: Column[] = [
   { name: "vuuCreatedTimestamp", dataType: "epochtimestamp" },
   { name: "vuuUpdatedTimestamp", dataType: "epochtimestamp" },
@@ -66,16 +71,33 @@ export interface SessionTableDef extends TableDef { }
 
 export const schemaToSessionTableDef = (
   tableDef: TableDef,
-): SessionTableDef => ({
-  ...tableDef,
-  schema: {
-    ...tableDef.schema,
-    columns: tableDef.schema.columns.concat({
-      name: "vuuMsg",
-      serverDataType: "string",
-    }),
-  },
-});
+): SessionTableDef => {
+  const extraColumns = [
+    ...(tableDef.columns.some(({ name }) => name === "vuuMsg")
+      ? []
+      : [{ name: "vuuMsg", dataType: "string" as const }]),
+    { name: "vuu_action", dataType: "string" as const },
+  ];
+  const sessionColumns: Column[] = [
+    ...tableDef.columns,
+    ...extraColumns,
+  ];
+
+  return {
+    ...tableDef,
+    columns: sessionColumns,
+    schema: {
+      ...tableDef.schema,
+      columns: [
+        ...tableDef.schema.columns,
+        ...extraColumns.map(({ name, dataType }) => ({
+          name,
+          serverDataType: dataType,
+        })),
+      ],
+    },
+  };
+};
 
 class TableDefImpl implements TableDef {
   columns: Column[];
