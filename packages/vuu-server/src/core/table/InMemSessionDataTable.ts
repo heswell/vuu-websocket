@@ -3,16 +3,19 @@ import { DataTable, InMemDataTable } from "./InMemDataTable";
 import { SessionTableDef } from "../../api/TableDef";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 
-type RowUpdates = {
+export type SessionTableAction = "" | "addRow" | "deleteRow";
+export type SessionRowChange = {
+  action: SessionTableAction;
   cellUpdates: Record<string, VuuRowDataItemType>;
+  key: string;
   lastUpdateTimestamp?: number;
+  row: VuuDataRow;
 };
 
-export type SessionTableAction = "" | "addRow" | "deleteRow";
+type SessionChangeState = Omit<SessionRowChange, "key" | "row">;
 
 export class InMemSessionDataTable extends InMemDataTable {
-  #updates = new Map<string, RowUpdates>();
-  #insertedKeys = new Set<string>();
+  #changes = new Map<string, SessionChangeState>();
 
   creationTimestamp = Date.now();
   #tableId = crypto.randomUUID();
@@ -29,17 +32,18 @@ export class InMemSessionDataTable extends InMemDataTable {
       const { columnMap } = this;
       const key = row[columnMap[this.schema.key]] as string;
       const tsIndex = columnMap.vuuUpdatedTimestamp;
+      const existingChange = this.#changes.get(key);
 
-      if (!this.#insertedKeys.has(key) && columnName !== "vuu_action") {
-        let updatesForRow = this.#updates.get(key);
-        if (updatesForRow === undefined) {
-          updatesForRow = {
+      if (existingChange?.action !== "addRow" && columnName !== "vuu_action") {
+        const change =
+          existingChange ??
+          ({
+            action: "",
             lastUpdateTimestamp: row[tsIndex] as number | undefined,
             cellUpdates: {},
-          };
-          this.#updates.set(key, updatesForRow);
-        }
-        updatesForRow.cellUpdates[columnName] = row[columnMap[columnName]];
+          } satisfies SessionChangeState);
+        change.cellUpdates[columnName] = row[columnMap[columnName]];
+        this.#changes.set(key, change);
       }
     }
     return super.update(rowIdx, row);
@@ -72,7 +76,10 @@ export class InMemSessionDataTable extends InMemDataTable {
     }
     row[this.indexOfKeyField] = key;
     row[this.columnMap.vuu_action] = "addRow";
-    this.#insertedKeys.add(key);
+    this.#changes.set(key, {
+      action: "addRow",
+      cellUpdates: {},
+    });
     super.insert(row);
     return key;
   }
@@ -82,14 +89,22 @@ export class InMemSessionDataTable extends InMemDataTable {
     if (!row) {
       throw Error(`deleteRow: row ${key} not found`);
     }
-    if (!this.#insertedKeys.has(key) && !this.#updates.has(key)) {
-      this.#updates.set(key, {
-        lastUpdateTimestamp: row[this.columnMap.vuuUpdatedTimestamp] as
-          | number
-          | undefined,
-        cellUpdates: {},
-      });
+    const existingChange = this.#changes.get(key);
+    if (existingChange?.action === "addRow") {
+      this.#changes.delete(key);
+      super.delete(key);
+      return;
     }
+
+    const change = existingChange ?? {
+      action: "",
+      cellUpdates: {},
+      lastUpdateTimestamp: row[this.columnMap.vuuUpdatedTimestamp] as
+        | number
+        | undefined,
+    };
+    change.action = "deleteRow";
+    this.#changes.set(key, change);
     const newRow = row.slice();
     newRow[this.columnMap.vuu_action] = "deleteRow";
     super.update(this.rowIndexAtKey(key), newRow);
@@ -101,16 +116,10 @@ export class InMemSessionDataTable extends InMemDataTable {
       throw Error(`undoRowChange: row ${key} not found`);
     }
 
-    if (this.#insertedKeys.has(key)) {
-      if (row[this.columnMap.vuu_action] === "deleteRow") {
-        const newRow = row.slice();
-        newRow[this.columnMap.vuu_action] = "addRow";
-        super.update(this.rowIndexAtKey(key), newRow);
-      } else {
-        this.#insertedKeys.delete(key);
-        this.#updates.delete(key);
-        super.delete(key);
-      }
+    const change = this.#changes.get(key);
+    if (change?.action === "addRow") {
+      this.#changes.delete(key);
+      super.delete(key);
       return;
     }
 
@@ -122,17 +131,17 @@ export class InMemSessionDataTable extends InMemDataTable {
     sourceRow.forEach((value, index) => {
       restoredRow[index] = value;
     });
-    this.#updates.delete(key);
+    this.#changes.delete(key);
     super.update(this.rowIndexAtKey(key), restoredRow);
   }
 
-  getAction(row: VuuDataRow): SessionTableAction {
-    return (row[this.columnMap.vuu_action] ?? "") as SessionTableAction;
+  getSessionChanges(): SessionRowChange[] {
+    return Array.from(this.#changes, ([key, change]) => ({
+      ...change,
+      key,
+      row: this.getRowAtKey(key),
+    }));
   }
-
-  getSessionUpdates = () => {
-    return this.#updates;
-  };
 
   get name() {
     return `session:${this.sessionId}/simple-${this.tableDef.name}_${this.creationTimestamp}-${this.#tableId}`;
