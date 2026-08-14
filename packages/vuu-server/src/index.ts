@@ -13,6 +13,12 @@ export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
+export {
+  CreateSessionTableRpcHandler,
+  type EditSessionMode,
+  type SessionTableCopyOption,
+} from "./net/rpc/CreateSessionTableRpcHandler";
+export { EndEditSessionRpcHandler } from "./net/rpc/EndEditSessionRpcHandler";
 export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
 export {
   JoinTableProvider,
