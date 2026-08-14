@@ -1,4 +1,4 @@
-import { TableDef } from "@heswell/vuu-server";
+import { TableDef, VUU_DEFAULT_COLUMNS } from "@heswell/vuu-server";
 
 export const modulesTable = TableDef({
   columns: [
@@ -16,6 +16,7 @@ export const modulesTable = TableDef({
     { name: "vuuConnectionId", dataType: "string" },
     { name: "vuuWebsocketUrl", dataType: "string" },
     { name: "vuuRestUrl", dataType: "string" },
+    ...VUU_DEFAULT_COLUMNS
   ],
   keyField: "id",
   name: "modules",
@@ -26,6 +27,7 @@ export const modulePermissionsTable = TableDef({
     { name: "id", dataType: "int" },
     { name: "module_id", dataType: "int" },
     { name: "role", dataType: "string" },
+    ...VUU_DEFAULT_COLUMNS
   ],
   keyField: "id",
   name: "modulePermissions",

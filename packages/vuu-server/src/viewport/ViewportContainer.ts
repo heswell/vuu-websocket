@@ -248,6 +248,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     preserveExistingSelection: boolean,
   ) {
     const viewport = this.getViewportById(viewPortId);
+
     const { selectedRowCount } = viewport.selectRow(
       rowKey,
       preserveExistingSelection,

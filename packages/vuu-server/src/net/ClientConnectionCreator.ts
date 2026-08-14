@@ -34,7 +34,7 @@ interface OutboundMessageHandler {
 }
 
 export interface MessageHandler
-  extends InboundMessageHandler, OutboundMessageHandler {}
+  extends InboundMessageHandler, OutboundMessageHandler { }
 
 class DefaultMessageHandlerImpl implements MessageHandler {
   constructor(
@@ -46,9 +46,9 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     private flowController: FlowController,
     private sessionContainer: ClientSessionContainer,
     private moduleContainer: ModuleContainer,
-  ) {}
+  ) { }
   handle = async (msg: VuuClientMessage) => {
-    // console.log(`[DefaultMessageHandler] handle ${JSON.stringify(msg)}`);
+
 
     const ctx = RequestContext(
       msg.requestId,
@@ -200,7 +200,7 @@ class ClientSessionIdImpl implements ClientSessionId {
   constructor(
     public sessionId: string,
     public channelId: string,
-  ) {}
+  ) { }
 
   toString() {
     return `sessionId: ${this.sessionId}, channelId: ${this.channelId}`;

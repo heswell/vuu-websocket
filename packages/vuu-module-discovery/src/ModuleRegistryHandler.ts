@@ -90,15 +90,11 @@ export function createModuleRegistryHttpHandler(
       const modulePermissions = readModulePermissions(
         tableContainer.getTable<DataTable>("modulePermissions"),
       );
-      const moduleUsers = readModuleUsers(
-        tableContainer.getTable<DataTable>("moduleUsers"),
-      );
 
       return jsonResponse({
         modules: selectModules(
           modules,
           modulePermissions,
-          moduleUsers,
           user.name,
           user.authorizations,
         ),
@@ -166,7 +162,6 @@ function readModuleUsers(table: DataTable): ModuleUser[] {
 function selectModules(
   modules: ModuleRecord[],
   modulePermissions: ModulePermission[],
-  moduleUsers: ModuleUser[],
   username: string,
   authorizations: string[],
 ) {
@@ -176,7 +171,6 @@ function selectModules(
       authorizations: ${authorizations.join(",")}
     `)
   console.table(modulePermissions);
-  console.table(moduleUsers)
   console.table(modules)
 
 
@@ -185,11 +179,6 @@ function selectModules(
 
   modulePermissions.forEach(({ moduleId, role }) => {
     if (roles.has(role)) {
-      permittedModuleIds.add(moduleId);
-    }
-  });
-  moduleUsers.forEach(({ moduleId, username: permittedUsername }) => {
-    if (username === permittedUsername) {
       permittedModuleIds.add(moduleId);
     }
   });

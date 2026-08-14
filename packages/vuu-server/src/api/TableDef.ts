@@ -3,10 +3,11 @@ import { VuuColumnDataType, VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { ViewServerModule } from "../core/module/VsModule";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
-export type Column = {
-  name: string;
-  dataType: VuuColumnDataType;
-};
+export const VUU_DEFAULT_COLUMNS: Column[] = [
+  { name: "vuuCreatedTimestamp", dataType: "epochtimestamp" },
+  { name: "vuuUpdatedTimestamp", dataType: "epochtimestamp" },
+  { name: "vuuMsg", dataType: "string" },
+];
 
 export const columnUtils = {
   allFrom: (tableDef: TableDef) => tableDef.columns,
@@ -26,7 +27,7 @@ class LinkImpl implements Link {
     public fromColumn: string,
     public toTable: string,
     public toColumn: string,
-  ) {}
+  ) { }
 }
 
 export const Link = (
@@ -36,7 +37,7 @@ export const Link = (
 ): Link => new LinkImpl(fromColumn, toTable, toColumn);
 
 class VisualLinksImpl {
-  constructor(public links: Link[]) {}
+  constructor(public links: Link[]) { }
 }
 
 export interface VisualLinks {
@@ -61,7 +62,7 @@ export interface TableDef extends TableDefConfig {
   schema: TableSchema;
   asVuuTable: VuuTable;
 }
-export interface SessionTableDef extends TableDef {}
+export interface SessionTableDef extends TableDef { }
 
 export const schemaToSessionTableDef = (
   tableDef: TableDef,
@@ -156,7 +157,7 @@ export class JoinSpecImpl implements JoinSpec {
     public left: string,
     public right: string,
     public type: JoinType,
-  ) {}
+  ) { }
 }
 
 export function JoinSpec(
@@ -176,7 +177,7 @@ export class JoinImpl implements Join {
   constructor(
     public table: TableDef,
     public joinSpec: JoinSpec,
-  ) {}
+  ) { }
 }
 
 export function Join(table: TableDef, joinSpec: JoinSpec): Join {

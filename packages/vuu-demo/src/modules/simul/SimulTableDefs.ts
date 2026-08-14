@@ -1,4 +1,4 @@
-import { Column, TableDef } from "@heswell/vuu-server";
+import { Column, Columns, TableDef } from "@heswell/vuu-server";
 import { SchemaColumn } from "@vuu-ui/vuu-data-types";
 
 const VUU_TIMESTAMP_COLUMNS: Column[] = [
@@ -7,10 +7,16 @@ const VUU_TIMESTAMP_COLUMNS: Column[] = [
 ];
 
 export const instruments = TableDef({
+  // columns: Columns.fromNames(
+  //   "bbg:string",
+  //   "currency:string",
+  //   "description:string",
+  //   "exchange:string",
+  //   "isin:string",
+  //   "lotSize:int",
+  //   "ric:string",
+  // ),
   columns: [
-    { name: "bbg", dataType: "string" },
-    { name: "currency", dataType: "string" },
-    { name: "description", dataType: "string" },
     { name: "exchange", dataType: "string" },
     { name: "isin", dataType: "string" },
     { name: "lotSize", dataType: "int" },

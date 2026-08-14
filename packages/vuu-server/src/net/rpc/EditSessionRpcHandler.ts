@@ -58,7 +58,7 @@ export class EditSessionRpcHandler extends EditTableRpcHandler {
             const updateTimestampOnTable =
               currentRow[columnMap.vuuUpdatedTimestamp];
             if (lastUpdateTimestamp !== updateTimestampOnTable && !force) {
-              // We will reject updates for this row, update sessionn table row with message
+              // We will reject updates for this row, update session table row with message
               rejectedCount += 1;
               const rowIdx = sessionTable.rowIndexAtKey(key);
               const sessionTableRow = sessionTable.getRowAtKey(key);

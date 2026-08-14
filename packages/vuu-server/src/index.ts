@@ -1,4 +1,5 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
+export { type Column, Columns } from "./core/table/Column";
 export type { TableContainer } from "./core/table/TableContainer";
 export type { DataTable } from "./core/table/InMemDataTable";
 export { ProviderContainer } from "./provider/ProviderContainer";
