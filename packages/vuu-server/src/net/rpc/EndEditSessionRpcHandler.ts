@@ -39,7 +39,14 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     let hasStaleUpdate = false;
 
     for (const change of sessionTable.getSessionChanges()) {
-      const { action, isInserted, key, row, rowUpdates } = change;
+      const {
+        action,
+        cellUpdates,
+        isInserted,
+        key,
+        lastUpdateTimestamp,
+        row,
+      } = change;
       const sourceRow = sourceTable.getRowAtKey(key, false);
 
       if (isInserted) {
@@ -66,13 +73,11 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       }
 
       if (
-        rowUpdates &&
-        rowUpdates.lastUpdateTimestamp !==
-          sourceRow[columnMap.vuuUpdatedTimestamp] &&
+        lastUpdateTimestamp !== sourceRow[columnMap.vuuUpdatedTimestamp] &&
         !force
       ) {
         const updateTimestamp = sourceRow[columnMap.vuuUpdatedTimestamp];
-        const messages = Object.entries(rowUpdates.cellUpdates).map(
+        const messages = Object.entries(cellUpdates).map(
           ([column, value]) =>
             `${column}:${value}:${sourceRow[columnMap[column]]}:${updateTimestamp}`,
         );
@@ -105,7 +110,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       isInserted,
       key,
       row,
-      rowUpdates,
+      cellUpdates,
       sourceRow,
     } of preparedChanges) {
       if (action === "addRow") {
@@ -117,9 +122,9 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
         if (!isInserted) {
           sourceTable.delete(key);
         }
-      } else if (rowUpdates && sourceRow) {
+      } else if (sourceRow) {
         const updatedRow = sourceRow.slice();
-        for (const [column, value] of Object.entries(rowUpdates.cellUpdates)) {
+        for (const [column, value] of Object.entries(cellUpdates)) {
           updatedRow[columnMap[column]] = value;
         }
         updatedRow[columnMap.vuuUpdatedTimestamp] = Date.now();
