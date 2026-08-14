@@ -20,7 +20,6 @@ import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
-import { tableRowsMessageBody } from "./responseUtils.ts";
 import logger from "../logger.ts";
 import { DataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable.ts";
 
@@ -133,13 +132,17 @@ export default class DataView extends EventEmitter<DataViewEvents> {
   }
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
-    const { rows, size } = this.rowSet.insert(rowIdx, row);
-    this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
+    this.postDataResponse({
+      ...this.rowSet.insert(rowIdx, row),
+      sizeMessageRequired: true,
+    });
   };
 
   private rowDeleted: RowInsertHandler = (rowIdx, row) => {
-    const { rows, size } = this.rowSet.delete(rowIdx, row);
-    this.enqueue(tableRowsMessageBody(rows, size, this.#id, true));
+    this.postDataResponse({
+      ...this.rowSet.delete(rowIdx, row),
+      sizeMessageRequired: true,
+    });
   };
 
   protected rowUpdated: RowUpdateHandler = (
