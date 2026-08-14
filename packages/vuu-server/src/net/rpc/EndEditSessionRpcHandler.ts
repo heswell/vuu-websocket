@@ -1,6 +1,11 @@
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 import { TableContainer } from "../../core/table/TableContainer";
-import { InMemSessionDataTable } from "../../core/table/InMemSessionDataTable";
+import {
+  InMemSessionDataTable,
+  SessionRowChange,
+} from "../../core/table/InMemSessionDataTable";
+import { DataTable } from "../../core/table/InMemDataTable";
+import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { EditTableRpcHandler } from "./EditTableRpcHandler";
 import { RpcParams } from "./Rpc";
 import { RpcNames } from "../../util/RpcNames";
@@ -23,111 +28,123 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       return { type: "SUCCESS_RESULT", data: undefined };
     }
 
-    const sourceTable = this.tableContainer.getTable(
+    const sourceTable = this.tableContainer.getTable<DataTable>(
       sessionTable.tableDef.name,
     );
     const { columnMap } = sourceTable;
-    let rejectedCount = 0;
-    let duplicateKeyCount = 0;
+    const preparedChanges: Array<
+      SessionRowChange & { sourceRow?: VuuDataRow }
+    > = [];
+    let hasDuplicateKey = false;
+    let hasStaleUpdate = false;
 
-    for (const sessionRow of sessionTable.rows) {
-      if (sessionTable.getAction(sessionRow) !== "addRow") {
+    for (const change of sessionTable.getSessionChanges()) {
+      const { action, isInserted, key, row, rowUpdates } = change;
+      const sourceRow = sourceTable.getRowAtKey(key, false);
+
+      if (isInserted) {
+        if (action === "addRow" && sourceRow) {
+          this.setSessionRowMessage(
+            sessionTable,
+            row,
+            `addRow:${key}:key already exists`,
+          );
+          hasDuplicateKey = true;
+        }
+        preparedChanges.push(change);
         continue;
       }
-      const key = sessionRow[sessionTable.indexOfKeyField] as string;
-      if (sourceTable.getRowAtKey(key, false)) {
-        const newRow = sessionRow.slice();
-        newRow[sessionTable.columnMap.vuuMsg] =
-          `addRow:${key}:key already exists`;
-        sessionTable.update(sessionTable.rowIndexAtKey(key), newRow);
-        duplicateKeyCount += 1;
+
+      if (!sourceRow) {
+        this.setSessionRowMessage(
+          sessionTable,
+          row,
+          `${action || "editRow"}:${key}:source row missing`,
+        );
+        hasStaleUpdate = true;
+        continue;
       }
+
+      if (
+        rowUpdates &&
+        rowUpdates.lastUpdateTimestamp !==
+          sourceRow[columnMap.vuuUpdatedTimestamp] &&
+        !force
+      ) {
+        const updateTimestamp = sourceRow[columnMap.vuuUpdatedTimestamp];
+        const messages = Object.entries(rowUpdates.cellUpdates).map(
+          ([column, value]) =>
+            `${column}:${value}:${sourceRow[columnMap[column]]}:${updateTimestamp}`,
+        );
+        if (action === "deleteRow") {
+          messages.push(`deleteRow:${key}:${updateTimestamp}`);
+        }
+        this.setSessionRowMessage(sessionTable, row, messages.join(","));
+        hasStaleUpdate = true;
+        continue;
+      }
+
+      preparedChanges.push({ ...change, sourceRow });
     }
 
-    if (duplicateKeyCount > 0) {
+    if (hasDuplicateKey) {
       return {
         errorMessage: "duplicate key",
         type: "ERROR_RESULT",
       };
     }
-
-    sessionTable.getSessionUpdates().forEach((rowUpdates, key) => {
-      const sessionRow = sessionTable.getRowAtKey(key, false);
-      if (!sessionRow) {
-        return;
-      }
-
-      const currentRow = sourceTable.getRowAtKey(key, false);
-      if (!currentRow) {
-        const newRow = sessionRow.slice();
-        const action = sessionTable.getAction(sessionRow) || "editRow";
-        newRow[sessionTable.columnMap.vuuMsg] =
-          `${action}:${key}:source row missing`;
-        sessionTable.update(sessionTable.rowIndexAtKey(key), newRow);
-        rejectedCount += 1;
-        return;
-      }
-
-      const { cellUpdates, lastUpdateTimestamp } = rowUpdates;
-      const updateTimestampOnTable =
-        currentRow[columnMap.vuuUpdatedTimestamp];
-      if (lastUpdateTimestamp !== updateTimestampOnTable && !force) {
-        rejectedCount += 1;
-        const newRow = sessionRow.slice();
-        const messages = Object.entries(cellUpdates).map(([column, value]) => {
-          const updatedValue = currentRow[columnMap[column]];
-          return `${column}:${value}:${updatedValue}:${updateTimestampOnTable}`;
-        });
-        if (sessionTable.getAction(sessionRow) === "deleteRow") {
-          messages.push(`deleteRow:${key}:${updateTimestampOnTable}`);
-        }
-        newRow[sessionTable.columnMap.vuuMsg] = messages.join(",");
-        sessionTable.update(sessionTable.rowIndexAtKey(key), newRow);
-      }
-    });
-
-    if (rejectedCount > 0) {
+    if (hasStaleUpdate) {
       return {
         errorMessage: "stale update",
         type: "ERROR_RESULT",
       };
     }
 
-    for (const sessionRow of [...sessionTable.rows]) {
-      const key = sessionRow[sessionTable.indexOfKeyField] as string;
-      const action = sessionTable.getAction(sessionRow);
+    for (const {
+      action,
+      isInserted,
+      key,
+      row,
+      rowUpdates,
+      sourceRow,
+    } of preparedChanges) {
       if (action === "addRow") {
-        const sourceRow = sourceTable.schema.columns.map(
-          ({ name }) => sessionRow[sessionTable.columnMap[name]],
+        const newSourceRow = sourceTable.schema.columns.map(
+          ({ name }) => row[sessionTable.columnMap[name]],
         );
-        sourceTable.insert(sourceRow);
+        sourceTable.insert(newSourceRow);
       } else if (action === "deleteRow") {
-        if (sourceTable.getRowAtKey(key, false)) {
+        if (!isInserted) {
           sourceTable.delete(key);
         }
+      } else if (rowUpdates && sourceRow) {
+        const updatedRow = sourceRow.slice();
+        for (const [column, value] of Object.entries(rowUpdates.cellUpdates)) {
+          updatedRow[columnMap[column]] = value;
+        }
+        updatedRow[columnMap.vuuUpdatedTimestamp] = Date.now();
+        sourceTable.update(sourceTable.rowIndexAtKey(key), updatedRow);
       }
     }
-
-    sessionTable.getSessionUpdates().forEach(({ cellUpdates }, key) => {
-      const sessionRow = sessionTable.getRowAtKey(key, false);
-      if (!sessionRow || sessionTable.getAction(sessionRow) === "deleteRow") {
-        return;
-      }
-      const currentRow = sourceTable.getRowAtKey(key, false);
-      if (!currentRow) {
-        return;
-      }
-      const newRow = currentRow.slice();
-      for (const [column, value] of Object.entries(cellUpdates)) {
-        newRow[columnMap[column]] = value;
-      }
-      newRow[columnMap.vuuUpdatedTimestamp] = Date.now();
-      sourceTable.update(sourceTable.rowIndexAtKey(key), newRow);
-    });
 
     this.tableContainer.removeSessionTable(sessionTable.name);
     return { type: "SUCCESS_RESULT", data: undefined };
   };
+
+  private setSessionRowMessage(
+    sessionTable: InMemSessionDataTable,
+    row: VuuDataRow,
+    message: string,
+  ) {
+    const updatedRow = row.slice();
+    updatedRow[sessionTable.columnMap.vuuMsg] = message;
+    sessionTable.update(
+      sessionTable.rowIndexAtKey(
+        updatedRow[sessionTable.indexOfKeyField] as string,
+      ),
+      updatedRow,
+    );
+  }
 
   constructor(tableContainer: TableContainer) {
     super(tableContainer);
