@@ -42,15 +42,14 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       const {
         action,
         cellUpdates,
-        isInserted,
         key,
         lastUpdateTimestamp,
         row,
       } = change;
       const sourceRow = sourceTable.getRowAtKey(key, false);
 
-      if (isInserted) {
-        if (action === "addRow" && sourceRow) {
+      if (action === "addRow") {
+        if (sourceRow) {
           this.setSessionRowMessage(
             sessionTable,
             row,
@@ -107,7 +106,6 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
 
     for (const {
       action,
-      isInserted,
       key,
       row,
       cellUpdates,
@@ -119,9 +117,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
         );
         sourceTable.insert(newSourceRow);
       } else if (action === "deleteRow") {
-        if (!isInserted) {
-          sourceTable.delete(key);
-        }
+        sourceTable.delete(key);
       } else if (sourceRow) {
         const updatedRow = sourceRow.slice();
         for (const [column, value] of Object.entries(cellUpdates)) {

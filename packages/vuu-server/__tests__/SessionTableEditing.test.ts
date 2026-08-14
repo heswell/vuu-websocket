@@ -68,10 +68,6 @@ describe("session table editing", () => {
     expect(action(sessionTable, "C")).toBe("addRow");
 
     call(handler, "deleteRow", sessionTable, { key: "C" });
-    expect(action(sessionTable, "C")).toBe("deleteRow");
-    call(handler, "undoRowChange", sessionTable, { key: "C" });
-    expect(action(sessionTable, "C")).toBe("addRow");
-    call(handler, "undoRowChange", sessionTable, { key: "C" });
     expect(sessionTable.getRowAtKey("C", false)).toBeUndefined();
 
     const generatedKeyResult = call(handler, "addRow", sessionTable, {
@@ -82,6 +78,8 @@ describe("session table editing", () => {
     ).key;
     expect(generatedKey).toBeString();
     expect(action(sessionTable, generatedKey)).toBe("addRow");
+    call(handler, "undoRowChange", sessionTable, { key: generatedKey });
+    expect(sessionTable.getRowAtKey(generatedKey, false)).toBeUndefined();
 
     call(
       handler,

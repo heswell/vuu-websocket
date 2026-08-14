@@ -7,7 +7,6 @@ export type SessionTableAction = "" | "addRow" | "deleteRow";
 export type SessionRowChange = {
   action: SessionTableAction;
   cellUpdates: Record<string, VuuRowDataItemType>;
-  isInserted: boolean;
   key: string;
   lastUpdateTimestamp?: number;
   row: VuuDataRow;
@@ -35,12 +34,11 @@ export class InMemSessionDataTable extends InMemDataTable {
       const tsIndex = columnMap.vuuUpdatedTimestamp;
       const existingChange = this.#changes.get(key);
 
-      if (!existingChange?.isInserted && columnName !== "vuu_action") {
+      if (existingChange?.action !== "addRow" && columnName !== "vuu_action") {
         const change =
           existingChange ??
           ({
             action: "",
-            isInserted: false,
             lastUpdateTimestamp: row[tsIndex] as number | undefined,
             cellUpdates: {},
           } satisfies SessionChangeState);
@@ -81,7 +79,6 @@ export class InMemSessionDataTable extends InMemDataTable {
     this.#changes.set(key, {
       action: "addRow",
       cellUpdates: {},
-      isInserted: true,
     });
     super.insert(row);
     return key;
@@ -92,10 +89,16 @@ export class InMemSessionDataTable extends InMemDataTable {
     if (!row) {
       throw Error(`deleteRow: row ${key} not found`);
     }
-    const change = this.#changes.get(key) ?? {
+    const existingChange = this.#changes.get(key);
+    if (existingChange?.action === "addRow") {
+      this.#changes.delete(key);
+      super.delete(key);
+      return;
+    }
+
+    const change = existingChange ?? {
       action: "",
       cellUpdates: {},
-      isInserted: false,
       lastUpdateTimestamp: row[this.columnMap.vuuUpdatedTimestamp] as
         | number
         | undefined,
@@ -114,16 +117,9 @@ export class InMemSessionDataTable extends InMemDataTable {
     }
 
     const change = this.#changes.get(key);
-    if (change?.isInserted) {
-      if (row[this.columnMap.vuu_action] === "deleteRow") {
-        const newRow = row.slice();
-        newRow[this.columnMap.vuu_action] = "addRow";
-        change.action = "addRow";
-        super.update(this.rowIndexAtKey(key), newRow);
-      } else {
-        this.#changes.delete(key);
-        super.delete(key);
-      }
+    if (change?.action === "addRow") {
+      this.#changes.delete(key);
+      super.delete(key);
       return;
     }
 
