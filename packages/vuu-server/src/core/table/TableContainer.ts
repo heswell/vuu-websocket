@@ -50,9 +50,15 @@ export class TableContainer {
   }
 
   removeSessionTables(clientSessionId: ClientSessionId) {
-    console.log(
-      `TODO TableContainer removeSessionTables for session ${clientSessionId.sessionId}`,
-    );
+    const sessionTablePrefix = `session:${clientSessionId.sessionId}/`;
+    for (const [tableName, table] of this.#tables) {
+      if (
+        table instanceof InMemSessionDataTable &&
+        tableName.startsWith(sessionTablePrefix)
+      ) {
+        this.#tables.delete(tableName);
+      }
+    }
   }
 
   removeSessionTable(tableName: string) {
