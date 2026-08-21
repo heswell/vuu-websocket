@@ -22,6 +22,7 @@ describe("session table editing", () => {
       copyOption: "All",
     });
     const allTable = sessionTableFromResult(tableContainer, allResult);
+    const allTableName = allTable.name;
     expect(allTable.rows).toHaveLength(2);
     expect(allTable.schema.columns.at(-1)?.name).toBe("vuu_action");
     expect(allTable.rows.map((row) => row[allTable.columnMap.vuu_action])).toEqual([
@@ -47,6 +48,20 @@ describe("session table editing", () => {
       editSessionMode: "empty-session-table",
     });
     expect(sessionTableFromResult(tableContainer, emptyResult).rows).toEqual([]);
+    expect(tableContainer.getDefinedTables()).toEqual([
+      { module: "TEST", table: "items" },
+    ]);
+
+    tableContainer.removeSessionTables({
+      sessionId: "test-session",
+      channelId: "test-channel",
+    });
+    expect(() => tableContainer.getTable(allTableName)).toThrow(
+      `[TableContainer] no table ${allTableName}`,
+    );
+    expect(tableContainer.getDefinedTables()).toEqual([
+      { module: "TEST", table: "items" },
+    ]);
   });
 
   test("adds, deletes, and undoes session rows", () => {
