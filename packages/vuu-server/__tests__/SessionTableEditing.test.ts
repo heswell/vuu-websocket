@@ -47,6 +47,9 @@ describe("session table editing", () => {
       editSessionMode: "empty-session-table",
     });
     expect(sessionTableFromResult(tableContainer, emptyResult).rows).toEqual([]);
+    expect(tableContainer.getDefinedTables()).toEqual([
+      { module: "TEST", table: "items" },
+    ]);
   });
 
   test("adds, deletes, and undoes session rows", () => {

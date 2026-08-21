@@ -22,6 +22,7 @@ export class TableContainer {
   getDefinedTables(): VuuTable[] {
     return this.#tables
       .values()
+      .filter((table) => !(table instanceof InMemSessionDataTable))
       .map((table) => table.schema.table)
       .toArray();
   }
