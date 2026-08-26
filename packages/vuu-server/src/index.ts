@@ -11,6 +11,7 @@ export type {
 } from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
+export type { RpcParams } from "./net/rpc/Rpc";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
 export {
@@ -70,5 +71,13 @@ export {
   KeycloakAuthProvider,
   type KeycloakAudiencePolicy,
 } from "./net/auth/KeycloakAuthProvider";
+export { createConfiguredAuthProviders } from "./net/auth/ConfiguredAuthProviders";
 export { composeHttpHandlers } from "./net/http/composeHttpHandlers";
+export type {
+  LoginSuccessOptions,
+  ModuleRecord,
+  ModuleRegistry,
+  RemoteModuleConnection,
+} from "./net/LoginSuccess";
+export type { LoginSuccessProvider } from "./core/LoginSuccessProvider";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";

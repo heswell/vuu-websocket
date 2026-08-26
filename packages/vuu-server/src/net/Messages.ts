@@ -24,6 +24,7 @@ import type {
   VuuViewportVisualLinksResponse,
 } from "@vuu-ui/vuu-protocol-types";
 import { RowUpdate } from "./row/RowUpdate";
+import type { LoginSuccessOptions } from "./LoginSuccess";
 
 interface ViewServerMessage {
   body: ServerMessageBody;
@@ -61,9 +62,13 @@ export const ErrorResponse = (msg: string): ServerToClientError => ({
   type: "ERROR",
 });
 
-export const LoginSuccess = (vuuServerId: string): VuuLoginSuccessResponse => ({
+export const LoginSuccess = (
+  vuuServerId: string,
+  options: LoginSuccessOptions = {},
+): VuuLoginSuccessResponse & LoginSuccessOptions => ({
   type: "LOGIN_SUCCESS",
   vuuServerId,
+  ...options,
 });
 
 export const GetTableMetaResponse = (

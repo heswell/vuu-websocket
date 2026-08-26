@@ -1,25 +1,23 @@
 import {
   ConfigFactory,
+  createConfiguredAuthProviders,
   createVuuServerApplication,
 } from "@heswell/vuu-server";
-import { createAuthProvider } from "./auth/createAuthProvider";
-import { KeycloakAdminModule } from "./modules/keycloak-admin";
-import { installKeycloakAdminRefreshCoordinator } from "./modules/keycloak-admin/KeycloakAdminRefreshCoordinator";
+import { createModuleRegistry } from "./ModuleRegistry";
+import { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
-  const authProvider = createAuthProvider(defaultConfig);
   const application = createVuuServerApplication({
-    authProviders: authProvider,
+    authProviders: createConfiguredAuthProviders(defaultConfig),
     config: defaultConfig,
     defaultHttpsPort: 8443,
     defaultWebSocketPort: 8091,
-    modules: [KeycloakAdminModule()],
+    loginSuccessProvider: (user, tableContainer) => ({
+      moduleRegistry: createModuleRegistry(tableContainer, user),
+    }),
+    modules: [ModuleDiscoveryModule()],
   });
-  installKeycloakAdminRefreshCoordinator(
-    application.server.tableContainer,
-    application.server.providers,
-  );
 
   await application.start();
 }

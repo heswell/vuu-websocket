@@ -8,9 +8,14 @@ const REALM_NAME = "vuu";
 const CLIENT_NAME = "vuu-portal";
 const SERVER_CLIENT_NAMES = [
   "vuu-portal-server",
-  "vuu-module-discovery-server",
+  "vuu-user-admin-server",
   "vuu-basket-trading-server",
 ] as const;
+const SERVER_CLIENT_SECRETS: Partial<
+  Record<(typeof SERVER_CLIENT_NAMES)[number], string>
+> = {
+  "vuu-user-admin-server": "vuu-user-admin-local-dev-secret",
+};
 const CLIENT_PORT = 5002;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
 const ALLOW_SELF_SIGNED_CERT =
@@ -152,7 +157,11 @@ async function main() {
     console.log("4️⃣  Creating/updating confidential server clients...");
     const serverClientSecrets: Array<{ clientId: string; secret: string }> = [];
     for (const serverClientName of SERVER_CLIENT_NAMES) {
-      const secret = await ensureServerClient(token, serverClientName);
+      const secret = await ensureServerClient(
+        token,
+        serverClientName,
+        SERVER_CLIENT_SECRETS[serverClientName],
+      );
       serverClientSecrets.push({ clientId: serverClientName, secret });
     }
     console.log("✅ Confidential server clients ready\n");
@@ -215,6 +224,7 @@ async function lookupClientByClientId(token: string, clientId: string) {
 async function ensureStandardTokenExchangeEnabled(
   token: string,
   internalClientId: string,
+  clientSecret?: string,
 ) {
   const getResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -236,6 +246,7 @@ async function ensureStandardTokenExchangeEnabled(
 
   const clientRepresentation = (await getResponse.json()) as {
     attributes?: Record<string, string>;
+    secret?: string;
     [key: string]: unknown;
   };
 
@@ -243,6 +254,9 @@ async function ensureStandardTokenExchangeEnabled(
     ...(clientRepresentation.attributes ?? {}),
     "standard.token.exchange.enabled": "true",
   };
+  if (clientSecret) {
+    clientRepresentation.secret = clientSecret;
+  }
 
   const updateResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -371,7 +385,11 @@ async function ensurePortalClientIncludesServerAudiences(
   }
 }
 
-async function ensureServerClient(token: string, serverClientName: string) {
+async function ensureServerClient(
+  token: string,
+  serverClientName: string,
+  clientSecret?: string,
+) {
   console.log(`   • Creating confidential client '${serverClientName}'...`);
   const createResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
@@ -396,6 +414,7 @@ async function ensureServerClient(token: string, serverClientName: string) {
         attributes: {
           "standard.token.exchange.enabled": "true",
         },
+        ...(clientSecret ? { secret: clientSecret } : {}),
       }),
     }
   );
@@ -419,7 +438,11 @@ async function ensureServerClient(token: string, serverClientName: string) {
   }
 
   console.log(`   • Enabling standard token exchange for '${serverClientName}'...`);
-  await ensureStandardTokenExchangeEnabled(token, serverClient.id);
+  await ensureStandardTokenExchangeEnabled(
+    token,
+    serverClient.id,
+    clientSecret,
+  );
 
   console.log(`   • Fetching secret for '${serverClientName}'...`);
   return await fetchClientSecret(token, serverClient.id, serverClientName);

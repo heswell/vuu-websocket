@@ -15,6 +15,7 @@ import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
 import { JsonViewServerMessage, LoginSuccess } from "./Messages";
 import { ViewPortUpdate } from "../viewport/Viewport";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
+import type { LoginSuccessOptions } from "./LoginSuccess";
 
 export type RequestContext = {
   queue: PublishQueue<ViewPortUpdate>;
@@ -47,6 +48,7 @@ export class RequestProcessor {
     private moduleContainer: ModuleContainer,
     private flowControllerFactory: FlowControllerFactory,
     private vuuServerId: string,
+    private loginSuccessProvider?: (user: VuuUser) => LoginSuccessOptions,
   ) {}
 
   async handle(msg: VuuClientMessage, channel: Channel) {
@@ -89,11 +91,12 @@ export class RequestProcessor {
     const id = ClientSessionId(session, channel.data.sessionId);
     const handler = this.createMessageHandler(channel, id, user);
     try {
+      const loginSuccessOptions = this.loginSuccessProvider?.(user);
       clientSessionContainer.register(user, id, handler);
       return JsonViewServerMessage(
         requestId,
         session,
-        LoginSuccess(vuUServerId),
+        LoginSuccess(vuUServerId, loginSuccessOptions),
       );
     } catch (e) {
       this.sendMessageAndCloseChannel((e as Error).message, channel);

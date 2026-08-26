@@ -5,7 +5,9 @@ import { ServerApi } from "./ServerApi";
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { Channel } from "./ws/Channel";
 import { LoginTokenService } from "./auth/LoginTokenService";
-import { FlowControllerFactory } from "./flowcontrol/FLowController";
+import { FlowControllerFactory } from "./flowcontrol/FlowController";
+import type { VuuUser } from "../core/auths/VuuUser";
+import type { LoginSuccessOptions } from "./LoginSuccess";
 
 export interface ViewServerHandlerFactory {
   create: () => ViewServerHandler;
@@ -19,6 +21,7 @@ export class ViewServerHandlerFactoryImpl implements ViewServerHandlerFactory {
     private moduleContainer: ModuleContainer,
     private flowControllerFactory: FlowControllerFactory,
     private vuuServerId: string,
+    private loginSuccessProvider?: (user: VuuUser) => LoginSuccessOptions,
   ) {}
 
   create() {
@@ -29,6 +32,7 @@ export class ViewServerHandlerFactoryImpl implements ViewServerHandlerFactory {
       this.moduleContainer,
       this.flowControllerFactory,
       this.vuuServerId,
+      this.loginSuccessProvider,
     );
     return new ViewServerHandler(requestProcessor);
   }

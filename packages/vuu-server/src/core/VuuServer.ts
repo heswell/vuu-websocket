@@ -43,7 +43,7 @@ export class VuuServer extends DefaultLifecycleEnabled {
   }
 
   constructor(
-    { loginTokenService, modules, ...config }: VuuServerConfig,
+    { loginSuccessProvider, loginTokenService, modules, ...config }: VuuServerConfig,
     private readonly lifecycle: LifecycleContainer,
   ) {
     super();
@@ -87,6 +87,9 @@ export class VuuServer extends DefaultLifecycleEnabled {
       this.moduleContainer,
       flowControllerFactory,
       this.vuuServerId,
+      loginSuccessProvider
+        ? (user) => loginSuccessProvider(user, this.tableContainer)
+        : undefined,
     );
 
     this.#webSocketServer = new WebSocketServer(

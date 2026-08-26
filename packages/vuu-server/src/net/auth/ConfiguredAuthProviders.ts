@@ -1,16 +1,18 @@
+import type { Config } from "../../util/ConfigFactory";
 import {
-  AuthenticationProviders,
-  Config,
+  type AuthenticationProviders,
   PermissiveAuthProvider,
-} from "@heswell/vuu-server";
-import { KeycloakAuthProvider } from "@heswell/vuu-server";
+} from "./AuthProvider";
+import { KeycloakAuthProvider } from "./KeycloakAuthProvider";
 
 const AuthConfigKeys = {
   mode: "vuu.auth.mode",
   permissiveUsers: "vuu.auth.permissive.users",
 } as const;
 
-export function createAuthProvider(config: Config): AuthenticationProviders {
+export function createConfiguredAuthProviders(
+  config: Config,
+): AuthenticationProviders {
   const mode = config
     .getString(AuthConfigKeys.mode, process.env.VUU_AUTH_MODE ?? "keycloak")
     .toLowerCase();

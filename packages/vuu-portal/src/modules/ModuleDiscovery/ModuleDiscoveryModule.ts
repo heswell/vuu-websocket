@@ -13,7 +13,7 @@ import { ModuleDiscoveryService } from "./ModuleDiscoveryService";
 const modules = [
   [
     1,
-    "module-admin",
+    "moduleAdmin",
     "Manage remote modules",
     "Create new remote module, update existing modules",
     1,
@@ -23,13 +23,13 @@ const modules = [
     "ModuleAdmin",
     "ModuleAdmin",
     "http://localhost:5008",
-    "module",
-    "wss://localhost:8092/websocket",
-    "https://localhost:8444/api/authn"
+    "portal",
+    "",
+    ""
   ],
   [
     2,
-    "user-admin",
+    "userAdmin",
     "Manage users",
     "Add, remove and update users",
     1,
@@ -39,9 +39,9 @@ const modules = [
     "UserAdmin",
     "UserAdmin",
     "http://localhost:5007",
-    "portal",
-    "",
-    ""
+    "user-admin",
+    "wss://localhost:8092/websocket",
+    "https://localhost:8444/api/authn"
   ],
   [
     3,
@@ -77,10 +77,13 @@ export const ModuleDiscoveryModule = () =>
       (table) => new ModuleDiscoveryProvider(table, modules),
       (table, _provider, _providerContainer, tableContainer) =>
         ViewPortDef(
-          table.schema.columns.map<Column>(({ name, serverDataType: dataType }) => ({
-            name,
-            dataType,
-          })),
+          table.schema.columns.map<Column>(
+            ({ name, serverDataType: dataType }, index) => ({
+              name,
+              dataType,
+              index,
+            }),
+          ),
           new ModuleDiscoveryService(tableContainer),
         ),
     )

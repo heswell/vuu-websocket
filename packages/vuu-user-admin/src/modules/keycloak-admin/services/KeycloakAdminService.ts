@@ -1,9 +1,9 @@
 import {
   CreateSessionTableRpcHandler,
+  type RpcParams,
   type TableContainer,
 } from "@heswell/vuu-server";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
 import { KeycloakAdminClient } from "../KeycloakAdminClient";
 import { getKeycloakAdminRefreshCoordinator } from "../KeycloakAdminRefreshCoordinator";
 

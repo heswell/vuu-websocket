@@ -1,10 +1,10 @@
 {
-  "name": "@heswell/vuu-module-discovery",
+  "name": "@heswell/vuu-user-admin",
   "version": "1.0.0",
-  "description": "Vuu server for module-federation discovery",
+  "description": "Standalone VUU server for Keycloak user administration",
   "type": "module",
-  "main": "dist/src/index.js",
-  "module": "src/index.ts",
+  "main": "dist/src/UserAdminMain.js",
+  "module": "src/UserAdminMain.ts",
   "types": "src/index.ts",
   "publishConfig": {
     "access": "public"
@@ -16,6 +16,7 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
+    "@heswell/data": "3.0.0",
     "@heswell/vuu-server": "3.0.0"
   }
 }
