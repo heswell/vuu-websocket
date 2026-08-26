@@ -75,7 +75,7 @@ require token exchange or a checked-in client secret.
 ## Shared Server Bootstrap
 
 `createVuuServerApplication` centralizes the entrypoint pattern shared by
-`vuu-portal`, `vuu-module-discovery`, and `vuu-basket-trading`:
+`vuu-portal`, `vuu-user-admin`, and `vuu-basket-trading`:
 
 1. create configuration-driven websocket and TLS options;
 2. create a lifecycle and login-token service;
@@ -85,8 +85,9 @@ require token exchange or a checked-in client secret.
 6. construct the `VuuServer`; and
 7. install the shutdown hook and start the lifecycle.
 
-Portal supplies its configurable Keycloak/permissive provider. Module discovery
-supplies Keycloak plus its `/module-registry` handler. Basket trading supplies
+Portal supplies its configurable Keycloak/permissive provider and returns its
+module registry on `LOGIN_SUCCESS`. User admin supplies the same authentication
+options and the standalone `KEYCLOAK_ADMIN` module. Basket trading supplies
 Keycloak and no additional HTTPS handlers, so `/api/authn` is its only HTTPS
 application endpoint.
 

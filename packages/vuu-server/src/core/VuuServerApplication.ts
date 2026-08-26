@@ -13,6 +13,7 @@ import {
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
 } from "./VuuServerOptions";
+import type { LoginSuccessProvider } from "./LoginSuccessProvider";
 
 const ConfigKeys = {
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
@@ -36,6 +37,7 @@ export type VuuServerApplicationOptions = {
   config: Config;
   defaultHttpsPort: number;
   defaultWebSocketPort: number;
+  loginSuccessProvider?: LoginSuccessProvider;
   modules: ViewServerModule[];
   additionalHttpHandlers?: (
     context: VuuServerApplicationContext,
@@ -55,6 +57,7 @@ export function createVuuServerApplication({
   config,
   defaultHttpsPort,
   defaultWebSocketPort,
+  loginSuccessProvider,
   modules,
 }: VuuServerApplicationOptions): VuuServerApplication {
   const lifecycle = new LifecycleContainer();
@@ -102,6 +105,8 @@ export function createVuuServerApplication({
       webSocketOptions,
       httpServerOptions,
       loginTokenService,
+      [],
+      loginSuccessProvider,
     ),
   );
 

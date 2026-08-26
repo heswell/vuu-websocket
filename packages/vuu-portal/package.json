@@ -1,7 +1,7 @@
 {
   "name": "@heswell/vuu-portal",
   "version": "1.0.0",
-  "description": "VUU portal server with Keycloak admin module",
+  "description": "VUU portal server with remote module discovery",
   "type": "module",
   "main": "dist/src/PortalMain.js",
   "module": "src/PortalMain.ts",

@@ -1,5 +1,6 @@
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { ViewServerModule } from "./module/VsModule";
+import type { LoginSuccessProvider } from "./LoginSuccessProvider";
 
 export type HttpRequestHandler = (
   req: Request,
@@ -56,6 +57,7 @@ export const VuuWebSocketOptions = (wsPort = 8091,
 
 export interface VuuServerConfig {
   httpServerOptions: HttpServerOptions;
+  loginSuccessProvider?: LoginSuccessProvider;
   loginTokenService: LoginTokenService;
   webSocketOptions: VuuWebSocketOptions;
   modules: ViewServerModule[];
@@ -67,9 +69,11 @@ export function VuuServerConfig(
   httpServerOptions: HttpServerOptions,
   loginTokenService: LoginTokenService,
   modules: ViewServerModule[] = [],
+  loginSuccessProvider?: LoginSuccessProvider,
 ): VuuServerConfig {
   return {
     httpServerOptions,
+    loginSuccessProvider,
     loginTokenService,
     webSocketOptions,
     modules,
@@ -79,6 +83,7 @@ export function VuuServerConfig(
         httpServerOptions,
         loginTokenService,
         modules.concat(module),
+        loginSuccessProvider,
       ),
   };
 }

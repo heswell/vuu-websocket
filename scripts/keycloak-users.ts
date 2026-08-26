@@ -55,11 +55,11 @@ const users = [
 ] as const;
 
 const clientRoles = {
-  "vuu-portal-server": ["users.view", "users.admin"],
-  "vuu-module-discovery-server": [
+  "vuu-portal-server": [
     "modules.view",
     "modules.edit",
   ],
+  "vuu-user-admin-server": ["users.view", "users.admin"],
   "vuu-basket-trading-server": ["basket.view", "basket.trade"],
 } as const;
 
@@ -78,15 +78,15 @@ const groupRoles: Record<string, readonly ClientRoleRef[]> = {
     { clientId: "vuu-basket-trading-server", roleName: "basket.trade" },
   ],
   MODULES_ADMIN: [
-    { clientId: "vuu-module-discovery-server", roleName: "modules.view" },
-    { clientId: "vuu-module-discovery-server", roleName: "modules.edit" },
+    { clientId: "vuu-portal-server", roleName: "modules.view" },
+    { clientId: "vuu-portal-server", roleName: "modules.edit" },
   ],
   USERS_VIEW: [
-    { clientId: "vuu-portal-server", roleName: "users.view" },
+    { clientId: "vuu-user-admin-server", roleName: "users.view" },
   ],
   USERS_ADMIN: [
-    { clientId: "vuu-portal-server", roleName: "users.view" },
-    { clientId: "vuu-portal-server", roleName: "users.admin" },
+    { clientId: "vuu-user-admin-server", roleName: "users.view" },
+    { clientId: "vuu-user-admin-server", roleName: "users.admin" },
   ],
 };
 
@@ -261,14 +261,14 @@ async function ensureTokenClientRoleScopes(
   roles: Map<string, RoleRepresentation>,
   headers: Record<string, string>,
 ) {
-  const discoveryClientId: ClientId = "vuu-module-discovery-server";
-  const discoveryClient = clients.get(discoveryClientId);
-  if (!discoveryClient) {
-    throw new Error(`Client ${discoveryClientId} was not loaded`);
+  const userAdminClientId: ClientId = "vuu-user-admin-server";
+  const userAdminClient = clients.get(userAdminClientId);
+  if (!userAdminClient) {
+    throw new Error(`Client ${userAdminClientId} was not loaded`);
   }
   const portalClient = await getClient("vuu-portal", headers);
 
-  for (const tokenClient of [portalClient, discoveryClient]) {
+  for (const tokenClient of [portalClient, userAdminClient]) {
     for (const [sourceClientId, roleNames] of Object.entries(clientRoles) as [
       ClientId,
       readonly string[],

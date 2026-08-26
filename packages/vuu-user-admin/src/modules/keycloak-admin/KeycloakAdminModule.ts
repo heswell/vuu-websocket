@@ -20,10 +20,13 @@ export const KeycloakAdminModule = () =>
       (table) => new KeycloakUsersProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
         ViewPortDef(
-          table.schema.columns.map<Column>(({ name, serverDataType: dataType }) => ({
-            name,
-            dataType,
-          })),
+          table.schema.columns.map<Column>(
+            ({ name, serverDataType: dataType }, index) => ({
+              name,
+              dataType,
+              index,
+            }),
+          ),
           new KeycloakAdminService(tableContainer),
         ),
     )

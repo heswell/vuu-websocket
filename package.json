@@ -13,7 +13,7 @@
     "start": "WEBSOCKET_PORT=8090 npm start:all",
     "start:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",
     "start:portal": "VUU_APP=vuu-portal bun ./scripts/start-portal.ts",
-    "start:module-discovery": "VUU_APP=vuu-module-discovery bun ./scripts/start-module-discovery.ts",
+    "start:user-admin": "VUU_APP=vuu-user-admin bun ./scripts/start-user-admin.ts",
     "start:basket-trading": "VUU_APP=vuu-basket-trading bun ./scripts/start-basket-trading.ts",
     "start:demo:2": "VUU_APP=vuu-demo WEBSOCKET_PORT=8095 bun ./scripts/start-demo.ts",
     "debug:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun --inspect ./scripts/start-demo.ts",
