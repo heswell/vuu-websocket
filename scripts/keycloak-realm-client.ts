@@ -1,21 +1,20 @@
 #!/usr/bin/env bun
 
+import {
+  reconcileServerAudienceMappers,
+  RETIRED_SERVER_CLIENT_NAMES,
+  SERVER_CLIENT_NAMES,
+  SERVER_CLIENT_SECRETS,
+  type ProtocolMapper,
+} from "./keycloak-client-config";
+
 // Keycloak configuration
 const KEYCLOAK_URL = "https://localhost:8080";
 const ADMIN_USER = "admin";
 const ADMIN_PASSWORD = "admin";
 const REALM_NAME = "vuu";
 const CLIENT_NAME = "vuu-portal";
-const SERVER_CLIENT_NAMES = [
-  "vuu-portal-server",
-  "vuu-user-admin-server",
-  "vuu-basket-trading-server",
-] as const;
-const SERVER_CLIENT_SECRETS: Partial<
-  Record<(typeof SERVER_CLIENT_NAMES)[number], string>
-> = {
-  "vuu-user-admin-server": "vuu-user-admin-local-dev-secret",
-};
+const AUTHORIZATION_HEADER = "Authorization";
 const CLIENT_PORT = 5002;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
 const ALLOW_SELF_SIGNED_CERT =
@@ -142,17 +141,6 @@ async function main() {
     }
     console.log(`ℹ️  ${CLIENT_NAME} internal ID: ${portalClient.id}\n`);
 
-    // Ensure portal-issued access tokens include all server clients as audiences.
-    console.log(
-      `3️⃣a Enabling server audiences on '${CLIENT_NAME}' tokens...`
-    );
-    await ensurePortalClientIncludesServerAudiences(
-      token,
-      portalClient.id,
-      SERVER_CLIENT_NAMES,
-    );
-    console.log("✅ Audience mapper configured\n");
-
     // Step 4: Create or update confidential server clients.
     console.log("4️⃣  Creating/updating confidential server clients...");
     const serverClientSecrets: Array<{ clientId: string; secret: string }> = [];
@@ -165,6 +153,19 @@ async function main() {
       serverClientSecrets.push({ clientId: serverClientName, secret });
     }
     console.log("✅ Confidential server clients ready\n");
+
+    // Configure audiences after the target clients exist and remove retired remotes.
+    console.log(
+      `4️⃣a Reconciling server audiences on '${CLIENT_NAME}' tokens...`
+    );
+    await reconcilePortalClientServerAudiences(token, portalClient.id);
+    console.log("✅ Audience mappers reconciled\n");
+
+    console.log("4️⃣b Removing retired confidential server clients...");
+    for (const retiredClientName of RETIRED_SERVER_CLIENT_NAMES) {
+      await removeClientIfPresent(token, retiredClientName);
+    }
+    console.log("✅ Retired server clients removed\n");
 
     // Success
     console.log("🎉 Setup complete!");
@@ -195,6 +196,12 @@ function keycloakFetch(url: string, init: RequestInit = {}) {
   return fetch(url, requestInit);
 }
 
+function keycloakHeaders(token: string) {
+  return {
+    [AUTHORIZATION_HEADER]: ["Bearer", token].join(" "),
+  };
+}
+
 main();
 
 
@@ -207,18 +214,41 @@ async function lookupClientByClientId(token: string, clientId: string) {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-    }
+    },
   );
 
   if (!response.ok) {
     const errorData = await response.text();
     throw new Error(
-      `Failed to lookup client '${clientId}': ${response.status} ${errorData}`
+      `Failed to lookup client '${clientId}': ${response.status} ${errorData}`,
     );
   }
 
   const clients = (await response.json()) as Array<{ id?: string }>;
   return clients[0];
+}
+
+async function removeClientIfPresent(token: string, clientId: string) {
+  const client = await lookupClientByClientId(token, clientId);
+  if (!client?.id) {
+    console.log(`   • Retired client '${clientId}' is already absent`);
+    return;
+  }
+
+  const response = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${client.id}`,
+    {
+      method: "DELETE",
+      headers: keycloakHeaders(token),
+    },
+  );
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(
+      `Failed to remove retired client '${clientId}': ${response.status} ${errorData}`,
+    );
+  }
+  console.log(`   • Retired client '${clientId}' removed`);
 }
 
 async function ensureStandardTokenExchangeEnabled(
@@ -278,10 +308,9 @@ async function ensureStandardTokenExchangeEnabled(
   }
 }
 
-async function ensurePortalClientIncludesServerAudience(
+async function reconcilePortalClientServerAudiences(
   token: string,
   internalClientId: string,
-  serverClientName: string,
 ) {
   const getResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -301,55 +330,14 @@ async function ensurePortalClientIncludesServerAudience(
     );
   }
 
-  type ProtocolMapper = {
-    name?: string;
-    protocol?: string;
-    protocolMapper?: string;
-    consentRequired?: boolean;
-    config?: Record<string, string>;
-    [key: string]: unknown;
-  };
-
   const clientRepresentation = (await getResponse.json()) as {
     protocolMappers?: ProtocolMapper[];
     [key: string]: unknown;
   };
 
-  const mapperTemplate: ProtocolMapper = {
-    name: `audience-${serverClientName}`,
-    protocol: "openid-connect",
-    protocolMapper: "oidc-audience-mapper",
-    consentRequired: false,
-    config: {
-      "included.client.audience": serverClientName,
-      "id.token.claim": "false",
-      "access.token.claim": "true",
-      "introspection.token.claim": "true",
-    },
-  };
-
-  const currentMappers = clientRepresentation.protocolMappers ?? [];
-  const mapperIndex = currentMappers.findIndex(
-    (mapper) =>
-      mapper.protocolMapper === "oidc-audience-mapper" &&
-      mapper.config?.["included.client.audience"] === serverClientName,
+  clientRepresentation.protocolMappers = reconcileServerAudienceMappers(
+    clientRepresentation.protocolMappers ?? [],
   );
-
-  if (mapperIndex >= 0) {
-    const existingMapper = currentMappers[mapperIndex];
-    currentMappers[mapperIndex] = {
-      ...existingMapper,
-      ...mapperTemplate,
-      config: {
-        ...(existingMapper.config ?? {}),
-        ...(mapperTemplate.config ?? {}),
-      },
-    };
-  } else {
-    currentMappers.push(mapperTemplate);
-  }
-
-  clientRepresentation.protocolMappers = currentMappers;
 
   const updateResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -367,20 +355,6 @@ async function ensurePortalClientIncludesServerAudience(
     const errorData = await updateResponse.text();
     throw new Error(
       `Failed to configure audience mapper for client '${internalClientId}': ${updateResponse.status} ${errorData}`
-    );
-  }
-}
-
-async function ensurePortalClientIncludesServerAudiences(
-  token: string,
-  internalClientId: string,
-  serverClientNames: readonly string[],
-) {
-  for (const serverClientName of serverClientNames) {
-    await ensurePortalClientIncludesServerAudience(
-      token,
-      internalClientId,
-      serverClientName,
     );
   }
 }
