@@ -30,6 +30,21 @@ The portal-issued Keycloak access token includes the user-admin server audience.
 The UI exchanges or validates it through the user-admin `/api/authn` endpoint,
 then opens that server's VUU WebSocket with the returned VUU token.
 
+## Token-exchange preparation
+
+Keycloak bootstrap also manages the reserved `vuu-module-admin-server` client.
+All confidential VUU clients have standard token exchange enabled, expose their
+own audience on exchanged access tokens, and remain audiences of tokens issued
+to `vuu-portal`. This is additive preparation only: current application
+authentication handlers, audience policies, runtime role extraction, full-scope
+settings, and active cross-client role scope mappings remain unchanged.
+
+The public `vuu-portal` client owns navigation-only login roles. Module admin,
+user admin, and basket trading permissions use resource roles owned by the
+corresponding confidential server client. Existing resource roles remain
+provisioned and assigned while the unchanged application authorization code
+still consumes them.
+
 ## Shared configuration
 
 | Key | Purpose |

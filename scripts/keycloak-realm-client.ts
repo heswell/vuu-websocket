@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import {
+  reconcileServerClientConfiguration,
   reconcileServerAudienceMappers,
   RETIRED_SERVER_CLIENT_NAMES,
   SERVER_CLIENT_NAMES,
@@ -152,7 +153,7 @@ async function main() {
       );
       serverClientSecrets.push({ clientId: serverClientName, secret });
     }
-    console.log("✅ Confidential server clients ready\n");
+    console.log("✅ Confidential server clients and self audiences ready\n");
 
     // Configure audiences after the target clients exist and remove retired remotes.
     console.log(
@@ -251,9 +252,10 @@ async function removeClientIfPresent(token: string, clientId: string) {
   console.log(`   • Retired client '${clientId}' removed`);
 }
 
-async function ensureStandardTokenExchangeEnabled(
+async function reconcileServerClient(
   token: string,
   internalClientId: string,
+  clientId: (typeof SERVER_CLIENT_NAMES)[number],
   clientSecret?: string,
 ) {
   const getResponse = await keycloakFetch(
@@ -274,19 +276,11 @@ async function ensureStandardTokenExchangeEnabled(
     );
   }
 
-  const clientRepresentation = (await getResponse.json()) as {
-    attributes?: Record<string, string>;
-    secret?: string;
-    [key: string]: unknown;
-  };
-
-  clientRepresentation.attributes = {
-    ...(clientRepresentation.attributes ?? {}),
-    "standard.token.exchange.enabled": "true",
-  };
-  if (clientSecret) {
-    clientRepresentation.secret = clientSecret;
-  }
+  const clientRepresentation = reconcileServerClientConfiguration(
+    await getResponse.json(),
+    clientId,
+    clientSecret,
+  );
 
   const updateResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -303,7 +297,7 @@ async function ensureStandardTokenExchangeEnabled(
   if (!updateResponse.ok) {
     const errorData = await updateResponse.text();
     throw new Error(
-      `Failed to enable token exchange for client '${internalClientId}': ${updateResponse.status} ${errorData}`
+      `Failed to reconcile confidential client '${clientId}': ${updateResponse.status} ${errorData}`,
     );
   }
 }
@@ -361,7 +355,7 @@ async function reconcilePortalClientServerAudiences(
 
 async function ensureServerClient(
   token: string,
-  serverClientName: string,
+  serverClientName: (typeof SERVER_CLIENT_NAMES)[number],
   clientSecret?: string,
 ) {
   console.log(`   • Creating confidential client '${serverClientName}'...`);
@@ -411,10 +405,13 @@ async function ensureServerClient(
     );
   }
 
-  console.log(`   • Enabling standard token exchange for '${serverClientName}'...`);
-  await ensureStandardTokenExchangeEnabled(
+  console.log(
+    `   • Reconciling token exchange and self audience for '${serverClientName}'...`,
+  );
+  await reconcileServerClient(
     token,
     serverClient.id,
+    serverClientName,
     clientSecret,
   );
 
