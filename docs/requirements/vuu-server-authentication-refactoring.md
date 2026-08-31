@@ -35,15 +35,23 @@ and authorize only from that exchanged token's target-client roles.
 
 Navigation roles (`module-admin-login`, `user-admin-login`, and
 `basket-trading-login`) belong to the public `vuu-portal` client. Resource roles
-belong to their corresponding confidential clients. Bootstrap retains the
-existing uppercase group names and adds `MODULES_VIEW`; assignments are additive,
-so existing roles and cross-client scope mappings are not removed. Phase 2 portal module discovery selects exactly the public login roles. Existing
-resource roles and scope mappings remain provisioned; Phase 3 tightening and
-removal is intentionally out of scope.
+belong only to their corresponding confidential clients. Phase 3 disables full
+scope on the public portal and all confidential VUU clients, maps each managed
+client only to its own roles, and removes known legacy roles and stale managed
+cross-client mappings. The portal access token therefore contains only the
+navigation roles while retaining all four confidential clients in `aud`.
+
+The exact boundary is VUU-managed role names and VUU-managed audience mappers.
+Bootstrap preserves administrator-created role mappings with other names,
+custom client scopes, and unrelated protocol mappers. It does not preserve a
+custom mapping that reuses a VUU-managed role name, because that would defeat
+role isolation.
 
 Run `npm run keycloak:bootstrap` to migrate an existing realm safely. Re-running
 the command reconciles managed clients, audience mappers, roles, and assignments
-without removing unrelated administrator-managed mappers.
+without further changes. Existing deployments must run this command after
+upgrading; users retain their uppercase-group assignments but legacy role names
+are removed.
 
 `LOGIN_SUCCESS` remains backward compatible. Servers return `type` and
 `vuuServerId`; portal additionally returns the optional `moduleRegistry`.

@@ -28,10 +28,23 @@ export type ProtocolMapper = {
 
 export type ServerClientRepresentation = {
   attributes?: Record<string, string>;
+  fullScopeAllowed?: boolean;
   protocolMappers?: ProtocolMapper[];
   secret?: string;
   [key: string]: unknown;
 };
+
+export function reconcilePortalClientConfiguration(
+  currentClient: ServerClientRepresentation,
+): ServerClientRepresentation {
+  return {
+    ...currentClient,
+    fullScopeAllowed: false,
+    protocolMappers: reconcileServerAudienceMappers(
+      currentClient.protocolMappers ?? [],
+    ),
+  };
+}
 
 export function reconcileServerClientConfiguration(
   currentClient: ServerClientRepresentation,
@@ -40,6 +53,7 @@ export function reconcileServerClientConfiguration(
 ): ServerClientRepresentation {
   return {
     ...currentClient,
+    fullScopeAllowed: false,
     attributes: {
       ...(currentClient.attributes ?? {}),
       "standard.token.exchange.enabled": "true",

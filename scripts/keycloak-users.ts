@@ -3,6 +3,8 @@
 import {
   CLIENT_ROLES,
   GROUP_ROLES,
+  MANAGED_CLIENT_ROLE_NAMES,
+  planManagedRoleScopeChanges,
   SEEDED_USERS,
   type ClientId,
 } from "./keycloak-user-config";
@@ -79,7 +81,8 @@ async function main() {
       roles.set(roleKey(clientId, roleName), role);
     }
   }
-  await ensureTokenClientRoleScopes(clients, roles, headers);
+  await reconcileTokenClientRoleScopes(clients, roles, headers);
+  await removeStaleManagedClientRoles(clients, headers);
 
   const groups = new Map<string, GroupRepresentation>();
   for (const groupName of Object.keys(GROUP_ROLES)) {
@@ -217,71 +220,122 @@ function roleKey(clientId: ClientId, roleName: string) {
   return `${clientId}:${roleName}`;
 }
 
-async function ensureTokenClientRoleScopes(
+async function reconcileTokenClientRoleScopes(
   clients: Map<ClientId, ClientRepresentation>,
   roles: Map<string, RoleRepresentation>,
   headers: Record<string, string>,
 ) {
-  const userAdminClientId: ClientId = "vuu-user-admin-server";
-  const userAdminClient = clients.get(userAdminClientId);
-  if (!userAdminClient) {
-    throw new Error(`Client ${userAdminClientId} was not loaded`);
-  }
   const portalClient = await getClient("vuu-portal", headers);
+  const tokenClients = new Map<ClientId, ClientRepresentation>(clients);
+  tokenClients.set("vuu-portal", portalClient);
+  const changes: Array<{
+    mappingsUrl: string;
+    tokenClientId: ClientId;
+    sourceClientId: ClientId;
+    add: RoleRepresentation[];
+    remove: RoleRepresentation[];
+  }> = [];
 
-  for (const tokenClient of [portalClient, userAdminClient]) {
-    for (const [sourceClientId, roleNames] of Object.entries(CLIENT_ROLES) as [
-      ClientId,
-      readonly string[],
-    ][]) {
+  for (const [tokenClientId, tokenClient] of tokenClients) {
+    for (const sourceClientId of Object.keys(CLIENT_ROLES) as ClientId[]) {
       const sourceClient = clients.get(sourceClientId);
       if (!sourceClient) {
         throw new Error(`Client ${sourceClientId} was not loaded`);
       }
-      if (sourceClient.id === tokenClient.id) {
-        continue;
-      }
-
-      const scopedRoles = roleNames.map((roleName) => {
-        const role = roles.get(roleKey(sourceClientId, roleName));
+      const mappingsUrl = clientRoleMappingsUrl(tokenClient, sourceClient);
+      const currentRoles = await requestJson<RoleRepresentation[]>(mappingsUrl, {
+        headers,
+      });
+      const desiredRoleNames =
+        tokenClientId === sourceClientId ? CLIENT_ROLES[sourceClientId] : [];
+      const planned = planManagedRoleScopeChanges(
+        currentRoles,
+        desiredRoleNames,
+        MANAGED_CLIENT_ROLE_NAMES[sourceClientId],
+      );
+      const add = planned.add.map((name) => {
+        const role = roles.get(roleKey(sourceClientId, name));
         if (!role) {
           throw new Error(
-            `Role ${roleName} was not loaded for client ${sourceClientId}`,
+            `Role ${name} was not loaded for client ${sourceClientId}`,
           );
         }
         return role;
       });
-      await ensureClientRoleScopes(
-        tokenClient,
-        sourceClient,
-        scopedRoles,
-        headers,
+      changes.push({
+        mappingsUrl,
+        tokenClientId,
+        sourceClientId,
+        add,
+        remove: planned.remove,
+      });
+    }
+  }
+
+  for (const change of changes) {
+    if (change.add.length > 0 || change.remove.length > 0) {
+      console.log(
+        `[keycloak] scope plan ${change.tokenClientId} <- ${change.sourceClientId}: add [${change.add.map(({ name }) => name).join(", ")}], remove [${change.remove.map(({ name }) => name).join(", ")}]`,
       );
+    }
+  }
+
+  for (const { mappingsUrl, add, remove } of changes) {
+    if (add.length > 0) {
+      await requestJson(mappingsUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(add),
+      });
+    }
+    if (remove.length > 0) {
+      await requestJson(mappingsUrl, {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify(remove),
+      });
     }
   }
 }
 
-async function ensureClientRoleScopes(
+function clientRoleMappingsUrl(
   client: ClientRepresentation,
   roleOwner: ClientRepresentation,
-  roles: RoleRepresentation[],
+) {
+  return `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/scope-mappings/clients/${encodeURIComponent(roleOwner.id)}`;
+}
+
+async function removeStaleManagedClientRoles(
+  clients: Map<ClientId, ClientRepresentation>,
   headers: Record<string, string>,
 ) {
-  const mappingsUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/scope-mappings/clients/${encodeURIComponent(roleOwner.id)}`;
-  const currentRoles = await requestJson<RoleRepresentation[]>(mappingsUrl, {
-    headers,
-  });
-  const currentRoleNames = new Set(currentRoles.map(({ name }) => name));
-  const missingRoles = roles.filter(({ name }) => !currentRoleNames.has(name));
-  if (missingRoles.length === 0) {
-    return;
+  const removals: Array<{ clientId: ClientId; roleName: string; url: string }> =
+    [];
+  for (const clientId of Object.keys(CLIENT_ROLES) as ClientId[]) {
+    const client = clients.get(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} was not loaded`);
+    }
+    const desiredRoleNames = new Set<string>(CLIENT_ROLES[clientId]);
+    for (const roleName of MANAGED_CLIENT_ROLE_NAMES[clientId]) {
+      if (desiredRoleNames.has(roleName)) {
+        continue;
+      }
+      const url = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/clients/${encodeURIComponent(client.id)}/roles/${encodeURIComponent(roleName)}`;
+      if (await getOptional<RoleRepresentation>(url, headers)) {
+        removals.push({ clientId, roleName, url });
+      }
+    }
   }
 
-  await requestJson(mappingsUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(missingRoles),
-  });
+  if (removals.length > 0) {
+    console.log(
+      `[keycloak] stale managed role deletion plan: ${removals.map(({ clientId, roleName }) => `${clientId}:${roleName}`).join(", ")}`,
+    );
+  }
+  for (const { url } of removals) {
+    await requestJson(url, { method: "DELETE", headers });
+  }
 }
 
 async function ensureGroup(name: string, headers: Record<string, string>) {
