@@ -51,7 +51,7 @@ describe("LoginSuccess", () => {
       VuuUserWithAuthorizations("admin", ["module-admin-view"]),
     );
     const config = VuuServerConfig(
-      VuuWebSocketOptions().withWsPort(0),
+      VuuWebSocketOptions().withUri("/websocket-module-admin").withWsPort(0),
       {},
       loginTokenService,
       [],
@@ -80,7 +80,11 @@ describe("LoginSuccess", () => {
 
     try {
       await lifecycle.start();
-      const response = await login(server.webSocketPort as number, token);
+      const port = server.webSocketPort as number;
+      expect(await fetch(`http://localhost:${port}/websocket`)).toMatchObject({
+        status: 404,
+      });
+      const response = await login(port, "/websocket-module-admin", token);
 
       expect(response.body).toEqual({
         type: "LOGIN_SUCCESS",
@@ -101,9 +105,13 @@ describe("LoginSuccess", () => {
   });
 });
 
-function login(port: number, token: string): Promise<{ body: unknown }> {
+function login(
+  port: number,
+  path: string,
+  token: string,
+): Promise<{ body: unknown }> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://localhost:${port}/websocket`);
+    const socket = new WebSocket(`ws://localhost:${port}${path}`);
     socket.addEventListener("error", () => reject(new Error("WebSocket failed")));
     socket.addEventListener("open", () => {
       socket.send(

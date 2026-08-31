@@ -46,7 +46,7 @@ describe("portal module registry", () => {
         vuu: {
           connectionId: "basket",
           restUrl: "https://localhost:8445/api/authn",
-          websocketUrl: "wss://localhost:8093/websocket",
+          websocketUrl: "wss://localhost:8093/websocket-basket-trading",
         },
       }),
       {
@@ -64,7 +64,7 @@ describe("portal module registry", () => {
         vuu: {
           connectionId: "module-admin",
           restUrl: "https://localhost:8443/api/authn/module-admin",
-          websocketUrl: "wss://localhost:8091/websocket",
+          websocketUrl: "wss://localhost:8091/websocket-portal",
         },
       },
       {
@@ -82,7 +82,7 @@ describe("portal module registry", () => {
         vuu: {
           connectionId: "user-admin",
           restUrl: "https://localhost:8444/api/authn",
-          websocketUrl: "wss://localhost:8092/websocket",
+          websocketUrl: "wss://localhost:8092/websocket-user-admin",
         },
       },
     ]);
@@ -104,7 +104,7 @@ describe("portal module registry", () => {
       "ModuleAdmin",
       "http://localhost:5011",
       "module-admin",
-      "wss://localhost:8091/websocket",
+      "wss://localhost:8091/websocket-portal",
       "https://localhost:8443/api/authn/module-admin",
     ]);
     modules.insert([

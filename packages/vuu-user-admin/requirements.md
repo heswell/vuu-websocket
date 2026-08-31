@@ -3,7 +3,8 @@
 `@heswell/vuu-user-admin` is an independent VUU server for Keycloak
 administration.
 
-- HTTPS defaults to `8444`; WebSocket defaults to `8092`.
+- HTTPS defaults to `8444`; WebSocket defaults to
+  `wss://localhost:8092/websocket-user-admin`.
 - `/api/authn` authenticates with the `vuu-user-admin-server` Keycloak client.
 - The server registers only the `KEYCLOAK_ADMIN` feature module.
 - User, group, role, group-role, and user-group-role providers load from the

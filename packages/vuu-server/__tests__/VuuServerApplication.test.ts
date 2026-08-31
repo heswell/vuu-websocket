@@ -7,7 +7,7 @@ import {
 } from "../src";
 
 describe("VuuServerApplication", () => {
-  test("builds websocket options from application config", () => {
+  test("uses the generic websocket path by default", () => {
     const options = createConfiguredWebSocketOptions(
       createConfig({
         "vuu.ssl": false,
@@ -16,9 +16,42 @@ describe("VuuServerApplication", () => {
       8091,
     );
 
-    expect(options.uri).toBe("websocket");
+    expect(options.uri).toBe("/websocket");
     expect(options.wsPort).toBe(8093);
     expect(options.sslOptions).toBe("ssl-disabled");
+  });
+
+  test("builds a configured websocket path", () => {
+    const options = createConfiguredWebSocketOptions(
+      createConfig({
+        "vuu.ssl": false,
+        "vuu.websocket.path": "/websocket-portal",
+      }),
+      8091,
+    );
+
+    expect(options.uri).toBe("/websocket-portal");
+  });
+
+  test.each([
+    ["websocket"],
+    ["/"],
+    ["/websocket/"],
+    ["/websocket?profile=portal"],
+    ["/websocket#portal"],
+    ["wss://localhost:8091/websocket"],
+  ])("rejects malformed websocket path %s", (configuredPath) => {
+    expect(() =>
+      createConfiguredWebSocketOptions(
+        createConfig({
+          "vuu.ssl": false,
+          "vuu.websocket.path": configuredPath,
+        }),
+        8091,
+      ),
+    ).toThrow(
+      `Invalid WebSocket path '${configuredPath}'. Expected an absolute URL path without a trailing slash, query, or fragment.`,
+    );
   });
 
   test("installs authn and additional HTTPS handlers", async () => {

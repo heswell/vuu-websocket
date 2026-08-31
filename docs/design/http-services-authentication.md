@@ -9,7 +9,7 @@ from `application.conf`.
 `@heswell/vuu-portal` is the browser-facing server:
 
 - HTTPS `8443`;
-- WebSocket `8091`;
+- WebSocket `wss://localhost:8091/websocket-portal`;
 - portal-token validation through confidential client `vuu-portal-server`;
 - navigation authorization from `resource_access.vuu-portal.roles` only; and
 - `MODULE_DISCOVERY` tables plus a user-specific registry on `LOGIN_SUCCESS`.
@@ -23,7 +23,7 @@ authorization cannot diverge.
 `@heswell/vuu-user-admin` is an independent server:
 
 - HTTPS `8444`;
-- WebSocket `8092`;
+- WebSocket `wss://localhost:8092/websocket-user-admin`;
 - Keycloak client and audience `vuu-user-admin-server`; and
 - the `KEYCLOAK_ADMIN` module and its refresh coordinator.
 
@@ -38,8 +38,8 @@ Portal owns two fixed authentication profiles:
   `vuu-module-admin-server`.
 
 The module-admin profile issues a distinct VUU login token used with connection
-ID `module-admin` at `wss://localhost:8091/websocket`. It remains in the portal
-process, so both portal profiles deliberately share the same stateful
+ID `module-admin` at `wss://localhost:8091/websocket-portal`. It remains in the
+portal process, so both portal profiles deliberately share the same stateful
 `LoginTokenService`.
 
 ## Remote token exchange

@@ -22,6 +22,7 @@ const ConfigKeys = {
   httpsPort: "vuu.https.port",
   keyPath: "vuu.keyPath",
   sslEnabled: "vuu.ssl",
+  websocketPath: "vuu.websocket.path",
   websocketPort: "vuu.websocket.port",
 } as const;
 
@@ -37,6 +38,7 @@ export type VuuServerApplicationOptions = {
   authProviders: AuthenticationProviders;
   config: Config;
   defaultHttpsPort: number;
+  defaultWebSocketPath?: string;
   defaultWebSocketPort: number;
   loginSuccessProvider?: LoginSuccessProvider;
   modules: ViewServerModule[];
@@ -58,6 +60,7 @@ export function createVuuServerApplication({
   authProviders,
   config,
   defaultHttpsPort,
+  defaultWebSocketPath = "/websocket",
   defaultWebSocketPort,
   loginSuccessProvider,
   modules,
@@ -101,6 +104,7 @@ export function createVuuServerApplication({
   const webSocketOptions = createConfiguredWebSocketOptions(
     config,
     defaultWebSocketPort,
+    defaultWebSocketPath,
   );
   const serverConfig = modules.reduce(
     (current, module) => current.withModule(module),
@@ -130,9 +134,10 @@ export function createVuuServerApplication({
 export function createConfiguredWebSocketOptions(
   config: Config,
   defaultWebSocketPort: number,
+  defaultWebSocketPath = "/websocket",
 ): VuuWebSocketOptions {
   const options = VuuWebSocketOptions()
-    .withUri("websocket")
+    .withUri(config.getString(ConfigKeys.websocketPath, defaultWebSocketPath))
     .withWsPort(
       config.getNumber(ConfigKeys.websocketPort, defaultWebSocketPort),
     );

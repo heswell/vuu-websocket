@@ -24,7 +24,7 @@ const modules = [
     "ModuleAdmin",
     "http://localhost:5008",
     "module-admin",
-    "wss://localhost:8091/websocket",
+    "wss://localhost:8091/websocket-portal",
     "https://localhost:8443/api/authn/module-admin"
   ],
   [
@@ -40,7 +40,7 @@ const modules = [
     "UserAdmin",
     "http://localhost:5007",
     "user-admin",
-    "wss://localhost:8092/websocket",
+    "wss://localhost:8092/websocket-user-admin",
     "https://localhost:8444/api/authn"
   ],
   [
@@ -56,7 +56,7 @@ const modules = [
     "basketTrading",
     "http://localhost:5005",
     "basket",
-    "wss://localhost:8093/websocket",
+    "wss://localhost:8093/websocket-basket-trading",
     "https://localhost:8445/api/authn",
   ],
 ];
