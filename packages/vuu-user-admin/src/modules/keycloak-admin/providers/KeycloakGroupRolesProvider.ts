@@ -7,17 +7,17 @@ export class KeycloakGroupRolesProvider extends Provider {
     const client = await KeycloakAdminClient.createFromConfig();
     const [groups, roles] = await Promise.all([
       client.listSeedGroups(),
-      client.listSeedRoles(),
+      client.listRealmRoles(),
     ]);
-    const seededRoleIds = new Set(roles.map((role) => role.id));
+    const realmRoleIds = new Set(roles.map((role) => role.id));
 
     const rows: (string | number)[][] = [];
 
     for (const group of groups) {
       const groupRoles = await client.listRolesForGroup(group.id);
-      const seededGroupRoles = groupRoles.filter((role) => seededRoleIds.has(role.id));
+      const realmGroupRoles = groupRoles.filter((role) => realmRoleIds.has(role.id));
 
-      for (const role of seededGroupRoles) {
+      for (const role of realmGroupRoles) {
         const id = `${group.id}:${role.id}`;
         const timestamp = Date.now();
         rows.push([

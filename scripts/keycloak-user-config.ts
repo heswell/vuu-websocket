@@ -23,6 +23,15 @@ export const RETIRED_CLIENT_ROLES: Record<ClientId, readonly string[]> = {
   "vuu-basket-trading-server": ["basket.view", "basket.trade"],
 };
 
+export const RETIRED_REALM_ROLE_NAMES = [
+  "modules.view",
+  "modules.edit",
+  "users.view",
+  "users.admin",
+  "basket.view",
+  "basket.trade",
+] as const;
+
 const allManagedRoleNames = [
   ...new Set([
     ...Object.values(CLIENT_ROLES).flat(),
@@ -42,6 +51,23 @@ export type RoleScopeChange<T> = {
   add: string[];
   remove: T[];
 };
+
+export function planManagedIdChanges<T extends { id: string }>(
+  current: readonly T[],
+  desired: readonly T[],
+  managed: readonly T[],
+): RoleScopeChange<T> {
+  const currentIds = new Set(current.map(({ id }) => id));
+  const desiredIds = new Set(desired.map(({ id }) => id));
+  const managedIds = new Set(managed.map(({ id }) => id));
+
+  return {
+    add: desired.filter(({ id }) => !currentIds.has(id)).map(({ id }) => id),
+    remove: current.filter(
+      ({ id }) => managedIds.has(id) && !desiredIds.has(id),
+    ),
+  };
+}
 
 export function planManagedRoleScopeChanges<T extends { name: string }>(
   currentRoles: readonly T[],

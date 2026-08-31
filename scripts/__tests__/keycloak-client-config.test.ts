@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  clientConfigurationsEqual,
   RETIRED_SERVER_CLIENT_NAMES,
   reconcilePortalClientConfiguration,
   reconcileServerClientConfiguration,
@@ -101,6 +102,16 @@ describe("reconcilePortalClientConfiguration", () => {
         .map((mapper) => mapper.config?.["included.client.audience"]),
     ).toEqual(SERVER_CLIENT_NAMES);
     expect(reconcilePortalClientConfiguration(once)).toEqual(once);
+  });
+
+  test("treats normalized mapper ordering as a no-op", () => {
+    const current = reconcilePortalClientConfiguration({});
+    const reordered = {
+      ...current,
+      protocolMappers: current.protocolMappers?.toReversed(),
+    };
+
+    expect(clientConfigurationsEqual(current, reordered)).toBeTrue();
   });
 });
 
