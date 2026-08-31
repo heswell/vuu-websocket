@@ -5,6 +5,8 @@ import {
   reconcileSelfAudienceMapper,
   reconcileServerAudienceMappers,
   SERVER_CLIENT_NAMES,
+  KEYCLOAK_CLIENT_SECRET_ENV,
+  resolveKeycloakClientSecret,
 } from "../keycloak-client-config";
 
 describe("reconcileServerAudienceMappers", () => {
@@ -176,6 +178,7 @@ describe("reconcileServerClientConfiguration", () => {
         "standard.token.exchange.enabled": "true",
       },
     });
+
     expect(once.protocolMappers).toHaveLength(2);
     expect(
       reconcileServerClientConfiguration(
@@ -184,5 +187,23 @@ describe("reconcileServerClientConfiguration", () => {
         "module-secret",
       ),
     ).toEqual(once);
+  });
+});
+
+describe("confidential client secret overrides", () => {
+  test("shares fixed environment names between bootstrap and applications", () => {
+    expect(KEYCLOAK_CLIENT_SECRET_ENV).toEqual({
+      "vuu-portal-server": "VUU_PORTAL_SERVER_CLIENT_SECRET",
+      "vuu-module-admin-server": "VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET",
+      "vuu-user-admin-server": "VUU_USER_ADMIN_SERVER_CLIENT_SECRET",
+      "vuu-basket-trading-server": "VUU_BASKET_TRADING_SERVER_CLIENT_SECRET",
+    });
+    expect(
+      resolveKeycloakClientSecret(
+        "vuu-module-admin-server",
+        "configured-secret",
+        { VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET: "environment-secret" },
+      ),
+    ).toBe("environment-secret");
   });
 });

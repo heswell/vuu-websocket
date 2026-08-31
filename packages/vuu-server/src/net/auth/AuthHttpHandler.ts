@@ -15,6 +15,7 @@ import { LoginTokenService } from "./LoginTokenService";
 export type HttpHandlerOptions = {
   allowedOrigin?: string;
   path?: string;
+  profiles?: Record<string, AuthenticationProviders>;
 };
 
 type Credentials = {
@@ -25,13 +26,32 @@ type Credentials = {
 export function createAuthHttpHandler(
   authProviders: AuthenticationProviders,
   loginTokenService: LoginTokenService,
-  { allowedOrigin = "*", path = "/api/authn" }: HttpHandlerOptions = {},
+  {
+    allowedOrigin = "*",
+    path = "/api/authn",
+    profiles = {},
+  }: HttpHandlerOptions = {},
 ): HttpRequestHandler {
   validateAuthPath(path);
+  validateProfiles(profiles);
 
   return async (req, url) => {
-    if (url.pathname !== path) {
+    const profileName =
+      url.pathname === path
+        ? ""
+        : url.pathname.startsWith(`${path}/`)
+          ? url.pathname.slice(path.length + 1)
+          : undefined;
+    if (profileName === undefined) {
       return undefined;
+    }
+    const selectedProviders =
+      profileName === "" ? authProviders : profiles[profileName];
+    if (!selectedProviders || profileName.includes("/")) {
+      return Response.json(
+        { error: "Authentication profile not found" },
+        { status: 404, headers: createCorsHeaders(req, allowedOrigin) },
+      );
     }
 
     const corsHeaders = createCorsHeaders(req, allowedOrigin);
@@ -62,8 +82,8 @@ export function createAuthHttpHandler(
 
     try {
       const vuuUser = req.headers.has("Authorization")
-        ? await authenticateBearer(authProviders, req)
-        : await authenticateCredentials(authProviders.credentials, req);
+        ? await authenticateBearer(selectedProviders, req)
+        : await authenticateCredentials(selectedProviders.credentials, req);
       let token: string;
       try {
         token = loginTokenService.getToken(vuuUser);
@@ -175,6 +195,14 @@ function validateAuthPath(path: string) {
     throw new Error(
       `Invalid authentication path '${path}'. Expected an absolute URL path without a trailing slash, query, or fragment.`,
     );
+  }
+}
+
+function validateProfiles(profiles: Record<string, AuthenticationProviders>) {
+  for (const name of Object.keys(profiles)) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) {
+      throw new Error(`Invalid authentication profile name '${name}'`);
+    }
   }
 }
 

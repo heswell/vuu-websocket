@@ -11,7 +11,7 @@ and audiences:
 | Server | Client/audience | HTTPS | WebSocket |
 | --- | --- | --- | --- |
 | Portal | `vuu-portal-server` | `8443` | `8091` |
-| Module admin | `vuu-module-admin-server` | _reserved_ | _reserved_ |
+| Module admin | `vuu-module-admin-server` | `8443` | `8091` |
 | User admin | `vuu-user-admin-server` | `8444` | `8092` |
 | Basket trading | `vuu-basket-trading-server` | `8445` | `8093` |
 
@@ -27,13 +27,19 @@ client to be an audience of a subject token issued to a different client; the
 self-audience mapper ensures an exchanged token can contain the requested
 `audience=<same-client-id>`.
 
+Phase 2 activates fixed server-owned profiles. Portal navigation remains
+`POST /api/authn`; module admin uses `POST /api/authn/module-admin` in the same
+portal process. User admin and basket trading retain `POST /api/authn` on ports
+8444 and 8445. Remote profiles always exchange into their own client/audience
+and authorize only from that exchanged token's target-client roles.
+
 Navigation roles (`module-admin-login`, `user-admin-login`, and
 `basket-trading-login`) belong to the public `vuu-portal` client. Resource roles
 belong to their corresponding confidential clients. Bootstrap retains the
 existing uppercase group names and adds `MODULES_VIEW`; assignments are additive,
-so existing roles and cross-client scope mappings are not removed. Until runtime
-authorization moves to the new resource-role names, bootstrap also continues to
-reconcile and assign the active `modules.*`, `users.*`, and `basket.*` roles.
+so existing roles and cross-client scope mappings are not removed. Phase 2 portal module discovery selects exactly the public login roles. Existing
+resource roles and scope mappings remain provisioned; Phase 3 tightening and
+removal is intentionally out of scope.
 
 Run `npm run keycloak:bootstrap` to migrate an existing realm safely. Re-running
 the command reconciles managed clients, audience mappers, roles, and assignments

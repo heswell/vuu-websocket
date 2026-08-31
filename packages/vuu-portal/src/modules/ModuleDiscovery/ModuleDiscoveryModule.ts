@@ -23,9 +23,9 @@ const modules = [
     "ModuleAdmin",
     "ModuleAdmin",
     "http://localhost:5008",
-    "portal",
-    "",
-    ""
+    "module-admin",
+    "wss://localhost:8091/websocket",
+    "https://localhost:8443/api/authn/module-admin"
   ],
   [
     2,
@@ -62,12 +62,9 @@ const modules = [
 ];
 
 const modulePermissions = [
-  [1, 1, "modules.view"],
-  [2, 1, "modules.edit"],
-  [3, 2, "users.view"],
-  [4, 2, "users.admin"],
-  [5, 3, "basket.view"],
-  [6, 3, "basket.trade"],
+  [1, 1, "module-admin-login"],
+  [2, 2, "user-admin-login"],
+  [3, 3, "basket-trading-login"],
 ];
 
 export const ModuleDiscoveryModule = () =>

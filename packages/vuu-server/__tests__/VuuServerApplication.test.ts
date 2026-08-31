@@ -72,6 +72,46 @@ describe("VuuServerApplication", () => {
     );
     expect(await healthResponse?.json()).toEqual({ tables: [] });
   });
+
+  test("assembles a fixed additional auth profile with the shared token service", async () => {
+    const application = createVuuServerApplication({
+      additionalAuthProfiles: {
+        "module-admin": {
+          bearerToken: {
+            authenticateBearerToken: async () =>
+              VuuUserWithAuthorizations("alice", ["module-admin-edit"]),
+          },
+        },
+      },
+      authProviders: {},
+      config: createConfig({ "vuu.ssl": false }),
+      defaultHttpsPort: 8443,
+      defaultWebSocketPort: 8091,
+      modules: [],
+    });
+    const url = new URL("https://localhost:8443/api/authn/module-admin");
+    const request = new Request(url.href, {
+      method: "POST",
+      headers: { Authorization: "******" },
+    });
+    request.headers.set(
+      "Authorization",
+      ["Bearer", "fixed-profile-token"].join(" "),
+    );
+    const response = await application.httpServerOptions.requestHandler?.(
+      request,
+      url,
+    );
+    const { token } = (await response?.json()) as { token: string };
+
+    expect(response?.status).toBe(200);
+    expect(
+      application.loginTokenService.login({ type: "LOGIN", token }),
+    ).toMatchObject({
+      name: "alice",
+      authorizations: ["module-admin-edit"],
+    });
+  });
 });
 
 function createConfig(values: Record<string, string | number | boolean>): Config {

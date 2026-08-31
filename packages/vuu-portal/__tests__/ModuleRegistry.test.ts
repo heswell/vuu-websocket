@@ -33,9 +33,9 @@ describe("portal module registry", () => {
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("admin", [
-        "modules.view",
-        "users.view",
-        "basket.view",
+        "module-admin-login",
+        "user-admin-login",
+        "basket-trading-login",
       ]),
     );
 
@@ -61,7 +61,11 @@ describe("portal module registry", () => {
         mfComponent: "ModuleAdmin",
         mfScope: "ModuleAdmin",
         mfUrl: "http://localhost:5008",
-        vuu: { connectionId: "portal" },
+        vuu: {
+          connectionId: "module-admin",
+          restUrl: "https://localhost:8443/api/authn/module-admin",
+          websocketUrl: "wss://localhost:8091/websocket",
+        },
       },
       {
         id: 2,
@@ -99,9 +103,9 @@ describe("portal module registry", () => {
       "ModuleAdmin",
       "ModuleAdmin",
       "http://localhost:5011",
-      "portal",
-      "",
-      "",
+      "module-admin",
+      "wss://localhost:8091/websocket",
+      "https://localhost:8443/api/authn/module-admin",
     ]);
     modules.insert([
       5,
@@ -119,12 +123,12 @@ describe("portal module registry", () => {
       "",
       "",
     ]);
-    permissions.insert([7, 4, "modules.view"]);
-    permissions.insert([8, 5, "modules.view"]);
+    permissions.insert([7, 4, "module-admin-login"]);
+    permissions.insert([8, 5, "module-admin-login"]);
 
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
-      VuuUserWithAuthorizations("admin", ["modules.view"]),
+      VuuUserWithAuthorizations("admin", ["module-admin-login"]),
     );
 
     expect(registry.modules).toEqual([
@@ -140,6 +144,19 @@ describe("portal module registry", () => {
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("no-access"),
+    );
+
+    expect(registry).toEqual({ modules: [] });
+  });
+
+  test("does not select modules from remote resource roles", () => {
+    const registry = createModuleRegistry(
+      vuuServer.tableContainer,
+      VuuUserWithAuthorizations("remote-only", [
+        "module-admin-view",
+        "users.view",
+        "basket.view",
+      ]),
     );
 
     expect(registry).toEqual({ modules: [] });

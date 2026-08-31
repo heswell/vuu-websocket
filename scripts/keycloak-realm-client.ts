@@ -6,14 +6,15 @@ import {
   RETIRED_SERVER_CLIENT_NAMES,
   SERVER_CLIENT_NAMES,
   SERVER_CLIENT_SECRETS,
+  resolveKeycloakClientSecret,
   type ProtocolMapper,
 } from "./keycloak-client-config";
 
 // Keycloak configuration
-const KEYCLOAK_URL = "https://localhost:8080";
-const ADMIN_USER = "admin";
-const ADMIN_PASSWORD = "admin";
-const REALM_NAME = "vuu";
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL ?? "https://localhost:8080";
+const ADMIN_USER = process.env.KEYCLOAK_ADMIN_USERNAME ?? "admin";
+const ADMIN_PASSWORD = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
+const REALM_NAME = process.env.KEYCLOAK_REALM ?? "vuu";
 const CLIENT_NAME = "vuu-portal";
 const AUTHORIZATION_HEADER = "Authorization";
 const CLIENT_PORT = 5002;
@@ -144,14 +145,15 @@ async function main() {
 
     // Step 4: Create or update confidential server clients.
     console.log("4️⃣  Creating/updating confidential server clients...");
-    const serverClientSecrets: Array<{ clientId: string; secret: string }> = [];
     for (const serverClientName of SERVER_CLIENT_NAMES) {
-      const secret = await ensureServerClient(
+      await ensureServerClient(
         token,
         serverClientName,
-        SERVER_CLIENT_SECRETS[serverClientName],
+        resolveKeycloakClientSecret(
+          serverClientName,
+          SERVER_CLIENT_SECRETS[serverClientName],
+        ),
       );
-      serverClientSecrets.push({ clientId: serverClientName, secret });
     }
     console.log("✅ Confidential server clients and self audiences ready\n");
 
@@ -173,9 +175,6 @@ async function main() {
     console.log(`Realm: ${REALM_NAME}`);
     console.log(`Client: ${CLIENT_NAME}`);
     console.log(`Server Clients: ${SERVER_CLIENT_NAMES.join(", ")}`);
-    for (const serverClient of serverClientSecrets) {
-      console.log(`✅ ${serverClient.clientId} secret: ${serverClient.secret}`);
-    }
     console.log(`Portal URL: ${CLIENT_URL}`);
     console.log(
       `\nAccess admin console at: ${KEYCLOAK_URL}/admin/`
@@ -415,8 +414,7 @@ async function ensureServerClient(
     clientSecret,
   );
 
-  console.log(`   • Fetching secret for '${serverClientName}'...`);
-  return await fetchClientSecret(token, serverClient.id, serverClientName);
+  console.log(`   • '${serverClientName}' configuration reconciled`);
 }
 
 async function fetchClientSecret(
