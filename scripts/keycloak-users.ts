@@ -1,5 +1,12 @@
 #!/usr/bin/env bun
 
+import {
+  CLIENT_ROLES,
+  GROUP_ROLES,
+  SEEDED_USERS,
+  type ClientId,
+} from "./keycloak-user-config";
+
 type RoleRepresentation = {
   id: string;
   name: string;
@@ -44,52 +51,6 @@ type BunFetchInit = RequestInit & {
   };
 };
 
-const users = [
-  { username: "trader1", email: "trader1@vuu.com", groups: ["BASKET_TRADE"] },
-  { username: "trader2", email: "trader2@vuu.com", groups: ["BASKET_TRADE"] },
-  {
-    username: "admin",
-    email: "admin@vuu.com",
-    groups: ["MODULES_ADMIN", "USERS_ADMIN", "BASKET_TRADE"],
-  },
-] as const;
-
-const clientRoles = {
-  "vuu-portal-server": [
-    "modules.view",
-    "modules.edit",
-  ],
-  "vuu-user-admin-server": ["users.view", "users.admin"],
-  "vuu-basket-trading-server": ["basket.view", "basket.trade"],
-} as const;
-
-type ClientId = keyof typeof clientRoles;
-type ClientRoleRef = {
-  clientId: ClientId;
-  roleName: string;
-};
-
-const groupRoles: Record<string, readonly ClientRoleRef[]> = {
-  BASKET_VIEW: [
-    { clientId: "vuu-basket-trading-server", roleName: "basket.view" },
-  ],
-  BASKET_TRADE: [
-    { clientId: "vuu-basket-trading-server", roleName: "basket.view" },
-    { clientId: "vuu-basket-trading-server", roleName: "basket.trade" },
-  ],
-  MODULES_ADMIN: [
-    { clientId: "vuu-portal-server", roleName: "modules.view" },
-    { clientId: "vuu-portal-server", roleName: "modules.edit" },
-  ],
-  USERS_VIEW: [
-    { clientId: "vuu-user-admin-server", roleName: "users.view" },
-  ],
-  USERS_ADMIN: [
-    { clientId: "vuu-user-admin-server", roleName: "users.view" },
-    { clientId: "vuu-user-admin-server", roleName: "users.admin" },
-  ],
-};
-
 async function main() {
   if (useInsecureTls) {
     console.warn(
@@ -107,7 +68,7 @@ async function main() {
 
   const clients = new Map<ClientId, ClientRepresentation>();
   const roles = new Map<string, RoleRepresentation>();
-  for (const [clientId, roleNames] of Object.entries(clientRoles) as [
+  for (const [clientId, roleNames] of Object.entries(CLIENT_ROLES) as [
     ClientId,
     readonly string[],
   ][]) {
@@ -121,12 +82,12 @@ async function main() {
   await ensureTokenClientRoleScopes(clients, roles, headers);
 
   const groups = new Map<string, GroupRepresentation>();
-  for (const groupName of Object.keys(groupRoles)) {
+  for (const groupName of Object.keys(GROUP_ROLES)) {
     const group = await ensureGroup(groupName, headers);
     groups.set(groupName, group);
   }
 
-  for (const [groupName, roleRefs] of Object.entries(groupRoles)) {
+  for (const [groupName, roleRefs] of Object.entries(GROUP_ROLES)) {
     const rolesByClient = Map.groupBy(roleRefs, ({ clientId }) => clientId);
     for (const [clientId, clientRoleRefs] of rolesByClient) {
       await ensureGroupClientRoles(
@@ -138,7 +99,7 @@ async function main() {
     }
   }
 
-  for (const user of users) {
+  for (const user of SEEDED_USERS) {
     const createdUser = await upsertUser(user.username, user.email, headers);
     await setUserPassword(createdUser.id, userPassword, headers);
 
@@ -148,7 +109,7 @@ async function main() {
   }
 
   console.log(
-    `[keycloak] seeded realm ${realm} with ${users.length} users, ${roles.size} client roles and ${Object.keys(groupRoles).length} groups`,
+    `[keycloak] seeded realm ${realm} with ${SEEDED_USERS.length} users, ${roles.size} client roles and ${Object.keys(GROUP_ROLES).length} groups`,
   );
 }
 
@@ -269,7 +230,7 @@ async function ensureTokenClientRoleScopes(
   const portalClient = await getClient("vuu-portal", headers);
 
   for (const tokenClient of [portalClient, userAdminClient]) {
-    for (const [sourceClientId, roleNames] of Object.entries(clientRoles) as [
+    for (const [sourceClientId, roleNames] of Object.entries(CLIENT_ROLES) as [
       ClientId,
       readonly string[],
     ][]) {
