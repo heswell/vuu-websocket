@@ -7,11 +7,11 @@ export const SERVER_CLIENT_NAMES = [
 
 export type ServerClientName = (typeof SERVER_CLIENT_NAMES)[number];
 
-export const SERVER_CLIENT_SECRETS: Partial<
-  Record<ServerClientName, string>
-> = {
-  "vuu-user-admin-server": "vuu-user-admin-local-dev-secret",
-};
+export {
+  KEYCLOAK_CLIENT_SECRET_ENV,
+  LOCAL_KEYCLOAK_CLIENT_SECRETS as SERVER_CLIENT_SECRETS,
+  resolveKeycloakClientSecret,
+} from "../packages/vuu-server/src/net/auth/KeycloakClientSecrets";
 
 export const RETIRED_SERVER_CLIENT_NAMES = [
   "vuu-module-discovery-server",

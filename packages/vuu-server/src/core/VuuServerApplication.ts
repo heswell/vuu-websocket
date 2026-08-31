@@ -33,6 +33,7 @@ export type VuuServerApplicationContext = {
 };
 
 export type VuuServerApplicationOptions = {
+  additionalAuthProfiles?: Record<string, AuthenticationProviders>;
   authProviders: AuthenticationProviders;
   config: Config;
   defaultHttpsPort: number;
@@ -52,6 +53,7 @@ export type VuuServerApplication = VuuServerApplicationContext & {
 };
 
 export function createVuuServerApplication({
+  additionalAuthProfiles,
   additionalHttpHandlers,
   authProviders,
   config,
@@ -84,6 +86,7 @@ export function createVuuServerApplication({
         "http://localhost:5002",
       ),
       path: config.getString(ConfigKeys.authPath, "/api/authn"),
+      profiles: additionalAuthProfiles,
     },
   );
   const handlers = [

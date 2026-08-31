@@ -70,7 +70,14 @@ export {
 export {
   KeycloakAuthProvider,
   type KeycloakAudiencePolicy,
+  type KeycloakAuthProviderOptions,
 } from "./net/auth/KeycloakAuthProvider";
+export {
+  KEYCLOAK_CLIENT_SECRET_ENV,
+  LOCAL_KEYCLOAK_CLIENT_SECRETS,
+  resolveKeycloakClientSecret,
+  type VuuKeycloakClientId,
+} from "./net/auth/KeycloakClientSecrets";
 export { createConfiguredAuthProviders } from "./net/auth/ConfiguredAuthProviders";
 export { composeHttpHandlers } from "./net/http/composeHttpHandlers";
 export type {

@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { Config } from "../src/util/ConfigFactory";
+import {
+  AuthenticationError,
+  AuthenticationUnavailableError,
+} from "../src/net/auth/AuthenticationErrors";
 import { KeycloakAuthProvider } from "../src/net/auth/KeycloakAuthProvider";
+import { Config } from "../src/util/ConfigFactory";
 
 type BunFetchInit = RequestInit & {
-  tls?: {
-    rejectUnauthorized?: boolean;
-  };
+  tls?: { rejectUnauthorized?: boolean };
 };
 
 const originalFetch = globalThis.fetch;
@@ -15,46 +17,37 @@ afterEach(() => {
 });
 
 describe("KeycloakAuthProvider", () => {
-  test("introspects a correctly scoped token", async () => {
-    const requests: Array<{ url: string; init: BunFetchInit }> = [];
-    globalThis.fetch = ((url, init) => {
-      requests.push({ url: String(url), init: init as BunFetchInit });
-      return Promise.resolve(activeTokenResponse("portal-client"));
-    }) as typeof fetch;
+  test("extracts only roles owned by the configured authorization client", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve(activeTokenResponse())) as typeof fetch;
 
     const user = await new KeycloakAuthProvider(
       createConfig(),
     ).authenticateBearerToken("keycloak-token");
 
     expect(user.name).toBe("keycloak-user");
-    expect(user.authorizations).toEqual([
-      "realm-role",
-      "client-role",
-      "cross-client-role",
-      "/test-group",
-    ]);
-    expect(requests).toHaveLength(1);
-    expect(requests[0].url).toEndWith("/token/introspect");
-    expect(requests[0].init.tls).toBeUndefined();
+    expect(user.authorizations).toEqual(["target-role"]);
   });
 
-  test("rejects a token for the wrong audience", async () => {
+  test("returns no authorizations when the target client has no roles", async () => {
     globalThis.fetch = (() =>
-      Promise.resolve(activeTokenResponse("another-client"))) as typeof fetch;
+      Promise.resolve(
+        activeTokenResponse({ resource_access: { "portal-client": {} } }),
+      )) as typeof fetch;
 
-    await expect(
-      new KeycloakAuthProvider(createConfig()).authenticateBearerToken(
-        "keycloak-token",
-      ),
-    ).rejects.toThrow("not scoped to audience");
+    const user = await new KeycloakAuthProvider(
+      createConfig(),
+    ).authenticateBearerToken("keycloak-token");
+
+    expect(user.authorizations).toEqual([]);
   });
 
-  test("exchanges and validates a token when the audience is missing", async () => {
+  test("always exchanges even when the subject already has the target audience", async () => {
     const requests: Array<{ url: string; body: URLSearchParams }> = [];
     const responses = [
-      activeTokenResponse("host-client"),
-      new Response(JSON.stringify({ access_token: "remote-token" })),
-      activeTokenResponse("portal-client"),
+      activeTokenResponse(),
+      Response.json({ access_token: "exchanged-token" }),
+      activeTokenResponse(),
     ];
     globalThis.fetch = ((url, init) => {
       requests.push({
@@ -64,25 +57,83 @@ describe("KeycloakAuthProvider", () => {
       return Promise.resolve(responses.shift()!);
     }) as typeof fetch;
 
-    const user = await new KeycloakAuthProvider(
+    await new KeycloakAuthProvider(
       createConfig({
-        audiencePolicy: "exchange-if-needed",
+        audiencePolicy: "always-exchange",
         tokenExchangeEnabled: true,
       }),
     ).authenticateBearerToken("subject-token");
 
-    expect(user.name).toBe("keycloak-user");
     expect(requests).toHaveLength(3);
     expect(requests[1].url).toEndWith("/token");
-    expect(requests[1].body.get("subject_token")).toBe("subject-token");
-    expect(requests[1].body.get("audience")).toBe("portal-client");
-    expect(requests[2].body.get("token")).toBe("remote-token");
+    expect([...requests[1].body.entries()]).toEqual([
+      ["grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"],
+      ["subject_token", "subject-token"],
+      [
+        "subject_token_type",
+        "urn:ietf:params:oauth:token-type:access_token",
+      ],
+      [
+        "requested_token_type",
+        "urn:ietf:params:oauth:token-type:access_token",
+      ],
+      ["audience", "portal-client"],
+      ["client_id", "portal-client"],
+      ["client_secret", "test-secret"],
+    ]);
+    expect(requests[2].body.get("token")).toBe("exchanged-token");
   });
 
-  test("fails closed when token exchange fails", async () => {
+  test("rejects exchanged tokens with a wrong or missing audience", async () => {
+    for (const audience of ["other-client", undefined]) {
+      const responses = [
+        activeTokenResponse(),
+        Response.json({ access_token: "exchanged-token" }),
+        activeTokenResponse({ aud: audience }),
+      ];
+      globalThis.fetch = (() =>
+        Promise.resolve(responses.shift()!)) as typeof fetch;
+
+      await expect(
+        new KeycloakAuthProvider(
+          createConfig({
+            audiencePolicy: "always-exchange",
+            tokenExchangeEnabled: true,
+          }),
+        ).authenticateBearerToken("subject-token"),
+      ).rejects.toThrow("not scoped to audience");
+    }
+  });
+
+  test("rejects an exchanged token for a different subject or user", async () => {
+    for (const exchanged of [
+      activeTokenResponse({ sub: "different-subject" }),
+      activeTokenResponse({ preferred_username: "different-user" }),
+    ]) {
+      const responses = [
+        activeTokenResponse(),
+        Response.json({ access_token: "exchanged-token" }),
+        exchanged,
+      ];
+      globalThis.fetch = (() =>
+        Promise.resolve(responses.shift()!)) as typeof fetch;
+
+      await expect(
+        new KeycloakAuthProvider(
+          createConfig({
+            audiencePolicy: "always-exchange",
+            tokenExchangeEnabled: true,
+          }),
+        ).authenticateBearerToken("subject-token"),
+      ).rejects.toThrow("changed the authenticated subject");
+    }
+  });
+
+  test("enforces an expected authorized party on the authorized token", async () => {
     const responses = [
-      activeTokenResponse("host-client"),
-      new Response(null, { status: 403, statusText: "Forbidden" }),
+      activeTokenResponse(),
+      Response.json({ access_token: "exchanged-token" }),
+      activeTokenResponse({ azp: "unexpected-client" }),
     ];
     globalThis.fetch = (() =>
       Promise.resolve(responses.shift()!)) as typeof fetch;
@@ -90,92 +141,121 @@ describe("KeycloakAuthProvider", () => {
     await expect(
       new KeycloakAuthProvider(
         createConfig({
-          audiencePolicy: "exchange-if-needed",
+          audiencePolicy: "always-exchange",
+          expectedAuthorizedParty: "portal-client",
           tokenExchangeEnabled: true,
         }),
       ).authenticateBearerToken("subject-token"),
-    ).rejects.toThrow("token exchange failed");
+    ).rejects.toThrow("authorized party");
   });
 
-  test("reports Keycloak server failures as unavailable", async () => {
+  test("rejects inactive, expired, and subject-less tokens", async () => {
+    for (const response of [
+      Response.json({ active: false }),
+      activeTokenResponse({ exp: Math.floor(Date.now() / 1000) - 1 }),
+      activeTokenResponse({ sub: undefined }),
+    ]) {
+      globalThis.fetch = (() => Promise.resolve(response)) as typeof fetch;
+      await expect(
+        new KeycloakAuthProvider(createConfig()).authenticateBearerToken(
+          "token",
+        ),
+      ).rejects.toThrow();
+    }
+  });
+
+  test("distinguishes rejected credentials from unavailable Keycloak", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve(new Response(null, { status: 401 }))) as typeof fetch;
+    await expect(
+      new KeycloakAuthProvider(createConfig()).authenticateBearerToken("token"),
+    ).rejects.toBeInstanceOf(AuthenticationError);
+
     globalThis.fetch = (() =>
       Promise.resolve(new Response(null, { status: 503 }))) as typeof fetch;
-
     await expect(
       new KeycloakAuthProvider(createConfig()).authenticateBearerToken("token"),
-    ).rejects.toMatchObject({
-      name: "Error",
-      message: "Keycloak token validation is unavailable",
-    });
+    ).rejects.toBeInstanceOf(AuthenticationUnavailableError);
   });
 
-  test("rejects inactive and expired tokens", async () => {
-    globalThis.fetch = (() =>
-      Promise.resolve(new Response(JSON.stringify({ active: false })))) as typeof fetch;
-    await expect(
-      new KeycloakAuthProvider(createConfig()).authenticateBearerToken("token"),
-    ).rejects.toThrow("inactive");
+  test("distinguishes rejected exchange from unavailable exchange", async () => {
+    for (const [status, errorType] of [
+      [403, AuthenticationError],
+      [503, AuthenticationUnavailableError],
+    ] as const) {
+      const responses = [
+        activeTokenResponse(),
+        new Response(null, { status }),
+      ];
+      globalThis.fetch = (() =>
+        Promise.resolve(responses.shift()!)) as typeof fetch;
 
-    globalThis.fetch = (() =>
-      Promise.resolve(
-        activeTokenResponse(
-          "portal-client",
-          Math.floor(Date.now() / 1000) - 1,
-        ),
-      )) as typeof fetch;
-    await expect(
-      new KeycloakAuthProvider(createConfig()).authenticateBearerToken("token"),
-    ).rejects.toThrow("expired");
+      await expect(
+        new KeycloakAuthProvider(
+          createConfig({
+            audiencePolicy: "always-exchange",
+            tokenExchangeEnabled: true,
+          }),
+        ).authenticateBearerToken("subject-token"),
+      ).rejects.toBeInstanceOf(errorType);
+    }
   });
 
   test("allows a configured self-signed Keycloak certificate", async () => {
-    const fetchCalls: BunFetchInit[] = [];
+    const calls: BunFetchInit[] = [];
     globalThis.fetch = ((_, init) => {
-      fetchCalls.push(init as BunFetchInit);
-      return Promise.resolve(activeTokenResponse("portal-client"));
+      calls.push(init as BunFetchInit);
+      return Promise.resolve(activeTokenResponse());
     }) as typeof fetch;
 
     await new KeycloakAuthProvider(
       createConfig({ allowSelfSignedCert: true }),
     ).authenticateBearerToken("keycloak-token");
 
-    expect(fetchCalls[0].tls).toEqual({ rejectUnauthorized: false });
+    expect(calls[0].tls).toEqual({ rejectUnauthorized: false });
   });
 
   test("requires exchange configuration for exchange policies", () => {
     expect(
       () =>
         new KeycloakAuthProvider(
-          createConfig({ audiencePolicy: "exchange-if-needed" }),
+          createConfig({ audiencePolicy: "always-exchange" }),
         ),
     ).toThrow("tokenExchangeEnabled");
   });
 });
 
-function activeTokenResponse(audience: string, exp = futureExpiry()) {
-  return new Response(
-    JSON.stringify({
-      active: true,
-      aud: audience,
-      preferred_username: "keycloak-user",
-      exp,
-      realm_access: { roles: ["realm-role"] },
-      resource_access: {
-        "portal-client": { roles: ["client-role"] },
-        "basket-client": { roles: ["cross-client-role"] },
-      },
-      groups: ["/test-group"],
-    }),
-  );
-}
+type TokenOverrides = {
+  aud?: string;
+  azp?: string;
+  exp?: number;
+  preferred_username?: string;
+  resource_access?: Record<string, { roles?: string[] }>;
+  sub?: string;
+};
 
-function futureExpiry() {
-  return Math.floor(Date.now() / 1000) + 60;
+function activeTokenResponse(overrides: TokenOverrides = {}) {
+  return Response.json({
+    active: true,
+    aud: "portal-client",
+    azp: "portal-client",
+    sub: "user-id",
+    preferred_username: "keycloak-user",
+    exp: Math.floor(Date.now() / 1000) + 60,
+    realm_access: { roles: ["realm-role"] },
+    resource_access: {
+      "portal-client": { roles: ["target-role"] },
+      "basket-client": { roles: ["cross-client-role"] },
+    },
+    groups: ["/test-group"],
+    ...overrides,
+  });
 }
 
 type ConfigOverrides = {
   allowSelfSignedCert?: boolean;
   audiencePolicy?: string;
+  expectedAuthorizedParty?: string;
   tokenExchangeEnabled?: boolean;
 };
 
@@ -186,6 +266,11 @@ function createConfig(overrides: ConfigOverrides = {}): Config {
     ["vuu.auth.keycloak.clientId", "portal-client"],
     ["vuu.auth.keycloak.clientSecret", "test-secret"],
     ["vuu.auth.keycloak.audience", "portal-client"],
+    ["vuu.auth.keycloak.authorizationClientId", "portal-client"],
+    [
+      "vuu.auth.keycloak.expectedAuthorizedParty",
+      overrides.expectedAuthorizedParty ?? "",
+    ],
     [
       "vuu.auth.keycloak.audiencePolicy",
       overrides.audiencePolicy ?? "require-audience",

@@ -10,7 +10,8 @@ from `application.conf`.
 
 - HTTPS `8443`;
 - WebSocket `8091`;
-- Keycloak client and audience `vuu-portal-server`; and
+- portal-token validation through confidential client `vuu-portal-server`;
+- navigation authorization from `resource_access.vuu-portal.roles` only; and
 - `MODULE_DISCOVERY` tables plus a user-specific registry on `LOGIN_SUCCESS`.
 
 The registry travels over the authenticated VUU WebSocket session. There is no
@@ -27,23 +28,31 @@ authorization cannot diverge.
 - the `KEYCLOAK_ADMIN` module and its refresh coordinator.
 
 The portal-issued Keycloak access token includes the user-admin server audience.
-The UI exchanges or validates it through the user-admin `/api/authn` endpoint,
+The UI exchanges it through the user-admin `/api/authn` endpoint,
 then opens that server's VUU WebSocket with the returned VUU token.
 
-## Token-exchange preparation
+Portal owns two fixed authentication profiles:
 
-Keycloak bootstrap also manages the reserved `vuu-module-admin-server` client.
-All confidential VUU clients have standard token exchange enabled, expose their
-own audience on exchanged access tokens, and remain audiences of tokens issued
-to `vuu-portal`. This is additive preparation only: current application
-authentication handlers, audience policies, runtime role extraction, full-scope
-settings, and active cross-client role scope mappings remain unchanged.
+- `POST /api/authn` validates portal navigation tokens; and
+- `POST /api/authn/module-admin` always exchanges into
+  `vuu-module-admin-server`.
 
-The public `vuu-portal` client owns navigation-only login roles. Module admin,
-user admin, and basket trading permissions use resource roles owned by the
-corresponding confidential server client. Existing resource roles remain
-provisioned and assigned while the unchanged application authorization code
-still consumes them.
+The module-admin profile issues a distinct VUU login token used with connection
+ID `module-admin` at `wss://localhost:8091/websocket`. It remains in the portal
+process, so both portal profiles deliberately share the same stateful
+`LoginTokenService`.
+
+## Remote token exchange
+
+Module admin, user admin, and basket trading always exchange the submitted
+portal access token, even if it already has the target audience. The exchanged
+token must retain the subject and username, be unexpired, contain the configured
+audience and expected authorized party, and supply authorizations only from
+`resource_access[authorizationClientId].roles`. Realm roles, groups, and roles
+for other clients are ignored.
+
+Profile names, client IDs, audiences, and authorization clients are server
+configuration. Query parameters and request bodies cannot override them.
 
 ## Shared configuration
 
@@ -55,5 +64,15 @@ still consumes them.
 | `vuu.auth.keycloak.clientSecret` | Client secret used for introspection/exchange |
 | `vuu.auth.keycloak.audience` | Required or requested token audience |
 | `vuu.auth.keycloak.audiencePolicy` | Audience validation/exchange policy |
+| `vuu.auth.keycloak.authorizationClientId` | Sole `resource_access` client used for VUU authorizations |
+| `vuu.auth.keycloak.expectedAuthorizedParty` | Required `azp` on the accepted token |
 | `vuu.auth.keycloak.tokenExchangeEnabled` | Enables Keycloak token exchange |
 | `vuu.auth.cors.allowedOrigin` | Allowed browser origin |
+
+Confidential client secrets use these environment overrides in both bootstrap
+and applications: `VUU_PORTAL_SERVER_CLIENT_SECRET`,
+`VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET`,
+`VUU_USER_ADMIN_SERVER_CLIENT_SECRET`, and
+`VUU_BASKET_TRADING_SERVER_CLIENT_SECRET`. `KEYCLOAK_ADMIN_USERNAME` and
+`KEYCLOAK_ADMIN_PASSWORD` remain separate bootstrap/Admin API credentials.
+Secrets are never written to logs.

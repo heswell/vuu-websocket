@@ -125,6 +125,92 @@ describe("AuthnHttpHandler", () => {
     expect(user.authorizations).toEqual(["portal.admin"]);
   });
 
+  test("routes only fixed profiles and issues profile tokens accepted by WebSocket login", async () => {
+    const loginTokenService = LoginTokenService();
+    const handler = createAuthHttpHandler(
+      {
+        bearerToken: {
+          authenticateBearerToken: async () =>
+            VuuUserWithAuthorizations("portal-user", ["module-admin-login"]),
+        },
+      },
+      loginTokenService,
+      {
+        allowedOrigin: CLIENT_ORIGIN,
+        profiles: {
+          "module-admin": {
+            bearerToken: {
+              authenticateBearerToken: async (token) => {
+                expect(token).toBe("portal-subject-token");
+                return VuuUserWithAuthorizations("portal-user", [
+                  "module-admin-edit",
+                ]);
+              },
+            },
+          },
+        },
+      },
+    );
+    const request = new Request(
+      "https://localhost:8443/api/authn/module-admin?audience=attacker",
+      {
+        method: "POST",
+          headers: {
+            Authorization: "******",
+            "Content-Type": "application/json",
+            Origin: CLIENT_ORIGIN,
+          },
+          body: JSON.stringify({
+            audience: "attacker",
+            clientId: "attacker",
+          }),
+      },
+    );
+    request.headers.set(
+      "Authorization",
+      ["Bearer", "portal-subject-token"].join(" "),
+    );
+
+    const response = await handler(request, new URL(request.url));
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get("Access-Control-Allow-Origin")).toBe(
+      CLIENT_ORIGIN,
+    );
+    const { token } = (await response?.json()) as { token: string };
+    expect(loginTokenService.login({ type: "LOGIN", token })).toMatchObject({
+      name: "portal-user",
+      authorizations: ["module-admin-edit"],
+    });
+
+    const unknown = new Request(
+      "https://localhost:8443/api/authn/arbitrary-client",
+      { method: "POST", headers: { Authorization: "******" } },
+    );
+    expect((await handler(unknown, new URL(unknown.url)))?.status).toBe(404);
+  });
+
+  test("applies CORS preflight handling to fixed profiles", async () => {
+    const handler = createAuthHttpHandler(
+      {},
+      LoginTokenService(),
+      {
+        allowedOrigin: CLIENT_ORIGIN,
+        profiles: { "module-admin": {} },
+      },
+    );
+    const request = new Request(
+      "https://localhost:8443/api/authn/module-admin",
+      { method: "OPTIONS", headers: { Origin: CLIENT_ORIGIN } },
+    );
+
+    const response = await handler(request, new URL(request.url));
+
+    expect(response?.status).toBe(204);
+    expect(response?.headers.get("Access-Control-Allow-Origin")).toBe(
+      CLIENT_ORIGIN,
+    );
+  });
+
   test("uses a configured path instead of the default path", async () => {
     const handler = createHandler(undefined, "/custom/auth");
     const defaultRequest = credentialRequest("/api/authn");
