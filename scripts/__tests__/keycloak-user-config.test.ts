@@ -3,8 +3,10 @@ import {
   CLIENT_ROLES,
   GROUP_ROLES,
   MANAGED_CLIENT_ROLE_NAMES,
+  planManagedIdChanges,
   planManagedRoleScopeChanges,
   RETIRED_CLIENT_ROLES,
+  RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
 } from "../keycloak-user-config";
 
@@ -85,6 +87,14 @@ describe("Keycloak user and role configuration", () => {
     expect(MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin-server"]).toContain(
       "users.admin",
     );
+    expect(RETIRED_REALM_ROLE_NAMES).toEqual([
+      "modules.view",
+      "modules.edit",
+      "users.view",
+      "users.admin",
+      "basket.view",
+      "basket.trade",
+    ]);
   });
 
   test("removes stale managed cross-client scopes but retains custom roles", () => {
@@ -129,6 +139,19 @@ describe("Keycloak user and role configuration", () => {
         desired,
         managed,
       ),
+    ).toEqual({ add: [], remove: [] });
+  });
+
+  test("reconciles managed groups by id and preserves same-name custom groups", () => {
+    const desired = [{ id: "managed-users-admin", name: "USERS_ADMIN" }];
+    const customSameName = [{ id: "custom-subgroup", name: "USERS_ADMIN" }];
+
+    expect(planManagedIdChanges(customSameName, desired, desired)).toEqual({
+      add: ["managed-users-admin"],
+      remove: [],
+    });
+    expect(
+      planManagedIdChanges([...customSameName, ...desired], desired, desired),
     ).toEqual({ add: [], remove: [] });
   });
 

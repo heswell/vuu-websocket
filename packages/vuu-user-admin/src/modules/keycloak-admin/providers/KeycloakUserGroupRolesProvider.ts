@@ -8,10 +8,10 @@ export class KeycloakUserGroupRolesProvider extends Provider {
     const [users, groups, roles] = await Promise.all([
       client.listSeedUsers(),
       client.listSeedGroups(),
-      client.listSeedRoles(),
+      client.listRealmRoles(),
     ]);
     const seededGroupIds = new Set(groups.map((group) => group.id));
-    const seededRoleIds = new Set(roles.map((role) => role.id));
+    const realmRoleIds = new Set(roles.map((role) => role.id));
 
     const rows: (string | number)[][] = [];
 
@@ -21,9 +21,9 @@ export class KeycloakUserGroupRolesProvider extends Provider {
 
       for (const group of seededUserGroups) {
         const groupRoles = await client.listRolesForGroup(group.id);
-        const seededGroupRoles = groupRoles.filter((role) => seededRoleIds.has(role.id));
+        const realmGroupRoles = groupRoles.filter((role) => realmRoleIds.has(role.id));
 
-        for (const role of seededGroupRoles) {
+        for (const role of realmGroupRoles) {
           const id = `${user.id}:${group.id}:${role.id}`;
           const timestamp = Date.now();
           rows.push([

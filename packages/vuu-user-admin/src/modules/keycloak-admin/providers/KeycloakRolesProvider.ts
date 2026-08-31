@@ -5,7 +5,7 @@ import { reconcileTableRows } from "./reconcileTableRows";
 export class KeycloakRolesProvider extends Provider {
   async load(_: TableContainer) {
     const client = await KeycloakAdminClient.createFromConfig();
-    const roles = await client.listSeedRoles();
+    const roles = await client.listRealmRoles();
     const rows = roles.map((role) => {
       const timestamp = Date.now();
       return [

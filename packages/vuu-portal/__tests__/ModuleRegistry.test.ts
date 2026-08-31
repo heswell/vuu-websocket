@@ -154,8 +154,8 @@ describe("portal module registry", () => {
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("remote-only", [
         "module-admin-view",
-        "users.view",
-        "basket.view",
+        "user-admin-view",
+        "basket-trading-view",
       ]),
     );
 

@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 export const SERVER_CLIENT_NAMES = [
   "vuu-portal-server",
   "vuu-module-admin-server",
@@ -33,6 +35,16 @@ export type ServerClientRepresentation = {
   secret?: string;
   [key: string]: unknown;
 };
+
+export function clientConfigurationsEqual(
+  left: ServerClientRepresentation,
+  right: ServerClientRepresentation,
+) {
+  return isDeepStrictEqual(
+    withDeterministicMapperOrder(left),
+    withDeterministicMapperOrder(right),
+  );
+}
 
 export function reconcilePortalClientConfiguration(
   currentClient: ServerClientRepresentation,
@@ -136,4 +148,24 @@ function reconcileAudienceMappers(
   }
 
   return reconciled;
+}
+
+function withDeterministicMapperOrder(
+  client: ServerClientRepresentation,
+): ServerClientRepresentation {
+  return {
+    ...client,
+    protocolMappers: client.protocolMappers
+      ?.slice()
+      .sort((left, right) => mapperKey(left).localeCompare(mapperKey(right))),
+  };
+}
+
+function mapperKey(mapper: ProtocolMapper) {
+  return [
+    mapper.protocolMapper ?? "",
+    mapper.config?.["included.client.audience"] ?? "",
+    mapper.name ?? "",
+    String(mapper.id ?? ""),
+  ].join("\u0000");
 }

@@ -48,7 +48,7 @@ describe("LoginSuccess", () => {
     const lifecycle = new LifecycleContainer();
     const loginTokenService = LoginTokenService();
     const token = loginTokenService.getToken(
-      VuuUserWithAuthorizations("admin", ["modules.view"]),
+      VuuUserWithAuthorizations("admin", ["module-admin-view"]),
     );
     const config = VuuServerConfig(
       VuuWebSocketOptions().withWsPort(0),
@@ -90,7 +90,7 @@ describe("LoginSuccess", () => {
             expect.objectContaining({
               name: "moduleAdmin",
               title: "admin",
-              description: "modules.view",
+              description: "module-admin-view",
             }),
           ],
         },

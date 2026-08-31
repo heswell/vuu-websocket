@@ -36,7 +36,7 @@ describe("VuuServerApplication", () => {
       authProviders: {
         bearerToken: {
           authenticateBearerToken: async () =>
-            VuuUserWithAuthorizations("alice", ["basket.view"]),
+            VuuUserWithAuthorizations("alice", ["basket-trading-view"]),
         },
       },
       config: createConfig({

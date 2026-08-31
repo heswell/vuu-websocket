@@ -8,6 +8,8 @@ administration.
 - The server registers only the `KEYCLOAK_ADMIN` feature module.
 - User, group, role, group-role, and user-group-role providers load from the
   Keycloak Admin API.
+- Role providers expose live realm roles generically. VUU portal login roles and
+  backend resource roles are client roles managed separately by bootstrap.
 - Edit RPCs update Keycloak and refresh all admin tables.
 - The refresh coordinator periodically reconciles tables so multiple server
   instances converge.

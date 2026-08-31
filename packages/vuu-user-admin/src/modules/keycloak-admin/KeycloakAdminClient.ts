@@ -6,15 +6,6 @@ export const SEEDED_USERNAMES = [
   "admin",
 ] as const;
 
-export const SEEDED_ROLE_NAMES = [
-  "basket.view",
-  "basket.trade",
-  "modules.view",
-  "modules.edit",
-  "users.view",
-  "users.admin",
-] as const;
-
 export const SEEDED_GROUP_NAMES = [
   "BASKET_VIEW",
   "BASKET_TRADE",
@@ -237,10 +228,8 @@ export class KeycloakAdminClient {
     return groups.filter((group) => wanted.has(group.name as (typeof SEEDED_GROUP_NAMES)[number]));
   }
 
-  async listSeedRoles() {
-    const roles = await this.requestJson<KeycloakRole[]>(this.realmUrl("/roles"));
-    const wanted = new Set(SEEDED_ROLE_NAMES);
-    return roles.filter((role) => wanted.has(role.name as (typeof SEEDED_ROLE_NAMES)[number]));
+  async listRealmRoles() {
+    return this.requestJson<KeycloakRole[]>(this.realmUrl("/roles"));
   }
 
   async listGroupNamesForUser(userId: string) {

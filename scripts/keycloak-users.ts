@@ -4,7 +4,9 @@ import {
   CLIENT_ROLES,
   GROUP_ROLES,
   MANAGED_CLIENT_ROLE_NAMES,
+  planManagedIdChanges,
   planManagedRoleScopeChanges,
+  RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
   type ClientId,
 } from "./keycloak-user-config";
@@ -19,7 +21,7 @@ type RoleRepresentation = {
 
 type ClientRepresentation = {
   id: string;
-  clientId: string;
+  clientId: ClientId;
 };
 
 type GroupRepresentation = {
@@ -33,6 +35,7 @@ type UserRepresentation = {
   username: string;
   email?: string;
   enabled?: boolean;
+  emailVerified?: boolean;
 };
 
 const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "https://localhost:8080").replace(
@@ -83,6 +86,7 @@ async function main() {
   }
   await reconcileTokenClientRoleScopes(clients, roles, headers);
   await removeStaleManagedClientRoles(clients, headers);
+  await removeRetiredRealmRoles(headers);
 
   const groups = new Map<string, GroupRepresentation>();
   for (const groupName of Object.keys(GROUP_ROLES)) {
@@ -91,24 +95,34 @@ async function main() {
   }
 
   for (const [groupName, roleRefs] of Object.entries(GROUP_ROLES)) {
-    const rolesByClient = Map.groupBy(roleRefs, ({ clientId }) => clientId);
-    for (const [clientId, clientRoleRefs] of rolesByClient) {
-      await ensureGroupClientRoles(
+    for (const clientId of Object.keys(CLIENT_ROLES) as ClientId[]) {
+      await reconcileGroupClientRoles(
         groups.get(groupName)!,
         clients.get(clientId)!,
-        clientRoleRefs.map(({ roleName }) => roles.get(roleKey(clientId, roleName))!),
+        roleRefs
+          .filter((roleRef) => roleRef.clientId === clientId)
+          .map(({ roleName }) => roles.get(roleKey(clientId, roleName))!),
         headers,
       );
     }
   }
 
   for (const user of SEEDED_USERS) {
-    const createdUser = await upsertUser(user.username, user.email, headers);
-    await setUserPassword(createdUser.id, userPassword, headers);
-
-    for (const groupName of user.groups) {
-      await addUserToGroup(createdUser.id, groups.get(groupName)!.id, headers);
+    const { user: createdUser, created } = await upsertUser(
+      user.username,
+      user.email,
+      headers,
+    );
+    if (created) {
+      await setUserPassword(createdUser.id, userPassword, headers);
     }
+
+    await reconcileUserGroups(
+      createdUser.id,
+      user.groups.map((groupName) => groups.get(groupName)!),
+      groups,
+      headers,
+    );
   }
 
   console.log(
@@ -168,7 +182,7 @@ async function ensureRealmExists(headers: Record<string, string>) {
 }
 
 async function getClient(
-  clientId: string,
+  clientId: ClientId,
   headers: Record<string, string>,
 ) {
   const clients = await requestJson<ClientRepresentation[]>(
@@ -338,6 +352,25 @@ async function removeStaleManagedClientRoles(
   }
 }
 
+async function removeRetiredRealmRoles(headers: Record<string, string>) {
+  const removals: Array<{ name: string; url: string }> = [];
+  for (const name of RETIRED_REALM_ROLE_NAMES) {
+    const url = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/roles/${encodeURIComponent(name)}`;
+    if (await getOptional<RoleRepresentation>(url, headers)) {
+      removals.push({ name, url });
+    }
+  }
+
+  if (removals.length > 0) {
+    console.log(
+      `[keycloak] retired realm role deletion plan: ${removals.map(({ name }) => name).join(", ")}`,
+    );
+  }
+  for (const { url } of removals) {
+    await requestJson(url, { method: "DELETE", headers });
+  }
+}
+
 async function ensureGroup(name: string, headers: Record<string, string>) {
   const groups = await requestJson<GroupRepresentation[]>(
     `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
@@ -371,7 +404,7 @@ async function ensureGroup(name: string, headers: Record<string, string>) {
   return created;
 }
 
-async function ensureGroupClientRoles(
+async function reconcileGroupClientRoles(
   group: GroupRepresentation,
   client: ClientRepresentation,
   roles: RoleRepresentation[],
@@ -383,21 +416,34 @@ async function ensureGroupClientRoles(
     { headers },
   );
 
-  const currentRoleNames = new Set(currentRoles.map((role) => role.name));
-  const missingRoles = roles.filter((role) => !currentRoleNames.has(role.name));
-
-  if (missingRoles.length === 0) {
-    return;
-  }
-
-  await requestJson(
-    mappingsUrl,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify(missingRoles),
-    },
+  const planned = planManagedRoleScopeChanges(
+    currentRoles,
+    roles.map(({ name }) => name),
+    MANAGED_CLIENT_ROLE_NAMES[client.clientId],
   );
+  const desiredByName = new Map(roles.map((role) => [role.name, role]));
+  const additions = planned.add.map((name) => desiredByName.get(name)!);
+
+  if (additions.length > 0) {
+    await requestJson(
+      mappingsUrl,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(additions),
+      },
+    );
+  }
+  if (planned.remove.length > 0) {
+    await requestJson(
+      mappingsUrl,
+      {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify(planned.remove),
+      },
+    );
+  }
 }
 
 async function upsertUser(
@@ -438,19 +484,26 @@ async function upsertUser(
       throw new Error(`User ${username} was not returned after creation`);
     }
 
-    return created;
+    return { user: created, created: true };
   }
 
-  await requestJson(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`,
-    {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(payload),
-    },
-  );
+  if (
+    existing.username !== payload.username ||
+    existing.email !== payload.email ||
+    existing.enabled !== payload.enabled ||
+    existing.emailVerified !== payload.emailVerified
+  ) {
+    await requestJson(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`,
+      {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(payload),
+      },
+    );
+  }
 
-  return existing;
+  return { user: existing, created: false };
 }
 
 async function setUserPassword(
@@ -472,18 +525,44 @@ async function setUserPassword(
   );
 }
 
-async function addUserToGroup(
+async function reconcileUserGroups(
   userId: string,
-  groupId: string,
+  desiredGroups: readonly GroupRepresentation[],
+  managedGroups: ReadonlyMap<string, GroupRepresentation>,
   headers: Record<string, string>,
 ) {
-  await requestJson(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/groups/${encodeURIComponent(groupId)}`,
-    {
-      method: "PUT",
-      headers,
-    },
+  const currentGroups = await requestJson<GroupRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/groups?briefRepresentation=true&max=200`,
+    { headers },
   );
+  const planned = planManagedIdChanges(
+    currentGroups,
+    desiredGroups,
+    [...managedGroups.values()],
+  );
+  const desiredById = new Map(desiredGroups.map((group) => [group.id, group]));
+  for (const id of planned.add) {
+    const group = desiredById.get(id);
+    if (!group) {
+      throw new Error(`Desired group ${id} was not loaded`);
+    }
+    await requestJson(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/groups/${encodeURIComponent(group.id)}`,
+      {
+        method: "PUT",
+        headers,
+      },
+    );
+  }
+  for (const group of planned.remove) {
+    await requestJson(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/groups/${encodeURIComponent(group.id)}`,
+      {
+        method: "DELETE",
+        headers,
+      },
+    );
+  }
 }
 
 async function getOptional<T>(url: string, headers: Record<string, string>) {

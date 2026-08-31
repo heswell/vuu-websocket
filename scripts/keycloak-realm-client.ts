@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import {
+  clientConfigurationsEqual,
   reconcileServerClientConfiguration,
   reconcilePortalClientConfiguration,
   RETIRED_SERVER_CLIENT_NAMES,
@@ -75,69 +76,78 @@ async function main() {
 
 
     // Step 2: Create realm
-    console.log(`2️⃣  Creating realm '${REALM_NAME}'...`);
-    const realmResponse = await keycloakFetch(`${KEYCLOAK_URL}/admin/realms`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        realm: REALM_NAME,
-        displayName: "Vuu Portal Realm",
-        enabled: true,
-      }),
-    });
-
-    if (realmResponse.status === 409) {
-      console.log("⚠️  Realm already exists, continuing...\n");
-    } else if (realmResponse.ok) {
-      console.log("✅ Realm created\n");
+    if (await realmExists(token)) {
+      console.log(`2️⃣  Realm '${REALM_NAME}' already exists; no change\n`);
     } else {
-      const errorData = await realmResponse.text();
-      throw new Error(
-        `Failed to create realm: ${realmResponse.status} ${errorData}`
-      );
-    }
-
-    // Step 3: Create client
-    console.log(`3️⃣  Creating client '${CLIENT_NAME}'...`);
-    const clientResponse = await keycloakFetch(
-      `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
-      {
+      console.log(`2️⃣  Creating realm '${REALM_NAME}'...`);
+      const realmResponse = await keycloakFetch(`${KEYCLOAK_URL}/admin/realms`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          ...keycloakHeaders(token),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          clientId: CLIENT_NAME,
-          name: "Vuu Portal Application",
+          realm: REALM_NAME,
+          displayName: "Vuu Portal Realm",
           enabled: true,
-          publicClient: true,
-          rootUrl: CLIENT_URL,
-          baseUrl: CLIENT_URL,
-          redirectUris: [`${CLIENT_URL}/*`],
-          webOrigins: [CLIENT_URL],
-          standardFlowEnabled: true,
-          implicitFlowEnabled: false,
-          directAccessGrantsEnabled: true,
         }),
-      }
-    );
+      });
 
-    if (clientResponse.status === 409) {
-      console.log("⚠️  Client already exists\n");
-    } else if (clientResponse.ok) {
-      console.log("✅ Client created\n");
-    } else {
-      const errorData = await clientResponse.text();
-      throw new Error(
-        `Failed to create client: ${clientResponse.status} ${errorData}`
-      );
+      if (realmResponse.status === 409) {
+        console.log("⚠️  Realm already exists, continuing...\n");
+      } else if (realmResponse.ok) {
+        console.log("✅ Realm created\n");
+      } else {
+        const errorData = await realmResponse.text();
+        throw new Error(
+          `Failed to create realm: ${realmResponse.status} ${errorData}`
+        );
+      }
     }
 
-    const portalClient = await lookupClientByClientId(token, CLIENT_NAME);
+    // Step 3: Create client
+    let portalClient = await lookupClientByClientId(token, CLIENT_NAME);
+    if (portalClient) {
+      console.log(`3️⃣  Client '${CLIENT_NAME}' already exists; no change\n`);
+    } else {
+      console.log(`3️⃣  Creating client '${CLIENT_NAME}'...`);
+      const clientResponse = await keycloakFetch(
+        `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
+        {
+          method: "POST",
+          headers: {
+            ...keycloakHeaders(token),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clientId: CLIENT_NAME,
+            name: "Vuu Portal Application",
+            enabled: true,
+            publicClient: true,
+            rootUrl: CLIENT_URL,
+            baseUrl: CLIENT_URL,
+            redirectUris: [`${CLIENT_URL}/*`],
+            webOrigins: [CLIENT_URL],
+            standardFlowEnabled: true,
+            implicitFlowEnabled: false,
+            directAccessGrantsEnabled: true,
+          }),
+        }
+      );
+
+      if (clientResponse.status === 409) {
+        console.log("⚠️  Client already exists\n");
+      } else if (clientResponse.ok) {
+        console.log("✅ Client created\n");
+      } else {
+        const errorData = await clientResponse.text();
+        throw new Error(
+          `Failed to create client: ${clientResponse.status} ${errorData}`
+        );
+      }
+      portalClient = await lookupClientByClientId(token, CLIENT_NAME);
+    }
+
     if (!portalClient?.id) {
       throw new Error("Portal client not found after create");
     }
@@ -224,8 +234,28 @@ async function lookupClientByClientId(token: string, clientId: string) {
     );
   }
 
-  const clients = (await response.json()) as Array<{ id?: string }>;
-  return clients[0];
+  const clients = (await response.json()) as Array<{
+    id?: string;
+    clientId?: string;
+  }>;
+  return clients.find((client) => client.clientId === clientId);
+}
+
+async function realmExists(token: string) {
+  const response = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${encodeURIComponent(REALM_NAME)}`,
+    { headers: keycloakHeaders(token) },
+  );
+  if (response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(
+      `Failed to query realm '${REALM_NAME}': ${response.status} ${errorData}`,
+    );
+  }
+  return true;
 }
 
 async function removeClientIfPresent(token: string, clientId: string) {
@@ -275,11 +305,16 @@ async function reconcileServerClient(
     );
   }
 
+  const currentClient = await getResponse.json();
   const clientRepresentation = reconcileServerClientConfiguration(
-    await getResponse.json(),
+    currentClient,
     clientId,
     clientSecret,
   );
+  if (clientConfigurationsEqual(clientRepresentation, currentClient)) {
+    console.log(`   • '${clientId}' configuration is already current`);
+    return;
+  }
 
   const updateResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -331,6 +366,10 @@ async function reconcilePortalClientServerAudiences(
   const reconciledClient = reconcilePortalClientConfiguration(
     clientRepresentation,
   );
+  if (clientConfigurationsEqual(reconciledClient, clientRepresentation)) {
+    console.log(`   • '${CLIENT_NAME}' audiences are already current`);
+    return;
+  }
 
   const updateResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${internalClientId}`,
@@ -357,6 +396,23 @@ async function ensureServerClient(
   serverClientName: (typeof SERVER_CLIENT_NAMES)[number],
   clientSecret?: string,
 ) {
+  const existingClient = await lookupClientByClientId(token, serverClientName);
+  if (existingClient?.id) {
+    console.log(`   • '${serverClientName}' already exists; no create needed`);
+    const currentSecret = await fetchClientSecret(
+      token,
+      existingClient.id,
+      serverClientName,
+    );
+    await reconcileServerClient(
+      token,
+      existingClient.id,
+      serverClientName,
+      currentSecret === clientSecret ? undefined : clientSecret,
+    );
+    return;
+  }
+
   console.log(`   • Creating confidential client '${serverClientName}'...`);
   const createResponse = await keycloakFetch(
     `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
@@ -412,7 +468,7 @@ async function ensureServerClient(
     token,
     serverClient.id,
     serverClientName,
-    clientSecret,
+    undefined,
   );
 
   console.log(`   • '${serverClientName}' configuration reconciled`);
