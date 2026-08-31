@@ -9,6 +9,7 @@
   "scripts": {
     "keycloak:realm": "bun ./scripts/keycloak-realm-client.ts",
     "keycloak:users": "bun ./scripts/keycloak-users.ts",
+    "keycloak:bootstrap": "npm run keycloak:realm && npm run keycloak:users",
     "start:all": "bun ./scripts/start-all.ts",
     "start": "WEBSOCKET_PORT=8090 npm start:all",
     "start:demo": "VUU_APP=vuu-demo WEBSOCKET_PORT=8090 bun ./scripts/start-demo.ts",
