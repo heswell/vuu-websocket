@@ -22,7 +22,7 @@ const modules = [
     "/modules/admin",
     "ModuleAdmin",
     "ModuleAdmin",
-    "http://localhost:5008",
+    "http://localhost:5002",
     "module-admin",
     "wss://localhost:8091/websocket-portal",
     "https://localhost:8443/api/authn/module-admin"
@@ -38,7 +38,7 @@ const modules = [
     "/users/admin",
     "UserAdmin",
     "UserAdmin",
-    "http://localhost:5007",
+    "http://localhost:5003",
     "user-admin",
     "wss://localhost:8092/websocket-user-admin",
     "https://localhost:8444/api/authn"
