@@ -26,7 +26,8 @@ The script sets `VUU_APP=vuu-basket-trading`, loads the package's
 
 The application exposes:
 
-- the VUU websocket endpoint on port `8093` by default; and
+- the VUU WebSocket endpoint at
+  `wss://localhost:8093/websocket-basket-trading` by default; and
 - the Keycloak-backed authentication endpoint at `POST /api/authn` over HTTPS
   on port `8445` by default.
 

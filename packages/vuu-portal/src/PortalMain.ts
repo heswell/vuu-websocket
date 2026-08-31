@@ -28,6 +28,7 @@ export default async function main() {
     authProviders: createConfiguredAuthProviders(defaultConfig),
     config: defaultConfig,
     defaultHttpsPort: 8443,
+    defaultWebSocketPath: "/websocket-portal",
     defaultWebSocketPort: 8091,
     loginSuccessProvider: (user, tableContainer) => ({
       moduleRegistry: createModuleRegistry(tableContainer, user),

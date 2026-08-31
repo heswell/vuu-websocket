@@ -18,7 +18,7 @@ export class WebSocketServer {
     if (this.#server) {
       return;
     }
-    const { sslOptions, wsPort, ...options } = this.webSocketOptions;
+    const { sslOptions, uri, wsPort, ...options } = this.webSocketOptions;
     this.#server = Bun.serve({
       port: wsPort,
       tls: sslEnabled(sslOptions)
@@ -29,6 +29,9 @@ export class WebSocketServer {
         : undefined,
 
       async fetch(req, server) {
+        if (new URL(req.url).pathname !== uri) {
+          return new Response("Not found", { status: 404 });
+        }
         const sessionId = crypto.randomUUID();
         console.log(
           `[VUU:server] websocket upgrade request sessionId ${sessionId}`,
@@ -41,11 +44,14 @@ export class WebSocketServer {
         }
         return new Response("Not found", { status: 404 });
       },
-      websocket: BunWebSocketConnectionHandler(options, this.factory.create()),
+      websocket: BunWebSocketConnectionHandler(
+        { ...options, uri },
+        this.factory.create(),
+      ),
     });
 
     console.log(
-      `[VUU] Websocket listening on ${this.#server.hostname}:${this.#server.port}`,
+      `[VUU] WebSocket listening on ${this.#server.hostname}:${this.#server.port}${uri}`,
     );
   }
 

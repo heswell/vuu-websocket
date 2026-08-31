@@ -12,7 +12,7 @@ export type HttpServerOptions = {
   requestHandler?: HttpRequestHandler;
 };
 
-export interface VuuWebSocketOptions  {
+export interface VuuWebSocketOptions {
   maxSessionsPerUser?: number;
   sslOptions: VuuSSLOptions;
   uri: string;
@@ -35,25 +35,68 @@ export const sslEnabled = (ssl: VuuSSLOptions) : ssl is VuuSslByCertAndKey => ss
 export const VuuSslByCertAndKey = (certPath: string,
   keyPath: string): VuuSslByCertAndKey =>  ({certPath, keyPath})
 
-class VuuWebSocketOptionsImpl implements  VuuWebSocketOptions {
+class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
   constructor(
-    public wsPort: number, 
-    public uri: string, 
+    public wsPort: number,
+    public uri: string,
     public sslOptions: VuuSSLOptions,
-    public maxSessionsPerUser: number
-  ){}
+    public maxSessionsPerUser: number,
+  ) {}
 
-  withSsl =  (sslOptions: VuuSslByCertAndKey) => VuuWebSocketOptions(this.wsPort, this.uri, sslOptions, this.maxSessionsPerUser);
-  withSslDisabled =  () => VuuWebSocketOptions(this.wsPort, this.uri, "ssl-disabled", this.maxSessionsPerUser);
-  withWsPort = (wsPort: number) => VuuWebSocketOptions(wsPort, this.uri,this.sslOptions, this.maxSessionsPerUser);
-  withUri = (uri: string) => VuuWebSocketOptions(this.wsPort, uri, this.sslOptions, this.maxSessionsPerUser);
+  withSsl = (sslOptions: VuuSslByCertAndKey) =>
+    VuuWebSocketOptions(
+      this.wsPort,
+      this.uri,
+      sslOptions,
+      this.maxSessionsPerUser,
+    );
+  withSslDisabled = () =>
+    VuuWebSocketOptions(
+      this.wsPort,
+      this.uri,
+      "ssl-disabled",
+      this.maxSessionsPerUser,
+    );
+  withWsPort = (wsPort: number) =>
+    VuuWebSocketOptions(
+      wsPort,
+      this.uri,
+      this.sslOptions,
+      this.maxSessionsPerUser,
+    );
+  withUri = (uri: string) =>
+    VuuWebSocketOptions(
+      this.wsPort,
+      uri,
+      this.sslOptions,
+      this.maxSessionsPerUser,
+    );
 }
 
-export const VuuWebSocketOptions = (wsPort = 8091, 
-    uri = "/websocket", 
-    sslOptions: VuuSSLOptions = "ssl-disabled",
-    maxSessionsPerUser = 1) : VuuWebSocketOptions =>
-  new VuuWebSocketOptionsImpl(wsPort, uri, sslOptions, maxSessionsPerUser);
+export const VuuWebSocketOptions = (
+  wsPort = 8091,
+  uri = "/websocket",
+  sslOptions: VuuSSLOptions = "ssl-disabled",
+  maxSessionsPerUser = 1,
+): VuuWebSocketOptions => {
+  validateWebSocketPath(uri);
+  return new VuuWebSocketOptionsImpl(wsPort, uri, sslOptions, maxSessionsPerUser);
+};
+
+function validateWebSocketPath(uri: string) {
+  if (
+    !uri.startsWith("/") ||
+    uri.length === 1 ||
+    uri.endsWith("/") ||
+    uri.includes("?") ||
+    uri.includes("#") ||
+    uri.includes("://")
+  ) {
+    throw new Error(
+      `Invalid WebSocket path '${uri}'. Expected an absolute URL path without a trailing slash, query, or fragment.`,
+    );
+  }
+}
 
 export interface VuuServerConfig {
   httpServerOptions: HttpServerOptions;

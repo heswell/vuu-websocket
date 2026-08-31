@@ -43,6 +43,21 @@ describe("application authentication configuration", () => {
       "require-audience",
     );
   });
+
+  test.each([
+    ["vuu-portal", "/websocket-portal", 8091],
+    ["vuu-user-admin", "/websocket-user-admin", 8092],
+    ["vuu-basket-trading", "/websocket-basket-trading", 8093],
+  ])(
+    "%s exposes its server-specific websocket path without changing authn",
+    (app, websocketPath, websocketPort) => {
+      const config = loadApplicationConfig(app);
+
+      expect(config.getString("vuu.websocket.path")).toBe(websocketPath);
+      expect(config.getNumber("vuu.websocket.port")).toBe(websocketPort);
+      expect(config.getString("vuu.auth.path")).toBe("/api/authn");
+    },
+  );
 });
 
 function loadApplicationConfig(app: string) {

@@ -12,6 +12,7 @@ export default async function main() {
     authProviders: createConfiguredAuthProviders(defaultConfig),
     config: defaultConfig,
     defaultHttpsPort: 8444,
+    defaultWebSocketPath: "/websocket-user-admin",
     defaultWebSocketPort: 8092,
     modules: [KeycloakAdminModule()],
   });

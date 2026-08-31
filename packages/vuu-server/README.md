@@ -2,6 +2,11 @@ Launching a Vuu Server instance
 
 VuuServer is created with module structure config then start method invoked
 
+Applications created with `createVuuServerApplication` can set
+`vuu.websocket.path` to an absolute URL path such as `/websocket-portal`. The
+default remains `/websocket`. Paths with a trailing slash, query, fragment, or
+full URL are rejected during application setup.
+
 VuUServer makes use of a number of global singletons
 
 - moduleContainer

@@ -4,7 +4,8 @@
 
 ## Runtime contract
 
-- HTTPS defaults to `8443`; WebSocket defaults to `8091`.
+- HTTPS defaults to `8443`; WebSocket defaults to
+  `wss://localhost:8091/websocket-portal`.
 - `POST /api/authn` validates portal navigation tokens and authorizes only from
   `resource_access.vuu-portal.roles`.
 - `POST /api/authn/module-admin` always exchanges into the fixed
@@ -20,10 +21,12 @@ The built-in records route:
 
 - `moduleAdmin` to `connectionId: "module-admin"` through
   `https://localhost:8443/api/authn/module-admin` and the portal WebSocket
-  `wss://localhost:8091/websocket`;
+  `wss://localhost:8091/websocket-portal`;
 - `userAdmin` to the standalone user-admin server (`connectionId:
-  "user-admin"`, HTTPS `8444`, WebSocket `8092`); and
-- basket trading to its existing independent server.
+  "user-admin"`, HTTPS `8444`, WebSocket
+  `wss://localhost:8092/websocket-user-admin`); and
+- basket trading to its independent server at
+  `wss://localhost:8093/websocket-basket-trading`.
 
 Keycloak mode uses `vuu-portal-server` to validate navigation tokens and
 `vuu-module-admin-server` for the fixed module-admin profile. Local permissive

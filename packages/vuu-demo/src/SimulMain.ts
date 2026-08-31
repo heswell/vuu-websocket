@@ -60,8 +60,13 @@ const ConfigKeys = {
 
 function createWebSocketOptions(c: Config): VuuWebSocketOptions {
   const options = VuuWebSocketOptions()
-    .withUri("websocket")
-    .withWsPort(c.getNumber(ConfigKeys.port, 8091));
+    .withUri("/websocket")
+    .withWsPort(
+      Number(
+        process.env.WEBSOCKET_PORT ??
+          c.getNumber(ConfigKeys.websocketPort, 8091),
+      ),
+    );
 
   if (c.getBoolean(ConfigKeys.sslEnabled)) {
     return options.withSsl(VuuSslByCertAndKey(c.getPath(ConfigKeys.certPath), c.getPath(ConfigKeys.keyPath)))

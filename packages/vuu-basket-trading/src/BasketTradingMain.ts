@@ -12,6 +12,7 @@ export default async function main() {
     authProviders: { bearerToken: authProvider },
     config,
     defaultHttpsPort: 8445,
+    defaultWebSocketPath: "/websocket-basket-trading",
     defaultWebSocketPort: 8093,
     modules: [BasketModule()],
   });
