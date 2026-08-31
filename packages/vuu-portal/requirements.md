@@ -28,3 +28,8 @@ The built-in records route:
 Keycloak mode uses `vuu-portal-server` to validate navigation tokens and
 `vuu-module-admin-server` for the fixed module-admin profile. Local permissive
 mode remains available through `vuu.auth.mode=permissive`.
+
+Keycloak bootstrap disables full scope for the public portal client. Portal
+tokens retain all four confidential server audiences for standard exchange but
+contain only the three portal-owned navigation roles; remote resource roles
+appear only after exchange into the owning confidential client.

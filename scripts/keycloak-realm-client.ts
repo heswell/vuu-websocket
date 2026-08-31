@@ -2,7 +2,7 @@
 
 import {
   reconcileServerClientConfiguration,
-  reconcileServerAudienceMappers,
+  reconcilePortalClientConfiguration,
   RETIRED_SERVER_CLIENT_NAMES,
   SERVER_CLIENT_NAMES,
   SERVER_CLIENT_SECRETS,
@@ -328,8 +328,8 @@ async function reconcilePortalClientServerAudiences(
     [key: string]: unknown;
   };
 
-  clientRepresentation.protocolMappers = reconcileServerAudienceMappers(
-    clientRepresentation.protocolMappers ?? [],
+  const reconciledClient = reconcilePortalClientConfiguration(
+    clientRepresentation,
   );
 
   const updateResponse = await keycloakFetch(
@@ -340,7 +340,7 @@ async function reconcilePortalClientServerAudiences(
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(clientRepresentation),
+      body: JSON.stringify(reconciledClient),
     }
   );
 
@@ -377,6 +377,7 @@ async function ensureServerClient(
         implicitFlowEnabled: false,
         directAccessGrantsEnabled: false,
         serviceAccountsEnabled: true,
+        fullScopeAllowed: false,
         frontchannelLogout: false,
         attributes: {
           "standard.token.exchange.enabled": "true",

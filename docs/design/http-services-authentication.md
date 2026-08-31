@@ -54,6 +54,26 @@ for other clients are ignored.
 Profile names, client IDs, audiences, and authorization clients are server
 configuration. Query parameters and request bodies cannot override them.
 
+## Keycloak bootstrap reconciliation
+
+`npm run keycloak:bootstrap` sets `fullScopeAllowed=false` on `vuu-portal` and
+each confidential VUU client. It gives each client scope mappings for only its
+owned roles: the portal gets the three navigation roles, module admin gets
+`module-admin-view/edit`, user admin gets `user-admin-view/edit`, basket trading
+gets `basket-trading-view/trade`, and the portal server currently has no service
+roles. Known legacy roles and managed cross-client mappings are removed.
+
+Before issuing deletes, bootstrap loads every managed client/role-owner pair and
+logs the planned additions and removals. API failures abort the run. Repeated
+runs are no-ops after reconciliation. Custom role mappings whose names are not
+managed by VUU, custom client scopes, and unrelated protocol mappers are
+preserved. Mappings that reuse a VUU-managed role name are reconciled as managed
+configuration so they cannot bypass role isolation.
+
+The portal's four audience mappers remain enabled even though remote roles are
+not included in its token. Keycloak standard exchange requires those audiences
+to establish requester eligibility.
+
 ## Shared configuration
 
 | Key | Purpose |

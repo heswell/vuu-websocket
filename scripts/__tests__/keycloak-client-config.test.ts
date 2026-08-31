@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   RETIRED_SERVER_CLIENT_NAMES,
+  reconcilePortalClientConfiguration,
   reconcileServerClientConfiguration,
   reconcileSelfAudienceMapper,
   reconcileServerAudienceMappers,
@@ -73,6 +74,33 @@ describe("reconcileServerAudienceMappers", () => {
       id: "user-admin-mapper",
       config: { "included.custom.audience": "reporting-api" },
     });
+  });
+});
+
+describe("reconcilePortalClientConfiguration", () => {
+  test("disables full scope while retaining audiences and custom mappers", () => {
+    const once = reconcilePortalClientConfiguration({
+      fullScopeAllowed: true,
+      protocolMappers: [
+        {
+          id: "custom",
+          name: "administrator-custom",
+          protocolMapper: "oidc-usermodel-property-mapper",
+        },
+      ],
+    });
+
+    expect(once.fullScopeAllowed).toBeFalse();
+    expect(once.protocolMappers?.[0]).toMatchObject({
+      id: "custom",
+      name: "administrator-custom",
+    });
+    expect(
+      once.protocolMappers
+        ?.slice(1)
+        .map((mapper) => mapper.config?.["included.client.audience"]),
+    ).toEqual(SERVER_CLIENT_NAMES);
+    expect(reconcilePortalClientConfiguration(once)).toEqual(once);
   });
 });
 
@@ -152,11 +180,11 @@ describe("reconcileSelfAudienceMapper", () => {
 });
 
 describe("reconcileServerClientConfiguration", () => {
-  test("enables exchange and self audience without tightening scopes", () => {
+  test("enables exchange, self audience, and disables full scope", () => {
     const once = reconcileServerClientConfiguration(
       {
         id: "module-admin",
-        fullScopeAllowed: true,
+        fullScopeAllowed: false,
         attributes: { "administrator.attribute": "preserved" },
         protocolMappers: [
           {
@@ -171,7 +199,7 @@ describe("reconcileServerClientConfiguration", () => {
 
     expect(once).toMatchObject({
       id: "module-admin",
-      fullScopeAllowed: true,
+      fullScopeAllowed: false,
       secret: "module-secret",
       attributes: {
         "administrator.attribute": "preserved",
