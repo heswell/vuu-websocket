@@ -1,25 +1,51 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import { KeycloakAdminClient } from "../KeycloakAdminClient";
+import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
+import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
+import { keycloakTimestamp, roleCounts } from "./snapshotCounts";
 
 export class KeycloakRolesProvider extends Provider {
   async load(_: TableContainer) {
-    const client = await KeycloakAdminClient.createFromConfig();
-    const roles = await client.listRealmRoles();
-    const rows = roles.map((role) => {
-      const timestamp = Date.now();
+    this.loadSnapshot(await getKeycloakAdminSnapshot());
+  }
+
+  loadSnapshot(snapshot: KeycloakAdminSnapshot) {
+    const realmRows = snapshot.realmRoles.map((role) => {
+      const counts = roleCounts(snapshot, role);
       return [
         role.id,
         role.name,
+        "",
+        "",
+        "",
         role.description ?? "",
-        timestamp,
-        timestamp,
+        counts.groupCount,
+        counts.userCount,
+        keycloakTimestamp(role.createdTimestamp),
+        snapshot.timestamp,
+        snapshot.timestamp,
         "",
       ];
     });
-
+    const clientRows = snapshot.clientRoles.map(({ client, role }) => {
+      const counts = roleCounts(snapshot, role, client.id);
+      return [
+        role.id,
+        role.name,
+        client.id,
+        client.clientId,
+        client.name ?? client.clientId,
+        role.description ?? "",
+        counts.groupCount,
+        counts.userCount,
+        keycloakTimestamp(role.createdTimestamp),
+        snapshot.timestamp,
+        snapshot.timestamp,
+        "",
+      ];
+    });
+    const rows = [...realmRows, ...clientRows];
     reconcileTableRows(this.table, rows);
-
     this.loaded = true;
   }
 }

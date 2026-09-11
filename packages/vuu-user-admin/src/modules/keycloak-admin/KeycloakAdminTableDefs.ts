@@ -1,71 +1,126 @@
-import { TableDef } from "@heswell/vuu-server";
+import { TableDef, VUU_DEFAULT_COLUMNS } from "@heswell/vuu-server";
 
-const VUU_AUDIT_COLUMNS = [
-  { name: "vuuCreatedTimestamp", dataType: "long" as const },
-  { name: "vuuUpdatedTimestamp", dataType: "long" as const },
-  { name: "vuuMsg", dataType: "string" as const },
-];
+const auditColumns = VUU_DEFAULT_COLUMNS;
 
 export const usersTable = TableDef({
   columns: [
-    { name: "id", dataType: "string" },
+    { name: "user_id", dataType: "string" },
     { name: "username", dataType: "string" },
     { name: "email", dataType: "string" },
-    { name: "enabled", dataType: "string" },
-    ...VUU_AUDIT_COLUMNS,
+    { name: "first_name", dataType: "string" },
+    { name: "last_name", dataType: "string" },
+    { name: "enabled", dataType: "boolean" },
+    { name: "email_verified", dataType: "boolean" },
+    { name: "password_update_required", dataType: "boolean" },
+    { name: "last_login", dataType: "long" },
+    { name: "created_at", dataType: "long" },
+    { name: "group_count", dataType: "int" },
+    { name: "role_count", dataType: "int" },
+    ...auditColumns,
   ],
-  keyField: "id",
+  keyField: "user_id",
   name: "users",
 });
 
 export const groupsTable = TableDef({
   columns: [
-    { name: "id", dataType: "string" },
-    { name: "name", dataType: "string" },
-    { name: "path", dataType: "string" },
-    { name: "roles", dataType: "string" },
-    ...VUU_AUDIT_COLUMNS,
+    { name: "group_id", dataType: "string" },
+    { name: "group_name", dataType: "string" },
+    { name: "group_path", dataType: "string" },
+    { name: "parent_group_id", dataType: "string" },
+    { name: "user_count", dataType: "int" },
+    { name: "role_count", dataType: "int" },
+    { name: "created_at", dataType: "long" },
+    ...auditColumns,
   ],
-  keyField: "id",
+  keyField: "group_id",
   name: "groups",
+});
+
+export const clientsTable = TableDef({
+  columns: [
+    { name: "client_id", dataType: "string" },
+    { name: "client_identifier", dataType: "string" },
+    { name: "client_name", dataType: "string" },
+    { name: "description", dataType: "string" },
+    { name: "enabled", dataType: "boolean" },
+    ...auditColumns,
+  ],
+  keyField: "client_id",
+  name: "clients",
 });
 
 export const rolesTable = TableDef({
   columns: [
-    { name: "id", dataType: "string" },
-    { name: "name", dataType: "string" },
+    { name: "role_id", dataType: "string" },
+    { name: "role_name", dataType: "string" },
+    { name: "client_id", dataType: "string" },
+    { name: "client_identifier", dataType: "string" },
+    { name: "client_name", dataType: "string" },
     { name: "description", dataType: "string" },
-    ...VUU_AUDIT_COLUMNS,
+    { name: "group_count", dataType: "int" },
+    { name: "user_count", dataType: "int" },
+    { name: "created_at", dataType: "long" },
+    ...auditColumns,
   ],
-  keyField: "id",
+  keyField: "role_id",
   name: "roles",
+});
+
+export const userGroupsTable = TableDef({
+  columns: [
+    { name: "membership_id", dataType: "string" },
+    { name: "user_id", dataType: "string" },
+    { name: "username", dataType: "string" },
+    { name: "group_id", dataType: "string" },
+    { name: "group_name", dataType: "string" },
+    { name: "group_path", dataType: "string" },
+    ...auditColumns,
+  ],
+  keyField: "membership_id",
+  name: "user_groups",
 });
 
 export const groupRolesTable = TableDef({
   columns: [
-    { name: "id", dataType: "string" },
+    { name: "assignment_id", dataType: "string" },
     { name: "group_id", dataType: "string" },
     { name: "group_name", dataType: "string" },
     { name: "role_id", dataType: "string" },
     { name: "role_name", dataType: "string" },
-    ...VUU_AUDIT_COLUMNS,
+    { name: "client_id", dataType: "string" },
+    { name: "client_identifier", dataType: "string" },
+    { name: "client_name", dataType: "string" },
+    ...auditColumns,
   ],
-  keyField: "id",
+  keyField: "assignment_id",
   name: "group_roles",
 });
 
+/** Flattened compatibility projection joining user, group, and role data. */
 export const userGroupRolesTable = TableDef({
   columns: [
     { name: "id", dataType: "string" },
+    { name: "membership_id", dataType: "string" },
+    { name: "assignment_id", dataType: "string" },
     { name: "user_id", dataType: "string" },
     { name: "username", dataType: "string" },
     { name: "email", dataType: "string" },
-    { name: "enabled", dataType: "string" },
+    { name: "first_name", dataType: "string" },
+    { name: "last_name", dataType: "string" },
+    { name: "enabled", dataType: "boolean" },
+    { name: "email_verified", dataType: "boolean" },
+    { name: "password_update_required", dataType: "boolean" },
+    { name: "last_login", dataType: "long" },
     { name: "group_id", dataType: "string" },
     { name: "group_name", dataType: "string" },
+    { name: "group_path", dataType: "string" },
     { name: "role_id", dataType: "string" },
     { name: "role_name", dataType: "string" },
-    ...VUU_AUDIT_COLUMNS,
+    { name: "client_id", dataType: "string" },
+    { name: "client_identifier", dataType: "string" },
+    { name: "client_name", dataType: "string" },
+    ...auditColumns,
   ],
   keyField: "id",
   name: "user_group_roles",

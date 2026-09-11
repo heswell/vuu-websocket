@@ -7,13 +7,40 @@ administration.
   `wss://localhost:8092/websocket-user-admin`.
 - `/api/authn` authenticates with the `vuu-user-admin-server` Keycloak client.
 - The server registers only the `KEYCLOAK_ADMIN` feature module.
-- User, group, role, group-role, and user-group-role providers load from the
-  Keycloak Admin API.
-- Role providers expose live realm roles generically. VUU portal login roles and
-  backend resource roles are client roles managed separately by bootstrap.
-- Edit RPCs update Keycloak and refresh all admin tables.
-- The refresh coordinator periodically reconciles tables so multiple server
-  instances converge.
+- User, group, client, unified-role, user-group, group-role, and compatibility
+  user-group-role providers load complete snapshots from the
+  Keycloak Admin API. Collection reads follow Keycloak's `first`/`max`
+  pagination contract; the old seeded-user/group lists are no longer used.
+- Providers share one snapshot read during startup and one fresh snapshot after
+  every mutation. The refresh coordinator reconciles every admin table so
+  multiple server instances converge.
+- Supported add, edit, delete, and relationship-assignment RPCs validate their
+  inputs, call Keycloak directly, and then refresh the snapshot. VUU edit
+  sessions are not used as a persistence mechanism.
+- The UI RPC contract is exported from `KeycloakAdminContract.ts`. Supported
+  RPC names are `addUser`, `updateUser`, `deleteUser`, `addGroup`,
+  `updateGroup`, `deleteGroup`, `addClient`, `updateClient`, `addRole`,
+  `addClientRole`, `updateRole`, `assignGroupRole`, `removeGroupRole`,
+  `assignUserToGroup`, and `removeUserFromGroup`. Legacy aliases
+  (`addRoleToGroup`, `assignRoleToGroup`, `removeRoleFromGroup`, and
+  `addUserToGroup`) remain registered.
+- `addUser` and `updateUser` validate `temporary_password` as a non-empty
+  write-only string and `group_ids` as a string array. `updateUser` replaces
+  group membership with that array; role assignment/removal accepts
+  `groupId`/`groupName`, `roleId`/`roleName`, and optional `clientId` (omit
+  `clientId` for realm roles).
+- Unsupported mutations are client/role deletion, direct user-role assignment,
+  client-secret rotation, password reads, arbitrary Keycloak attributes, and
+  group hierarchy/parent changes.
+- The primary VUU tables are `users`, `groups`, `clients`, `roles`,
+  `user_groups`, and `group_roles`. The `user_group_roles` table remains as a
+  flattened compatibility projection. Realm and client roles are unified in
+  `roles`; realm rows have empty client fields.
+- Exact logical columns are declared in `KEYCLOAK_ADMIN_TABLE_CONTRACT` and
+  mirror the table definitions: user identity/count and login fields, group
+  hierarchy/count fields, unified role/client identity and counts, client
+  identity fields, and membership/assignment identity fields. Keycloak
+  omissions use empty strings or `0` for timestamps/counts.
 
 The portal registry routes `userAdmin` to this server with connection id
 `user-admin`. This server returns the generic `LOGIN_SUCCESS` shape and does not
