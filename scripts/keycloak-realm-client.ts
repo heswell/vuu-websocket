@@ -21,7 +21,7 @@ const ADMIN_PASSWORD = process.env.KEYCLOAK_ADMIN_PASSWORD ?? "admin";
 const REALM_NAME = process.env.KEYCLOAK_REALM ?? "vuu";
 const CLIENT_NAME = "vuu-portal";
 const AUTHORIZATION_HEADER = "Authorization";
-const CLIENT_PORT = 5002;
+const CLIENT_PORT = 5001;
 const CLIENT_URL = `http://localhost:${CLIENT_PORT}`;
 const ALLOW_SELF_SIGNED_CERT =
   (process.env.KEYCLOAK_ALLOW_SELF_SIGNED_CERT ?? "true").toLowerCase() ===
