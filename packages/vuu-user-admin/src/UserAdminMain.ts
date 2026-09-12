@@ -16,9 +16,12 @@ export default async function main() {
     defaultWebSocketPort: 8092,
     modules: [KeycloakAdminModule()],
   });
-  installKeycloakAdminRefreshCoordinator(
+  const refreshCoordinator = installKeycloakAdminRefreshCoordinator(
     application.server.tableContainer,
     application.server.providers,
+  );
+  refreshCoordinator.startPeriodicRefresh(
+    defaultConfig.getNumber("vuu.keycloak.sync.intervalMs", 10_000),
   );
 
   await application.start();

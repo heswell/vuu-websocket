@@ -1,50 +1,49 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import { KeycloakAdminClient } from "../KeycloakAdminClient";
+import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
+import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
+import { lastLogin } from "./snapshotCounts";
 
 export class KeycloakUserGroupRolesProvider extends Provider {
   async load(_: TableContainer) {
-    const client = await KeycloakAdminClient.createFromConfig();
-    const [users, groups, roles] = await Promise.all([
-      client.listSeedUsers(),
-      client.listSeedGroups(),
-      client.listRealmRoles(),
-    ]);
-    const seededGroupIds = new Set(groups.map((group) => group.id));
-    const realmRoleIds = new Set(roles.map((role) => role.id));
+    this.loadSnapshot(await getKeycloakAdminSnapshot());
+  }
 
-    const rows: (string | number)[][] = [];
-
-    for (const user of users) {
-      const userGroups = await client.listGroupsForUser(user.id);
-      const seededUserGroups = userGroups.filter((group) => seededGroupIds.has(group.id));
-
-      for (const group of seededUserGroups) {
-        const groupRoles = await client.listRolesForGroup(group.id);
-        const realmGroupRoles = groupRoles.filter((role) => realmRoleIds.has(role.id));
-
-        for (const role of realmGroupRoles) {
-          const id = `${user.id}:${group.id}:${role.id}`;
-          const timestamp = Date.now();
-          rows.push([
-            id,
+  loadSnapshot(snapshot: KeycloakAdminSnapshot) {
+    const rows = snapshot.groupRoles.flatMap(({ group, role, client }) =>
+      snapshot.userGroups
+        .filter(({ group: userGroup }) => userGroup.id === group.id)
+        .map(({ user }) => {
+          const membershipId = `${user.id}:${group.id}`;
+          const assignmentId = `${group.id}:${client?.id ?? "realm"}:${role.id}`;
+          return [
+            `${membershipId}:${assignmentId}`,
+            membershipId,
+            assignmentId,
             user.id,
             user.username,
             user.email ?? "",
-            `${user.enabled ?? false}`,
+            user.firstName ?? "",
+            user.lastName ?? "",
+            user.enabled ?? false,
+            user.emailVerified ?? false,
+            user.requiredActions?.includes("UPDATE_PASSWORD") ?? false,
+            lastLogin(user),
             group.id,
             group.name,
+            group.path ?? "",
             role.id,
             role.name,
-            timestamp,
-            timestamp,
+            client?.id ?? "",
+            client?.clientId ?? "",
+            client?.name ?? client?.clientId ?? "",
+            snapshot.timestamp,
+            snapshot.timestamp,
             "",
-          ]);
-        }
-      }
-    }
+          ];
+        }),
+    );
     reconcileTableRows(this.table, rows);
-
     this.loaded = true;
   }
 }
