@@ -6,6 +6,8 @@ import type {
   VuuUser,
 } from "@heswell/vuu-server";
 
+const PORTAL_CLIENT_IDENTIFIER = "vuu-portal";
+
 type ModulePermission = {
   moduleId: number;
   role: string;
@@ -18,9 +20,7 @@ export function createModuleRegistry(
   return {
     modules: selectModules(
       readModules(tableContainer.getTable<DataTable>("modules")),
-      readModulePermissions(
-        tableContainer.getTable<DataTable>("modulePermissions"),
-      ),
+      readModulePermissions(tableContainer.getTable<DataTable>("modulePermissions")),
       user.authorizations,
     ),
   };
@@ -28,7 +28,9 @@ export function createModuleRegistry(
 
 function readModules(table: DataTable): ModuleRecord[] {
   return table.rows.map((row) => ({
+    clientIdentifier: PORTAL_CLIENT_IDENTIFIER,
     id: numberValue(table, row, "id"),
+    loginRole: "",
     name: stringValue(table, row, "name"),
     title: stringValue(table, row, "title"),
     description: stringValue(table, row, "description"),
@@ -65,28 +67,30 @@ function selectModules(
   modulePermissions: ModulePermission[],
   authorizations: string[],
 ) {
-  const permittedModuleIds = new Set<number>();
+  const permittedModuleRoles = new Map<number, string>();
   const roles = new Set(authorizations);
 
   modulePermissions.forEach(({ moduleId, role }) => {
     if (roles.has(role)) {
-      permittedModuleIds.add(moduleId);
+      permittedModuleRoles.set(moduleId, role);
     }
   });
 
   const latestByName = new Map<string, ModuleRecord>();
   modules.forEach((module) => {
-    if (!module.enabled || !permittedModuleIds.has(module.id)) {
+    const loginRole = permittedModuleRoles.get(module.id);
+    if (!module.enabled || !loginRole) {
       return;
     }
 
+    const moduleWithAccess = { ...module, loginRole };
     const current = latestByName.get(module.name);
     if (
       !current ||
       module.version > current.version ||
       (module.version === current.version && module.id > current.id)
     ) {
-      latestByName.set(module.name, module);
+      latestByName.set(module.name, moduleWithAccess);
     }
   });
 

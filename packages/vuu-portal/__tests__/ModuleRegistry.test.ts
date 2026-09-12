@@ -47,7 +47,9 @@ describe("portal module registry", () => {
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
+        clientIdentifier: "vuu-portal",
         id: 3,
+        loginRole: "basket-trading-access",
         name: "basket-trading",
         vuu: {
           connectionId: "basket",
@@ -56,7 +58,9 @@ describe("portal module registry", () => {
         },
       }),
       {
+        clientIdentifier: "vuu-portal",
         id: 1,
+        loginRole: "module-admin-access",
         name: "moduleAdmin",
         title: "Manage remote modules",
         description: "Create new remote module, update existing modules",
@@ -74,7 +78,9 @@ describe("portal module registry", () => {
         },
       },
       {
+        clientIdentifier: "vuu-portal",
         id: 2,
+        loginRole: "user-admin-access",
         name: "userAdmin",
         title: "Manage users",
         description: "Add, remove and update users",
@@ -139,8 +145,10 @@ describe("portal module registry", () => {
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
+        clientIdentifier: "vuu-portal",
         id: 4,
         description: "Latest module",
+        loginRole: "module-admin-access",
         version: 2,
       }),
     ]);
