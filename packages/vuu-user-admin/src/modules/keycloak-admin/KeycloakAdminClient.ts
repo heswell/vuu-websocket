@@ -1,4 +1,5 @@
 import { ConfigFactory } from "@heswell/vuu-server";
+import { assertVuuClientId, isVuuClientId } from "./KeycloakAdminContract";
 
 export type KeycloakUser = {
   id: string;
@@ -186,7 +187,7 @@ export class KeycloakAdminClient {
     const clientRoles = (
       await Promise.all(
         clients.map(async (client) => {
-          const roles = await this.listClientRoles(client.id);
+          const roles = await this.listClientRoles(client);
           return roles.map((role) => ({ client, role }));
         }),
       )
@@ -211,7 +212,7 @@ export class KeycloakAdminClient {
           const clientRolesForGroup = (
             await Promise.all(
               clients.map(async (client) => {
-                const roles = await this.listClientRolesForGroup(group.id, client.id);
+                const roles = await this.listClientRolesForGroup(group.id, client);
                 return roles.map((role) => ({ group, role, client }));
               }),
             )
@@ -246,16 +247,18 @@ export class KeycloakAdminClient {
   }
 
   async listClients() {
-    return this.listPaginated<KeycloakClient>("/clients");
+    const clients = await this.listPaginated<KeycloakClient>("/clients");
+    return clients.filter(({ clientId }) => isVuuClientId(clientId));
   }
 
   async listRealmRoles() {
     return this.listPaginated<KeycloakRole>("/roles");
   }
 
-  async listClientRoles(clientId: string) {
+  async listClientRoles(client: Pick<KeycloakClient, "id" | "clientId">) {
+    assertVuuClientId(client.clientId);
     return this.listPaginated<KeycloakRole>(
-      `/clients/${encodeURIComponent(clientId)}/roles`,
+      `/clients/${encodeURIComponent(client.id)}/roles`,
     );
   }
 
@@ -271,10 +274,14 @@ export class KeycloakAdminClient {
     );
   }
 
-  async listClientRolesForGroup(groupId: string, clientId: string) {
+  async listClientRolesForGroup(
+    groupId: string,
+    client: Pick<KeycloakClient, "id" | "clientId">,
+  ) {
+    assertVuuClientId(client.clientId);
     return this.requestJson<KeycloakRole[]>(
       this.realmUrl(
-        `/groups/${encodeURIComponent(groupId)}/role-mappings/clients/${encodeURIComponent(clientId)}`,
+        `/groups/${encodeURIComponent(groupId)}/role-mappings/clients/${encodeURIComponent(client.id)}`,
       ),
     );
   }
@@ -403,18 +410,21 @@ export class KeycloakAdminClient {
   }
 
   async updateClientRole(
-    clientId: string,
+    clientIdentifier: string,
     roleName: string,
     changes: Partial<AddRoleParams>,
   ) {
+    const client = await this.resolveClient({
+      clientKey: assertVuuClientId(clientIdentifier),
+    });
     const role = await this.requestJson<KeycloakRole>(
       this.realmUrl(
-        `/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleName)}`,
+        `/clients/${encodeURIComponent(client.id)}/roles/${encodeURIComponent(roleName)}`,
       ),
     );
     await this.requestNoContent(
       this.realmUrl(
-        `/clients/${encodeURIComponent(clientId)}/roles/${encodeURIComponent(roleName)}`,
+        `/clients/${encodeURIComponent(client.id)}/roles/${encodeURIComponent(roleName)}`,
       ),
       {
         method: "PUT",
@@ -425,6 +435,7 @@ export class KeycloakAdminClient {
   }
 
   async addClient({ clientId, name, description, enabled = true }: AddClientParams) {
+    assertVuuClientId(clientId);
     await this.requestNoContent(this.realmUrl("/clients"), {
       method: "POST",
       body: JSON.stringify({
@@ -439,7 +450,7 @@ export class KeycloakAdminClient {
   }
 
   async updateClient(clientId: string, changes: Partial<AddClientParams>) {
-    const client = await this.resolveClient({ clientKey: clientId });
+    const client = await this.resolveClient({ clientKey: assertVuuClientId(clientId) });
     await this.requestNoContent(this.realmUrl(`/clients/${encodeURIComponent(client.id)}`), {
       method: "PUT",
       body: JSON.stringify({ ...client, ...changes }),
@@ -561,11 +572,14 @@ export class KeycloakAdminClient {
 
   private async resolveClient({ clientId, clientKey }: ClientRef) {
     if (clientId) {
-      return this.requestJson<KeycloakClient>(
+      const client = await this.requestJson<KeycloakClient>(
         this.realmUrl(`/clients/${encodeURIComponent(clientId)}`),
       );
+      assertVuuClientId(client.clientId);
+      return client;
     }
     if (!clientKey) throw new Error("Expected clientId or clientKey");
+    assertVuuClientId(clientKey);
     const clients = await this.requestJson<KeycloakClient[]>(
       this.realmUrl(`/clients?clientId=${encodeURIComponent(clientKey)}&max=100`),
     );
@@ -597,7 +611,7 @@ export class KeycloakAdminClient {
         ),
       );
     }
-    const roles = await this.listClientRoles(client.id);
+    const roles = await this.listClientRoles(client);
     const role = roles.find((candidate) => candidate.id === roleRef.roleId);
     if (!role) throw new Error(`Keycloak client role not found for id: ${roleRef.roleId}`);
     return role;

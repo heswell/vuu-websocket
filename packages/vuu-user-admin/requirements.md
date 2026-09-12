@@ -11,6 +11,10 @@ administration.
   user-group-role providers load complete snapshots from the
   Keycloak Admin API. Collection reads follow Keycloak's `first`/`max`
   pagination contract; the old seeded-user/group lists are no longer used.
+- Client and client-role reads are limited to client identifiers beginning
+  with `vuu-`. Client creation, client-role creation/editing, and client-role
+  group assignment/removal reject other client identifiers; realm roles remain
+  available without this restriction.
 - Providers share one snapshot read during startup and one fresh snapshot after
   every mutation. The refresh coordinator reconciles every admin table so
   multiple server instances converge.

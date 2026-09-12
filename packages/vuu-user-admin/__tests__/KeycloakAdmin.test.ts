@@ -62,6 +62,70 @@ describe("Keycloak admin backend", () => {
     }
   });
 
+  test("scopes client and client-role reads to vuu clients while retaining realm roles", async () => {
+    const originalFetch = globalThis.fetch;
+    const requests: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requests.push(url);
+      if (url.includes("/token")) {
+        return new Response(JSON.stringify({ access_token: "test-token" }), { status: 200 });
+      }
+      if (url.endsWith("/admin/realms/vuu")) {
+        return new Response(JSON.stringify({ realm: "vuu", enabled: true }), { status: 200 });
+      }
+      if (url.includes("/clients?")) {
+        return new Response(
+          JSON.stringify([
+            { id: "vuu-client-internal", clientId: "vuu-orders", name: "Orders" },
+            { id: "other-client-internal", clientId: "other-app", name: "Other" },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/clients/vuu-client-internal/roles?")) {
+        return new Response(
+          JSON.stringify([{ id: "role-1", name: "trader", clientRole: true }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/roles?")) {
+        return new Response(
+          JSON.stringify([{ id: "realm-role-1", name: "operator", clientRole: false }]),
+          { status: 200 },
+        );
+      }
+      throw new Error(`Unexpected mocked URL ${url}`);
+    }) as typeof fetch;
+
+    try {
+      process.env.VUU_CONFIG_FILE = "packages/vuu-user-admin/application.conf";
+      const client = await KeycloakAdminClient.createFromConfig();
+      const clients = await client.listClients();
+      expect(clients.map(({ clientId }) => clientId)).toEqual(["vuu-orders"]);
+      expect(await client.listClientRoles(clients[0]!)).toEqual([
+        { id: "role-1", name: "trader", clientRole: true },
+      ]);
+      expect(await client.listRealmRoles()).toEqual([
+        { id: "realm-role-1", name: "operator", clientRole: false },
+      ]);
+      await expect(
+        client.listClientRoles({ id: "other-client-internal", clientId: "other-app" }),
+      ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
+      await expect(
+        client.listClientRolesForGroup("group-1", {
+          id: "other-client-internal",
+          clientId: "other-app",
+        }),
+      ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
+      expect(requests.some((url) => url.includes("other-client-internal/roles"))).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.VUU_CONFIG_FILE;
+      ConfigFactory.reset();
+    }
+  });
+
   test("provider maps a snapshot into VUU rows", () => {
     const rows: unknown[][] = [];
     const table = {
@@ -124,6 +188,43 @@ describe("Keycloak admin backend", () => {
       type: "ERROR_RESULT",
       errorMessage: 'Invalid RPC param "username"',
     });
+  });
+
+  test("rejects non-vuu client mutations before creating a Keycloak client", async () => {
+    const service = new KeycloakAdminService(
+      {} as never,
+      async () => {
+        throw new Error("client should not be created");
+      },
+    );
+    const requests = [
+      ["addClient", { clientId: "other-app" }],
+      ["updateClient", { clientId: "other-app", name: "Other" }],
+      ["addClientRole", { clientId: "other-app", name: "reader" }],
+      ["updateRole", { clientId: "other-app", roleName: "reader", name: "writer" }],
+      ["assignGroupRole", {
+        groupId: "group-1",
+        roleId: "role-1",
+        clientId: "other-app",
+      }],
+      ["removeGroupRole", {
+        groupId: "group-1",
+        roleId: "role-1",
+        clientId: "other-app",
+      }],
+    ] as const;
+
+    for (const [rpcName, namedParams] of requests) {
+      const result = await service.processRpcRequest(rpcName, {
+        namedParams,
+        viewport: {} as never,
+        ctx: {} as never,
+      });
+      expect(result).toEqual({
+        type: "ERROR_RESULT",
+        errorMessage: 'Keycloak client identifier must start with "vuu-"',
+      });
+    }
   });
 
   test("defines the complete VUU contract and module", () => {

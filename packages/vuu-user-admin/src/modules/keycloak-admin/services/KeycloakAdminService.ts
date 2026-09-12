@@ -6,6 +6,7 @@ import {
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 import { KeycloakAdminClient } from "../KeycloakAdminClient";
 import { getKeycloakAdminRefreshCoordinator } from "../KeycloakAdminRefreshCoordinator";
+import { assertVuuClientId } from "../KeycloakAdminContract";
 
 type Params = Record<string, unknown>;
 
@@ -200,6 +201,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly addClient = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const clientId = ensureRequiredNonEmptyString(namedParams.clientId, "clientId");
+      assertVuuClientId(clientId);
       const name = getOptionalNonEmptyString(namedParams.name, "name");
       const description = getOptionalNonEmptyString(namedParams.description, "description");
       const enabled = getOptionalBoolean(namedParams.enabled, "enabled") ?? true;
@@ -214,6 +216,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly updateClient = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const clientId = ensureRequiredNonEmptyString(namedParams.clientId, "clientId");
+      assertVuuClientId(clientId);
       const changes = {
         name: getOptionalNonEmptyString(namedParams.name, "name"),
         description: getOptionalNonEmptyString(namedParams.description, "description"),
@@ -246,6 +249,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly addClientRole = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const clientId = ensureRequiredNonEmptyString(namedParams.clientId, "clientId");
+      assertVuuClientId(clientId);
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
       const description = getOptionalNonEmptyString(namedParams.description, "description") ?? "";
       await (await this.createClient()).addClientRole({ clientKey: clientId }, { name, description });
@@ -265,6 +269,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       if (!roleId && !roleName) throw new Error('Missing required RPC param "roleId" or "roleName"');
       if (name === undefined && description === undefined) throw new Error("No role fields supplied");
       const clientKey = getOptionalNonEmptyString(namedParams.clientId, "clientId");
+      if (clientKey) assertVuuClientId(clientKey);
       const client = await this.createClient();
       if (clientKey) {
         if (!roleName) throw new Error('Missing required RPC param "roleName" for a client role');
@@ -321,6 +326,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       const groupRef = getRequiredEntityRef(namedParams, "groupId", "groupName");
       const roleRef = getRequiredEntityRef(namedParams, "roleId", "roleName");
       const clientKey = getOptionalNonEmptyString(namedParams.clientId, "clientId");
+      if (clientKey) assertVuuClientId(clientKey);
       const client = await this.createClient();
       await mutate(
         client,
