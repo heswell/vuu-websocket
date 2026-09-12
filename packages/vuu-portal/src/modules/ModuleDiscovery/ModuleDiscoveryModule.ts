@@ -33,7 +33,7 @@ const modules = [
     "http://localhost:5002",
     "module-admin",
     "wss://localhost:8091/websocket-portal",
-    "https://localhost:8443/api/authn/module-admin"
+    "https://localhost:8443/api/authn"
   ],
   [
     2,

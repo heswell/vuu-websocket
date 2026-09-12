@@ -69,7 +69,7 @@ describe("portal module registry", () => {
         mfUrl: "http://localhost:5002",
         vuu: {
           connectionId: "module-admin",
-          restUrl: "https://localhost:8443/api/authn/module-admin",
+          restUrl: "https://localhost:8443/api/authn",
           websocketUrl: "wss://localhost:8091/websocket-portal",
         },
       },
@@ -111,7 +111,7 @@ describe("portal module registry", () => {
       "http://localhost:5011",
       "module-admin",
       "wss://localhost:8091/websocket-portal",
-      "https://localhost:8443/api/authn/module-admin",
+      "https://localhost:8443/api/authn",
     ]);
     modules.insert([
       5,
