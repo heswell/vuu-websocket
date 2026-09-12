@@ -12,8 +12,11 @@ administration.
   Keycloak Admin API. Collection reads follow Keycloak's `first`/`max`
   pagination contract; the old seeded-user/group lists are no longer used.
 - Keycloak's nested group tree is recursively flattened into the `groups` read
-  model. Each row retains its Keycloak group ID, full path, and parent group ID,
-  so groups such as `/vuu/basket-trading/users` are independently addressable.
+  model, but the `groups` table currently exposes only leaf groups. Each row
+  retains its Keycloak group ID, full path, and parent group ID, so a group such
+  as `/vuu/basket-trading/users` is independently addressable without exposing
+  a separate `group_name` column. The full hierarchy remains in the snapshot for
+  relationship reads and future nested-group views.
 - Client and client-role reads are limited to client identifiers beginning
   with `vuu-`. Client creation, client-role creation/editing, and client-role
   group assignment/removal reject other client identifiers; realm roles remain
@@ -53,8 +56,8 @@ administration.
   flattened compatibility projection. The `roles` table contains only client
   roles from `vuu-*` clients.
 - Exact logical columns are declared in `KEYCLOAK_ADMIN_TABLE_CONTRACT` and
-  mirror the table definitions: user identity/count and login fields, group
-  hierarchy/count fields, unified role/client identity and counts, client
+  mirror the table definitions: user identity/count and login fields, leaf
+  group path/parent/count fields, unified role/client identity and counts, client
   identity fields, and membership/assignment identity fields. Keycloak
   omissions use empty strings or `0` for timestamps/counts.
 

@@ -73,7 +73,7 @@ export const KEYCLOAK_ADMIN_TABLE_CONTRACT = {
     "role_count", "module_access", "module_access_count",
   ],
   groups: [
-    "group_id", "group_name", "group_path", "parent_group_id", "user_count",
+    "group_id", "group_path", "parent_group_id", "user_count",
     "role_count",
   ],
   roles: [

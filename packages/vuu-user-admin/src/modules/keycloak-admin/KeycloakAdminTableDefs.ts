@@ -26,7 +26,6 @@ export const usersTable = TableDef({
 export const groupsTable = TableDef({
   columns: [
     { name: "group_id", dataType: "string" },
-    { name: "group_name", dataType: "string" },
     { name: "group_path", dataType: "string" },
     { name: "parent_group_id", dataType: "string" },
     { name: "user_count", dataType: "int" },

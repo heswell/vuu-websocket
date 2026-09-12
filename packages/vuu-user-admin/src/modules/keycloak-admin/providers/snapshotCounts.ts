@@ -61,6 +61,15 @@ export const userModuleAccess = (snapshot: KeycloakAdminSnapshot, userId: string
 export const groupUserCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
   snapshot.userGroups.filter(({ group }) => group.id === groupId).length;
 
+export const leafGroups = (snapshot: KeycloakAdminSnapshot) => {
+  const parentIds = new Set(
+    snapshot.groups
+      .map(({ parentId }) => parentId)
+      .filter((parentId): parentId is string => Boolean(parentId)),
+  );
+  return snapshot.groups.filter(({ id }) => !parentIds.has(id));
+};
+
 export const groupRoleCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
   snapshot.groupRoles.filter(({ group, client }) => client && group.id === groupId).length;
 

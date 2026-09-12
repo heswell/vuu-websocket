@@ -2,7 +2,7 @@ import { Provider, type TableContainer } from "@heswell/vuu-server";
 import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
 import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
-import { groupRoleCount, groupUserCount } from "./snapshotCounts";
+import { groupRoleCount, groupUserCount, leafGroups } from "./snapshotCounts";
 
 export class KeycloakGroupsProvider extends Provider {
   async load(_: TableContainer) {
@@ -10,9 +10,8 @@ export class KeycloakGroupsProvider extends Provider {
   }
 
   loadSnapshot(snapshot: KeycloakAdminSnapshot) {
-    const rows = snapshot.groups.map((group) => [
+    const rows = leafGroups(snapshot).map((group) => [
       group.id,
-      group.name,
       group.path ?? "",
       group.parentId ?? "",
       groupUserCount(snapshot, group.id),

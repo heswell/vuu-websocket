@@ -24,6 +24,7 @@ import {
 } from "../src/modules/keycloak-admin/KeycloakAdminTableDefs";
 import { KeycloakUsersProvider } from "../src/modules/keycloak-admin/providers/KeycloakUsersProvider";
 import { KeycloakGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupRolesProvider";
+import { KeycloakGroupsProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupsProvider";
 import { KeycloakRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakRolesProvider";
 import { KeycloakUserGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider";
 import {
@@ -123,6 +124,34 @@ describe("Keycloak admin backend", () => {
           parentId: "basket",
         },
       ]);
+
+      const rows: unknown[][] = [];
+      new KeycloakGroupsProvider({
+        indexOfKeyField: 0,
+        rows,
+        upsert: (row: unknown[]) => rows.push(row),
+        delete: () => undefined,
+        rowIndexAtKey: () => -1,
+      } as never).loadSnapshot({
+        realm: { realm: "vuu" },
+        users: [],
+        groups,
+        clients: [],
+        clientRoles: [],
+        userGroups: [],
+        groupRoles: [],
+        timestamp: 123,
+      });
+      expect(rows).toEqual([[
+        "users",
+        "/vuu/basket-trading/users",
+        "basket",
+        0,
+        0,
+        123,
+        123,
+        "",
+      ]]);
     } finally {
       globalThis.fetch = originalFetch;
       delete process.env.VUU_CONFIG_FILE;
