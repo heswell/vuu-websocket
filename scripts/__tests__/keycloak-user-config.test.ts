@@ -11,80 +11,58 @@ import {
 } from "../keycloak-user-config";
 
 describe("Keycloak user and role configuration", () => {
-  test("owns navigation roles on the public portal client", () => {
-    expect(CLIENT_ROLES["vuu-portal"]).toEqual([
+  test("assigns roles to the requested owning clients", () => {
+    expect(CLIENT_ROLES).toEqual({
+      "vuu-portal": [
+        "user-admin-access",
+        "basket-trading-access",
+        "module-admin-access",
+      ],
+      "vuu-portal-server": ["module-admin-read", "module-admin-admin"],
+      "vuu-user-admin": ["read", "admin"],
+      "vuu-basket-trading": ["read", "trade"],
+    });
+  });
+
+  test("maps the requested hierarchical groups to client roles", () => {
+    expect(GROUP_ROLES).toEqual({
+      "/vuu/user-admin/users": [
+        { clientId: "vuu-portal", roleName: "user-admin-access" },
+        { clientId: "vuu-user-admin", roleName: "read" },
+      ],
+      "/vuu/user-admin/administrators": [
+        { clientId: "vuu-portal", roleName: "user-admin-access" },
+        { clientId: "vuu-user-admin", roleName: "read" },
+        { clientId: "vuu-user-admin", roleName: "admin" },
+      ],
+      "/vuu/basket-trading/users": [
+        { clientId: "vuu-portal", roleName: "basket-trading-access" },
+        { clientId: "vuu-basket-trading", roleName: "read" },
+      ],
+      "/vuu/basket-trading/traders": [
+        { clientId: "vuu-portal", roleName: "basket-trading-access" },
+        { clientId: "vuu-basket-trading", roleName: "read" },
+        { clientId: "vuu-basket-trading", roleName: "trade" },
+      ],
+      "/vuu/module-admin/users": [
+        { clientId: "vuu-portal", roleName: "module-admin-access" },
+        { clientId: "vuu-portal-server", roleName: "module-admin-read" },
+      ],
+      "/vuu/module-admin/administrators": [
+        { clientId: "vuu-portal", roleName: "module-admin-access" },
+        { clientId: "vuu-portal-server", roleName: "module-admin-read" },
+        { clientId: "vuu-portal-server", roleName: "module-admin-admin" },
+      ],
+    });
+  });
+
+  test("tracks legacy managed roles for cleanup", () => {
+    expect(RETIRED_CLIENT_ROLES["vuu-portal"]).toEqual([
       "module-admin-login",
       "user-admin-login",
       "basket-trading-login",
     ]);
-    expect(CLIENT_ROLES["vuu-portal-server"]).toEqual([]);
-    expect(CLIENT_ROLES["vuu-module-admin-server"]).toEqual([
-      "module-admin-view",
-      "module-admin-edit",
-    ]);
-    expect(CLIENT_ROLES["vuu-user-admin-server"]).toEqual([
-      "user-admin-view",
-      "user-admin-edit",
-    ]);
-    expect(CLIENT_ROLES["vuu-basket-trading-server"]).toEqual([
-      "basket-trading-view",
-      "basket-trading-trade",
-    ]);
-  });
-
-  test("assigns independent login and resource roles to each group", () => {
-    expect(GROUP_ROLES).toEqual({
-      MODULES_VIEW: [
-        { clientId: "vuu-portal", roleName: "module-admin-login" },
-        { clientId: "vuu-module-admin-server", roleName: "module-admin-view" },
-      ],
-      MODULES_ADMIN: [
-        { clientId: "vuu-portal", roleName: "module-admin-login" },
-        { clientId: "vuu-module-admin-server", roleName: "module-admin-view" },
-        { clientId: "vuu-module-admin-server", roleName: "module-admin-edit" },
-      ],
-      USERS_VIEW: [
-        { clientId: "vuu-portal", roleName: "user-admin-login" },
-        { clientId: "vuu-user-admin-server", roleName: "user-admin-view" },
-      ],
-      USERS_ADMIN: [
-        { clientId: "vuu-portal", roleName: "user-admin-login" },
-        { clientId: "vuu-user-admin-server", roleName: "user-admin-view" },
-        { clientId: "vuu-user-admin-server", roleName: "user-admin-edit" },
-      ],
-      BASKET_VIEW: [
-        { clientId: "vuu-portal", roleName: "basket-trading-login" },
-        {
-          clientId: "vuu-basket-trading-server",
-          roleName: "basket-trading-view",
-        },
-      ],
-      BASKET_TRADE: [
-        { clientId: "vuu-portal", roleName: "basket-trading-login" },
-        {
-          clientId: "vuu-basket-trading-server",
-          roleName: "basket-trading-view",
-        },
-        {
-          clientId: "vuu-basket-trading-server",
-          roleName: "basket-trading-trade",
-        },
-      ],
-    });
-  });
-
-  test("declares only target-owned resource roles and tracks legacy roles", () => {
-    expect(RETIRED_CLIENT_ROLES).toEqual({
-      "vuu-portal": [],
-      "vuu-portal-server": ["modules.view", "modules.edit"],
-      "vuu-module-admin-server": [],
-      "vuu-user-admin-server": ["users.view", "users.admin"],
-      "vuu-basket-trading-server": ["basket.view", "basket.trade"],
-    });
-    expect(MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin-server"]).toContain(
-      "module-admin-edit",
-    );
-    expect(MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin-server"]).toContain(
+    expect(MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin"]).toContain(
       "users.admin",
     );
     expect(RETIRED_REALM_ROLE_NAMES).toEqual([
@@ -97,96 +75,56 @@ describe("Keycloak user and role configuration", () => {
     ]);
   });
 
-  test("removes stale managed cross-client scopes but retains custom roles", () => {
+  test("removes stale managed scopes while retaining custom roles", () => {
     const current = [
-      { id: "stale-cross-client", name: "user-admin-view" },
+      { id: "stale", name: "admin" },
       { id: "legacy", name: "users.admin" },
-      { id: "administrator", name: "reporting.export" },
+      { id: "custom", name: "reporting.export" },
     ];
 
     expect(
       planManagedRoleScopeChanges(
         current,
         [],
-        MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin-server"],
+        MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin"],
       ),
-    ).toEqual({
+    ).toEqual({ add: [], remove: current.slice(0, 2) });
+  });
+
+  test("reconciles managed IDs idempotently", () => {
+    const desired = [{ id: "managed", name: "group" }];
+    const custom = [{ id: "custom", name: "group" }];
+
+    expect(planManagedIdChanges(custom, desired, desired)).toEqual({
+      add: ["managed"],
+      remove: [],
+    });
+    expect(planManagedIdChanges([...custom, ...desired], desired, desired)).toEqual({
       add: [],
-      remove: current.slice(0, 2),
-    });
-  });
-
-  test("reconciles target-only role scopes idempotently", () => {
-    const desired = CLIENT_ROLES["vuu-module-admin-server"];
-    const managed = MANAGED_CLIENT_ROLE_NAMES["vuu-module-admin-server"];
-    const once = planManagedRoleScopeChanges(
-      [{ id: "view", name: "module-admin-view" }],
-      desired,
-      managed,
-    );
-    expect(once).toEqual({
-      add: ["module-admin-edit"],
       remove: [],
     });
-
-    expect(
-      planManagedRoleScopeChanges(
-        [
-          { id: "view", name: "module-admin-view" },
-          { id: "edit", name: "module-admin-edit" },
-          { id: "custom", name: "administrator.custom" },
-        ],
-        desired,
-        managed,
-      ),
-    ).toEqual({ add: [], remove: [] });
   });
 
-  test("reconciles managed groups by id and preserves same-name custom groups", () => {
-    const desired = [{ id: "managed-users-admin", name: "USERS_ADMIN" }];
-    const customSameName = [{ id: "custom-subgroup", name: "USERS_ADMIN" }];
-
-    expect(planManagedIdChanges(customSameName, desired, desired)).toEqual({
-      add: ["managed-users-admin"],
-      remove: [],
-    });
-    expect(
-      planManagedIdChanges([...customSameName, ...desired], desired, desired),
-    ).toEqual({ add: [], remove: [] });
-  });
-
-  test("keeps portal navigation roles and excludes all resource roles", () => {
-    expect(CLIENT_ROLES["vuu-portal"]).toEqual([
-      "module-admin-login",
-      "user-admin-login",
-      "basket-trading-login",
-    ]);
-    const remoteRoles = new Set<string>(
-      Object.entries(CLIENT_ROLES)
-        .filter(([clientId]) => clientId !== "vuu-portal")
-        .flatMap(([, roles]) => roles),
-    );
-    expect(
-      CLIENT_ROLES["vuu-portal"].filter((role) => remoteRoles.has(role)),
-    ).toEqual([]);
-  });
-
-  test("preserves seeded-user group intent", () => {
+  test("keeps seeded users and assigns them only to groups", () => {
     expect(SEEDED_USERS).toEqual([
       {
         username: "trader1",
         email: "trader1@vuu.com",
-        groups: ["BASKET_TRADE"],
+        groups: ["/vuu/basket-trading/traders"],
       },
       {
         username: "trader2",
         email: "trader2@vuu.com",
-        groups: ["BASKET_TRADE"],
+        groups: ["/vuu/basket-trading/traders"],
       },
       {
         username: "admin",
         email: "admin@vuu.com",
-        groups: ["MODULES_ADMIN", "USERS_ADMIN", "BASKET_TRADE"],
+        groups: [
+          "/vuu/module-admin/administrators",
+          "/vuu/user-admin/administrators",
+          "/vuu/basket-trading/traders",
+        ],
       },
     ]);
   });
