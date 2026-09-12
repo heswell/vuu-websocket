@@ -50,6 +50,45 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
     });
   });
 
+  describe("CoreServerApiHandler selection", () => {
+    test("handles DESELECT_ALL and returns DESELECT_ALL_SUCCESS", async () => {
+      let deselectedViewportId: string | undefined;
+      const tableContainer = {};
+      const viewPortContainer = {
+        deselectAll: (viewPortId: string) => {
+          deselectedViewportId = viewPortId;
+          return 0;
+        },
+      };
+      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer as any,
+        tableContainer as any,
+        {} as any,
+      );
+
+      const response = await handler.process(
+        {
+          requestId: "req-select-1",
+          sessionId: "sess-1",
+          body: { type: "DESELECT_ALL", vpId: "vp-1" },
+        } as any,
+        buildContext("req-select-1"),
+      );
+
+      expect(deselectedViewportId).toBe("vp-1");
+      expect(response).toEqual({
+        body: {
+          type: "DESELECT_ALL_SUCCESS",
+          vpId: "vp-1",
+        },
+        module: "CORE",
+        requestId: "req-select-1",
+        sessionId: "sess-1",
+      });
+    });
+  });
+
   test("returns ERROR when table lookup fails", async () => {
     const tableContainer = {
       getDefinedTables: () => {

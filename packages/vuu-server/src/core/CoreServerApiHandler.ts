@@ -1,5 +1,6 @@
 import {
   ClientToServerMenuSelectRPC,
+  DeselectAllRequest,
   DeselectRowRequest,
   SelectRowRangeRequest,
   SelectRowRequest,
@@ -26,6 +27,7 @@ import {
   ChangeViewPortRangeSuccess,
   CreateViewPortReject,
   CreateViewPortSuccess,
+  DeselectAllSuccess,
   DeselectRowSuccess,
   ErrorResponse,
   GetTableListResponse,
@@ -108,6 +110,8 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processSelectRowRequest(body, ctx);
       case "DESELECT_ROW":
         return this.processDeselectRowRequest(body, ctx);
+      case "DESELECT_ALL":
+        return this.processDeselectAllRequest(body, ctx);
       case "SELECT_ROW_RANGE":
         return this.processSelectRowRangeRequest(body, ctx);
       // case "CREATE_VISUAL_LINK":
@@ -397,6 +401,14 @@ export class CoreServerApiHandler implements ServerApi {
       msg.preserveExistingSelection,
     );
     return vsMsg(DeselectRowSuccess(msg.vpId, selectedRowCount), ctx);
+  }
+
+  private processDeselectAllRequest(
+    msg: DeselectAllRequest,
+    ctx: RequestContext,
+  ) {
+    this.viewPortContainer.deselectAll(msg.vpId);
+    return vsMsg(DeselectAllSuccess(msg.vpId), ctx);
   }
 
   private processSelectRowRangeRequest(

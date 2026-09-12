@@ -1,5 +1,6 @@
 import type {
   RpcResult,
+  DeselectAllSuccess as VuuDeselectAllSuccess,
   DeselectRowSuccess as VuuDeselectRowSuccess,
   SelectRowSuccess as VuuSelectRowSuccess,
   SelectRowRangeSuccess as VuuSelectRowRangeSuccess,
@@ -183,6 +184,11 @@ export const DeselectRowSuccess = (
 ): VuuDeselectRowSuccess => ({
   selectedRowCount,
   type: "DESELECT_ROW_SUCCESS",
+  vpId,
+});
+
+export const DeselectAllSuccess = (vpId: string): VuuDeselectAllSuccess => ({
+  type: "DESELECT_ALL_SUCCESS",
   vpId,
 });
 
