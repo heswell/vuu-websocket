@@ -11,6 +11,9 @@ administration.
   user-group-role providers load complete snapshots from the
   Keycloak Admin API. Collection reads follow Keycloak's `first`/`max`
   pagination contract; the old seeded-user/group lists are no longer used.
+- Keycloak's nested group tree is recursively flattened into the `groups` read
+  model. Each row retains its Keycloak group ID, full path, and parent group ID,
+  so groups such as `/vuu/basket-trading/users` are independently addressable.
 - Client and client-role reads are limited to client identifiers beginning
   with `vuu-`. Client creation, client-role creation/editing, and client-role
   group assignment/removal reject other client identifiers; realm roles remain

@@ -236,7 +236,10 @@ export class KeycloakAdminClient {
     const topLevelGroups = await this.listPaginated<KeycloakGroup>(
       "/groups?briefRepresentation=true",
     );
-    return topLevelGroups.flatMap((group) => flattenGroups(group));
+    const flattenedGroups = await Promise.all(
+      topLevelGroups.map((group) => this.flattenGroupTree(group)),
+    );
+    return flattenedGroups.flat();
   }
 
   async listClients() {
@@ -622,6 +625,24 @@ export class KeycloakAdminClient {
     }
   }
 
+  private async flattenGroupTree(
+    group: KeycloakGroup,
+    parentId?: string,
+  ): Promise<KeycloakGroup[]> {
+    const flattenedGroup = {
+      ...group,
+      ...(group.parentId || !parentId ? {} : { parentId }),
+    };
+    delete flattenedGroup.subGroups;
+    const children = await this.listPaginated<KeycloakGroup>(
+      `/groups/${encodeURIComponent(group.id)}/children?briefRepresentation=true`,
+    );
+    const flattenedChildren = await Promise.all(
+      children.map((child) => this.flattenGroupTree(child, group.id)),
+    );
+    return [flattenedGroup, ...flattenedChildren.flat()];
+  }
+
   private realmUrl(path: string) {
     return `${this.baseUrl}/admin/realms/${encodeURIComponent(this.realm)}${path}`;
   }
@@ -689,20 +710,6 @@ function dedupeGroupRoles(roles: KeycloakGroupRole[]) {
     seen.add(key);
     return true;
   });
-}
-
-function flattenGroups(group: KeycloakGroup, parentId?: string): KeycloakGroup[] {
-  const { subGroups = [], ...groupWithoutChildren } = group;
-  const flattenedGroup = {
-    ...groupWithoutChildren,
-    ...(groupWithoutChildren.parentId || !parentId
-      ? {}
-      : { parentId }),
-  };
-  return [
-    flattenedGroup,
-    ...subGroups.flatMap((child) => flattenGroups(child, group.id)),
-  ];
 }
 
 function keycloakFetch(url: string, init: RequestInit, allowSelfSignedCert: boolean) {

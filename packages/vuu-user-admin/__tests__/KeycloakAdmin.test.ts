@@ -70,6 +70,66 @@ describe("Keycloak admin backend", () => {
     }
   });
 
+  test("flattens Keycloak nested groups into the groups read model", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/token")) {
+        return new Response(JSON.stringify({ access_token: "test-token" }), { status: 200 });
+      }
+      if (url.endsWith("/admin/realms/vuu")) {
+        return new Response(JSON.stringify({ realm: "vuu", enabled: true }), { status: 200 });
+      }
+      if (url.includes("/groups?")) {
+        return new Response(
+          JSON.stringify([{ id: "vuu", name: "vuu", path: "/vuu" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/vuu/children?")) {
+        return new Response(
+          JSON.stringify([{ id: "basket", name: "basket-trading", path: "/vuu/basket-trading" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/basket/children?")) {
+        return new Response(
+          JSON.stringify([{ id: "users", name: "users", path: "/vuu/basket-trading/users" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/users/children?")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      throw new Error(`Unexpected mocked URL ${url}`);
+    }) as typeof fetch;
+
+    try {
+      process.env.VUU_CONFIG_FILE = "packages/vuu-user-admin/application.conf";
+      const client = await KeycloakAdminClient.createFromConfig();
+      const groups = await client.listGroups();
+      expect(groups.map(({ id, name, path, parentId }) => ({
+        id,
+        name,
+        path,
+        parentId,
+      }))).toEqual([
+        { id: "vuu", name: "vuu", path: "/vuu", parentId: undefined },
+        { id: "basket", name: "basket-trading", path: "/vuu/basket-trading", parentId: "vuu" },
+        {
+          id: "users",
+          name: "users",
+          path: "/vuu/basket-trading/users",
+          parentId: "basket",
+        },
+      ]);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.VUU_CONFIG_FILE;
+      ConfigFactory.reset();
+    }
+  });
+
   test("loads only client roles from in-scope vuu clients", async () => {
     const originalFetch = globalThis.fetch;
     const requests: string[] = [];
