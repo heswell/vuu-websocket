@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { ConfigFactory } from "@heswell/vuu-server";
+import {
+  ConfigFactory,
+  LoginTokenService,
+  LifecycleContainer,
+  VuuServer,
+  VuuServerConfig,
+  VuuWebSocketOptions,
+} from "@heswell/vuu-server";
 import { KeycloakAdminClient } from "../src/modules/keycloak-admin/KeycloakAdminClient";
 import {
   KEYCLOAK_ADMIN_RPC_CONTRACT,
@@ -149,5 +156,26 @@ describe("Keycloak admin backend", () => {
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.addUser).toContain("temporary_password");
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.updateUser).toContain("group_ids");
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.assignGroupRole).toContain("clientId");
+  });
+
+  test("registers clients in the runtime table container", () => {
+    const server = new VuuServer(
+      VuuServerConfig(
+        VuuWebSocketOptions().withWsPort(0),
+        {},
+        LoginTokenService(),
+        [KeycloakAdminModule()],
+      ),
+      new LifecycleContainer(),
+    );
+
+    expect(server.tableContainer.getDefinedTables()).toContainEqual({
+      module: "KEYCLOAK_ADMIN",
+      table: "clients",
+    });
+    expect(server.tableContainer.getTable("clients").schema.table).toEqual({
+      module: "KEYCLOAK_ADMIN",
+      table: "clients",
+    });
   });
 });
