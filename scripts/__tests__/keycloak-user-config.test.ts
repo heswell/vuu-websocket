@@ -56,12 +56,8 @@ describe("Keycloak user and role configuration", () => {
     });
   });
 
-  test("tracks legacy managed roles for cleanup", () => {
-    expect(RETIRED_CLIENT_ROLES["vuu-portal"]).toEqual([
-      "module-admin-login",
-      "user-admin-login",
-      "basket-trading-login",
-    ]);
+  test("tracks managed roles for cleanup", () => {
+    expect(RETIRED_CLIENT_ROLES["vuu-portal"]).toEqual([]);
     expect(MANAGED_CLIENT_ROLE_NAMES["vuu-user-admin"]).toContain(
       "users.admin",
     );

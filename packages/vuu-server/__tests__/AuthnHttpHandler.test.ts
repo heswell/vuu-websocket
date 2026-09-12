@@ -131,7 +131,7 @@ describe("AuthnHttpHandler", () => {
       {
         bearerToken: {
           authenticateBearerToken: async () =>
-            VuuUserWithAuthorizations("portal-user", ["module-admin-login"]),
+            VuuUserWithAuthorizations("portal-user", ["module-admin-access"]),
         },
       },
       loginTokenService,
