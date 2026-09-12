@@ -1,26 +1,30 @@
 export const CLIENT_ROLES = {
   "vuu-portal": [
-    "module-admin-login",
-    "user-admin-login",
-    "basket-trading-login",
+    "user-admin-access",
+    "basket-trading-access",
+    "module-admin-access",
   ],
-  "vuu-portal-server": [],
-  "vuu-module-admin-server": ["module-admin-view", "module-admin-edit"],
-  "vuu-user-admin-server": ["user-admin-view", "user-admin-edit"],
-  "vuu-basket-trading-server": [
-    "basket-trading-view",
-    "basket-trading-trade",
-  ],
+  "vuu-portal-server": ["module-admin-read", "module-admin-admin"],
+  "vuu-user-admin": ["read", "admin"],
+  "vuu-basket-trading": ["read", "trade"],
 } as const;
 
 export type ClientId = keyof typeof CLIENT_ROLES;
 
 export const RETIRED_CLIENT_ROLES: Record<ClientId, readonly string[]> = {
-  "vuu-portal": [],
+  "vuu-portal": [
+    "module-admin-login",
+    "user-admin-login",
+    "basket-trading-login",
+  ],
   "vuu-portal-server": ["modules.view", "modules.edit"],
-  "vuu-module-admin-server": [],
-  "vuu-user-admin-server": ["users.view", "users.admin"],
-  "vuu-basket-trading-server": ["basket.view", "basket.trade"],
+  "vuu-user-admin": ["user-admin-view", "user-admin-edit", "users.view", "users.admin"],
+  "vuu-basket-trading": [
+    "basket-trading-view",
+    "basket-trading-trade",
+    "basket.view",
+    "basket.trade",
+  ],
 };
 
 export const RETIRED_REALM_ROLE_NAMES = [
@@ -42,9 +46,8 @@ const allManagedRoleNames = [
 export const MANAGED_CLIENT_ROLE_NAMES = {
   "vuu-portal": allManagedRoleNames,
   "vuu-portal-server": allManagedRoleNames,
-  "vuu-module-admin-server": allManagedRoleNames,
-  "vuu-user-admin-server": allManagedRoleNames,
-  "vuu-basket-trading-server": allManagedRoleNames,
+  "vuu-user-admin": allManagedRoleNames,
+  "vuu-basket-trading": allManagedRoleNames,
 } satisfies Record<ClientId, readonly string[]>;
 
 export type RoleScopeChange<T> = {
@@ -92,50 +95,62 @@ export type ClientRoleRef = {
 };
 
 export const GROUP_ROLES: Record<string, readonly ClientRoleRef[]> = {
-  MODULES_VIEW: [
-    { clientId: "vuu-portal", roleName: "module-admin-login" },
-    { clientId: "vuu-module-admin-server", roleName: "module-admin-view" },
+  "/vuu/user-admin/users": [
+    { clientId: "vuu-portal", roleName: "user-admin-access" },
+    { clientId: "vuu-user-admin", roleName: "read" },
   ],
-  MODULES_ADMIN: [
-    { clientId: "vuu-portal", roleName: "module-admin-login" },
-    { clientId: "vuu-module-admin-server", roleName: "module-admin-view" },
-    { clientId: "vuu-module-admin-server", roleName: "module-admin-edit" },
+  "/vuu/user-admin/administrators": [
+    { clientId: "vuu-portal", roleName: "user-admin-access" },
+    { clientId: "vuu-user-admin", roleName: "read" },
+    { clientId: "vuu-user-admin", roleName: "admin" },
   ],
-  USERS_VIEW: [
-    { clientId: "vuu-portal", roleName: "user-admin-login" },
-    { clientId: "vuu-user-admin-server", roleName: "user-admin-view" },
+  "/vuu/basket-trading/users": [
+    { clientId: "vuu-portal", roleName: "basket-trading-access" },
+    { clientId: "vuu-basket-trading", roleName: "read" },
   ],
-  USERS_ADMIN: [
-    { clientId: "vuu-portal", roleName: "user-admin-login" },
-    { clientId: "vuu-user-admin-server", roleName: "user-admin-view" },
-    { clientId: "vuu-user-admin-server", roleName: "user-admin-edit" },
+  "/vuu/basket-trading/traders": [
+    { clientId: "vuu-portal", roleName: "basket-trading-access" },
+    { clientId: "vuu-basket-trading", roleName: "read" },
+    { clientId: "vuu-basket-trading", roleName: "trade" },
   ],
-  BASKET_VIEW: [
-    { clientId: "vuu-portal", roleName: "basket-trading-login" },
-    {
-      clientId: "vuu-basket-trading-server",
-      roleName: "basket-trading-view",
-    },
+  "/vuu/module-admin/users": [
+    { clientId: "vuu-portal", roleName: "module-admin-access" },
+    { clientId: "vuu-portal-server", roleName: "module-admin-read" },
   ],
-  BASKET_TRADE: [
-    { clientId: "vuu-portal", roleName: "basket-trading-login" },
-    {
-      clientId: "vuu-basket-trading-server",
-      roleName: "basket-trading-view",
-    },
-    {
-      clientId: "vuu-basket-trading-server",
-      roleName: "basket-trading-trade",
-    },
+  "/vuu/module-admin/administrators": [
+    { clientId: "vuu-portal", roleName: "module-admin-access" },
+    { clientId: "vuu-portal-server", roleName: "module-admin-read" },
+    { clientId: "vuu-portal-server", roleName: "module-admin-admin" },
   ],
 };
 
+export const RETIRED_GROUP_NAMES = [
+  "MODULES_VIEW",
+  "MODULES_ADMIN",
+  "USERS_VIEW",
+  "USERS_ADMIN",
+  "BASKET_VIEW",
+  "BASKET_TRADE",
+] as const;
+
 export const SEEDED_USERS = [
-  { username: "trader1", email: "trader1@vuu.com", groups: ["BASKET_TRADE"] },
-  { username: "trader2", email: "trader2@vuu.com", groups: ["BASKET_TRADE"] },
+  {
+    username: "trader1",
+    email: "trader1@vuu.com",
+    groups: ["/vuu/basket-trading/traders"],
+  },
+  {
+    username: "trader2",
+    email: "trader2@vuu.com",
+    groups: ["/vuu/basket-trading/traders"],
+  },
   {
     username: "admin",
     email: "admin@vuu.com",
-    groups: ["MODULES_ADMIN", "USERS_ADMIN", "BASKET_TRADE"],
+    groups: [
+      "/vuu/module-admin/administrators",
+      "/vuu/user-admin/administrators",
+      "/vuu/basket-trading/traders",
+    ],
   },
 ] as const;

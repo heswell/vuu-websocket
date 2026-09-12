@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
 
+// Bootstraps the configured Keycloak realm and reconciles the portal,
+// confidential server, and remote application clients. Run this before the
+// user/group provisioning script; it authenticates through the master realm.
+
 import {
   clientConfigurationsEqual,
   reconcileServerClientConfiguration,
   reconcilePortalClientConfiguration,
-  RETIRED_SERVER_CLIENT_NAMES,
   SERVER_CLIENT_NAMES,
   SERVER_CLIENT_SECRETS,
   resolveKeycloakClientSecret,
@@ -130,7 +133,10 @@ async function main() {
             webOrigins: [CLIENT_URL],
             standardFlowEnabled: true,
             implicitFlowEnabled: false,
-            directAccessGrantsEnabled: true,
+            directAccessGrantsEnabled: false,
+            serviceAccountsEnabled: false,
+            bearerOnly: false,
+            fullScopeAllowed: false,
           }),
         }
       );
@@ -173,12 +179,6 @@ async function main() {
     );
     await reconcilePortalClientServerAudiences(token, portalClient.id);
     console.log("✅ Audience mappers reconciled\n");
-
-    console.log("4️⃣b Removing retired confidential server clients...");
-    for (const retiredClientName of RETIRED_SERVER_CLIENT_NAMES) {
-      await removeClientIfPresent(token, retiredClientName);
-    }
-    console.log("✅ Retired server clients removed\n");
 
     // Success
     console.log("🎉 Setup complete!");
@@ -256,29 +256,6 @@ async function realmExists(token: string) {
     );
   }
   return true;
-}
-
-async function removeClientIfPresent(token: string, clientId: string) {
-  const client = await lookupClientByClientId(token, clientId);
-  if (!client?.id) {
-    console.log(`   • Retired client '${clientId}' is already absent`);
-    return;
-  }
-
-  const response = await keycloakFetch(
-    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients/${client.id}`,
-    {
-      method: "DELETE",
-      headers: keycloakHeaders(token),
-    },
-  );
-  if (!response.ok) {
-    const errorData = await response.text();
-    throw new Error(
-      `Failed to remove retired client '${clientId}': ${response.status} ${errorData}`,
-    );
-  }
-  console.log(`   • Retired client '${clientId}' removed`);
 }
 
 async function reconcileServerClient(

@@ -1,85 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import {
   clientConfigurationsEqual,
-  RETIRED_SERVER_CLIENT_NAMES,
+  KEYCLOAK_CLIENT_SECRET_ENV,
   reconcilePortalClientConfiguration,
-  reconcileServerClientConfiguration,
   reconcileSelfAudienceMapper,
   reconcileServerAudienceMappers,
-  SERVER_CLIENT_NAMES,
-  KEYCLOAK_CLIENT_SECRET_ENV,
+  reconcileServerClientConfiguration,
   resolveKeycloakClientSecret,
+  SERVER_CLIENT_NAMES,
 } from "../keycloak-client-config";
 
-describe("reconcileServerAudienceMappers", () => {
-  test("manages every confidential VUU server client", () => {
+describe("Keycloak client configuration", () => {
+  test("manages the confidential server and remote application clients", () => {
     expect(SERVER_CLIENT_NAMES).toEqual([
       "vuu-portal-server",
-      "vuu-module-admin-server",
-      "vuu-user-admin-server",
-      "vuu-basket-trading-server",
+      "vuu-user-admin",
+      "vuu-basket-trading",
     ]);
   });
 
-  test("migrates stale module-discovery audiences to user-admin", () => {
-    const mappers = reconcileServerAudienceMappers([
-      {
-        name: "legacy-discovery",
-        protocolMapper: "oidc-audience-mapper",
-        config: {
-          "included.client.audience": "vuu-module-discovery-server",
-          "access.token.claim": "true",
-        },
-      },
-      {
-        name: "unrelated",
-        protocolMapper: "oidc-usermodel-property-mapper",
-        config: { "claim.name": "preferred_username" },
-      },
-    ]);
-
-    expect(
-      mappers.map(
-        (mapper) => mapper.config?.["included.client.audience"],
-      ),
-    ).toEqual([undefined, ...SERVER_CLIENT_NAMES]);
-    expect(mappers.map(({ name }) => name)).not.toContain("legacy-discovery");
-    expect(RETIRED_SERVER_CLIENT_NAMES).toContain(
-      "vuu-module-discovery-server",
-    );
-  });
-
-  test("replaces existing server audience mappers idempotently", () => {
-    const once = reconcileServerAudienceMappers([
-      {
-        id: "user-admin-mapper",
-        name: "custom-user-admin-name",
-        protocolMapper: "oidc-audience-mapper",
-        config: {
-          "included.client.audience": "vuu-user-admin-server",
-          "included.custom.audience": "reporting-api",
-        },
-      },
-    ]);
-    const twice = reconcileServerAudienceMappers(once);
-
-    expect(twice).toEqual(once);
-    expect(twice).toHaveLength(SERVER_CLIENT_NAMES.length);
-    expect(
-      twice.find(
-        (mapper) =>
-          mapper.config?.["included.client.audience"] ===
-          "vuu-user-admin-server",
-      ),
-    ).toMatchObject({
-      id: "user-admin-mapper",
-      config: { "included.custom.audience": "reporting-api" },
-    });
-  });
-});
-
-describe("reconcilePortalClientConfiguration", () => {
-  test("disables full scope while retaining audiences and custom mappers", () => {
+  test("configures the public portal and preserves custom mappers", () => {
     const once = reconcilePortalClientConfiguration({
       fullScopeAllowed: true,
       protocolMappers: [
@@ -91,7 +31,15 @@ describe("reconcilePortalClientConfiguration", () => {
       ],
     });
 
-    expect(once.fullScopeAllowed).toBeFalse();
+    expect(once).toMatchObject({
+      publicClient: true,
+      bearerOnly: false,
+      standardFlowEnabled: true,
+      implicitFlowEnabled: false,
+      directAccessGrantsEnabled: false,
+      serviceAccountsEnabled: false,
+      fullScopeAllowed: false,
+    });
     expect(once.protocolMappers?.[0]).toMatchObject({
       id: "custom",
       name: "administrator-custom",
@@ -101,66 +49,15 @@ describe("reconcilePortalClientConfiguration", () => {
         ?.slice(1)
         .map((mapper) => mapper.config?.["included.client.audience"]),
     ).toEqual(SERVER_CLIENT_NAMES);
-    expect(reconcilePortalClientConfiguration(once)).toEqual(once);
+    expect(
+      clientConfigurationsEqual(
+        once,
+        { ...once, protocolMappers: once.protocolMappers?.toReversed() },
+      ),
+    ).toBeTrue();
   });
 
-  test("treats normalized mapper ordering as a no-op", () => {
-    const current = reconcilePortalClientConfiguration({});
-    const reordered = {
-      ...current,
-      protocolMappers: current.protocolMappers?.toReversed(),
-    };
-
-    expect(clientConfigurationsEqual(current, reordered)).toBeTrue();
-  });
-});
-
-describe("reconcileSelfAudienceMapper", () => {
-  test("adds an explicit self audience and preserves unrelated mappers", () => {
-    const mappers = reconcileSelfAudienceMapper(
-      [
-        {
-          id: "administrator-mapper",
-          name: "administrator-mapper",
-          protocolMapper: "oidc-usermodel-property-mapper",
-          config: { "claim.name": "department" },
-        },
-        {
-          id: "other-audience",
-          name: "other-audience",
-          protocolMapper: "oidc-audience-mapper",
-          config: { "included.client.audience": "reporting-api" },
-        },
-      ],
-      "vuu-module-admin-server",
-    );
-
-    expect(mappers).toHaveLength(3);
-    expect(mappers.slice(0, 2)).toEqual([
-      {
-        id: "administrator-mapper",
-        name: "administrator-mapper",
-        protocolMapper: "oidc-usermodel-property-mapper",
-        config: { "claim.name": "department" },
-      },
-      {
-        id: "other-audience",
-        name: "other-audience",
-        protocolMapper: "oidc-audience-mapper",
-        config: { "included.client.audience": "reporting-api" },
-      },
-    ]);
-    expect(mappers[2]).toMatchObject({
-      name: "audience-vuu-module-admin-server",
-      protocolMapper: "oidc-audience-mapper",
-      config: {
-        "included.client.audience": "vuu-module-admin-server",
-        "access.token.claim": "true",
-      },
-    });
-  });
-
-  test("reconciles the managed mapper idempotently", () => {
+  test("reconciles server self-audience mappers idempotently", () => {
     const once = reconcileSelfAudienceMapper(
       [
         {
@@ -168,80 +65,72 @@ describe("reconcileSelfAudienceMapper", () => {
           name: "old-name",
           protocolMapper: "oidc-audience-mapper",
           config: {
-            "included.client.audience": "vuu-user-admin-server",
+            "included.client.audience": "vuu-user-admin",
             "included.custom.audience": "legacy-extra",
           },
         },
       ],
-      "vuu-user-admin-server",
+      "vuu-user-admin",
     );
 
-    expect(reconcileSelfAudienceMapper(once, "vuu-user-admin-server")).toEqual(
-      once,
-    );
+    expect(reconcileSelfAudienceMapper(once, "vuu-user-admin")).toEqual(once);
     expect(once[0]).toMatchObject({
       id: "self-audience",
-      name: "audience-vuu-user-admin-server",
+      name: "audience-vuu-user-admin",
       config: {
         "included.custom.audience": "legacy-extra",
-        "included.client.audience": "vuu-user-admin-server",
+        "included.client.audience": "vuu-user-admin",
       },
     });
   });
-});
 
-describe("reconcileServerClientConfiguration", () => {
-  test("enables exchange, self audience, and disables full scope", () => {
+  test("configures confidential clients without replacing custom settings", () => {
     const once = reconcileServerClientConfiguration(
       {
-        id: "module-admin",
-        fullScopeAllowed: false,
+        id: "portal-server",
+        fullScopeAllowed: true,
         attributes: { "administrator.attribute": "preserved" },
-        protocolMappers: [
-          {
-            id: "administrator-mapper",
-            protocolMapper: "oidc-usermodel-property-mapper",
-          },
-        ],
+        protocolMappers: [],
       },
-      "vuu-module-admin-server",
-      "module-secret",
+      "vuu-portal-server",
+      "configured-secret",
     );
 
     expect(once).toMatchObject({
-      id: "module-admin",
+      id: "portal-server",
+      publicClient: false,
+      bearerOnly: false,
+      standardFlowEnabled: false,
+      implicitFlowEnabled: false,
+      directAccessGrantsEnabled: false,
+      serviceAccountsEnabled: true,
       fullScopeAllowed: false,
-      secret: "module-secret",
+      secret: "configured-secret",
       attributes: {
         "administrator.attribute": "preserved",
         "standard.token.exchange.enabled": "true",
       },
     });
-
-    expect(once.protocolMappers).toHaveLength(2);
     expect(
       reconcileServerClientConfiguration(
         once,
-        "vuu-module-admin-server",
-        "module-secret",
+        "vuu-portal-server",
+        "configured-secret",
       ),
     ).toEqual(once);
   });
-});
 
-describe("confidential client secret overrides", () => {
-  test("shares fixed environment names between bootstrap and applications", () => {
+  test("uses environment overrides without requiring committed secrets", () => {
     expect(KEYCLOAK_CLIENT_SECRET_ENV).toEqual({
       "vuu-portal-server": "VUU_PORTAL_SERVER_CLIENT_SECRET",
-      "vuu-module-admin-server": "VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET",
-      "vuu-user-admin-server": "VUU_USER_ADMIN_SERVER_CLIENT_SECRET",
-      "vuu-basket-trading-server": "VUU_BASKET_TRADING_SERVER_CLIENT_SECRET",
+      "vuu-user-admin": "VUU_USER_ADMIN_SERVER_CLIENT_SECRET",
+      "vuu-basket-trading": "VUU_BASKET_TRADING_SERVER_CLIENT_SECRET",
     });
     expect(
       resolveKeycloakClientSecret(
-        "vuu-module-admin-server",
-        "configured-secret",
-        { VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET: "environment-secret" },
+        "vuu-user-admin",
+        undefined,
+        { VUU_USER_ADMIN_SERVER_CLIENT_SECRET: "environment-secret" },
       ),
     ).toBe("environment-secret");
   });

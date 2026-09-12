@@ -1,11 +1,16 @@
 #!/usr/bin/env bun
 
+// Reconciles the configured realm's client roles, hierarchical groups, role
+// mappings, and seeded users. Users receive access through groups only; run
+// keycloak-realm-client.ts first so the realm and clients already exist.
+
 import {
   CLIENT_ROLES,
   GROUP_ROLES,
   MANAGED_CLIENT_ROLE_NAMES,
   planManagedIdChanges,
   planManagedRoleScopeChanges,
+  RETIRED_GROUP_NAMES,
   RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
   type ClientId,
@@ -28,6 +33,7 @@ type GroupRepresentation = {
   id: string;
   name: string;
   path?: string;
+  subGroups?: GroupRepresentation[];
 };
 
 type UserRepresentation = {
@@ -89,15 +95,15 @@ async function main() {
   await removeRetiredRealmRoles(headers);
 
   const groups = new Map<string, GroupRepresentation>();
-  for (const groupName of Object.keys(GROUP_ROLES)) {
-    const group = await ensureGroup(groupName, headers);
-    groups.set(groupName, group);
+  for (const groupPath of Object.keys(GROUP_ROLES)) {
+    const group = await ensureGroupPath(groupPath, headers);
+    groups.set(groupPath, group);
   }
 
-  for (const [groupName, roleRefs] of Object.entries(GROUP_ROLES)) {
+  for (const [groupPath, roleRefs] of Object.entries(GROUP_ROLES)) {
     for (const clientId of Object.keys(CLIENT_ROLES) as ClientId[]) {
       await reconcileGroupClientRoles(
-        groups.get(groupName)!,
+        groups.get(groupPath)!,
         clients.get(clientId)!,
         roleRefs
           .filter((roleRef) => roleRef.clientId === clientId)
@@ -106,6 +112,7 @@ async function main() {
       );
     }
   }
+  await removeRetiredGroups(headers);
 
   for (const user of SEEDED_USERS) {
     const { user: createdUser, created } = await upsertUser(
@@ -119,11 +126,18 @@ async function main() {
 
     await reconcileUserGroups(
       createdUser.id,
-      user.groups.map((groupName) => groups.get(groupName)!),
+      user.groups.map((groupPath) => {
+        const group = groups.get(groupPath);
+        if (!group) {
+          throw new Error(`Desired group ${groupPath} was not loaded`);
+        }
+        return group;
+      }),
       groups,
       headers,
     );
   }
+  await removeDirectManagedClientRolesFromUsers(clients, headers);
 
   console.log(
     `[keycloak] seeded realm ${realm} with ${SEEDED_USERS.length} users, ${roles.size} client roles and ${Object.keys(GROUP_ROLES).length} groups`,
@@ -371,37 +385,86 @@ async function removeRetiredRealmRoles(headers: Record<string, string>) {
   }
 }
 
-async function ensureGroup(name: string, headers: Record<string, string>) {
-  const groups = await requestJson<GroupRepresentation[]>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
-    { headers },
-  );
-
-  const existing = groups.find((group) => group.name === name);
-  if (existing) {
-    return existing;
+async function ensureGroupPath(
+  groupPath: string,
+  headers: Record<string, string>,
+) {
+  const segments = groupPath.split("/").filter(Boolean);
+  if (segments.length === 0) {
+    throw new Error(`Invalid empty Keycloak group path: ${groupPath}`);
   }
 
-  await requestJson(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
-    {
+  let parent: GroupRepresentation | undefined;
+  for (const name of segments) {
+    const childrenUrl = parent
+      ? `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(parent.id)}/children?max=200`
+      : `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups?max=200`;
+    const children = await requestJson<GroupRepresentation[]>(childrenUrl, {
+      headers,
+    });
+    const existing = children.find((group) => group.name === name);
+    if (existing) {
+      parent = existing;
+      continue;
+    }
+
+    const createUrl = parent
+      ? `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(parent.id)}/children`
+      : `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`;
+    await requestJson(createUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({ name }),
-    },
-  );
+    });
 
-  const createdGroups = await requestJson<GroupRepresentation[]>(
-    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups`,
-    { headers },
-  );
-
-  const created = createdGroups.find((group) => group.name === name);
-  if (!created) {
-    throw new Error(`Group ${name} was not returned after creation`);
+    const createdChildren = await requestJson<GroupRepresentation[]>(
+      childrenUrl,
+      { headers },
+    );
+    parent = createdChildren.find((group) => group.name === name);
+    if (!parent) {
+      throw new Error(`Group ${groupPath} was not returned after creation`);
+    }
   }
 
-  return created;
+  return parent;
+}
+
+async function removeRetiredGroups(headers: Record<string, string>) {
+  const groups = await listAllGroups(headers);
+  const retiredNames = new Set(RETIRED_GROUP_NAMES);
+  for (const group of groups) {
+    if (!retiredNames.has(group.name)) {
+      continue;
+    }
+    await requestJson(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}`,
+      { method: "DELETE", headers },
+    );
+    console.log(`[keycloak] retired group '${group.name}' removed`);
+  }
+}
+
+async function listAllGroups(headers: Record<string, string>) {
+  const roots = await requestJson<GroupRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups?max=200`,
+    { headers },
+  );
+  const result: GroupRepresentation[] = [];
+  const visit = async (group: GroupRepresentation) => {
+    result.push(group);
+    const children = await requestJson<GroupRepresentation[]>(
+      `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}/children?max=200`,
+      { headers },
+    );
+    for (const child of children) {
+      await visit(child);
+    }
+  };
+  for (const root of roots) {
+    await visit(root);
+  }
+  return result;
 }
 
 async function reconcileGroupClientRoles(
@@ -546,6 +609,7 @@ async function reconcileUserGroups(
     if (!group) {
       throw new Error(`Desired group ${id} was not loaded`);
     }
+
     await requestJson(
       `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/groups/${encodeURIComponent(group.id)}`,
       {
@@ -562,6 +626,52 @@ async function reconcileUserGroups(
         headers,
       },
     );
+  }
+}
+
+async function removeDirectManagedClientRoles(
+  userId: string,
+  clients: ReadonlyMap<ClientId, ClientRepresentation>,
+  headers: Record<string, string>,
+) {
+  for (const clientId of Object.keys(CLIENT_ROLES) as ClientId[]) {
+    const client = clients.get(clientId);
+    if (!client) {
+      throw new Error(`Client ${clientId} was not loaded`);
+    }
+    const mappingsUrl = `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(userId)}/role-mappings/clients/${encodeURIComponent(client.id)}`;
+    const currentRoles = await requestJson<RoleRepresentation[]>(
+      mappingsUrl,
+      { headers },
+    );
+    const managed = new Set(MANAGED_CLIENT_ROLE_NAMES[clientId]);
+    const directManagedRoles = currentRoles.filter(({ name }) =>
+      managed.has(name),
+    );
+    if (directManagedRoles.length === 0) {
+      continue;
+    }
+    await requestJson(mappingsUrl, {
+      method: "DELETE",
+      headers,
+      body: JSON.stringify(directManagedRoles),
+    });
+    console.log(
+      `[keycloak] removed direct managed roles from ${userId}: ${directManagedRoles.map(({ name }) => `${clientId}:${name}`).join(", ")}`,
+    );
+  }
+}
+
+async function removeDirectManagedClientRolesFromUsers(
+  clients: ReadonlyMap<ClientId, ClientRepresentation>,
+  headers: Record<string, string>,
+) {
+  const users = await requestJson<UserRepresentation[]>(
+    `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users?max=200`,
+    { headers },
+  );
+  for (const user of users) {
+    await removeDirectManagedClientRoles(user.id, clients, headers);
   }
 }
 
