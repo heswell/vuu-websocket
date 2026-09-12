@@ -2,6 +2,7 @@ import type {
   KeycloakAdminSnapshot,
   KeycloakRole,
 } from "../KeycloakAdminClient";
+import { VUU_PORTAL_CLIENT_IDENTIFIER } from "../KeycloakAdminContract";
 
 export const keycloakTimestamp = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -29,6 +30,32 @@ export const userRoleCount = (snapshot: KeycloakAdminSnapshot, userId: string) =
   return snapshot.groupRoles.filter(
     ({ group, client }) => client && groupIds.has(group.id),
   ).length;
+};
+
+export const userModuleAccess = (snapshot: KeycloakAdminSnapshot, userId: string) => {
+  const groupIds = new Set(
+    snapshot.userGroups
+      .filter(({ user }) => user.id === userId)
+      .map(({ group }) => group.id),
+  );
+  const loginRoles = new Set(
+    snapshot.groupRoles
+      .filter(
+        ({ group, role, client }) =>
+          client?.clientId === VUU_PORTAL_CLIENT_IDENTIFIER &&
+          role.name.endsWith("-login") &&
+          groupIds.has(group.id),
+      )
+      .map(({ role }) => role.name),
+  );
+  const roles = [...loginRoles].sort((left, right) =>
+    left < right ? -1 : left > right ? 1 : 0,
+  );
+  return {
+    roles,
+    value: roles.join(","),
+    count: roles.length,
+  };
 };
 
 export const groupUserCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>

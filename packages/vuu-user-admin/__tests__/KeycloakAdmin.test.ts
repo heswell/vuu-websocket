@@ -26,7 +26,11 @@ import { KeycloakUsersProvider } from "../src/modules/keycloak-admin/providers/K
 import { KeycloakGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupRolesProvider";
 import { KeycloakRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakRolesProvider";
 import { KeycloakUserGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider";
-import { groupRoleCount, userRoleCount } from "../src/modules/keycloak-admin/providers/snapshotCounts";
+import {
+  groupRoleCount,
+  userModuleAccess,
+  userRoleCount,
+} from "../src/modules/keycloak-admin/providers/snapshotCounts";
 import { KeycloakAdminService } from "../src/modules/keycloak-admin/services/KeycloakAdminService";
 
 describe("Keycloak admin backend", () => {
@@ -169,10 +173,77 @@ describe("Keycloak admin backend", () => {
       456,
       0,
       0,
+      "",
+      0,
       123,
       123,
       "",
     ]);
+  });
+
+  test("derives sorted module access from vuu-portal group login roles", () => {
+    const user = { id: "u1", username: "alice" };
+    const assignedGroup = { id: "g1", name: "portal-users" };
+    const otherGroup = { id: "g2", name: "other-users" };
+    const portalClient = { id: "portal-client", clientId: "vuu-portal" };
+    const otherClient = { id: "orders-client", clientId: "vuu-orders" };
+    const snapshot = {
+      realm: { realm: "vuu" },
+      users: [user],
+      groups: [assignedGroup, otherGroup],
+      clients: [portalClient, otherClient],
+      clientRoles: [],
+      userGroups: [
+        { user, group: assignedGroup },
+        { user, group: assignedGroup },
+      ],
+      groupRoles: [
+        { group: assignedGroup, client: portalClient, role: { id: "z", name: "z-login" } },
+        { group: assignedGroup, client: portalClient, role: { id: "a", name: "a-login" } },
+        { group: assignedGroup, client: portalClient, role: { id: "a-2", name: "a-login" } },
+        { group: assignedGroup, client: portalClient, role: { id: "read", name: "read" } },
+        { group: assignedGroup, client: otherClient, role: { id: "orders", name: "orders-login" } },
+        { group: otherGroup, client: portalClient, role: { id: "other", name: "other-login" } },
+        { group: assignedGroup, role: { id: "realm", name: "realm-login" } },
+      ],
+      timestamp: 123,
+    };
+
+    expect(userModuleAccess(snapshot, user.id)).toEqual({
+      roles: ["a-login", "z-login"],
+      value: "a-login,z-login",
+      count: 2,
+    });
+
+    const rows: unknown[][] = [];
+    const table = {
+      indexOfKeyField: 0,
+      rows,
+      upsert: (row: unknown[]) => {
+        const index = rows.findIndex(([key]) => key === row[0]);
+        if (index === -1) rows.push(row);
+        else rows[index] = row;
+      },
+      delete: (key: string) => {
+        const index = rows.findIndex(([rowKey]) => rowKey === key);
+        if (index !== -1) rows.splice(index, 1);
+      },
+      rowIndexAtKey: (key: string) => rows.findIndex(([rowKey]) => rowKey === key),
+    };
+    const provider = new KeycloakUsersProvider(table as never);
+    provider.loadSnapshot(snapshot);
+    expect(rows[0]?.[12]).toBe("a-login,z-login");
+    expect(rows[0]?.[13]).toBe(2);
+    provider.loadSnapshot({ ...snapshot, groupRoles: [] });
+    expect(rows[0]?.[12]).toBe("");
+    expect(rows[0]?.[13]).toBe(0);
+    provider.loadSnapshot({
+      ...snapshot,
+      users: [],
+      userGroups: [],
+      groupRoles: [],
+    });
+    expect(rows).toEqual([]);
   });
 
   test("excludes realm roles from role projections and counts", () => {

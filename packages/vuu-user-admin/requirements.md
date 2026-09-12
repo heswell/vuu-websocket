@@ -19,6 +19,11 @@ administration.
 - Providers share one snapshot read during startup and one fresh snapshot after
   every mutation. The refresh coordinator reconciles every admin table so
   multiple server instances converge.
+- The `users` table includes server-derived `module_access` and
+  `module_access_count` fields. They contain sorted, deduplicated `*-login`
+  role names assigned through the user's groups for the `vuu-portal` client
+  only; direct user-role assumptions, realm roles, and non-VUU clients are
+  excluded. The UI maps these login role names to its module descriptors.
 - Supported add, edit, delete, and relationship-assignment RPCs validate their
   inputs, call Keycloak directly, and then refresh the snapshot. VUU edit
   sessions are not used as a persistence mechanism.

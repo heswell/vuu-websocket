@@ -16,6 +16,8 @@ export const usersTable = TableDef({
     { name: "created_at", dataType: "long" },
     { name: "group_count", dataType: "int" },
     { name: "role_count", dataType: "int" },
+    { name: "module_access", dataType: "string" },
+    { name: "module_access_count", dataType: "int" },
     ...auditColumns,
   ],
   keyField: "user_id",
