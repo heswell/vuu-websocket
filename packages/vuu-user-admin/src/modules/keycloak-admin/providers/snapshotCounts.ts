@@ -43,7 +43,7 @@ export const userModuleAccess = (snapshot: KeycloakAdminSnapshot, userId: string
       .filter(
         ({ group, role, client }) =>
           client?.clientId === VUU_PORTAL_CLIENT_IDENTIFIER &&
-          role.name.endsWith("-login") &&
+          (role.name.endsWith("-access") || role.name.endsWith("-login")) &&
           groupIds.has(group.id),
       )
       .map(({ role }) => role.name),

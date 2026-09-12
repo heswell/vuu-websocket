@@ -26,10 +26,12 @@ administration.
   every mutation. The refresh coordinator reconciles every admin table so
   multiple server instances converge.
 - The `users` table includes server-derived `module_access` and
-  `module_access_count` fields. They contain sorted, deduplicated `*-login`
-  role names assigned through the user's groups for the `vuu-portal` client
-  only; direct user-role assumptions, realm roles, and non-VUU clients are
-  excluded. The UI maps these login role names to its module descriptors.
+  `module_access_count` fields. They contain sorted, deduplicated portal module
+  access role names assigned through the user's groups for the `vuu-portal`
+  client only. Current `*-access` role names are supported, with legacy
+  `*-login` names retained for compatibility; direct user-role assumptions,
+  realm roles, and non-VUU clients are excluded. The UI maps these role names to
+  its module descriptors.
 - Identity tables use the standard Vuu `vuuCreatedTimestamp` and
   `vuuUpdatedTimestamp` audit columns for row timestamps; `users`, `groups`,
   and `roles` do not expose a separate `created_at` column.

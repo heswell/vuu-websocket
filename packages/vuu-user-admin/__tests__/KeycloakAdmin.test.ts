@@ -268,7 +268,7 @@ describe("Keycloak admin backend", () => {
     ]);
   });
 
-  test("derives sorted module access from vuu-portal group login roles", () => {
+  test("derives sorted module access from vuu-portal group access roles", () => {
     const user = { id: "u1", username: "alice" };
     const assignedGroup = { id: "g1", name: "portal-users" };
     const otherGroup = { id: "g2", name: "other-users" };
@@ -288,6 +288,7 @@ describe("Keycloak admin backend", () => {
         { group: assignedGroup, client: portalClient, role: { id: "z", name: "z-login" } },
         { group: assignedGroup, client: portalClient, role: { id: "a", name: "a-login" } },
         { group: assignedGroup, client: portalClient, role: { id: "a-2", name: "a-login" } },
+        { group: assignedGroup, client: portalClient, role: { id: "user-admin", name: "user-admin-access" } },
         { group: assignedGroup, client: portalClient, role: { id: "read", name: "read" } },
         { group: assignedGroup, client: otherClient, role: { id: "orders", name: "orders-login" } },
         { group: otherGroup, client: portalClient, role: { id: "other", name: "other-login" } },
@@ -297,9 +298,9 @@ describe("Keycloak admin backend", () => {
     };
 
     expect(userModuleAccess(snapshot, user.id)).toEqual({
-      roles: ["a-login", "z-login"],
-      value: "a-login,z-login",
-      count: 2,
+      roles: ["a-login", "user-admin-access", "z-login"],
+      value: "a-login,user-admin-access,z-login",
+      count: 3,
     });
 
     const rows: unknown[][] = [];
@@ -319,8 +320,8 @@ describe("Keycloak admin backend", () => {
     };
     const provider = new KeycloakUsersProvider(table as never);
     provider.loadSnapshot(snapshot);
-    expect(rows[0]?.[11]).toBe("a-login,z-login");
-    expect(rows[0]?.[12]).toBe(2);
+    expect(rows[0]?.[11]).toBe("a-login,user-admin-access,z-login");
+    expect(rows[0]?.[12]).toBe(3);
     provider.loadSnapshot({ ...snapshot, groupRoles: [] });
     expect(rows[0]?.[11]).toBe("");
     expect(rows[0]?.[12]).toBe(0);
