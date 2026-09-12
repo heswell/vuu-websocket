@@ -13,6 +13,20 @@ export type UserMutationFields = {
   group_ids?: string[];
 };
 
+export const KEYCLOAK_CLIENT_ID_PREFIX = "vuu-";
+
+export const isVuuClientId = (clientId: string) =>
+  clientId.startsWith(KEYCLOAK_CLIENT_ID_PREFIX);
+
+export const assertVuuClientId = (clientId: string) => {
+  if (!isVuuClientId(clientId)) {
+    throw new Error(
+      `Keycloak client identifier must start with "${KEYCLOAK_CLIENT_ID_PREFIX}"`,
+    );
+  }
+  return clientId;
+};
+
 export type AddUserRpcParams = {
   username: string;
 } & UserMutationFields;

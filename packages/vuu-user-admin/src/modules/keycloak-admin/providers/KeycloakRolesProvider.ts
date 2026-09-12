@@ -10,24 +10,7 @@ export class KeycloakRolesProvider extends Provider {
   }
 
   loadSnapshot(snapshot: KeycloakAdminSnapshot) {
-    const realmRows = snapshot.realmRoles.map((role) => {
-      const counts = roleCounts(snapshot, role);
-      return [
-        role.id,
-        role.name,
-        "",
-        "",
-        "",
-        role.description ?? "",
-        counts.groupCount,
-        counts.userCount,
-        keycloakTimestamp(role.createdTimestamp),
-        snapshot.timestamp,
-        snapshot.timestamp,
-        "",
-      ];
-    });
-    const clientRows = snapshot.clientRoles.map(({ client, role }) => {
+    const rows = snapshot.clientRoles.map(({ client, role }) => {
       const counts = roleCounts(snapshot, role, client.id);
       return [
         role.id,
@@ -44,7 +27,6 @@ export class KeycloakRolesProvider extends Provider {
         "",
       ];
     });
-    const rows = [...realmRows, ...clientRows];
     reconcileTableRows(this.table, rows);
     this.loaded = true;
   }

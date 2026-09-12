@@ -272,6 +272,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     return selectedRowCount;
   }
 
+  deselectAll(viewPortId: string) {
+    const viewport = this.getViewportById(viewPortId);
+    const { selectedRowCount } = viewport.deselectRow("", false);
+    return selectedRowCount;
+  }
+
   selectRowRange(
     viewPortId: string,
     fromRowKey: string,

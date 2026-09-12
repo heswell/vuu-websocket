@@ -26,14 +26,16 @@ export const userRoleCount = (snapshot: KeycloakAdminSnapshot, userId: string) =
       .filter(({ user }) => user.id === userId)
       .map(({ group }) => group.id),
   );
-  return snapshot.groupRoles.filter(({ group }) => groupIds.has(group.id)).length;
+  return snapshot.groupRoles.filter(
+    ({ group, client }) => client && groupIds.has(group.id),
+  ).length;
 };
 
 export const groupUserCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
   snapshot.userGroups.filter(({ group }) => group.id === groupId).length;
 
 export const groupRoleCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
-  snapshot.groupRoles.filter(({ group }) => group.id === groupId).length;
+  snapshot.groupRoles.filter(({ group, client }) => client && group.id === groupId).length;
 
 export const roleCounts = (
   snapshot: KeycloakAdminSnapshot,
@@ -42,7 +44,9 @@ export const roleCounts = (
 ) => {
   const assignments = snapshot.groupRoles.filter(
     ({ role: candidate, client }) =>
-      candidate.id === role.id && (client?.id ?? "") === (clientId ?? ""),
+      client &&
+      candidate.id === role.id &&
+      client.id === clientId,
   );
   const groupIds = new Set(assignments.map(({ group }) => group.id));
   return {
