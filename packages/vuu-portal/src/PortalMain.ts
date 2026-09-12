@@ -6,7 +6,10 @@ import {
   LOCAL_KEYCLOAK_CLIENT_SECRETS,
 } from "@heswell/vuu-server";
 import { createModuleRegistry } from "./ModuleRegistry";
-import { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
+import {
+  loadModuleAccessRoles,
+  ModuleDiscoveryModule,
+} from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
@@ -33,7 +36,9 @@ export default async function main() {
     loginSuccessProvider: (user, tableContainer) => ({
       moduleRegistry: createModuleRegistry(tableContainer, user),
     }),
-    modules: [ModuleDiscoveryModule()],
+    modules: [
+      ModuleDiscoveryModule(loadModuleAccessRoles(defaultConfig)),
+    ],
   });
 
   await application.start();

@@ -10,6 +10,12 @@ import {
 import { createModuleRegistry } from "../src/ModuleRegistry";
 import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 
+const moduleAccessRoles = [
+  { moduleName: "moduleAdmin", role: "module-admin-access" },
+  { moduleName: "userAdmin", role: "user-admin-access" },
+  { moduleName: "basket-trading", role: "basket-trading-access" },
+];
+
 describe("portal module registry", () => {
   let lifecycle: LifecycleContainer;
   let vuuServer: VuuServer;
@@ -20,7 +26,7 @@ describe("portal module registry", () => {
       VuuWebSocketOptions().withWsPort(0),
       {},
       LoginTokenService(),
-    ).withModule(ModuleDiscoveryModule());
+    ).withModule(ModuleDiscoveryModule(moduleAccessRoles));
     vuuServer = new VuuServer(config, lifecycle);
     await lifecycle.start();
   });
