@@ -5,7 +5,7 @@ administration.
 
 - HTTPS defaults to `8444`; WebSocket defaults to
   `wss://localhost:8092/websocket-user-admin`.
-- `/api/authn` authenticates with the `vuu-user-admin-server` Keycloak client.
+- `/api/authn` authenticates with the `vuu-user-admin` Keycloak client.
 - The server registers only the `KEYCLOAK_ADMIN` feature module.
 - User, group, client, unified-role, user-group, group-role, and compatibility
   user-group-role providers load complete snapshots from the

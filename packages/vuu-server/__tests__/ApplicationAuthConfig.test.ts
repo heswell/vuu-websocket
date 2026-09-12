@@ -6,8 +6,8 @@ afterEach(() => ConfigFactory.reset());
 
 describe("application authentication configuration", () => {
   test.each([
-    ["vuu-user-admin", "vuu-user-admin-server"],
-    ["vuu-basket-trading", "vuu-basket-trading-server"],
+    ["vuu-user-admin", "vuu-user-admin"],
+    ["vuu-basket-trading", "vuu-basket-trading"],
   ])("%s always exchanges into its own authorization client", (app, clientId) => {
     const config = loadApplicationConfig(app);
 

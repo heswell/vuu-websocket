@@ -24,7 +24,7 @@ authorization cannot diverge.
 
 - HTTPS `8444`;
 - WebSocket `wss://localhost:8092/websocket-user-admin`;
-- Keycloak client and audience `vuu-user-admin-server`; and
+- Keycloak client and audience `vuu-user-admin`; and
 - the `KEYCLOAK_ADMIN` module and its refresh coordinator.
 
 The portal-issued Keycloak access token includes the user-admin server audience.

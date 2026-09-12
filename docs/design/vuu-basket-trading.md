@@ -69,7 +69,7 @@ TLS is enabled for basket trading because the VUU REST server serves HTTPS
 only. The package uses its checked-in development certificate by default;
 deployments must provide their own certificate and key paths.
 
-The public portal client includes `vuu-basket-trading-server` in its token
+The public portal client includes `vuu-basket-trading` in its token
 audience. Basket authentication therefore uses `require-audience` and does not
 require token exchange or a checked-in client secret.
 

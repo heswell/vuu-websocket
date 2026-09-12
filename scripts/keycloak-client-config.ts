@@ -14,18 +14,16 @@ export type ServerClientName = (typeof SERVER_CLIENT_NAMES)[number];
 
 export const KEYCLOAK_CLIENT_SECRET_ENV = {
   "vuu-portal-server": EXISTING_CLIENT_SECRET_ENV["vuu-portal-server"],
-  "vuu-user-admin": EXISTING_CLIENT_SECRET_ENV["vuu-user-admin-server"],
-  "vuu-basket-trading":
-    EXISTING_CLIENT_SECRET_ENV["vuu-basket-trading-server"],
+  "vuu-user-admin": EXISTING_CLIENT_SECRET_ENV["vuu-user-admin"],
+  "vuu-basket-trading": EXISTING_CLIENT_SECRET_ENV["vuu-basket-trading"],
 } as const;
 
 export const SERVER_CLIENT_SECRETS: Partial<
   Record<ServerClientName, string>
 > = {
   "vuu-portal-server": LOCAL_KEYCLOAK_CLIENT_SECRETS["vuu-portal-server"],
-  "vuu-user-admin": LOCAL_KEYCLOAK_CLIENT_SECRETS["vuu-user-admin-server"],
-  "vuu-basket-trading":
-    LOCAL_KEYCLOAK_CLIENT_SECRETS["vuu-basket-trading-server"],
+  "vuu-user-admin": LOCAL_KEYCLOAK_CLIENT_SECRETS["vuu-user-admin"],
+  "vuu-basket-trading": LOCAL_KEYCLOAK_CLIENT_SECRETS["vuu-basket-trading"],
 };
 
 export function resolveKeycloakClientSecret(
