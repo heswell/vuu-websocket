@@ -3,7 +3,6 @@ import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
 import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import {
-  keycloakTimestamp,
   lastLogin,
   userGroupCount,
   userModuleAccess,
@@ -29,7 +28,6 @@ export class KeycloakUsersProvider extends Provider {
         user.emailVerified ?? false,
         user.requiredActions?.includes("UPDATE_PASSWORD") ?? false,
         lastLogin(user),
-        keycloakTimestamp(user.createdTimestamp),
         userGroupCount(snapshot, user.id),
         userRoleCount(snapshot, user.id),
         moduleAccess.value,

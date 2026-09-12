@@ -151,7 +151,6 @@ describe("Keycloak admin backend", () => {
         username: "alice",
         enabled: true,
         requiredActions: ["UPDATE_PASSWORD"],
-        createdTimestamp: 456,
       }],
       groups: [],
       clients: [],
@@ -170,7 +169,6 @@ describe("Keycloak admin backend", () => {
       false,
       true,
       0,
-      456,
       0,
       0,
       "",
@@ -232,11 +230,11 @@ describe("Keycloak admin backend", () => {
     };
     const provider = new KeycloakUsersProvider(table as never);
     provider.loadSnapshot(snapshot);
-    expect(rows[0]?.[12]).toBe("a-login,z-login");
-    expect(rows[0]?.[13]).toBe(2);
+    expect(rows[0]?.[11]).toBe("a-login,z-login");
+    expect(rows[0]?.[12]).toBe(2);
     provider.loadSnapshot({ ...snapshot, groupRoles: [] });
-    expect(rows[0]?.[12]).toBe("");
-    expect(rows[0]?.[13]).toBe(0);
+    expect(rows[0]?.[11]).toBe("");
+    expect(rows[0]?.[12]).toBe(0);
     provider.loadSnapshot({
       ...snapshot,
       users: [],

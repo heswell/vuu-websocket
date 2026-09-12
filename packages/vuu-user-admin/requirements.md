@@ -24,6 +24,9 @@ administration.
   role names assigned through the user's groups for the `vuu-portal` client
   only; direct user-role assumptions, realm roles, and non-VUU clients are
   excluded. The UI maps these login role names to its module descriptors.
+- Identity tables use the standard Vuu `vuuCreatedTimestamp` and
+  `vuuUpdatedTimestamp` audit columns for row timestamps; `users`, `groups`,
+  and `roles` do not expose a separate `created_at` column.
 - Supported add, edit, delete, and relationship-assignment RPCs validate their
   inputs, call Keycloak directly, and then refresh the snapshot. VUU edit
   sessions are not used as a persistence mechanism.
