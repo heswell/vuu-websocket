@@ -62,9 +62,9 @@ const modules = [
 ];
 
 const modulePermissions = [
-  [1, 1, "module-admin-login"],
-  [2, 2, "user-admin-login"],
-  [3, 3, "basket-trading-login"],
+  [1, 1, "module-admin-access"],
+  [2, 2, "user-admin-access"],
+  [3, 3, "basket-trading-access"],
 ];
 
 export const ModuleDiscoveryModule = () =>

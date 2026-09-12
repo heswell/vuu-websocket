@@ -33,9 +33,9 @@ describe("portal module registry", () => {
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("admin", [
-        "module-admin-login",
-        "user-admin-login",
-        "basket-trading-login",
+        "module-admin-access",
+        "user-admin-access",
+        "basket-trading-access",
       ]),
     );
 
@@ -60,7 +60,7 @@ describe("portal module registry", () => {
         path: "/modules/admin",
         mfComponent: "ModuleAdmin",
         mfScope: "ModuleAdmin",
-        mfUrl: "http://localhost:5008",
+        mfUrl: "http://localhost:5002",
         vuu: {
           connectionId: "module-admin",
           restUrl: "https://localhost:8443/api/authn/module-admin",
@@ -78,7 +78,7 @@ describe("portal module registry", () => {
         path: "/users/admin",
         mfComponent: "UserAdmin",
         mfScope: "UserAdmin",
-        mfUrl: "http://localhost:5007",
+        mfUrl: "http://localhost:5003",
         vuu: {
           connectionId: "user-admin",
           restUrl: "https://localhost:8444/api/authn",
@@ -123,12 +123,12 @@ describe("portal module registry", () => {
       "",
       "",
     ]);
-    permissions.insert([7, 4, "module-admin-login"]);
-    permissions.insert([8, 5, "module-admin-login"]);
+    permissions.insert([7, 4, "module-admin-access"]);
+    permissions.insert([8, 5, "module-admin-access"]);
 
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
-      VuuUserWithAuthorizations("admin", ["module-admin-login"]),
+      VuuUserWithAuthorizations("admin", ["module-admin-access"]),
     );
 
     expect(registry.modules).toEqual([
