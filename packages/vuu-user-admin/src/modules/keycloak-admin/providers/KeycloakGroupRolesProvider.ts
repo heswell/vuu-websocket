@@ -9,19 +9,21 @@ export class KeycloakGroupRolesProvider extends Provider {
   }
 
   loadSnapshot(snapshot: KeycloakAdminSnapshot) {
-    const rows = snapshot.groupRoles.map(({ group, role, client }) => [
-      `${group.id}:${client?.id ?? "realm"}:${role.id}`,
-      group.id,
-      group.name,
-      role.id,
-      role.name,
-      client?.id ?? "",
-      client?.clientId ?? "",
-      client?.name ?? client?.clientId ?? "",
-      snapshot.timestamp,
-      snapshot.timestamp,
-      "",
-    ]);
+    const rows = snapshot.groupRoles
+      .filter(({ client }) => client)
+      .map(({ group, role, client }) => [
+        `${group.id}:${client?.id ?? "realm"}:${role.id}`,
+        group.id,
+        group.name,
+        role.id,
+        role.name,
+        client?.id ?? "",
+        client?.clientId ?? "",
+        client?.name ?? client?.clientId ?? "",
+        snapshot.timestamp,
+        snapshot.timestamp,
+        "",
+      ]);
     reconcileTableRows(this.table, rows);
     this.loaded = true;
   }

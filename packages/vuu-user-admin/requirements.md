@@ -14,7 +14,8 @@ administration.
 - Client and client-role reads are limited to client identifiers beginning
   with `vuu-`. Client creation, client-role creation/editing, and client-role
   group assignment/removal reject other client identifiers; realm roles remain
-  available without this restriction.
+  available to mutation APIs but are not loaded into the `roles`,
+  `group_roles`, or `user_group_roles` read models.
 - Providers share one snapshot read during startup and one fresh snapshot after
   every mutation. The refresh coordinator reconciles every admin table so
   multiple server instances converge.
@@ -38,8 +39,8 @@ administration.
   group hierarchy/parent changes.
 - The primary VUU tables are `users`, `groups`, `clients`, `roles`,
   `user_groups`, and `group_roles`. The `user_group_roles` table remains as a
-  flattened compatibility projection. Realm and client roles are unified in
-  `roles`; realm rows have empty client fields.
+  flattened compatibility projection. The `roles` table contains only client
+  roles from `vuu-*` clients.
 - Exact logical columns are declared in `KEYCLOAK_ADMIN_TABLE_CONTRACT` and
   mirror the table definitions: user identity/count and login fields, group
   hierarchy/count fields, unified role/client identity and counts, client

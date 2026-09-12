@@ -71,7 +71,6 @@ export type KeycloakAdminSnapshot = {
   users: KeycloakUser[];
   groups: KeycloakGroup[];
   clients: KeycloakClient[];
-  realmRoles: KeycloakRole[];
   clientRoles: Array<{ client: KeycloakClient; role: KeycloakRole }>;
   userGroups: KeycloakUserGroup[];
   groupRoles: KeycloakGroupRole[];
@@ -176,12 +175,11 @@ export class KeycloakAdminClient {
   }
 
   async readSnapshot(): Promise<KeycloakAdminSnapshot> {
-    const [realm, users, groups, clients, realmRoles] = await Promise.all([
+    const [realm, users, groups, clients] = await Promise.all([
       this.requestJson<KeycloakRealm>(this.realmUrl("")),
       this.listUsers(),
       this.listGroups(),
       this.listClients(),
-      this.listRealmRoles(),
     ]);
 
     const clientRoles = (
@@ -205,10 +203,6 @@ export class KeycloakAdminClient {
     const groupRoles = (
       await Promise.all(
         groups.map(async (group) => {
-          const realmRolesForGroup = (await this.listRolesForGroup(group.id)).map((role) => ({
-            group,
-            role,
-          }));
           const clientRolesForGroup = (
             await Promise.all(
               clients.map(async (client) => {
@@ -217,7 +211,7 @@ export class KeycloakAdminClient {
               }),
             )
           ).flat();
-          return [...realmRolesForGroup, ...clientRolesForGroup];
+          return clientRolesForGroup;
         }),
       )
     ).flat();
@@ -227,7 +221,6 @@ export class KeycloakAdminClient {
       users,
       groups,
       clients,
-      realmRoles,
       clientRoles,
       userGroups,
       groupRoles: dedupeGroupRoles(groupRoles),

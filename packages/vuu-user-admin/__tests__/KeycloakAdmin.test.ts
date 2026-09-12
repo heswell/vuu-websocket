@@ -23,6 +23,10 @@ import {
   usersTable,
 } from "../src/modules/keycloak-admin/KeycloakAdminTableDefs";
 import { KeycloakUsersProvider } from "../src/modules/keycloak-admin/providers/KeycloakUsersProvider";
+import { KeycloakGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupRolesProvider";
+import { KeycloakRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakRolesProvider";
+import { KeycloakUserGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider";
+import { groupRoleCount, userRoleCount } from "../src/modules/keycloak-admin/providers/snapshotCounts";
 import { KeycloakAdminService } from "../src/modules/keycloak-admin/services/KeycloakAdminService";
 
 describe("Keycloak admin backend", () => {
@@ -62,7 +66,7 @@ describe("Keycloak admin backend", () => {
     }
   });
 
-  test("scopes client and client-role reads to vuu clients while retaining realm roles", async () => {
+  test("loads only client roles from in-scope vuu clients", async () => {
     const originalFetch = globalThis.fetch;
     const requests: string[] = [];
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -83,15 +87,15 @@ describe("Keycloak admin backend", () => {
           { status: 200 },
         );
       }
+      if (url.includes("/users?")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (url.includes("/groups?")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
       if (url.includes("/clients/vuu-client-internal/roles?")) {
         return new Response(
           JSON.stringify([{ id: "role-1", name: "trader", clientRole: true }]),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/roles?")) {
-        return new Response(
-          JSON.stringify([{ id: "realm-role-1", name: "operator", clientRole: false }]),
           { status: 200 },
         );
       }
@@ -101,14 +105,13 @@ describe("Keycloak admin backend", () => {
     try {
       process.env.VUU_CONFIG_FILE = "packages/vuu-user-admin/application.conf";
       const client = await KeycloakAdminClient.createFromConfig();
-      const clients = await client.listClients();
-      expect(clients.map(({ clientId }) => clientId)).toEqual(["vuu-orders"]);
-      expect(await client.listClientRoles(clients[0]!)).toEqual([
-        { id: "role-1", name: "trader", clientRole: true },
-      ]);
-      expect(await client.listRealmRoles()).toEqual([
-        { id: "realm-role-1", name: "operator", clientRole: false },
-      ]);
+      const snapshot = await client.readSnapshot();
+      expect(snapshot.clients.map(({ clientId }) => clientId)).toEqual(["vuu-orders"]);
+      expect(snapshot.clientRoles).toEqual([{
+        client: snapshot.clients[0],
+        role: { id: "role-1", name: "trader", clientRole: true },
+      }]);
+      expect(snapshot.groupRoles).toEqual([]);
       await expect(
         client.listClientRoles({ id: "other-client-internal", clientId: "other-app" }),
       ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
@@ -118,6 +121,7 @@ describe("Keycloak admin backend", () => {
           clientId: "other-app",
         }),
       ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
+      expect(requests.some((url) => url.includes("/admin/realms/vuu/roles?"))).toBe(false);
       expect(requests.some((url) => url.includes("other-client-internal/roles"))).toBe(false);
     } finally {
       globalThis.fetch = originalFetch;
@@ -147,7 +151,6 @@ describe("Keycloak admin backend", () => {
       }],
       groups: [],
       clients: [],
-      realmRoles: [],
       clientRoles: [],
       userGroups: [],
       groupRoles: [],
@@ -170,6 +173,53 @@ describe("Keycloak admin backend", () => {
       123,
       "",
     ]);
+  });
+
+  test("excludes realm roles from role projections and counts", () => {
+    const user = { id: "u1", username: "alice" };
+    const group = { id: "g1", name: "traders" };
+    const client = { id: "c1", clientId: "vuu-orders", name: "Orders" };
+    const realmRole = { id: "realm-role", name: "default-roles-vuu" };
+    const clientRole = { id: "client-role", name: "trader" };
+    const snapshot = {
+      realm: { realm: "vuu" },
+      users: [user],
+      groups: [group],
+      clients: [client],
+      clientRoles: [{ client, role: clientRole }],
+      userGroups: [{ user, group }],
+      groupRoles: [
+        { group, role: realmRole },
+        { group, role: clientRole, client },
+      ],
+      timestamp: 123,
+    };
+    const createTable = () => {
+      const rows: unknown[][] = [];
+      return {
+        rows,
+        table: {
+          indexOfKeyField: 0,
+          rows,
+          upsert: (row: unknown[]) => rows.push(row),
+          delete: () => undefined,
+          rowIndexAtKey: () => -1,
+        },
+      };
+    };
+
+    const rolesTable = createTable();
+    new KeycloakRolesProvider(rolesTable.table as never).loadSnapshot(snapshot);
+    const groupRolesTable = createTable();
+    new KeycloakGroupRolesProvider(groupRolesTable.table as never).loadSnapshot(snapshot);
+    const userGroupRolesTable = createTable();
+    new KeycloakUserGroupRolesProvider(userGroupRolesTable.table as never).loadSnapshot(snapshot);
+
+    expect(rolesTable.rows).toHaveLength(1);
+    expect(groupRolesTable.rows).toHaveLength(1);
+    expect(userGroupRolesTable.rows).toHaveLength(1);
+    expect(groupRoleCount(snapshot, group.id)).toBe(1);
+    expect(userRoleCount(snapshot, user.id)).toBe(1);
   });
 
   test("rejects invalid mutation parameters before creating a Keycloak client", async () => {
