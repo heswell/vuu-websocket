@@ -447,6 +447,101 @@ describe("Keycloak admin backend", () => {
     expect(userRoleCount(snapshot, user.id)).toBe(1);
   });
 
+  test("uses each role's owning client for module access roles", () => {
+    const portalClient = {
+      id: "portal-client",
+      clientId: "vuu-portal",
+      name: "Portal",
+    };
+    const basketClient = {
+      id: "basket-client",
+      clientId: "vuu-basket-trading",
+      name: "Basket Trading",
+    };
+    const snapshot = {
+      realm: { realm: "vuu" },
+      users: [],
+      groups: [],
+      clients: [portalClient, basketClient],
+      clientRoles: [
+        {
+          client: basketClient,
+          role: {
+            id: "module-admin",
+            name: "module-admin-access",
+            containerId: portalClient.id,
+          },
+        },
+        {
+          client: basketClient,
+          role: {
+            id: "user-admin",
+            name: "user-admin-access",
+            containerId: portalClient.id,
+          },
+        },
+        {
+          client: basketClient,
+          role: {
+            id: "basket-trading",
+            name: "basket-trading-access",
+            containerId: portalClient.id,
+          },
+        },
+        {
+          client: basketClient,
+          role: {
+            id: "basket-read",
+            name: "read",
+            containerId: basketClient.id,
+          },
+        },
+      ],
+      userGroups: [],
+      groupRoles: [],
+      timestamp: 123,
+    } satisfies KeycloakAdminSnapshot;
+    const rows: unknown[][] = [];
+    const table = {
+      indexOfKeyField: 0,
+      rows,
+      upsert: (row: unknown[]) => rows.push(row),
+      delete: () => undefined,
+      rowIndexAtKey: () => -1,
+    };
+
+    new KeycloakRolesProvider(table as never).loadSnapshot(snapshot);
+
+    expect(
+      rows.map((row) => ({
+        roleName: row[1],
+        clientIdentifier: row[3],
+        clientName: row[4],
+      })),
+    ).toEqual([
+      {
+        roleName: "module-admin-access",
+        clientIdentifier: "vuu-portal",
+        clientName: "Portal",
+      },
+      {
+        roleName: "user-admin-access",
+        clientIdentifier: "vuu-portal",
+        clientName: "Portal",
+      },
+      {
+        roleName: "basket-trading-access",
+        clientIdentifier: "vuu-portal",
+        clientName: "Portal",
+      },
+      {
+        roleName: "read",
+        clientIdentifier: "vuu-basket-trading",
+        clientName: "Basket Trading",
+      },
+    ]);
+  });
+
   test("rejects invalid mutation parameters before creating a Keycloak client", async () => {
     const service = new KeycloakAdminService(
       {} as never,

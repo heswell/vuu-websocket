@@ -1,5 +1,8 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
+import {
+  clientForRole,
+  type KeycloakAdminSnapshot,
+} from "../KeycloakAdminClient";
 import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { roleCounts } from "./snapshotCounts";
@@ -10,7 +13,8 @@ export class KeycloakRolesProvider extends Provider {
   }
 
   loadSnapshot(snapshot: KeycloakAdminSnapshot) {
-    const rows = snapshot.clientRoles.map(({ client, role }) => {
+    const rows = snapshot.clientRoles.map(({ client: requestedClient, role }) => {
+      const client = clientForRole(snapshot.clients, requestedClient, role);
       const counts = roleCounts(snapshot, role, client.id);
       return [
         role.id,
