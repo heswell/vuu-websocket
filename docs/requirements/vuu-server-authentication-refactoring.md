@@ -12,8 +12,8 @@ and audiences:
 | --- | --- | --- | --- |
 | Portal | `vuu-portal-server` | `8443` | `8091/websocket-portal` |
 | Module admin | `vuu-module-admin-server` | `8443` | `8091/websocket-portal` |
-| User admin | `vuu-user-admin-server` | `8444` | `8092/websocket-user-admin` |
-| Basket trading | `vuu-basket-trading-server` | `8445` | `8093/websocket-basket-trading` |
+| User admin | `vuu-user-admin` | `8444` | `8092/websocket-user-admin` |
+| Basket trading | `vuu-basket-trading` | `8445` | `8093/websocket-basket-trading` |
 
 The public `vuu-portal` client must include every backend server client in its
 access-token audience. Bootstrap scripts create those clients, audience mappers,
@@ -32,8 +32,8 @@ portal process. User admin and basket trading retain `POST /api/authn` on ports
 8444 and 8445. Remote profiles always exchange into their own client/audience
 and authorize only from that exchanged token's target-client roles.
 
-Navigation roles (`module-admin-login`, `user-admin-login`, and
-`basket-trading-login`) belong to the public `vuu-portal` client. Resource roles
+Navigation roles (`module-admin-access`, `user-admin-access`, and
+`basket-trading-access`) belong to the public `vuu-portal` client. Resource roles
 belong only to their corresponding confidential clients. Bootstrap disables full
 scope on the public portal and all confidential VUU clients, maps each managed
 client only to its own roles, and removes known legacy roles and stale managed

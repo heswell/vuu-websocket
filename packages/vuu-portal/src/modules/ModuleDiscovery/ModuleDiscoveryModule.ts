@@ -1,14 +1,22 @@
+import fs from "node:fs";
+import { YAML } from "bun";
 import {
   Column,
   ModuleFactory,
   ViewPortDef,
 } from "@heswell/vuu-server";
+import type { Config } from "@heswell/vuu-server";
 import {
   modulePermissionsTable,
   modulesTable,
 } from "./ModuleDiscoveryTableDefs";
 import { ModuleDiscoveryProvider } from "./ModuleDiscoveryProvider";
 import { ModuleDiscoveryService } from "./ModuleDiscoveryService";
+
+export type ModuleAccessRole = {
+  moduleName: string;
+  role: string;
+};
 
 const modules = [
   [
@@ -25,7 +33,7 @@ const modules = [
     "http://localhost:5002",
     "module-admin",
     "wss://localhost:8091/websocket-portal",
-    "https://localhost:8443/api/authn/module-admin"
+    "https://localhost:8443/api/authn"
   ],
   [
     2,
@@ -61,14 +69,52 @@ const modules = [
   ],
 ];
 
-const modulePermissions = [
-  [1, 1, "module-admin-login"],
-  [2, 2, "user-admin-login"],
-  [3, 3, "basket-trading-login"],
-];
+type ModuleAccessConfig = {
+  moduleAccess?: unknown;
+};
 
-export const ModuleDiscoveryModule = () =>
-  ModuleFactory.withNameSpace("MODULE_DISCOVERY")
+export function loadModuleAccessRoles(
+  config: Pick<Config, "getPath">,
+): ModuleAccessRole[] {
+  const filePath = config.getPath(
+    "vuu.portal.moduleAccessFile",
+    "module-access.yaml",
+  );
+  const source = fs.readFileSync(filePath, "utf8");
+  const parsed = YAML.parse(source) as ModuleAccessConfig;
+
+  if (!isRecord(parsed) || !isRecord(parsed.moduleAccess)) {
+    throw new Error(
+      `Module access file '${filePath}' must contain a 'moduleAccess' object`,
+    );
+  }
+
+  return Object.entries(parsed.moduleAccess).map(([moduleName, role]) => {
+    if (typeof role !== "string" || role.trim() === "") {
+      throw new Error(
+        `Module access file '${filePath}' must map '${moduleName}' to a non-empty role`,
+      );
+    }
+    return { moduleName, role };
+  });
+}
+
+export const ModuleDiscoveryModule = (
+  moduleAccessRoles: readonly ModuleAccessRole[],
+) => {
+  const modulePermissions = moduleAccessRoles.map(
+    ({ moduleName, role }, index) => {
+      const module = modules.find(([, name]) => name === moduleName);
+      if (!module) {
+        throw new Error(
+          `Module access configuration references unknown module '${moduleName}'`,
+        );
+      }
+      return [index + 1, module[0], role];
+    },
+  );
+
+  return ModuleFactory.withNameSpace("MODULE_DISCOVERY")
     .addTable(
       modulesTable,
       (table) => new ModuleDiscoveryProvider(table, modules),
@@ -89,3 +135,8 @@ export const ModuleDiscoveryModule = () =>
       (table) => new ModuleDiscoveryProvider(table, modulePermissions),
     )
     .asModule();
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

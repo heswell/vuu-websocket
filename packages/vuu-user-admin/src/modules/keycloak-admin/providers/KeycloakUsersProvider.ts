@@ -3,9 +3,9 @@ import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
 import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import {
-  keycloakTimestamp,
   lastLogin,
   userGroupCount,
+  userModuleAccess,
   userRoleCount,
 } from "./snapshotCounts";
 
@@ -16,23 +16,27 @@ export class KeycloakUsersProvider extends Provider {
 
   loadSnapshot(snapshot: KeycloakAdminSnapshot) {
     const { timestamp } = snapshot;
-    const rows = snapshot.users.map((user) => [
-      user.id,
-      user.username,
-      user.email ?? "",
-      user.firstName ?? "",
-      user.lastName ?? "",
-      user.enabled ?? false,
-      user.emailVerified ?? false,
-      user.requiredActions?.includes("UPDATE_PASSWORD") ?? false,
-      lastLogin(user),
-      keycloakTimestamp(user.createdTimestamp),
-      userGroupCount(snapshot, user.id),
-      userRoleCount(snapshot, user.id),
-      timestamp,
-      timestamp,
-      "",
-    ]);
+    const rows = snapshot.users.map((user) => {
+      const moduleAccess = userModuleAccess(snapshot, user.id);
+      return [
+        user.id,
+        user.username,
+        user.email ?? "",
+        user.firstName ?? "",
+        user.lastName ?? "",
+        user.enabled ?? false,
+        user.emailVerified ?? false,
+        user.requiredActions?.includes("UPDATE_PASSWORD") ?? false,
+        lastLogin(user),
+        userGroupCount(snapshot, user.id),
+        userRoleCount(snapshot, user.id),
+        moduleAccess.value,
+        moduleAccess.count,
+        timestamp,
+        timestamp,
+        "",
+      ];
+    });
     reconcileTableRows(this.table, rows);
     this.loaded = true;
   }

@@ -10,6 +10,12 @@ import {
 import { createModuleRegistry } from "../src/ModuleRegistry";
 import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 
+const moduleAccessRoles = [
+  { moduleName: "moduleAdmin", role: "module-admin-access" },
+  { moduleName: "userAdmin", role: "user-admin-access" },
+  { moduleName: "basket-trading", role: "basket-trading-access" },
+];
+
 describe("portal module registry", () => {
   let lifecycle: LifecycleContainer;
   let vuuServer: VuuServer;
@@ -20,7 +26,7 @@ describe("portal module registry", () => {
       VuuWebSocketOptions().withWsPort(0),
       {},
       LoginTokenService(),
-    ).withModule(ModuleDiscoveryModule());
+    ).withModule(ModuleDiscoveryModule(moduleAccessRoles));
     vuuServer = new VuuServer(config, lifecycle);
     await lifecycle.start();
   });
@@ -33,15 +39,17 @@ describe("portal module registry", () => {
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("admin", [
-        "module-admin-login",
-        "user-admin-login",
-        "basket-trading-login",
+        "module-admin-access",
+        "user-admin-access",
+        "basket-trading-access",
       ]),
     );
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
+        clientIdentifier: "vuu-portal",
         id: 3,
+        loginRole: "basket-trading-access",
         name: "basket-trading",
         vuu: {
           connectionId: "basket",
@@ -50,7 +58,9 @@ describe("portal module registry", () => {
         },
       }),
       {
+        clientIdentifier: "vuu-portal",
         id: 1,
+        loginRole: "module-admin-access",
         name: "moduleAdmin",
         title: "Manage remote modules",
         description: "Create new remote module, update existing modules",
@@ -60,15 +70,17 @@ describe("portal module registry", () => {
         path: "/modules/admin",
         mfComponent: "ModuleAdmin",
         mfScope: "ModuleAdmin",
-        mfUrl: "http://localhost:5008",
+        mfUrl: "http://localhost:5002",
         vuu: {
           connectionId: "module-admin",
-          restUrl: "https://localhost:8443/api/authn/module-admin",
+          restUrl: "https://localhost:8443/api/authn",
           websocketUrl: "wss://localhost:8091/websocket-portal",
         },
       },
       {
+        clientIdentifier: "vuu-portal",
         id: 2,
+        loginRole: "user-admin-access",
         name: "userAdmin",
         title: "Manage users",
         description: "Add, remove and update users",
@@ -78,7 +90,7 @@ describe("portal module registry", () => {
         path: "/users/admin",
         mfComponent: "UserAdmin",
         mfScope: "UserAdmin",
-        mfUrl: "http://localhost:5007",
+        mfUrl: "http://localhost:5003",
         vuu: {
           connectionId: "user-admin",
           restUrl: "https://localhost:8444/api/authn",
@@ -105,7 +117,7 @@ describe("portal module registry", () => {
       "http://localhost:5011",
       "module-admin",
       "wss://localhost:8091/websocket-portal",
-      "https://localhost:8443/api/authn/module-admin",
+      "https://localhost:8443/api/authn",
     ]);
     modules.insert([
       5,
@@ -123,18 +135,20 @@ describe("portal module registry", () => {
       "",
       "",
     ]);
-    permissions.insert([7, 4, "module-admin-login"]);
-    permissions.insert([8, 5, "module-admin-login"]);
+    permissions.insert([7, 4, "module-admin-access"]);
+    permissions.insert([8, 5, "module-admin-access"]);
 
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
-      VuuUserWithAuthorizations("admin", ["module-admin-login"]),
+      VuuUserWithAuthorizations("admin", ["module-admin-access"]),
     );
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
+        clientIdentifier: "vuu-portal",
         id: 4,
         description: "Latest module",
+        loginRole: "module-admin-access",
         version: 2,
       }),
     ]);

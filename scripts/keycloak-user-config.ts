@@ -12,11 +12,7 @@ export const CLIENT_ROLES = {
 export type ClientId = keyof typeof CLIENT_ROLES;
 
 export const RETIRED_CLIENT_ROLES: Record<ClientId, readonly string[]> = {
-  "vuu-portal": [
-    "module-admin-login",
-    "user-admin-login",
-    "basket-trading-login",
-  ],
+  "vuu-portal": [],
   "vuu-portal-server": ["modules.view", "modules.edit"],
   "vuu-user-admin": ["user-admin-view", "user-admin-edit", "users.view", "users.admin"],
   "vuu-basket-trading": [

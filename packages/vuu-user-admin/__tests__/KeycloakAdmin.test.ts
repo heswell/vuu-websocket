@@ -24,9 +24,14 @@ import {
 } from "../src/modules/keycloak-admin/KeycloakAdminTableDefs";
 import { KeycloakUsersProvider } from "../src/modules/keycloak-admin/providers/KeycloakUsersProvider";
 import { KeycloakGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupRolesProvider";
+import { KeycloakGroupsProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupsProvider";
 import { KeycloakRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakRolesProvider";
 import { KeycloakUserGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider";
-import { groupRoleCount, userRoleCount } from "../src/modules/keycloak-admin/providers/snapshotCounts";
+import {
+  groupRoleCount,
+  userModuleAccess,
+  userRoleCount,
+} from "../src/modules/keycloak-admin/providers/snapshotCounts";
 import { KeycloakAdminService } from "../src/modules/keycloak-admin/services/KeycloakAdminService";
 
 describe("Keycloak admin backend", () => {
@@ -59,6 +64,94 @@ describe("Keycloak admin backend", () => {
       const users = await client.listUsers();
       expect(users).toHaveLength(101);
       expect(users.at(-1)?.username).toBe("user-100");
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env.VUU_CONFIG_FILE;
+      ConfigFactory.reset();
+    }
+  });
+
+  test("flattens Keycloak nested groups into the groups read model", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/token")) {
+        return new Response(JSON.stringify({ access_token: "test-token" }), { status: 200 });
+      }
+      if (url.endsWith("/admin/realms/vuu")) {
+        return new Response(JSON.stringify({ realm: "vuu", enabled: true }), { status: 200 });
+      }
+      if (url.includes("/groups?")) {
+        return new Response(
+          JSON.stringify([{ id: "vuu", name: "vuu", path: "/vuu" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/vuu/children?")) {
+        return new Response(
+          JSON.stringify([{ id: "basket", name: "basket-trading", path: "/vuu/basket-trading" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/basket/children?")) {
+        return new Response(
+          JSON.stringify([{ id: "users", name: "users", path: "/vuu/basket-trading/users" }]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/groups/users/children?")) {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      throw new Error(`Unexpected mocked URL ${url}`);
+    }) as typeof fetch;
+
+    try {
+      process.env.VUU_CONFIG_FILE = "packages/vuu-user-admin/application.conf";
+      const client = await KeycloakAdminClient.createFromConfig();
+      const groups = await client.listGroups();
+      expect(groups.map(({ id, name, path, parentId }) => ({
+        id,
+        name,
+        path,
+        parentId,
+      }))).toEqual([
+        { id: "vuu", name: "vuu", path: "/vuu", parentId: undefined },
+        { id: "basket", name: "basket-trading", path: "/vuu/basket-trading", parentId: "vuu" },
+        {
+          id: "users",
+          name: "users",
+          path: "/vuu/basket-trading/users",
+          parentId: "basket",
+        },
+      ]);
+
+      const rows: unknown[][] = [];
+      new KeycloakGroupsProvider({
+        indexOfKeyField: 0,
+        rows,
+        upsert: (row: unknown[]) => rows.push(row),
+        delete: () => undefined,
+        rowIndexAtKey: () => -1,
+      } as never).loadSnapshot({
+        realm: { realm: "vuu" },
+        users: [],
+        groups,
+        clients: [],
+        clientRoles: [],
+        userGroups: [],
+        groupRoles: [],
+        timestamp: 123,
+      });
+      expect(rows).toEqual([[
+        "users",
+        "/vuu/basket-trading/users",
+        "basket",
+        0,
+        0,
+        123,
+        123,
+        "",
+      ]]);
     } finally {
       globalThis.fetch = originalFetch;
       delete process.env.VUU_CONFIG_FILE;
@@ -147,7 +240,6 @@ describe("Keycloak admin backend", () => {
         username: "alice",
         enabled: true,
         requiredActions: ["UPDATE_PASSWORD"],
-        createdTimestamp: 456,
       }],
       groups: [],
       clients: [],
@@ -166,13 +258,80 @@ describe("Keycloak admin backend", () => {
       false,
       true,
       0,
-      456,
       0,
+      0,
+      "",
       0,
       123,
       123,
       "",
     ]);
+  });
+
+  test("derives sorted module access from vuu-portal group access roles", () => {
+    const user = { id: "u1", username: "alice" };
+    const assignedGroup = { id: "g1", name: "portal-users" };
+    const otherGroup = { id: "g2", name: "other-users" };
+    const portalClient = { id: "portal-client", clientId: "vuu-portal" };
+    const otherClient = { id: "orders-client", clientId: "vuu-orders" };
+    const snapshot = {
+      realm: { realm: "vuu" },
+      users: [user],
+      groups: [assignedGroup, otherGroup],
+      clients: [portalClient, otherClient],
+      clientRoles: [],
+      userGroups: [
+        { user, group: assignedGroup },
+        { user, group: assignedGroup },
+      ],
+      groupRoles: [
+        { group: assignedGroup, client: portalClient, role: { id: "z", name: "z-access" } },
+        { group: assignedGroup, client: portalClient, role: { id: "a", name: "a-access" } },
+        { group: assignedGroup, client: portalClient, role: { id: "a-2", name: "a-access" } },
+        { group: assignedGroup, client: portalClient, role: { id: "user-admin", name: "user-admin-access" } },
+        { group: assignedGroup, client: portalClient, role: { id: "read", name: "read" } },
+        { group: assignedGroup, client: otherClient, role: { id: "orders", name: "orders-access" } },
+        { group: otherGroup, client: portalClient, role: { id: "other", name: "other-access" } },
+        { group: assignedGroup, role: { id: "realm", name: "realm-access" } },
+      ],
+      timestamp: 123,
+    };
+
+    expect(userModuleAccess(snapshot, user.id)).toEqual({
+      roles: ["a-access", "user-admin-access", "z-access"],
+      value: "a-access,user-admin-access,z-access",
+      count: 3,
+    });
+
+    const rows: unknown[][] = [];
+    const table = {
+      indexOfKeyField: 0,
+      rows,
+      upsert: (row: unknown[]) => {
+        const index = rows.findIndex(([key]) => key === row[0]);
+        if (index === -1) rows.push(row);
+        else rows[index] = row;
+      },
+      delete: (key: string) => {
+        const index = rows.findIndex(([rowKey]) => rowKey === key);
+        if (index !== -1) rows.splice(index, 1);
+      },
+      rowIndexAtKey: (key: string) => rows.findIndex(([rowKey]) => rowKey === key),
+    };
+    const provider = new KeycloakUsersProvider(table as never);
+    provider.loadSnapshot(snapshot);
+    expect(rows[0]?.[11]).toBe("a-access,user-admin-access,z-access");
+    expect(rows[0]?.[12]).toBe(3);
+    provider.loadSnapshot({ ...snapshot, groupRoles: [] });
+    expect(rows[0]?.[11]).toBe("");
+    expect(rows[0]?.[12]).toBe(0);
+    provider.loadSnapshot({
+      ...snapshot,
+      users: [],
+      userGroups: [],
+      groupRoles: [],
+    });
+    expect(rows).toEqual([]);
   });
 
   test("excludes realm roles from role projections and counts", () => {

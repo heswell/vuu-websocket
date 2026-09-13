@@ -1,0 +1,6 @@
+# Maps each portal module to the Keycloak client role required to access it.
+# This file is intended to become writable through module administration later.
+moduleAccess:
+  moduleAdmin: module-admin-access
+  userAdmin: user-admin-access
+  basket-trading: basket-trading-access

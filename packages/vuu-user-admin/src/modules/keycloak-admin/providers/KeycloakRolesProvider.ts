@@ -2,7 +2,7 @@ import { Provider, type TableContainer } from "@heswell/vuu-server";
 import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
 import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
-import { keycloakTimestamp, roleCounts } from "./snapshotCounts";
+import { roleCounts } from "./snapshotCounts";
 
 export class KeycloakRolesProvider extends Provider {
   async load(_: TableContainer) {
@@ -21,7 +21,6 @@ export class KeycloakRolesProvider extends Provider {
         role.description ?? "",
         counts.groupCount,
         counts.userCount,
-        keycloakTimestamp(role.createdTimestamp),
         snapshot.timestamp,
         snapshot.timestamp,
         "",

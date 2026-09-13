@@ -14,6 +14,7 @@ export type UserMutationFields = {
 };
 
 export const KEYCLOAK_CLIENT_ID_PREFIX = "vuu-";
+export const VUU_PORTAL_CLIENT_IDENTIFIER = "vuu-portal";
 
 export const isVuuClientId = (clientId: string) =>
   clientId.startsWith(KEYCLOAK_CLIENT_ID_PREFIX);
@@ -68,16 +69,16 @@ export type SupportedKeycloakAdminRpc =
 export const KEYCLOAK_ADMIN_TABLE_CONTRACT = {
   users: [
     "user_id", "username", "email", "first_name", "last_name", "enabled",
-    "email_verified", "password_update_required", "last_login", "created_at",
-    "group_count", "role_count",
+    "email_verified", "password_update_required", "last_login", "group_count",
+    "role_count", "module_access", "module_access_count",
   ],
   groups: [
-    "group_id", "group_name", "group_path", "parent_group_id", "user_count",
-    "role_count", "created_at",
+    "group_id", "group_path", "parent_group_id", "user_count",
+    "role_count",
   ],
   roles: [
     "role_id", "role_name", "client_id", "client_identifier", "client_name",
-    "description", "group_count", "user_count", "created_at",
+    "description", "group_count", "user_count",
   ],
   clients: [
     "client_id", "client_identifier", "client_name", "description", "enabled",

@@ -5,7 +5,9 @@ export interface RemoteModuleConnection {
 }
 
 export interface ModuleRecord {
+  clientIdentifier: string;
   id: number;
+  loginRole: string;
   name: string;
   title: string;
   description: string;

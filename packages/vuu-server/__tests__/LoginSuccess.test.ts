@@ -21,7 +21,9 @@ describe("LoginSuccess", () => {
     const moduleRegistry = {
       modules: [
         {
+          clientIdentifier: "vuu-portal",
           id: 1,
+          loginRole: "module-admin-access",
           name: "moduleAdmin",
           title: "Manage remote modules",
           description: "Create new remote module, update existing modules",
@@ -59,7 +61,9 @@ describe("LoginSuccess", () => {
         moduleRegistry: {
           modules: [
             {
+              clientIdentifier: "vuu-portal",
               id: 1,
+              loginRole: "module-admin-access",
               name: "moduleAdmin",
               title: user.name,
               description: user.authorizations.join(","),
