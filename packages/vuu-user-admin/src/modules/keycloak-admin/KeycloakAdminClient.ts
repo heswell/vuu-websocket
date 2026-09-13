@@ -84,6 +84,15 @@ export type KeycloakAdminSnapshot = {
   timestamp: number;
 };
 
+export function clientForRole(
+  clients: KeycloakClient[],
+  requestedClient: KeycloakClient,
+  role: KeycloakRole,
+) {
+  if (!role.containerId) return requestedClient;
+  return clients.find(({ id }) => id === role.containerId) ?? requestedClient;
+}
+
 type TokenResponse = { access_token?: string };
 type BunFetchInit = RequestInit & {
   tls?: { rejectUnauthorized?: boolean };
@@ -193,7 +202,10 @@ export class KeycloakAdminClient {
       await Promise.all(
         clients.map(async (client) => {
           const roles = await this.listClientRoles(client);
-          return roles.map((role) => ({ client, role }));
+          return roles.map((role) => ({
+            client: clientForRole(clients, client, role),
+            role,
+          }));
         }),
       )
     ).flat();
@@ -214,7 +226,11 @@ export class KeycloakAdminClient {
             await Promise.all(
               clients.map(async (client) => {
                 const roles = await this.listClientRolesForGroup(group.id, client);
-                return roles.map((role) => ({ group, role, client }));
+                return roles.map((role) => ({
+                  group,
+                  role,
+                  client: clientForRole(clients, client, role),
+                }));
               }),
             )
           ).flat();
