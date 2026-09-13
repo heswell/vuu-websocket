@@ -45,6 +45,42 @@ export type GroupRoleRpcParams = {
   clientId?: string;
 };
 
+export type GetUserModuleAccessOptionsRpcParams = {
+  userId: string;
+};
+
+export type UserModuleAccessAssignment = {
+  loginRole: string;
+  groupId: string;
+};
+
+export type SetUserModuleAccessRpcParams = {
+  userId: string;
+  /** JSON-encoded UserModuleAccessAssignment[]. */
+  assignments: string;
+};
+
+export type UserModuleAccessGroup = {
+  groupId: string;
+  groupName: string;
+  groupPath?: string;
+  roleId: string;
+  roleName: string;
+  privilege?: string;
+  isDefault: boolean;
+};
+
+export type UserModuleAccessModule = {
+  clientIdentifier: string;
+  loginRole: string;
+  groups: UserModuleAccessGroup[];
+  selectedGroupId?: string;
+};
+
+export type UserModuleAccessOptions = {
+  modules: UserModuleAccessModule[];
+};
+
 export const KEYCLOAK_ADMIN_RPC_CONTRACT = {
   addUser: ["username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
   updateUser: ["userId", "username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
@@ -61,6 +97,8 @@ export const KEYCLOAK_ADMIN_RPC_CONTRACT = {
   removeGroupRole: ["groupId", "groupName", "roleId", "roleName", "clientId"],
   assignUserToGroup: ["userId", "username", "groupId", "groupName"],
   removeUserFromGroup: ["userId", "username", "groupId", "groupName"],
+  getUserModuleAccessOptions: ["userId"],
+  setUserModuleAccess: ["userId", "assignments"],
 } as const;
 
 export type SupportedKeycloakAdminRpc =

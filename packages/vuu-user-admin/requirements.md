@@ -37,11 +37,19 @@ administration.
 - Supported add, edit, delete, and relationship-assignment RPCs validate their
   inputs, call Keycloak directly, and then refresh the snapshot. VUU edit
   sessions are not used as a persistence mechanism.
+- Module-oriented access is exposed through `getUserModuleAccessOptions` with
+  `{ userId }` and `setUserModuleAccess` with
+  `{ userId, assignments }`, where `assignments` is a JSON-encoded array of
+  `{ loginRole, groupId }` objects. Options are derived from current
+  `vuu-portal` `*-access` roles and the groups carrying those roles; saving
+  reconciles only those access-bearing group memberships and preserves
+  unrelated groups.
 - The UI RPC contract is exported from `KeycloakAdminContract.ts`. Supported
   RPC names are `addUser`, `updateUser`, `deleteUser`, `addGroup`,
   `updateGroup`, `deleteGroup`, `addClient`, `updateClient`, `addRole`,
   `addClientRole`, `updateRole`, `assignGroupRole`, `removeGroupRole`,
-  `assignUserToGroup`, and `removeUserFromGroup`. Legacy aliases
+  `assignUserToGroup`, `removeUserFromGroup`, `getUserModuleAccessOptions`, and
+  `setUserModuleAccess`. Legacy aliases
   (`addRoleToGroup`, `assignRoleToGroup`, `removeRoleFromGroup`, and
   `addUserToGroup`) remain registered.
 - `addUser` and `updateUser` validate `temporary_password` as a non-empty

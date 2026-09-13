@@ -7,7 +7,12 @@ import {
   VuuServerConfig,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { KeycloakAdminClient } from "../src/modules/keycloak-admin/KeycloakAdminClient";
+import {
+  buildUserModuleAccessOptions,
+  KeycloakAdminClient,
+  planUserModuleAccessChanges,
+  type KeycloakAdminSnapshot,
+} from "../src/modules/keycloak-admin/KeycloakAdminClient";
 import {
   KEYCLOAK_ADMIN_RPC_CONTRACT,
   KEYCLOAK_ADMIN_TABLE_CONTRACT,
@@ -35,6 +40,67 @@ import {
 import { KeycloakAdminService } from "../src/modules/keycloak-admin/services/KeycloakAdminService";
 
 describe("Keycloak admin backend", () => {
+  const moduleAccessSnapshot = {
+    realm: { realm: "vuu" },
+    users: [
+      { id: "u1", username: "alice" },
+      { id: "u2", username: "bob" },
+    ],
+    groups: [
+      { id: "users", name: "Users", path: "/vuu/orders/users" },
+      { id: "traders", name: "Traders", path: "/vuu/orders/traders" },
+      { id: "unrelated", name: "Unrelated", path: "/vuu/unrelated" },
+    ],
+    clients: [
+      { id: "portal", clientId: "vuu-portal" },
+      { id: "orders", clientId: "vuu-orders" },
+    ],
+    clientRoles: [
+      {
+        client: { id: "portal", clientId: "vuu-portal" },
+        role: { id: "orders-access", name: "orders-access" },
+      },
+    ],
+    userGroups: [
+      {
+        user: { id: "u1", username: "alice" },
+        group: { id: "users", name: "Users", path: "/vuu/orders/users" },
+      },
+      {
+        user: { id: "u1", username: "alice" },
+        group: { id: "unrelated", name: "Unrelated", path: "/vuu/unrelated" },
+      },
+    ],
+    groupRoles: [
+      {
+        group: { id: "users", name: "Users", path: "/vuu/orders/users" },
+        client: { id: "portal", clientId: "vuu-portal" },
+        role: { id: "orders-access", name: "orders-access" },
+      },
+      {
+        group: { id: "traders", name: "Traders", path: "/vuu/orders/traders" },
+        client: { id: "portal", clientId: "vuu-portal" },
+        role: { id: "orders-access", name: "orders-access" },
+      },
+      {
+        group: { id: "users", name: "Users", path: "/vuu/orders/users" },
+        client: { id: "orders", clientId: "vuu-orders" },
+        role: { id: "read", name: "read" },
+      },
+      {
+        group: { id: "traders", name: "Traders", path: "/vuu/orders/traders" },
+        client: { id: "orders", clientId: "vuu-orders" },
+        role: { id: "read", name: "read" },
+      },
+      {
+        group: { id: "traders", name: "Traders", path: "/vuu/orders/traders" },
+        client: { id: "orders", clientId: "vuu-orders" },
+        role: { id: "trade", name: "trade" },
+      },
+    ],
+    timestamp: 123,
+  } satisfies KeycloakAdminSnapshot;
+
   test("reads every user page instead of the seeded users", async () => {
     const originalFetch = globalThis.fetch;
     const firstPage = Array.from({ length: 100 }, (_, index) => ({
@@ -436,6 +502,148 @@ describe("Keycloak admin backend", () => {
     }
   });
 
+  test("returns module access options with the user's selected group", async () => {
+    const client = {
+      getUserModuleAccessOptions: async () => ({
+        modules: [{
+          clientIdentifier: "vuu-portal",
+          loginRole: "orders-access",
+          selectedGroupId: "users",
+          groups: [{
+            groupId: "users",
+            groupName: "Users",
+            groupPath: "/vuu/orders/users",
+            roleId: "orders-access",
+            roleName: "orders-access",
+            privilege: "read",
+            isDefault: true,
+          }],
+        }],
+      }),
+    };
+    const service = new KeycloakAdminService(
+      {} as never,
+      async () => client as never,
+      async () => undefined,
+    );
+    const result = await service.processRpcRequest("getUserModuleAccessOptions", {
+      namedParams: { userId: "u1" },
+      viewport: {} as never,
+      ctx: {} as never,
+    });
+    expect(result).toEqual({
+      type: "SUCCESS_RESULT",
+      data: await client.getUserModuleAccessOptions(),
+    });
+  });
+
+  test("builds module options from portal access-bearing groups", () => {
+    expect(buildUserModuleAccessOptions(moduleAccessSnapshot, "u1")).toEqual({
+      modules: [{
+        clientIdentifier: "vuu-portal",
+        loginRole: "orders-access",
+        selectedGroupId: "users",
+        groups: [
+          {
+            groupId: "traders",
+            groupName: "Traders",
+            groupPath: "/vuu/orders/traders",
+            roleId: "orders-access",
+            roleName: "orders-access",
+            privilege: "trade",
+            isDefault: false,
+          },
+          {
+            groupId: "users",
+            groupName: "Users",
+            groupPath: "/vuu/orders/users",
+            roleId: "orders-access",
+            roleName: "orders-access",
+            privilege: "read",
+            isDefault: true,
+          },
+        ],
+      }],
+    });
+  });
+
+  test("reconciles a module assignment while preserving unrelated groups", async () => {
+    const assignments: Array<{ userId: string; assignments: unknown[] }> = [];
+    const client = {
+      setUserModuleAccess: async (userId: string, next: unknown[]) => {
+        assignments.push({ userId, assignments: next });
+      },
+    };
+    const service = new KeycloakAdminService(
+      {} as never,
+      async () => client as never,
+      async () => undefined,
+    );
+    const result = await service.processRpcRequest("setUserModuleAccess", {
+      namedParams: {
+        userId: "u1",
+        assignments: JSON.stringify([{ loginRole: "orders-access", groupId: "traders" }]),
+      },
+      viewport: {} as never,
+      ctx: {} as never,
+    });
+    expect(result).toEqual({ type: "SUCCESS_RESULT", data: undefined });
+    expect(assignments).toEqual([{
+      userId: "u1",
+      assignments: [{ loginRole: "orders-access", groupId: "traders" }],
+    }]);
+  });
+
+  test("plans removal of module groups without removing unrelated groups", () => {
+    expect(
+      planUserModuleAccessChanges(moduleAccessSnapshot, "u1", []),
+    ).toEqual({
+      addGroupIds: [],
+      removeGroupIds: ["users"],
+    });
+    expect(() =>
+      planUserModuleAccessChanges(moduleAccessSnapshot, "missing", []),
+    ).toThrow("Keycloak user not found: missing");
+  });
+
+  test("rejects invalid module assignments before creating a Keycloak client", async () => {
+    const service = new KeycloakAdminService(
+      {} as never,
+      async () => {
+        throw new Error("client should not be created");
+      },
+      async () => undefined,
+    );
+    const invalidAssignments = [
+      "not-json",
+      JSON.stringify([{ loginRole: "unknown-access", groupId: "users" }]),
+      JSON.stringify([{ loginRole: "orders-access", groupId: "missing" }]),
+    ];
+    for (const assignments of invalidAssignments) {
+      const result = await service.processRpcRequest("setUserModuleAccess", {
+        namedParams: { userId: "u1", assignments },
+        viewport: {} as never,
+        ctx: {} as never,
+      });
+      expect(result.type).toBe("ERROR_RESULT");
+    }
+  });
+
+  test("rejects unknown module and group assignments", () => {
+    expect(() =>
+      planUserModuleAccessChanges(moduleAccessSnapshot, "u1", [{
+        loginRole: "unknown-access",
+        groupId: "users",
+      }]),
+    ).toThrow("Unknown module access role: unknown-access");
+    expect(() =>
+      planUserModuleAccessChanges(moduleAccessSnapshot, "u1", [{
+        loginRole: "orders-access",
+        groupId: "missing",
+      }]),
+    ).toThrow("Keycloak group not found: missing");
+  });
+
   test("defines the complete VUU contract and module", () => {
     const tables = [
       usersTable,
@@ -466,6 +674,11 @@ describe("Keycloak admin backend", () => {
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.addUser).toContain("temporary_password");
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.updateUser).toContain("group_ids");
     expect(KEYCLOAK_ADMIN_RPC_CONTRACT.assignGroupRole).toContain("clientId");
+    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.getUserModuleAccessOptions).toEqual(["userId"]);
+    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.setUserModuleAccess).toEqual([
+      "userId",
+      "assignments",
+    ]);
   });
 
   test("registers clients in the runtime table container", () => {

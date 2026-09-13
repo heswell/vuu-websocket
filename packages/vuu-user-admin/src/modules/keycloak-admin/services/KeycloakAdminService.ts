@@ -57,6 +57,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     tableContainer: TableContainer,
     private readonly createClient: () => Promise<KeycloakAdminClient> =
       KeycloakAdminClient.createFromConfig,
+    private readonly refreshAfterMutation: (reason: string) => Promise<void> =
+      (reason) => this.refreshFromKeycloak(reason),
   ) {
     super(tableContainer);
     this.registerRpc("addUser", this.addUser);
@@ -78,6 +80,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     this.registerRpc("addUserToGroup", this.addUserToGroup);
     this.registerRpc("assignUserToGroup", this.addUserToGroup);
     this.registerRpc("removeUserFromGroup", this.removeUserFromGroup);
+    this.registerRpc("getUserModuleAccessOptions", this.getUserModuleAccessOptions);
+    this.registerRpc("setUserModuleAccess", this.setUserModuleAccess);
   }
 
   private readonly addUser = async ({ namedParams }: RpcParams<Params>) => {
@@ -312,6 +316,32 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       client.removeUserFromGroup(user, group),
     );
 
+  private readonly getUserModuleAccessOptions = async ({
+    namedParams,
+  }: RpcParams<Params>) => {
+    try {
+      const userId = ensureRequiredNonEmptyString(namedParams.userId, "userId");
+      const data = await (await this.createClient()).getUserModuleAccessOptions(userId);
+      return success(data);
+    } catch (error) {
+      return failure(toErrorMessage(error));
+    }
+  };
+
+  private readonly setUserModuleAccess = async ({
+    namedParams,
+  }: RpcParams<Params>) => {
+    try {
+      const userId = ensureRequiredNonEmptyString(namedParams.userId, "userId");
+      const assignments = parseModuleAccessAssignments(namedParams.assignments);
+      await (await this.createClient()).setUserModuleAccess(userId, assignments);
+      await this.refreshAfterMutation("rpc:setUserModuleAccess");
+      return success();
+    } catch (error) {
+      return failure(toErrorMessage(error));
+    }
+  };
+
   private async mutateRelationship(
     namedParams: Params,
     reason: string,
@@ -371,4 +401,44 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     if (!coordinator) throw new Error("Keycloak admin refresh coordinator is not configured");
     await coordinator.refreshAll(reason);
   }
+}
+
+function parseModuleAccessAssignments(value: unknown) {
+  if (value === undefined) {
+    throw new Error('Missing required RPC param "assignments"');
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error('Invalid RPC param "assignments"');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error('Invalid RPC param "assignments": expected JSON array');
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('Invalid RPC param "assignments": expected JSON array');
+  }
+
+  const loginRoles = new Set<string>();
+  return parsed.map((assignment, index) => {
+    if (typeof assignment !== "object" || assignment === null || Array.isArray(assignment)) {
+      throw new Error(`Invalid module access assignment at index ${index}`);
+    }
+    const record = assignment as Record<string, unknown>;
+    const loginRole = ensureRequiredNonEmptyString(
+      record.loginRole,
+      `assignments[${index}].loginRole`,
+    );
+    const groupId = ensureRequiredNonEmptyString(
+      record.groupId,
+      `assignments[${index}].groupId`,
+    );
+    if (loginRoles.has(loginRole)) {
+      throw new Error(`Duplicate module access assignment for role "${loginRole}"`);
+    }
+    loginRoles.add(loginRole);
+    return { loginRole, groupId };
+  });
 }
