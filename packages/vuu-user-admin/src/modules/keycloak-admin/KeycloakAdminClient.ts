@@ -1,5 +1,12 @@
 import { ConfigFactory } from "@heswell/vuu-server";
-import { assertVuuClientId, isVuuClientId } from "./KeycloakAdminContract";
+import {
+  assertVuuClientId,
+  isVuuClientId,
+  VUU_PORTAL_CLIENT_IDENTIFIER,
+  type UserModuleAccessAssignment,
+  type UserModuleAccessModule,
+  type UserModuleAccessOptions,
+} from "./KeycloakAdminContract";
 
 export type KeycloakUser = {
   id: string;
@@ -367,6 +374,29 @@ export class KeycloakAdminClient {
     );
   }
 
+  async getUserModuleAccessOptions(
+    userId: string,
+  ): Promise<UserModuleAccessOptions> {
+    const snapshot = await this.readSnapshot();
+    return buildUserModuleAccessOptions(snapshot, userId);
+  }
+
+  async setUserModuleAccess(
+    userId: string,
+    assignments: readonly UserModuleAccessAssignment[],
+  ) {
+    const snapshot = await this.readSnapshot();
+    const plan = planUserModuleAccessChanges(snapshot, userId, assignments);
+    await Promise.all([
+      ...plan.removeGroupIds.map((groupId) =>
+        this.removeUserFromGroup({ userId }, { groupId }),
+      ),
+      ...plan.addGroupIds.map((groupId) =>
+        this.addUserToGroup({ userId }, { groupId }),
+      ),
+    ]);
+  }
+
   async deleteUser(userId: string) {
     await this.requestNoContent(this.realmUrl(`/users/${encodeURIComponent(userId)}`), {
       method: "DELETE",
@@ -710,6 +740,183 @@ function dedupeGroupRoles(roles: KeycloakGroupRole[]) {
     seen.add(key);
     return true;
   });
+}
+
+export function buildUserModuleAccessOptions(
+  snapshot: KeycloakAdminSnapshot,
+  userId: string,
+): UserModuleAccessOptions {
+  const user = snapshot.users.find(({ id }) => id === userId);
+  if (!user) throw new Error(`Keycloak user not found: ${userId}`);
+
+  const portalClient = snapshot.clients.find(
+    ({ clientId }) => clientId === VUU_PORTAL_CLIENT_IDENTIFIER,
+  );
+  if (!portalClient) return { modules: [] };
+
+  const userGroupIds = new Set(
+    snapshot.userGroups
+      .filter(({ user: candidate }) => candidate.id === userId)
+      .map(({ group }) => group.id),
+  );
+  const groupsById = new Map(snapshot.groups.map((group) => [group.id, group]));
+  const portalRoles = snapshot.clientRoles
+    .filter(
+      ({ client, role }) =>
+        client.id === portalClient.id && role.name.endsWith("-access"),
+    )
+    .sort((left, right) => left.role.name.localeCompare(right.role.name));
+
+  const modules = portalRoles.map(({ role }) => {
+    const groups = snapshot.groupRoles
+      .filter(
+        ({ client, role: candidate }) =>
+          client?.id === portalClient.id && candidate.id === role.id,
+      )
+      .map(({ group }) => group.id)
+      .filter((groupId, index, groupIds) => groupIds.indexOf(groupId) === index)
+      .map((groupId) => {
+        const group = groupsById.get(groupId);
+        if (!group) {
+          throw new Error(`Keycloak group not found in snapshot: ${groupId}`);
+        }
+        const privilegeRoles = snapshot.groupRoles
+          .filter(
+            ({ group: candidate, client }) =>
+              candidate.id === groupId &&
+              client &&
+              client.id !== portalClient.id,
+          )
+          .map(({ role: candidate }) => candidate.name)
+          .filter((name, index, names) => names.indexOf(name) === index)
+          .sort();
+        const privilege = selectPrivilege(privilegeRoles);
+        return {
+          groupId: group.id,
+          groupName: group.name,
+          ...(group.path ? { groupPath: group.path } : {}),
+          roleId: role.id,
+          roleName: role.name,
+          ...(privilege ? { privilege } : {}),
+          isDefault: false,
+        };
+      })
+      .sort(compareModuleAccessGroups);
+
+    if (groups[0]) {
+      const leastPrivilege = groups.reduce((current, candidate) =>
+        privilegeCount(candidate) < privilegeCount(current) ? candidate : current,
+      );
+      leastPrivilege.isDefault = true;
+    }
+
+    const selectedGroups = groups.filter(({ groupId }) => userGroupIds.has(groupId));
+    const selectedGroup = [...selectedGroups].sort(
+      (left, right) =>
+        privilegeCount(right) - privilegeCount(left) ||
+        compareModuleAccessGroups(left, right),
+    )[0];
+
+    const module: UserModuleAccessModule = {
+      clientIdentifier: portalClient.clientId,
+      loginRole: role.name,
+      groups,
+      ...(selectedGroup ? { selectedGroupId: selectedGroup.groupId } : {}),
+    };
+    return module;
+  });
+
+  return { modules };
+}
+
+type UserModuleAccessChangePlan = {
+  addGroupIds: string[];
+  removeGroupIds: string[];
+};
+
+export function planUserModuleAccessChanges(
+  snapshot: KeycloakAdminSnapshot,
+  userId: string,
+  assignments: readonly UserModuleAccessAssignment[],
+): UserModuleAccessChangePlan {
+  const options = buildUserModuleAccessOptions(snapshot, userId);
+  const modulesByRole = new Map(options.modules.map((module) => [module.loginRole, module]));
+  const groupIds = new Set(snapshot.groups.map(({ id }) => id));
+  const desiredGroupIds = new Set<string>();
+
+  for (const assignment of assignments) {
+    const module = modulesByRole.get(assignment.loginRole);
+    if (!module) {
+      throw new Error(`Unknown module access role: ${assignment.loginRole}`);
+    }
+    if (!groupIds.has(assignment.groupId)) {
+      throw new Error(`Keycloak group not found: ${assignment.groupId}`);
+    }
+    if (!module.groups.some(({ groupId }) => groupId === assignment.groupId)) {
+      throw new Error(
+        `Group ${assignment.groupId} does not grant module access role ${assignment.loginRole}`,
+      );
+    }
+    if (desiredGroupIds.has(assignment.groupId)) continue;
+    desiredGroupIds.add(assignment.groupId);
+  }
+
+  const userGroupIds = new Set(
+    snapshot.userGroups
+      .filter(({ user }) => user.id === userId)
+      .map(({ group }) => group.id),
+  );
+  const moduleGroupIds = new Set(
+    options.modules.flatMap((module) => module.groups.map(({ groupId }) => groupId)),
+  );
+  const moduleRolesByGroup = new Map<string, Set<string>>();
+  for (const module of options.modules) {
+    for (const group of module.groups) {
+      const roles = moduleRolesByGroup.get(group.groupId) ?? new Set<string>();
+      roles.add(module.loginRole);
+      moduleRolesByGroup.set(group.groupId, roles);
+    }
+  }
+  for (const groupId of desiredGroupIds) {
+    const roles = moduleRolesByGroup.get(groupId) ?? new Set<string>();
+    const assignedRoles = new Set(
+      assignments
+        .filter(({ groupId: assignedGroupId }) => assignedGroupId === groupId)
+        .map(({ loginRole }) => loginRole),
+    );
+    const omittedRole = [...roles].find((role) => !assignedRoles.has(role));
+    if (omittedRole) {
+      throw new Error(
+        `Group ${groupId} also grants module access role ${omittedRole}; assign that module to the same group or choose another group`,
+      );
+    }
+  }
+
+  return {
+    addGroupIds: [...desiredGroupIds].filter((groupId) => !userGroupIds.has(groupId)),
+    removeGroupIds: [...moduleGroupIds].filter(
+      (groupId) => userGroupIds.has(groupId) && !desiredGroupIds.has(groupId),
+    ),
+  };
+}
+
+function privilegeCount(group: { privilege?: string }) {
+  return group.privilege && group.privilege !== "read" ? 1 : 0;
+}
+
+function selectPrivilege(privileges: string[]) {
+  const elevatedPrivileges = privileges.filter((privilege) => privilege !== "read");
+  return elevatedPrivileges.at(-1) ?? privileges[0];
+}
+
+function compareModuleAccessGroups(
+  left: { groupPath?: string; groupName: string; groupId: string },
+  right: { groupPath?: string; groupName: string; groupId: string },
+) {
+  return (
+    (left.groupPath ?? left.groupName).localeCompare(right.groupPath ?? right.groupName) ||
+    left.groupId.localeCompare(right.groupId)
+  );
 }
 
 function keycloakFetch(url: string, init: RequestInit, allowSelfSignedCert: boolean) {
