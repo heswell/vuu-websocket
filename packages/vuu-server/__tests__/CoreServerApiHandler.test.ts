@@ -50,6 +50,78 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
     });
   });
 
+  describe("CoreServerApiHandler REMOVE_VP", () => {
+    test("returns REMOVE_VP_SUCCESS after removing the viewport", async () => {
+      let removedViewportId: string | undefined;
+      const tableContainer = {};
+      const viewPortContainer = {
+        removeViewport: (viewPortId: string) => {
+          removedViewportId = viewPortId;
+        },
+      };
+      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer as any,
+        tableContainer as any,
+        {} as any,
+      );
+
+      const response = await handler.process(
+        {
+          requestId: "req-remove-1",
+          sessionId: "sess-1",
+          body: { type: "REMOVE_VP", viewPortId: "vp-1" },
+        } as any,
+        buildContext("req-remove-1"),
+      );
+
+      expect(removedViewportId).toBe("vp-1");
+      expect(response).toEqual({
+        body: {
+          type: "REMOVE_VP_SUCCESS",
+          viewPortId: "vp-1",
+        },
+        module: "CORE",
+        requestId: "req-remove-1",
+        sessionId: "sess-1",
+      });
+    });
+
+    test("returns ERROR when the viewport does not exist", async () => {
+      const tableContainer = {};
+      const viewPortContainer = {
+        removeViewport: () => {
+          throw new Error("viewport not found");
+        },
+      };
+      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer as any,
+        tableContainer as any,
+        {} as any,
+      );
+
+      const response = await handler.process(
+        {
+          requestId: "req-remove-1",
+          sessionId: "sess-1",
+          body: { type: "REMOVE_VP", viewPortId: "missing-vp" },
+        } as any,
+        buildContext("req-remove-1"),
+      );
+
+      expect(response).toEqual({
+        body: {
+          type: "ERROR",
+          msg: "Failed to process request req-remove-1",
+        },
+        module: "CORE",
+        requestId: "req-remove-1",
+        sessionId: "sess-1",
+      });
+    });
+  });
+
   describe("CoreServerApiHandler selection", () => {
     test("handles DESELECT_ALL and returns DESELECT_ALL_SUCCESS", async () => {
       let deselectedViewportId: string | undefined;
