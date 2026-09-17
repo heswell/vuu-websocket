@@ -368,14 +368,18 @@ export class CoreServerApiHandler implements ServerApi {
     { viewPortId }: VuuViewportRemoveRequest,
     ctx: RequestContext,
   ) {
-    this.viewPortContainer.removeViewport(viewPortId);
-    return vsMsg(
-      {
-        type: "REMOVE_VP_SUCCESS",
-        viewPortId,
-      },
-      ctx,
-    );
+    try {
+      this.viewPortContainer.removeViewport(viewPortId);
+      return vsMsg(
+        {
+          type: "REMOVE_VP_SUCCESS",
+          viewPortId,
+        },
+        ctx,
+      );
+    } catch (e) {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
   }
 
   private processSelectRowRequest(msg: SelectRowRequest, ctx: RequestContext) {
