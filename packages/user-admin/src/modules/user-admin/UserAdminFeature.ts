@@ -3,7 +3,10 @@ import { UserAdminModule } from "./UserAdminModule";
 import { InMemoryUserAdminStore } from "./InMemoryUserAdminStore";
 import { UserAdminRefreshCoordinator } from "./UserAdminRefreshCoordinator";
 import type { UserAdminModuleOptions } from "./UserAdminModule";
-import type { UserAdminSnapshot } from "../../contracts/UserAdminTypes";
+import type {
+  UserAdminSnapshot,
+  UserAdminSnapshotSource,
+} from "../../contracts/UserAdminTypes";
 
 export type UserAdminFeature = {
   module: ReturnType<typeof UserAdminModule>;
@@ -13,8 +16,15 @@ export type UserAdminFeature = {
   ) => UserAdminRefreshCoordinator;
 };
 
+export type UserAdminFeatureOptions = Omit<
+  UserAdminModuleOptions,
+  "refreshAfterMutation"
+> & {
+  refreshSnapshot?: UserAdminSnapshotSource;
+};
+
 export const createUserAdminFeature = (
-  options: Omit<UserAdminModuleOptions, "refreshAfterMutation">,
+  options: UserAdminFeatureOptions,
 ): UserAdminFeature => {
   let refreshCoordinator: UserAdminRefreshCoordinator | undefined;
   const refreshAfterMutation = async (reason: string) => {
@@ -34,7 +44,7 @@ export const createUserAdminFeature = (
       refreshCoordinator = new UserAdminRefreshCoordinator(
         tableContainer,
         providerContainer,
-        options.snapshotSource,
+        options.refreshSnapshot ?? options.snapshotSource,
       );
       return refreshCoordinator;
     },
