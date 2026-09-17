@@ -1,8 +1,8 @@
 import type {
   UserAdminSnapshot,
   UserAdminRole,
-} from "../../../contracts/UserAdminTypes";
-import { VUU_PORTAL_CLIENT_IDENTIFIER } from "../../../contracts/UserAdminContract";
+} from "@heswell/user-admin";
+import { VUU_PORTAL_CLIENT_IDENTIFIER } from "@heswell/user-admin";
 
 export const userAdminTimestamp = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;

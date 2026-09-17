@@ -1,1 +1,2 @@
-export * from "./modules/user-admin";
+export * from "./contracts";
+export * from "./in-memory";

@@ -1,5 +1,5 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { UserAdminSnapshot } from "../../../contracts/UserAdminTypes";
+import type { UserAdminSnapshot } from "@heswell/user-admin";
 import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { lastLogin } from "./snapshotCounts";

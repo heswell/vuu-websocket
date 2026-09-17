@@ -2,7 +2,7 @@ import { Provider, type TableContainer } from "@heswell/vuu-server";
 import {
   clientForRole,
   type UserAdminSnapshot,
-} from "../../../contracts/UserAdminTypes";
+} from "@heswell/user-admin";
 import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { roleCounts } from "./snapshotCounts";

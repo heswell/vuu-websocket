@@ -2,7 +2,7 @@ import { TableDef } from "@heswell/vuu-server";
 import {
   USER_ADMIN_TABLE_SCHEMAS,
   type UserAdminTableName,
-} from "../../contracts";
+} from "@heswell/user-admin";
 
 const tableDef = (name: UserAdminTableName) => {
   const schema = USER_ADMIN_TABLE_SCHEMAS[name];

@@ -3,9 +3,7 @@ import {
   createConfiguredAuthProviders,
   createVuuServerApplication,
 } from "@heswell/vuu-server";
-import {
-  createUserAdminFeature,
-} from "@heswell/user-admin";
+import { createUserAdminFeature } from "./modules/user-admin";
 import { KeycloakAdminClient } from "./keycloak/KeycloakAdminClient";
 import {
   getKeycloakAdminSnapshot,

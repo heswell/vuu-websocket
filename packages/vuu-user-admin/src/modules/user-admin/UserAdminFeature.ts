@@ -1,12 +1,12 @@
 import type { ProviderContainer, TableContainer } from "@heswell/vuu-server";
 import { UserAdminModule } from "./UserAdminModule";
-import { InMemoryUserAdminStore } from "./InMemoryUserAdminStore";
+import { InMemoryUserAdminStore } from "@heswell/user-admin/in-memory";
 import { UserAdminRefreshCoordinator } from "./UserAdminRefreshCoordinator";
 import type { UserAdminModuleOptions } from "./UserAdminModule";
 import type {
   UserAdminSnapshot,
   UserAdminSnapshotSource,
-} from "../../contracts/UserAdminTypes";
+} from "@heswell/user-admin";
 
 export type UserAdminFeature = {
   module: ReturnType<typeof UserAdminModule>;

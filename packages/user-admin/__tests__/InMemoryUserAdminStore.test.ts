@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  createUserAdminFeature,
-  createInMemoryUserAdminFeature,
-  InMemoryUserAdminStore,
-} from "../src";
+import { InMemoryUserAdminStore } from "../src";
 
 describe("InMemoryUserAdminStore", () => {
   test("updates local memberships while preserving unrelated groups", async () => {
@@ -49,40 +45,5 @@ describe("InMemoryUserAdminStore", () => {
     expect((await store.snapshot()).userGroups.map(({ group }) => group.id)).toEqual([
       "unrelated",
     ]);
-  });
-
-  test("creates an embeddable in-memory VUU feature", () => {
-    expect(createInMemoryUserAdminFeature().module.name).toBe("USER_ADMIN");
-  });
-
-  test("uses the supplied refresh source when reconciling VUU tables", async () => {
-    const snapshot = {
-      users: [],
-      groups: [],
-      clients: [],
-      clientRoles: [],
-      userGroups: [],
-      groupRoles: [],
-      timestamp: 1,
-    };
-    let refreshes = 0;
-    const provider = { loadSnapshot: () => undefined };
-    const feature = createUserAdminFeature({
-      createOperations: async () => new InMemoryUserAdminStore(snapshot),
-      refreshSnapshot: async () => {
-        refreshes += 1;
-        return snapshot;
-      },
-      snapshotSource: async () => snapshot,
-    });
-
-    await feature
-      .install(
-        {} as never,
-        { getProviderForTable: () => provider } as never,
-      )
-      .refreshAll("test");
-
-    expect(refreshes).toBe(1);
   });
 });

@@ -1,21 +1,20 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { UserAdminSnapshot } from "../../../contracts/UserAdminTypes";
+import type { UserAdminSnapshot } from "@heswell/user-admin";
 import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 
-export class UserAdminUserGroupsProvider extends Provider {
+export class UserAdminClientsProvider extends Provider {
   async load(_: TableContainer) {
     this.loadSnapshot(await getUserAdminSnapshot());
   }
 
   loadSnapshot(snapshot: UserAdminSnapshot) {
-    const rows = snapshot.userGroups.map(({ user, group }) => [
-      `${user.id}:${group.id}`,
-      user.id,
-      user.username,
-      group.id,
-      group.name,
-      group.path ?? "",
+    const rows = snapshot.clients.map((client) => [
+      client.id,
+      client.clientId,
+      client.name ?? client.clientId,
+      client.description ?? "",
+      client.enabled ?? true,
       snapshot.timestamp,
       snapshot.timestamp,
       "",

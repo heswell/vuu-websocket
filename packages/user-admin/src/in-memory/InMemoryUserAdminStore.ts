@@ -2,7 +2,7 @@ import {
   VUU_PORTAL_CLIENT_IDENTIFIER,
   type UserModuleAccessAssignment,
   type UserModuleAccessOptions,
-} from "../../contracts/UserAdminContract";
+} from "../contracts/UserAdminContract";
 import type {
   UserAdminClient,
   UserAdminGroup,
@@ -10,7 +10,7 @@ import type {
   UserAdminRole,
   UserAdminSnapshot,
   UserAdminUser,
-} from "../../contracts/UserAdminTypes";
+} from "../contracts/UserAdminTypes";
 
 export class InMemoryUserAdminStore implements UserAdminOperations {
   #nextId = 0;

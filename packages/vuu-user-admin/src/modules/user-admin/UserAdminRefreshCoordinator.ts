@@ -1,5 +1,5 @@
 import { type ProviderContainer, type TableContainer } from "@heswell/vuu-server";
-import type { UserAdminSnapshotSource } from "../../contracts/UserAdminTypes";
+import type { UserAdminSnapshotSource } from "@heswell/user-admin";
 
 const USER_ADMIN_TABLES = [
   "users",
