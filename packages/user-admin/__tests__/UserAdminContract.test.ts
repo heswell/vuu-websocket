@@ -23,6 +23,11 @@ describe("user admin browser contract", () => {
       name: "vuuUpdatedTimestamp",
       serverDataType: "epochtimestamp",
     });
+    for (const schema of Object.values(USER_ADMIN_TABLE_SCHEMAS)) {
+      expect(schema.columns.every(({ serverDataType }) => serverDataType !== undefined)).toBe(
+        true,
+      );
+    }
     expect(USER_ADMIN_RPC_CONTRACT.setUserModuleAccess).toEqual([
       "userId",
       "assignments",
