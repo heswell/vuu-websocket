@@ -15,8 +15,12 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
 const PACKAGE_NAME = "@heswell/user-admin";
-const PACKAGE_DIRECTORY = "packages/user-admin";
+const PACKAGE_DIRECTORY = "dist/user-admin";
 const PACKAGE_JSON_PATH = path.join(ROOT, PACKAGE_DIRECTORY, "package.json");
+const SOURCE_PACKAGE_JSON_PATH = path.join(
+  ROOT,
+  "packages/user-admin/package.json",
+);
 const PUBLISH_VERIFICATION_DELAY_MS = 10_000;
 
 type PackageManifest = {
@@ -38,7 +42,7 @@ type Options = {
 const printHelp = () => {
   console.log(`Usage: npm run pub -- [options]
 
-Publishes ${PACKAGE_NAME} from ${PACKAGE_DIRECTORY}.
+Builds and publishes ${PACKAGE_NAME} from dist/user-admin.
 
 Options:
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
@@ -48,15 +52,35 @@ Options:
 };
 
 const readManifest = (): PackageManifest => {
-  const manifest = JSON.parse(
-    fs.readFileSync(PACKAGE_JSON_PATH, "utf8"),
+  const sourceManifest = JSON.parse(
+    fs.readFileSync(SOURCE_PACKAGE_JSON_PATH, "utf8"),
   ) as Partial<PackageManifest>;
 
-  if (manifest.name !== PACKAGE_NAME || !manifest.version) {
-    throw new Error(`Invalid package manifest at ${PACKAGE_DIRECTORY}.`);
+  if (sourceManifest.name !== PACKAGE_NAME || !sourceManifest.version) {
+    throw new Error("Invalid source package manifest at packages/user-admin.");
   }
 
-  return manifest as PackageManifest;
+  return sourceManifest as PackageManifest;
+};
+
+const assertBuiltPackageMatchesSource = (sourceManifest: PackageManifest) => {
+  if (!fs.existsSync(PACKAGE_JSON_PATH)) {
+    throw new Error(
+      `Build output is missing at ${PACKAGE_DIRECTORY}. Run npm run build:packages.`,
+    );
+  }
+
+  const builtManifest = JSON.parse(
+    fs.readFileSync(PACKAGE_JSON_PATH, "utf8"),
+  ) as Partial<PackageManifest>;
+  if (
+    builtManifest.name !== sourceManifest.name ||
+    builtManifest.version !== sourceManifest.version
+  ) {
+    throw new Error(
+      `Build output is stale at ${PACKAGE_DIRECTORY}. Run npm run build:packages.`,
+    );
+  }
 };
 
 const getOptionValue = (args: string[], index: number, flag: string) => {
@@ -160,17 +184,18 @@ const checkPackageVersion = async () => {
 };
 
 const options = parseOptions();
-readManifest();
+const sourceManifest = readManifest();
 
 if (options.versionCheck) {
   console.table([await checkPackageVersion()]);
 } else {
-  runNpm(["pack", "--dry-run", "--workspace", PACKAGE_NAME]);
+  runNpm(["run", "build:packages"]);
+  assertBuiltPackageMatchesSource(sourceManifest);
+  runNpm(["pack", "--dry-run", `./${PACKAGE_DIRECTORY}`]);
 
   const publishArgs = [
     "publish",
-    "--workspace",
-    PACKAGE_NAME,
+    `./${PACKAGE_DIRECTORY}`,
     "--registry",
     REGISTRY,
     "--access",

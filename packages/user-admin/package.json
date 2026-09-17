@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Reusable VUU user-administration module",
   "type": "module",
-  "main": "dist/src/index.js",
+  "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
@@ -24,8 +24,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "etsc",
-    "build:vuu": "node ../../scripts/build.mjs"
+    "build": "rslib build && bun ./scripts/prepare-package.ts"
   },
   "author": "heswell",
   "license": "MIT"

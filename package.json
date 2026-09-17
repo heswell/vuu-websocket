@@ -7,6 +7,7 @@
     "packages/**"
   ],
   "scripts": {
+    "build:packages": "npm run build --workspace=@heswell/user-admin",
     "keycloak:realm": "bun ./scripts/keycloak-realm-client.ts",
     "keycloak:users": "bun ./scripts/keycloak-users.ts",
     "keycloak:bootstrap": "npm run keycloak:realm && npm run keycloak:users",
@@ -32,6 +33,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@microsoft/api-extractor": "7.59.1",
+    "@rslib/core": "0.23.1",
     "@types/bun": "1.3.3",
     "@vuu-ui/vuu-protocol-types": "2.1.4",
     "typescript": "^5.5.3"

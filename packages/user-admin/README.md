@@ -19,8 +19,9 @@ npm run bump:versions -- --version=1.0.1
 ```
 
 Omit `--version` to increment the patch version. Prereleases use
-`n.n.n-alpha.n` or `n.n.n-beta.n`. Before publishing, inspect the package or
-the registry version:
+`n.n.n-alpha.n` or `n.n.n-beta.n`. Build the publishable package to
+`dist/user-admin` with `npm run build:packages`; `npm run pub` does this
+automatically. Before publishing, inspect the package or the registry version:
 
 ```sh
 npm run pub -- --dry-run
