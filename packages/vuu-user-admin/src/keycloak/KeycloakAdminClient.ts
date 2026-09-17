@@ -6,7 +6,7 @@ import {
   type UserModuleAccessAssignment,
   type UserModuleAccessModule,
   type UserModuleAccessOptions,
-} from "./KeycloakAdminContract";
+} from "@heswell/user-admin";
 
 export type KeycloakUser = {
   id: string;

@@ -1,12 +1,23 @@
-# VUU user administration server
+# Reusable VUU user administration module
 
-`@heswell/vuu-user-admin` is an independent VUU server for Keycloak
-administration.
+`@heswell/user-admin` supplies the reusable VUU user-administration module.
+It has no Keycloak client or configuration dependency: hosts provide a snapshot
+source and persistence operations, or use `createInMemoryUserAdminFeature()`
+for local/demo data that is changed directly in memory. Hosts register
+`UserAdminModule()` (or the `module` returned by a feature) and install its
+refresh coordinator against their VUU server's table and provider containers.
+`@heswell/vuu-user-admin` is the independent Keycloak-backed server wrapper.
+
+The browser-safe `@heswell/user-admin/contracts` entry point contains the
+`USER_ADMIN` table schemas, RPC contracts, and data types shared with future
+client `VuuModule` implementations. The `@heswell/user-admin/in-memory` entry
+point supplies `InMemoryUserAdminStore` for local client/demo table updates;
+neither entry point imports the VUU server feature.
 
 - HTTPS defaults to `8444`; WebSocket defaults to
   `wss://localhost:8092/websocket-user-admin`.
 - `/api/authn` authenticates with the `vuu-user-admin` Keycloak client.
-- The server registers only the `KEYCLOAK_ADMIN` feature module.
+- The module registers only the `USER_ADMIN` feature module.
 - User, group, client, unified-role, user-group, group-role, and compatibility
   user-group-role providers load complete snapshots from the
   Keycloak Admin API. Collection reads follow Keycloak's `first`/`max`
@@ -64,7 +75,7 @@ administration.
   `user_groups`, and `group_roles`. The `user_group_roles` table remains as a
   flattened compatibility projection. The `roles` table contains only client
   roles from `vuu-*` clients.
-- Exact logical columns are declared in `KEYCLOAK_ADMIN_TABLE_CONTRACT` and
+- Exact logical columns are declared in `USER_ADMIN_TABLE_CONTRACT` and
   mirror the table definitions: user identity/count and login fields, leaf
   group path/parent/count fields, unified role/client identity and counts, client
   identity fields, and membership/assignment identity fields. Keycloak

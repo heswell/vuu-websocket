@@ -1,10 +1,10 @@
 import type {
-  KeycloakAdminSnapshot,
-  KeycloakRole,
-} from "../KeycloakAdminClient";
-import { VUU_PORTAL_CLIENT_IDENTIFIER } from "../KeycloakAdminContract";
+  UserAdminSnapshot,
+  UserAdminRole,
+} from "../../../contracts/UserAdminTypes";
+import { VUU_PORTAL_CLIENT_IDENTIFIER } from "../../../contracts/UserAdminContract";
 
-export const keycloakTimestamp = (value: unknown): number => {
+export const userAdminTimestamp = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
@@ -16,12 +16,12 @@ export const keycloakTimestamp = (value: unknown): number => {
 };
 
 export const lastLogin = (user: { attributes?: Record<string, string | string[]> }) =>
-  keycloakTimestamp(user.attributes?.last_login);
+  userAdminTimestamp(user.attributes?.last_login);
 
-export const userGroupCount = (snapshot: KeycloakAdminSnapshot, userId: string) =>
+export const userGroupCount = (snapshot: UserAdminSnapshot, userId: string) =>
   snapshot.userGroups.filter(({ user }) => user.id === userId).length;
 
-export const userRoleCount = (snapshot: KeycloakAdminSnapshot, userId: string) => {
+export const userRoleCount = (snapshot: UserAdminSnapshot, userId: string) => {
   const groupIds = new Set(
     snapshot.userGroups
       .filter(({ user }) => user.id === userId)
@@ -32,7 +32,7 @@ export const userRoleCount = (snapshot: KeycloakAdminSnapshot, userId: string) =
   ).length;
 };
 
-export const userModuleAccess = (snapshot: KeycloakAdminSnapshot, userId: string) => {
+export const userModuleAccess = (snapshot: UserAdminSnapshot, userId: string) => {
   const groupIds = new Set(
     snapshot.userGroups
       .filter(({ user }) => user.id === userId)
@@ -58,10 +58,10 @@ export const userModuleAccess = (snapshot: KeycloakAdminSnapshot, userId: string
   };
 };
 
-export const groupUserCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
+export const groupUserCount = (snapshot: UserAdminSnapshot, groupId: string) =>
   snapshot.userGroups.filter(({ group }) => group.id === groupId).length;
 
-export const leafGroups = (snapshot: KeycloakAdminSnapshot) => {
+export const leafGroups = (snapshot: UserAdminSnapshot) => {
   const parentIds = new Set(
     snapshot.groups
       .map(({ parentId }) => parentId)
@@ -70,12 +70,12 @@ export const leafGroups = (snapshot: KeycloakAdminSnapshot) => {
   return snapshot.groups.filter(({ id }) => !parentIds.has(id));
 };
 
-export const groupRoleCount = (snapshot: KeycloakAdminSnapshot, groupId: string) =>
+export const groupRoleCount = (snapshot: UserAdminSnapshot, groupId: string) =>
   snapshot.groupRoles.filter(({ group, client }) => client && group.id === groupId).length;
 
 export const roleCounts = (
-  snapshot: KeycloakAdminSnapshot,
-  role: KeycloakRole,
+  snapshot: UserAdminSnapshot,
+  role: UserAdminRole,
   clientId?: string,
 ) => {
   const assignments = snapshot.groupRoles.filter(

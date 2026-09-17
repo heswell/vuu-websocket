@@ -1,6 +1,7 @@
 /**
  * The write-only fields in this contract are deliberately not table columns:
- * Keycloak never returns a user's password and it must not be echoed by VUU.
+ * Identity providers never return a user's password and it must not be echoed
+ * by VUU.
  */
 export type UserMutationFields = {
   username?: string;
@@ -13,16 +14,16 @@ export type UserMutationFields = {
   group_ids?: string[];
 };
 
-export const KEYCLOAK_CLIENT_ID_PREFIX = "vuu-";
+export const VUU_CLIENT_ID_PREFIX = "vuu-";
 export const VUU_PORTAL_CLIENT_IDENTIFIER = "vuu-portal";
 
 export const isVuuClientId = (clientId: string) =>
-  clientId.startsWith(KEYCLOAK_CLIENT_ID_PREFIX);
+  clientId.startsWith(VUU_CLIENT_ID_PREFIX);
 
 export const assertVuuClientId = (clientId: string) => {
   if (!isVuuClientId(clientId)) {
     throw new Error(
-      `Keycloak client identifier must start with "${KEYCLOAK_CLIENT_ID_PREFIX}"`,
+      `Managed client identifier must start with "${VUU_CLIENT_ID_PREFIX}"`,
     );
   }
   return clientId;
@@ -81,7 +82,7 @@ export type UserModuleAccessOptions = {
   modules: UserModuleAccessModule[];
 };
 
-export const KEYCLOAK_ADMIN_RPC_CONTRACT = {
+export const USER_ADMIN_RPC_CONTRACT = {
   addUser: ["username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
   updateUser: ["userId", "username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
   deleteUser: ["userId"],
@@ -101,10 +102,10 @@ export const KEYCLOAK_ADMIN_RPC_CONTRACT = {
   setUserModuleAccess: ["userId", "assignments"],
 } as const;
 
-export type SupportedKeycloakAdminRpc =
-  keyof typeof KEYCLOAK_ADMIN_RPC_CONTRACT;
+export type SupportedUserAdminRpc =
+  keyof typeof USER_ADMIN_RPC_CONTRACT;
 
-export const KEYCLOAK_ADMIN_TABLE_CONTRACT = {
+export const USER_ADMIN_TABLE_CONTRACT = {
   users: [
     "user_id", "username", "email", "first_name", "last_name", "enabled",
     "email_verified", "password_update_required", "last_login", "group_count",
@@ -137,3 +138,96 @@ export const KEYCLOAK_ADMIN_TABLE_CONTRACT = {
     "client_name",
   ],
 } as const;
+
+export type UserAdminTableName = keyof typeof USER_ADMIN_TABLE_CONTRACT;
+
+export type UserAdminColumnDataType =
+  | "boolean"
+  | "epochtimestamp"
+  | "int"
+  | "long"
+  | "string";
+
+export type UserAdminTableSchema = {
+  columns: ReadonlyArray<{
+    name: string;
+    serverDataType: UserAdminColumnDataType;
+  }>;
+  key: string;
+  table: {
+    module: "USER_ADMIN";
+    table: UserAdminTableName;
+  };
+};
+
+export const USER_ADMIN_SYSTEM_COLUMNS = [
+  { name: "vuuCreatedTimestamp", serverDataType: "epochtimestamp" },
+  { name: "vuuUpdatedTimestamp", serverDataType: "epochtimestamp" },
+  { name: "vuuMsg", serverDataType: "string" },
+] as const;
+
+const columnTypes: Record<string, UserAdminColumnDataType> = {
+  assignment_id: "string",
+  client_id: "string",
+  client_identifier: "string",
+  client_name: "string",
+  description: "string",
+  email: "string",
+  email_verified: "boolean",
+  enabled: "boolean",
+  first_name: "string",
+  group_count: "int",
+  group_id: "string",
+  group_name: "string",
+  group_path: "string",
+  id: "string",
+  last_login: "long",
+  membership_id: "string",
+  module_access: "string",
+  module_access_count: "int",
+  parent_group_id: "string",
+  password_update_required: "boolean",
+  role_count: "int",
+  role_id: "string",
+  role_name: "string",
+  user_count: "int",
+  user_id: "string",
+  username: "string",
+  vuuCreatedTimestamp: "epochtimestamp",
+  vuuMsg: "string",
+  vuuUpdatedTimestamp: "epochtimestamp",
+};
+
+const tableKeys: Record<UserAdminTableName, string> = {
+  clients: "client_id",
+  group_roles: "assignment_id",
+  groups: "group_id",
+  roles: "role_id",
+  user_group_roles: "id",
+  user_groups: "membership_id",
+  users: "user_id",
+};
+
+const schemaFor = (table: UserAdminTableName): UserAdminTableSchema => ({
+  columns: [
+    ...USER_ADMIN_TABLE_CONTRACT[table],
+    ...USER_ADMIN_SYSTEM_COLUMNS.map(({ name }) => name),
+  ].map((name) => ({
+    name,
+    serverDataType: columnTypes[name],
+  })),
+  key: tableKeys[table],
+  table: { module: "USER_ADMIN", table },
+});
+
+export const USER_ADMIN_TABLE_SCHEMAS: Readonly<
+  Record<UserAdminTableName, UserAdminTableSchema>
+> = {
+  clients: schemaFor("clients"),
+  group_roles: schemaFor("group_roles"),
+  groups: schemaFor("groups"),
+  roles: schemaFor("roles"),
+  user_group_roles: schemaFor("user_group_roles"),
+  user_groups: schemaFor("user_groups"),
+  users: schemaFor("users"),
+};

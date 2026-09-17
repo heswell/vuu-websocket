@@ -1,6 +1,6 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
-import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
+import type { UserAdminSnapshot } from "../../../contracts/UserAdminTypes";
+import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import {
   lastLogin,
@@ -9,12 +9,12 @@ import {
   userRoleCount,
 } from "./snapshotCounts";
 
-export class KeycloakUsersProvider extends Provider {
+export class UserAdminUsersProvider extends Provider {
   async load(_: TableContainer) {
-    this.loadSnapshot(await getKeycloakAdminSnapshot());
+    this.loadSnapshot(await getUserAdminSnapshot());
   }
 
-  loadSnapshot(snapshot: KeycloakAdminSnapshot) {
+  loadSnapshot(snapshot: UserAdminSnapshot) {
     const { timestamp } = snapshot;
     const rows = snapshot.users.map((user) => {
       const moduleAccess = userModuleAccess(snapshot, user.id);

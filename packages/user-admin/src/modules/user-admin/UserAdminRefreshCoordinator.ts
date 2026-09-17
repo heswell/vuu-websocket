@@ -1,8 +1,7 @@
 import { type ProviderContainer, type TableContainer } from "@heswell/vuu-server";
-import type { KeycloakAdminSnapshot } from "./KeycloakAdminClient";
-import { refreshKeycloakAdminSnapshot } from "./KeycloakAdminSnapshotStore";
+import type { UserAdminSnapshotSource } from "../../contracts/UserAdminTypes";
 
-const KEYCLOAK_ADMIN_TABLES = [
+const USER_ADMIN_TABLES = [
   "users",
   "groups",
   "clients",
@@ -12,24 +11,21 @@ const KEYCLOAK_ADMIN_TABLES = [
   "user_group_roles",
 ] as const;
 
-export class KeycloakAdminRefreshCoordinator {
+export class UserAdminRefreshCoordinator {
   #inFlightRefresh: Promise<void> | undefined;
   #refreshTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(
     private readonly tableContainer: TableContainer,
     private readonly providerContainer: ProviderContainer,
+    private readonly snapshotSource: UserAdminSnapshotSource,
   ) {}
 
   refreshAll(reason: string) {
-    if (this.#inFlightRefresh) {
-      return this.#inFlightRefresh;
-    }
-
+    if (this.#inFlightRefresh) return this.#inFlightRefresh;
     this.#inFlightRefresh = this.runRefresh(reason).finally(() => {
       this.#inFlightRefresh = undefined;
     });
-
     return this.#inFlightRefresh;
   }
 
@@ -39,7 +35,7 @@ export class KeycloakAdminRefreshCoordinator {
     }
     this.#refreshTimer = setInterval(() => {
       void this.refreshAll("interval").catch((error) => {
-        console.error("[KeycloakAdminRefreshCoordinator] interval refresh failed", error);
+        console.error("[UserAdminRefreshCoordinator] interval refresh failed", error);
       });
     }, intervalMs);
     this.#refreshTimer.unref?.();
@@ -53,9 +49,9 @@ export class KeycloakAdminRefreshCoordinator {
   }
 
   private async runRefresh(reason: string) {
-    console.log(`[KeycloakAdminRefreshCoordinator] refresh start ${reason}`);
-    const snapshot = await refreshKeycloakAdminSnapshot();
-    for (const tableName of KEYCLOAK_ADMIN_TABLES) {
+    console.log(`[UserAdminRefreshCoordinator] refresh start ${reason}`);
+    const snapshot = await this.snapshotSource();
+    for (const tableName of USER_ADMIN_TABLES) {
       const provider = this.providerContainer.getProviderForTable(tableName);
       if ("loadSnapshot" in provider && typeof provider.loadSnapshot === "function") {
         provider.loadSnapshot(snapshot);
@@ -63,21 +59,6 @@ export class KeycloakAdminRefreshCoordinator {
         await provider.load(this.tableContainer);
       }
     }
-    console.log(`[KeycloakAdminRefreshCoordinator] refresh complete ${reason}`);
+    console.log(`[UserAdminRefreshCoordinator] refresh complete ${reason}`);
   }
 }
-
-let refreshCoordinator: KeycloakAdminRefreshCoordinator | undefined;
-
-export const installKeycloakAdminRefreshCoordinator = (
-  tableContainer: TableContainer,
-  providerContainer: ProviderContainer,
-) => {
-  refreshCoordinator = new KeycloakAdminRefreshCoordinator(
-    tableContainer,
-    providerContainer,
-  );
-  return refreshCoordinator;
-};
-
-export const getKeycloakAdminRefreshCoordinator = () => refreshCoordinator;

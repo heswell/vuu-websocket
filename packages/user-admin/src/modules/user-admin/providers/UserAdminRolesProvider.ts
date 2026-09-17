@@ -1,18 +1,18 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
 import {
   clientForRole,
-  type KeycloakAdminSnapshot,
-} from "../KeycloakAdminClient";
-import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
+  type UserAdminSnapshot,
+} from "../../../contracts/UserAdminTypes";
+import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { roleCounts } from "./snapshotCounts";
 
-export class KeycloakRolesProvider extends Provider {
+export class UserAdminRolesProvider extends Provider {
   async load(_: TableContainer) {
-    this.loadSnapshot(await getKeycloakAdminSnapshot());
+    this.loadSnapshot(await getUserAdminSnapshot());
   }
 
-  loadSnapshot(snapshot: KeycloakAdminSnapshot) {
+  loadSnapshot(snapshot: UserAdminSnapshot) {
     const rows = snapshot.clientRoles.map(({ client: requestedClient, role }) => {
       const client = clientForRole(snapshot.clients, requestedClient, role);
       const counts = roleCounts(snapshot, role, client.id);
