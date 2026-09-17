@@ -4,9 +4,8 @@ import {
   type TableContainer,
 } from "@heswell/vuu-server";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import { KeycloakAdminClient } from "../KeycloakAdminClient";
-import { getKeycloakAdminRefreshCoordinator } from "../KeycloakAdminRefreshCoordinator";
-import { assertVuuClientId } from "../KeycloakAdminContract";
+import { assertVuuClientId } from "../../../contracts/UserAdminContract";
+import type { UserAdminOperations } from "../../../contracts/UserAdminTypes";
 
 type Params = Record<string, unknown>;
 
@@ -52,13 +51,11 @@ const getRequiredEntityRef = (params: Params, idName: string, keyName: string) =
   return { id, key };
 };
 
-export class KeycloakAdminService extends CreateSessionTableRpcHandler {
+export class UserAdminService extends CreateSessionTableRpcHandler {
   constructor(
     tableContainer: TableContainer,
-    private readonly createClient: () => Promise<KeycloakAdminClient> =
-      KeycloakAdminClient.createFromConfig,
-    private readonly refreshAfterMutation: (reason: string) => Promise<void> =
-      (reason) => this.refreshFromKeycloak(reason),
+    private readonly createOperations: () => Promise<UserAdminOperations>,
+    private readonly refreshAfterMutation: (reason: string) => Promise<void>,
   ) {
     super(tableContainer);
     this.registerRpc("addUser", this.addUser);
@@ -98,7 +95,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
         "temporary_password",
       );
       const group_ids = getOptionalStringArray(params.group_ids, "group_ids") ?? [];
-      const client = await this.createClient();
+      const client = await this.createOperations();
       await client.addUser({
         username,
         email,
@@ -110,10 +107,10 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       });
       if (group_ids.length) {
         const user = await client.findUserByUsername(username);
-        if (!user) throw new Error(`Keycloak user not found after creation: ${username}`);
+        if (!user) throw new Error(`User admin user not found after creation: ${username}`);
         await client.syncUserGroups(user.id, group_ids);
       }
-      await this.refreshFromKeycloak("rpc:addUser");
+      await this.refreshAfterMutation("rpc:addUser");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -143,14 +140,14 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       if (Object.keys(update).length === 0 && group_ids === undefined) {
         throw new Error("No user fields supplied");
       }
-      const client = await this.createClient();
+      const client = await this.createOperations();
       if (Object.keys(update).length) {
         await client.updateUser({ userId, ...update });
       }
       if (group_ids !== undefined) {
         await client.syncUserGroups(userId, group_ids);
       }
-      await this.refreshFromKeycloak("rpc:updateUser");
+      await this.refreshAfterMutation("rpc:updateUser");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -160,8 +157,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly deleteUser = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const userId = ensureRequiredNonEmptyString(namedParams.userId, "userId");
-      await (await this.createClient()).deleteUser(userId);
-      await this.refreshFromKeycloak("rpc:deleteUser");
+      await (await this.createOperations()).deleteUser(userId);
+      await this.refreshAfterMutation("rpc:deleteUser");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -171,8 +168,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly addGroup = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
-      await (await this.createClient()).addGroup({ name });
-      await this.refreshFromKeycloak("rpc:addGroup");
+      await (await this.createOperations()).addGroup({ name });
+      await this.refreshAfterMutation("rpc:addGroup");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -183,8 +180,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     try {
       const groupId = ensureRequiredNonEmptyString(namedParams.groupId, "groupId");
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
-      await (await this.createClient()).updateGroup(groupId, { name });
-      await this.refreshFromKeycloak("rpc:updateGroup");
+      await (await this.createOperations()).updateGroup(groupId, { name });
+      await this.refreshAfterMutation("rpc:updateGroup");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -194,8 +191,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   private readonly deleteGroup = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const groupId = ensureRequiredNonEmptyString(namedParams.groupId, "groupId");
-      await (await this.createClient()).deleteGroup(groupId);
-      await this.refreshFromKeycloak("rpc:deleteGroup");
+      await (await this.createOperations()).deleteGroup(groupId);
+      await this.refreshAfterMutation("rpc:deleteGroup");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -209,8 +206,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       const name = getOptionalNonEmptyString(namedParams.name, "name");
       const description = getOptionalNonEmptyString(namedParams.description, "description");
       const enabled = getOptionalBoolean(namedParams.enabled, "enabled") ?? true;
-      await (await this.createClient()).addClient({ clientId, name, description, enabled });
-      await this.refreshFromKeycloak("rpc:addClient");
+      await (await this.createOperations()).addClient({ clientId, name, description, enabled });
+      await this.refreshAfterMutation("rpc:addClient");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -230,8 +227,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
         Object.entries(changes).filter(([, value]) => value !== undefined),
       );
       if (!Object.keys(update).length) throw new Error("No client fields supplied");
-      await (await this.createClient()).updateClient(clientId, update);
-      await this.refreshFromKeycloak("rpc:updateClient");
+      await (await this.createOperations()).updateClient(clientId, update);
+      await this.refreshAfterMutation("rpc:updateClient");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -242,8 +239,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     try {
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
       const description = getOptionalNonEmptyString(namedParams.description, "description") ?? "";
-      await (await this.createClient()).addRole({ name, description });
-      await this.refreshFromKeycloak("rpc:addRole");
+      await (await this.createOperations()).addRole({ name, description });
+      await this.refreshAfterMutation("rpc:addRole");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -256,8 +253,8 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       assertVuuClientId(clientId);
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
       const description = getOptionalNonEmptyString(namedParams.description, "description") ?? "";
-      await (await this.createClient()).addClientRole({ clientKey: clientId }, { name, description });
-      await this.refreshFromKeycloak("rpc:addClientRole");
+      await (await this.createOperations()).addClientRole({ clientKey: clientId }, { name, description });
+      await this.refreshAfterMutation("rpc:addClientRole");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -274,7 +271,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       if (name === undefined && description === undefined) throw new Error("No role fields supplied");
       const clientKey = getOptionalNonEmptyString(namedParams.clientId, "clientId");
       if (clientKey) assertVuuClientId(clientKey);
-      const client = await this.createClient();
+      const client = await this.createOperations();
       if (clientKey) {
         if (!roleName) throw new Error('Missing required RPC param "roleName" for a client role');
         await client.updateClientRole(
@@ -289,7 +286,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
           ...(description === undefined ? {} : { description }),
         });
       }
-      await this.refreshFromKeycloak("rpc:updateRole");
+      await this.refreshAfterMutation("rpc:updateRole");
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -321,7 +318,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
   }: RpcParams<Params>) => {
     try {
       const userId = ensureRequiredNonEmptyString(namedParams.userId, "userId");
-      const data = await (await this.createClient()).getUserModuleAccessOptions(userId);
+      const data = await (await this.createOperations()).getUserModuleAccessOptions(userId);
       return success(data);
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -334,7 +331,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     try {
       const userId = ensureRequiredNonEmptyString(namedParams.userId, "userId");
       const assignments = parseModuleAccessAssignments(namedParams.assignments);
-      await (await this.createClient()).setUserModuleAccess(userId, assignments);
+      await (await this.createOperations()).setUserModuleAccess(userId, assignments);
       await this.refreshAfterMutation("rpc:setUserModuleAccess");
       return success();
     } catch (error) {
@@ -346,7 +343,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     namedParams: Params,
     reason: string,
     mutate: (
-      client: KeycloakAdminClient,
+      client: UserAdminOperations,
       group: { groupId?: string; groupName?: string },
       role: { roleId?: string; roleName?: string },
       clientKey?: string,
@@ -357,14 +354,14 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
       const roleRef = getRequiredEntityRef(namedParams, "roleId", "roleName");
       const clientKey = getOptionalNonEmptyString(namedParams.clientId, "clientId");
       if (clientKey) assertVuuClientId(clientKey);
-      const client = await this.createClient();
+      const client = await this.createOperations();
       await mutate(
         client,
         { groupId: groupRef.id, groupName: groupRef.key },
         { roleId: roleRef.id, roleName: roleRef.key },
         clientKey,
       );
-      await this.refreshFromKeycloak(`rpc:${reason}`);
+      await this.refreshAfterMutation(`rpc:${reason}`);
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
@@ -375,7 +372,7 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     namedParams: Params,
     reason: string,
     mutate: (
-      client: KeycloakAdminClient,
+      client: UserAdminOperations,
       user: { userId?: string; username?: string },
       group: { groupId?: string; groupName?: string },
     ) => Promise<void>,
@@ -383,24 +380,19 @@ export class KeycloakAdminService extends CreateSessionTableRpcHandler {
     try {
       const userRef = getRequiredEntityRef(namedParams, "userId", "username");
       const groupRef = getRequiredEntityRef(namedParams, "groupId", "groupName");
-      const client = await this.createClient();
+      const client = await this.createOperations();
       await mutate(
         client,
         { userId: userRef.id, username: userRef.key },
         { groupId: groupRef.id, groupName: groupRef.key },
       );
-      await this.refreshFromKeycloak(`rpc:${reason}`);
+      await this.refreshAfterMutation(`rpc:${reason}`);
       return success();
     } catch (error) {
       return failure(toErrorMessage(error));
     }
   }
 
-  private async refreshFromKeycloak(reason: string) {
-    const coordinator = getKeycloakAdminRefreshCoordinator();
-    if (!coordinator) throw new Error("Keycloak admin refresh coordinator is not configured");
-    await coordinator.refreshAll(reason);
-  }
 }
 
 function parseModuleAccessAssignments(value: unknown) {

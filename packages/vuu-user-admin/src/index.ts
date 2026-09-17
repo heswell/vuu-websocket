@@ -1,2 +1,2 @@
 export { default } from "./UserAdminMain";
-export * from "./modules/keycloak-admin";
+export * from "@heswell/user-admin";

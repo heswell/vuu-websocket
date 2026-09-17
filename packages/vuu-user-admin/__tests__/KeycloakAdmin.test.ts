@@ -12,12 +12,12 @@ import {
   KeycloakAdminClient,
   planUserModuleAccessChanges,
   type KeycloakAdminSnapshot,
-} from "../src/modules/keycloak-admin/KeycloakAdminClient";
+} from "../src/keycloak/KeycloakAdminClient";
 import {
-  KEYCLOAK_ADMIN_RPC_CONTRACT,
-  KEYCLOAK_ADMIN_TABLE_CONTRACT,
-} from "../src/modules/keycloak-admin/KeycloakAdminContract";
-import { KeycloakAdminModule } from "../src/modules/keycloak-admin/KeycloakAdminModule";
+  USER_ADMIN_RPC_CONTRACT,
+  USER_ADMIN_TABLE_CONTRACT,
+  UserAdminModule,
+} from "@heswell/user-admin";
 import {
   clientsTable,
   groupRolesTable,
@@ -26,18 +26,18 @@ import {
   userGroupsTable,
   userGroupRolesTable,
   usersTable,
-} from "../src/modules/keycloak-admin/KeycloakAdminTableDefs";
-import { KeycloakUsersProvider } from "../src/modules/keycloak-admin/providers/KeycloakUsersProvider";
-import { KeycloakGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupRolesProvider";
-import { KeycloakGroupsProvider } from "../src/modules/keycloak-admin/providers/KeycloakGroupsProvider";
-import { KeycloakRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakRolesProvider";
-import { KeycloakUserGroupRolesProvider } from "../src/modules/keycloak-admin/providers/KeycloakUserGroupRolesProvider";
+} from "@heswell/user-admin";
+import { UserAdminUsersProvider } from "@heswell/user-admin";
+import { UserAdminGroupRolesProvider } from "@heswell/user-admin";
+import { UserAdminGroupsProvider } from "@heswell/user-admin";
+import { UserAdminRolesProvider } from "@heswell/user-admin";
+import { UserAdminUserGroupRolesProvider } from "@heswell/user-admin";
 import {
   groupRoleCount,
   userModuleAccess,
   userRoleCount,
-} from "../src/modules/keycloak-admin/providers/snapshotCounts";
-import { KeycloakAdminService } from "../src/modules/keycloak-admin/services/KeycloakAdminService";
+} from "@heswell/user-admin";
+import { UserAdminService } from "@heswell/user-admin";
 
 describe("Keycloak admin backend", () => {
   const moduleAccessSnapshot = {
@@ -192,7 +192,7 @@ describe("Keycloak admin backend", () => {
       ]);
 
       const rows: unknown[][] = [];
-      new KeycloakGroupsProvider({
+      new UserAdminGroupsProvider({
         indexOfKeyField: 0,
         rows,
         upsert: (row: unknown[]) => rows.push(row),
@@ -273,13 +273,13 @@ describe("Keycloak admin backend", () => {
       expect(snapshot.groupRoles).toEqual([]);
       await expect(
         client.listClientRoles({ id: "other-client-internal", clientId: "other-app" }),
-      ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
+      ).rejects.toThrow('Managed client identifier must start with "vuu-"');
       await expect(
         client.listClientRolesForGroup("group-1", {
           id: "other-client-internal",
           clientId: "other-app",
         }),
-      ).rejects.toThrow('Keycloak client identifier must start with "vuu-"');
+      ).rejects.toThrow('Managed client identifier must start with "vuu-"');
       expect(requests.some((url) => url.includes("/admin/realms/vuu/roles?"))).toBe(false);
       expect(requests.some((url) => url.includes("other-client-internal/roles"))).toBe(false);
     } finally {
@@ -298,7 +298,7 @@ describe("Keycloak admin backend", () => {
       delete: () => undefined,
       rowIndexAtKey: () => -1,
     };
-    const provider = new KeycloakUsersProvider(table as never);
+    const provider = new UserAdminUsersProvider(table as never);
     provider.loadSnapshot({
       realm: { realm: "vuu" },
       users: [{
@@ -384,7 +384,7 @@ describe("Keycloak admin backend", () => {
       },
       rowIndexAtKey: (key: string) => rows.findIndex(([rowKey]) => rowKey === key),
     };
-    const provider = new KeycloakUsersProvider(table as never);
+    const provider = new UserAdminUsersProvider(table as never);
     provider.loadSnapshot(snapshot);
     expect(rows[0]?.[11]).toBe("a-access,user-admin-access,z-access");
     expect(rows[0]?.[12]).toBe(3);
@@ -434,11 +434,11 @@ describe("Keycloak admin backend", () => {
     };
 
     const rolesTable = createTable();
-    new KeycloakRolesProvider(rolesTable.table as never).loadSnapshot(snapshot);
+    new UserAdminRolesProvider(rolesTable.table as never).loadSnapshot(snapshot);
     const groupRolesTable = createTable();
-    new KeycloakGroupRolesProvider(groupRolesTable.table as never).loadSnapshot(snapshot);
+    new UserAdminGroupRolesProvider(groupRolesTable.table as never).loadSnapshot(snapshot);
     const userGroupRolesTable = createTable();
-    new KeycloakUserGroupRolesProvider(userGroupRolesTable.table as never).loadSnapshot(snapshot);
+    new UserAdminUserGroupRolesProvider(userGroupRolesTable.table as never).loadSnapshot(snapshot);
 
     expect(rolesTable.rows).toHaveLength(1);
     expect(groupRolesTable.rows).toHaveLength(1);
@@ -510,7 +510,7 @@ describe("Keycloak admin backend", () => {
       rowIndexAtKey: () => -1,
     };
 
-    new KeycloakRolesProvider(table as never).loadSnapshot(snapshot);
+    new UserAdminRolesProvider(table as never).loadSnapshot(snapshot);
 
     expect(
       rows.map((row) => ({
@@ -543,7 +543,7 @@ describe("Keycloak admin backend", () => {
   });
 
   test("rejects invalid mutation parameters before creating a Keycloak client", async () => {
-    const service = new KeycloakAdminService(
+    const service = new UserAdminService(
       {} as never,
       async () => {
         throw new Error("client should not be created");
@@ -561,7 +561,7 @@ describe("Keycloak admin backend", () => {
   });
 
   test("rejects non-vuu client mutations before creating a Keycloak client", async () => {
-    const service = new KeycloakAdminService(
+    const service = new UserAdminService(
       {} as never,
       async () => {
         throw new Error("client should not be created");
@@ -592,7 +592,7 @@ describe("Keycloak admin backend", () => {
       });
       expect(result).toEqual({
         type: "ERROR_RESULT",
-        errorMessage: 'Keycloak client identifier must start with "vuu-"',
+        errorMessage: 'Managed client identifier must start with "vuu-"',
       });
     }
   });
@@ -616,7 +616,7 @@ describe("Keycloak admin backend", () => {
         }],
       }),
     };
-    const service = new KeycloakAdminService(
+    const service = new UserAdminService(
       {} as never,
       async () => client as never,
       async () => undefined,
@@ -669,7 +669,7 @@ describe("Keycloak admin backend", () => {
         assignments.push({ userId, assignments: next });
       },
     };
-    const service = new KeycloakAdminService(
+    const service = new UserAdminService(
       {} as never,
       async () => client as never,
       async () => undefined,
@@ -702,7 +702,7 @@ describe("Keycloak admin backend", () => {
   });
 
   test("rejects invalid module assignments before creating a Keycloak client", async () => {
-    const service = new KeycloakAdminService(
+    const service = new UserAdminService(
       {} as never,
       async () => {
         throw new Error("client should not be created");
@@ -763,14 +763,14 @@ describe("Keycloak admin backend", () => {
         table.columns
           .filter(({ name }) => !name.startsWith("vuu"))
           .map(({ name }) => name),
-      ).toEqual(KEYCLOAK_ADMIN_TABLE_CONTRACT[table.name as keyof typeof KEYCLOAK_ADMIN_TABLE_CONTRACT]);
+      ).toEqual(USER_ADMIN_TABLE_CONTRACT[table.name as keyof typeof USER_ADMIN_TABLE_CONTRACT]);
     }
-    expect(KeycloakAdminModule()).toBeDefined();
-    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.addUser).toContain("temporary_password");
-    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.updateUser).toContain("group_ids");
-    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.assignGroupRole).toContain("clientId");
-    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.getUserModuleAccessOptions).toEqual(["userId"]);
-    expect(KEYCLOAK_ADMIN_RPC_CONTRACT.setUserModuleAccess).toEqual([
+    expect(UserAdminModule()).toBeDefined();
+    expect(USER_ADMIN_RPC_CONTRACT.addUser).toContain("temporary_password");
+    expect(USER_ADMIN_RPC_CONTRACT.updateUser).toContain("group_ids");
+    expect(USER_ADMIN_RPC_CONTRACT.assignGroupRole).toContain("clientId");
+    expect(USER_ADMIN_RPC_CONTRACT.getUserModuleAccessOptions).toEqual(["userId"]);
+    expect(USER_ADMIN_RPC_CONTRACT.setUserModuleAccess).toEqual([
       "userId",
       "assignments",
     ]);
@@ -782,17 +782,17 @@ describe("Keycloak admin backend", () => {
         VuuWebSocketOptions().withWsPort(0),
         {},
         LoginTokenService(),
-        [KeycloakAdminModule()],
+        [UserAdminModule()],
       ),
       new LifecycleContainer(),
     );
 
     expect(server.tableContainer.getDefinedTables()).toContainEqual({
-      module: "KEYCLOAK_ADMIN",
+      module: "USER_ADMIN",
       table: "clients",
     });
     expect(server.tableContainer.getTable("clients").schema.table).toEqual({
-      module: "KEYCLOAK_ADMIN",
+      module: "USER_ADMIN",
       table: "clients",
     });
   });

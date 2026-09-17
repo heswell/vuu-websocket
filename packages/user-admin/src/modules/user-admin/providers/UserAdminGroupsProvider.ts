@@ -1,15 +1,15 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { KeycloakAdminSnapshot } from "../KeycloakAdminClient";
-import { getKeycloakAdminSnapshot } from "../KeycloakAdminSnapshotStore";
+import type { UserAdminSnapshot } from "../../../contracts/UserAdminTypes";
+import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { groupRoleCount, groupUserCount, leafGroups } from "./snapshotCounts";
 
-export class KeycloakGroupsProvider extends Provider {
+export class UserAdminGroupsProvider extends Provider {
   async load(_: TableContainer) {
-    this.loadSnapshot(await getKeycloakAdminSnapshot());
+    this.loadSnapshot(await getUserAdminSnapshot());
   }
 
-  loadSnapshot(snapshot: KeycloakAdminSnapshot) {
+  loadSnapshot(snapshot: UserAdminSnapshot) {
     const rows = leafGroups(snapshot).map((group) => [
       group.id,
       group.path ?? "",

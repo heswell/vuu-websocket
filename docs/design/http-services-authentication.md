@@ -20,12 +20,16 @@ authorization cannot diverge.
 
 ## User administration
 
-`@heswell/vuu-user-admin` is an independent server:
+`@heswell/user-admin` supplies the reusable `USER_ADMIN` module, its table
+definitions, RPC contract, providers, refresh coordinator, and an in-memory
+demo implementation. It has no Keycloak dependency. `@heswell/vuu-user-admin`
+consumes that package and is the independent server that supplies all Keycloak
+configuration, synchronization, and persistence:
 
 - HTTPS `8444`;
 - WebSocket `wss://localhost:8092/websocket-user-admin`;
 - Keycloak client and audience `vuu-user-admin`; and
-- the `KEYCLOAK_ADMIN` module and its refresh coordinator.
+- the `USER_ADMIN` module and its refresh coordinator.
 
 The portal-issued Keycloak access token includes the user-admin server audience.
 The UI exchanges it through the user-admin `/api/authn` endpoint,
@@ -105,8 +109,8 @@ Confidential client secrets use these environment overrides in both bootstrap
 and applications: `VUU_PORTAL_SERVER_CLIENT_SECRET`,
 `VUU_MODULE_ADMIN_SERVER_CLIENT_SECRET`,
 `VUU_USER_ADMIN_SERVER_CLIENT_SECRET`, and
-`VUU_BASKET_TRADING_SERVER_CLIENT_SECRET`. `KEYCLOAK_ADMIN_USERNAME` and
-`KEYCLOAK_ADMIN_PASSWORD` remain separate bootstrap/Admin API credentials.
+`VUU_BASKET_TRADING_SERVER_CLIENT_SECRET`. `USER_ADMIN_USERNAME` and
+`USER_ADMIN_PASSWORD` remain separate bootstrap/Admin API credentials.
 Secrets are never written to logs.
 
 ## Intentional generic support
@@ -117,7 +121,7 @@ fixed, server-owned `always-exchange` profiles, while portal navigation uses
 `require-audience`; `exchange-if-needed` remains a generic library policy, not
 a deployment compatibility path.
 
-The `KEYCLOAK_ADMIN` role, group-role, and user-group-role tables also remain.
+The `USER_ADMIN` role, group-role, and user-group-role tables also remain.
 They expose live realm-role administration generically and no longer filter the
 role table through the retired VUU seed-role names. VUU application
 authorization roles are client roles and remain managed by bootstrap.
