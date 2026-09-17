@@ -4,8 +4,7 @@ import {
   type TableContainer,
 } from "@heswell/vuu-server";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import { assertVuuClientId } from "../../../contracts/UserAdminContract";
-import type { UserAdminOperations } from "../../../contracts/UserAdminTypes";
+import { assertVuuClientId, type UserAdminOperations } from "@heswell/user-admin";
 
 type Params = Record<string, unknown>;
 

@@ -1,7 +1,7 @@
 import type {
   UserAdminSnapshot,
   UserAdminSnapshotSource,
-} from "../../contracts/UserAdminTypes";
+} from "@heswell/user-admin";
 
 let snapshotSource: UserAdminSnapshotSource | undefined;
 

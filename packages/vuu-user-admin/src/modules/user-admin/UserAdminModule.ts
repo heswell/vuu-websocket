@@ -28,7 +28,7 @@ import {
 import type {
   UserAdminOperations,
   UserAdminSnapshotSource,
-} from "../../contracts/UserAdminTypes";
+} from "@heswell/user-admin";
 
 const adminViewport = (
   table: DataTable,

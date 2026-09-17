@@ -1,7 +1,5 @@
-export * from "../../contracts/UserAdminContract";
 export * from "./UserAdminModule";
 export * from "./UserAdminTableDefs";
-export * from "./InMemoryUserAdminStore";
 export * from "./providers/UserAdminClientsProvider";
 export * from "./providers/UserAdminGroupRolesProvider";
 export * from "./providers/UserAdminGroupsProvider";
@@ -12,6 +10,5 @@ export * from "./providers/UserAdminUsersProvider";
 export * from "./providers/snapshotCounts";
 export * from "./services/UserAdminService";
 export * from "./UserAdminSnapshotStore";
-export * from "../../contracts/UserAdminTypes";
 export * from "./UserAdminFeature";
 export * from "./UserAdminRefreshCoordinator";

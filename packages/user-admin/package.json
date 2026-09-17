@@ -28,9 +28,5 @@
     "build:vuu": "node ../../scripts/build.mjs"
   },
   "author": "heswell",
-  "license": "MIT",
-  "dependencies": {
-    "@heswell/data": "3.0.0",
-    "@heswell/vuu-server": "3.0.0"
-  }
+  "license": "MIT"
 }

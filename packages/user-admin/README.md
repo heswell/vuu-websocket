@@ -1,20 +1,20 @@
 # `@heswell/user-admin`
 
-`@heswell/user-admin` provides a reusable user-administration domain for VUU.
-It has three entry points:
+`@heswell/user-admin` provides browser-safe, reusable user-administration
+contracts and an in-memory demo store. It has three entry points:
 
 | Import | Use |
 | --- | --- |
-| `@heswell/user-admin` | Server-side VUU feature, providers, and RPC dispatcher. |
+| `@heswell/user-admin` | Browser-safe contracts and in-memory demo store. |
 | `@heswell/user-admin/contracts` | Browser-safe table schemas, RPC names, and domain types. |
 | `@heswell/user-admin/in-memory` | Browser-safe in-memory state and mutation implementation for demos. |
 
 ## Client-side VuuModule integration
 
 Use this guide when implementing a client/demo module such as
-`packages/vuu-data-test/src/user-admin/UserAdminModule.ts`. Do not import the
-package root in browser code: it includes `@heswell/vuu-server`. Import only
-`contracts` and, for a local demo, `in-memory`.
+`packages/vuu-data-test/src/user-admin/UserAdminModule.ts`. The package root
+is browser-safe; `contracts` and `in-memory` remain available as focused entry
+points.
 
 ### 1. Define the module class
 
@@ -73,9 +73,7 @@ const store = new InMemoryUserAdminStore(initialSnapshot);
 Call the matching store operation for a user-admin RPC, then project the new
 `await store.snapshot()` into the local tables. Keep this projection in the
 client module; `InMemoryUserAdminStore` deliberately does not import or depend
-on browser `Table` APIs. A server-backed feature can additionally supply
-`refreshSnapshot` to `createUserAdminFeature()` so periodic reconciliation
-retrieves a fresh external snapshot rather than reusing the startup snapshot.
+on browser `Table` APIs.
 
 | Snapshot collection | Target table |
 | --- | --- |

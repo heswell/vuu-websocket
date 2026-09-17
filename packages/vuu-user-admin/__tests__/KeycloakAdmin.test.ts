@@ -16,9 +16,9 @@ import {
 import {
   USER_ADMIN_RPC_CONTRACT,
   USER_ADMIN_TABLE_CONTRACT,
-  UserAdminModule,
 } from "@heswell/user-admin";
 import {
+  UserAdminModule,
   clientsTable,
   groupRolesTable,
   groupsTable,
@@ -26,18 +26,16 @@ import {
   userGroupsTable,
   userGroupRolesTable,
   usersTable,
-} from "@heswell/user-admin";
-import { UserAdminUsersProvider } from "@heswell/user-admin";
-import { UserAdminGroupRolesProvider } from "@heswell/user-admin";
-import { UserAdminGroupsProvider } from "@heswell/user-admin";
-import { UserAdminRolesProvider } from "@heswell/user-admin";
-import { UserAdminUserGroupRolesProvider } from "@heswell/user-admin";
-import {
+  UserAdminUsersProvider,
+  UserAdminGroupRolesProvider,
+  UserAdminGroupsProvider,
+  UserAdminRolesProvider,
+  UserAdminUserGroupRolesProvider,
   groupRoleCount,
   userModuleAccess,
   userRoleCount,
-} from "@heswell/user-admin";
-import { UserAdminService } from "@heswell/user-admin";
+  UserAdminService,
+} from "../src/modules/user-admin";
 
 describe("Keycloak admin backend", () => {
   const moduleAccessSnapshot = {

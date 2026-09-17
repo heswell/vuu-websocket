@@ -1,1 +1,1 @@
-export { InMemoryUserAdminStore } from "../modules/user-admin/InMemoryUserAdminStore";
+export { InMemoryUserAdminStore } from "./InMemoryUserAdminStore";
