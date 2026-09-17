@@ -32,6 +32,15 @@ type NpmMetadata = {
   "dist-tags"?: Record<string, string>;
 };
 
+type PackageVersionCheck = {
+  "npm alpha": string;
+  "npm beta": string;
+  "npm latest": string;
+  package: string;
+  "package.json": string;
+  published: boolean;
+};
+
 type Options = {
   dryRun: boolean;
   packageName: PublishablePackageName;
@@ -190,7 +199,7 @@ const runNpm = (args: string[]) => {
 const checkPackageVersion = async (
   packageName: PublishablePackageName,
   sourceManifestPath: string,
-) => {
+): Promise<PackageVersionCheck> => {
   const { name, version } = readManifest(packageName, sourceManifestPath);
   const response = await fetch(`${REGISTRY}/${encodeURIComponent(name)}`);
 
@@ -219,6 +228,32 @@ const checkPackageVersion = async (
   };
 };
 
+const printVersionCheck = async (
+  packageName: PublishablePackageName,
+  sourceManifestPath: string,
+) => {
+  const result = await checkPackageVersion(packageName, sourceManifestPath);
+  console.table([
+    {
+      "npm alpha": result["npm alpha"],
+      "npm beta": result["npm beta"],
+      "npm latest": result["npm latest"],
+      package: result.package,
+      "package.json": result["package.json"],
+    },
+  ]);
+};
+
+const reportPublishSuccess = (packageName: PublishablePackageName) => {
+  console.table([
+    {
+      message: "publish succeeded",
+      package: packageName,
+      status: "SUCCESS",
+    },
+  ]);
+};
+
 const options = parseOptions();
 const { directory: packageDirectory, sourceManifestPath } = getPackage(
   options.packageName,
@@ -226,9 +261,7 @@ const { directory: packageDirectory, sourceManifestPath } = getPackage(
 const sourceManifest = readManifest(options.packageName, sourceManifestPath);
 
 if (options.versionCheck) {
-  console.table([
-    await checkPackageVersion(options.packageName, sourceManifestPath),
-  ]);
+  await printVersionCheck(options.packageName, sourceManifestPath);
 } else {
   runNpm(["run", "build:packages"]);
   assertBuiltPackageMatchesSource(sourceManifest, packageDirectory);
@@ -247,11 +280,10 @@ if (options.versionCheck) {
   runNpm(publishArgs);
 
   if (!options.dryRun) {
+    reportPublishSuccess(options.packageName);
     await new Promise((resolve) =>
       setTimeout(resolve, PUBLISH_VERIFICATION_DELAY_MS),
     );
-    console.table([
-      await checkPackageVersion(options.packageName, sourceManifestPath),
-    ]);
+    await printVersionCheck(options.packageName, sourceManifestPath);
   }
 }
