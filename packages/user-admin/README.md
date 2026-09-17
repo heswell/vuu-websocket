@@ -9,6 +9,28 @@ contracts and an in-memory demo store. It has three entry points:
 | `@heswell/user-admin/contracts` | Browser-safe table schemas, RPC names, and domain types. |
 | `@heswell/user-admin/in-memory` | Browser-safe in-memory state and mutation implementation for demos. |
 
+## Publishing
+
+This repository currently publishes only `@heswell/user-admin`. Bump its
+version and the version consumed by workspace dependants with:
+
+```sh
+npm run bump:versions -- --version=1.0.1
+```
+
+Omit `--version` to increment the patch version. Prereleases use
+`n.n.n-alpha.n` or `n.n.n-beta.n`. Before publishing, inspect the package or
+the registry version:
+
+```sh
+npm run pub -- --dry-run
+npm run pub -- --version-check
+```
+
+Publish the release with `npm run pub`, or add `--tag alpha` or `--tag beta`
+for a prerelease. The command publishes only this package from
+`packages/user-admin`.
+
 ## Client-side VuuModule integration
 
 Use this guide when implementing a client/demo module such as
