@@ -73,7 +73,9 @@ const store = new InMemoryUserAdminStore(initialSnapshot);
 Call the matching store operation for a user-admin RPC, then project the new
 `await store.snapshot()` into the local tables. Keep this projection in the
 client module; `InMemoryUserAdminStore` deliberately does not import or depend
-on browser `Table` APIs.
+on browser `Table` APIs. A server-backed feature can additionally supply
+`refreshSnapshot` to `createUserAdminFeature()` so periodic reconciliation
+retrieves a fresh external snapshot rather than reusing the startup snapshot.
 
 | Snapshot collection | Target table |
 | --- | --- |

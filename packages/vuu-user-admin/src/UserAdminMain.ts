@@ -9,12 +9,14 @@ import {
 import { KeycloakAdminClient } from "./keycloak/KeycloakAdminClient";
 import {
   getKeycloakAdminSnapshot,
+  refreshKeycloakAdminSnapshot,
 } from "./keycloak/KeycloakAdminSnapshotStore";
 
 export default async function main() {
   const defaultConfig = ConfigFactory.load();
   const userAdmin = createUserAdminFeature({
     createOperations: KeycloakAdminClient.createFromConfig,
+    refreshSnapshot: refreshKeycloakAdminSnapshot,
     snapshotSource: getKeycloakAdminSnapshot,
   });
   const application = createVuuServerApplication({

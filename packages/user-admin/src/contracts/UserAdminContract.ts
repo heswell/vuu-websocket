@@ -182,6 +182,7 @@ const columnTypes: Record<string, UserAdminColumnDataType> = {
   group_path: "string",
   id: "string",
   last_login: "long",
+  last_name: "string",
   membership_id: "string",
   module_access: "string",
   module_access_count: "int",
