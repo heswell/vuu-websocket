@@ -7,7 +7,7 @@
     "packages/**"
   ],
   "scripts": {
-    "build:packages": "npm run build --workspace=@heswell/user-admin",
+    "build:packages": "bun ./scripts/build-packages.ts",
     "keycloak:realm": "bun ./scripts/keycloak-realm-client.ts",
     "keycloak:users": "bun ./scripts/keycloak-users.ts",
     "keycloak:bootstrap": "npm run keycloak:realm && npm run keycloak:users",

@@ -1,6 +1,7 @@
 /**
- * Publish @heswell/user-admin:
+ * Publish a package:
  *   npm run pub
+ *   npm run pub -- --package=@heswell/module-admin
  *
  * Validate without publishing:
  *   npm run pub -- --dry-run
@@ -11,16 +12,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_PUBLISHABLE_PACKAGE_NAME,
+  getPublishablePackage,
+  type PublishablePackageName,
+} from "./publishable-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
-const PACKAGE_NAME = "@heswell/user-admin";
-const PACKAGE_DIRECTORY = "dist/user-admin";
-const PACKAGE_JSON_PATH = path.join(ROOT, PACKAGE_DIRECTORY, "package.json");
-const SOURCE_PACKAGE_JSON_PATH = path.join(
-  ROOT,
-  "packages/user-admin/package.json",
-);
 const PUBLISH_VERIFICATION_DELAY_MS = 10_000;
 
 type PackageManifest = {
@@ -35,6 +34,7 @@ type NpmMetadata = {
 
 type Options = {
   dryRun: boolean;
+  packageName: PublishablePackageName;
   publishTag?: string;
   versionCheck: boolean;
 };
@@ -42,43 +42,63 @@ type Options = {
 const printHelp = () => {
   console.log(`Usage: npm run pub -- [options]
 
-Builds and publishes ${PACKAGE_NAME} from dist/user-admin.
+Builds and publishes ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default.
 
 Options:
+  --package <name>   Publish @heswell/user-admin or @heswell/module-admin.
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
   --dry-run           Validate the npm package without publishing it.
   --version-check     Show the version and current npm dist-tags.
   --help              Print this help message.`);
 };
 
-const readManifest = (): PackageManifest => {
+const getPackage = (packageName: PublishablePackageName) => {
+  const selectedPackage = getPublishablePackage(packageName);
+  if (!selectedPackage) {
+    throw new Error(`Unsupported package "${packageName}".`);
+  }
+  const { directory } = selectedPackage;
+  return {
+    directory: `dist/${directory}`,
+    sourceManifestPath: path.join(ROOT, "packages", directory, "package.json"),
+  };
+};
+
+const readManifest = (
+  packageName: PublishablePackageName,
+  sourceManifestPath: string,
+): PackageManifest => {
   const sourceManifest = JSON.parse(
-    fs.readFileSync(SOURCE_PACKAGE_JSON_PATH, "utf8"),
+    fs.readFileSync(sourceManifestPath, "utf8"),
   ) as Partial<PackageManifest>;
 
-  if (sourceManifest.name !== PACKAGE_NAME || !sourceManifest.version) {
-    throw new Error("Invalid source package manifest at packages/user-admin.");
+  if (sourceManifest.name !== packageName || !sourceManifest.version) {
+    throw new Error(`Invalid source package manifest at ${sourceManifestPath}.`);
   }
 
   return sourceManifest as PackageManifest;
 };
 
-const assertBuiltPackageMatchesSource = (sourceManifest: PackageManifest) => {
-  if (!fs.existsSync(PACKAGE_JSON_PATH)) {
+const assertBuiltPackageMatchesSource = (
+  sourceManifest: PackageManifest,
+  packageDirectory: string,
+) => {
+  const packageJsonPath = path.join(ROOT, packageDirectory, "package.json");
+  if (!fs.existsSync(packageJsonPath)) {
     throw new Error(
-      `Build output is missing at ${PACKAGE_DIRECTORY}. Run npm run build:packages.`,
+      `Build output is missing at ${packageDirectory}. Run npm run build:packages.`,
     );
   }
 
   const builtManifest = JSON.parse(
-    fs.readFileSync(PACKAGE_JSON_PATH, "utf8"),
+    fs.readFileSync(packageJsonPath, "utf8"),
   ) as Partial<PackageManifest>;
   if (
     builtManifest.name !== sourceManifest.name ||
     builtManifest.version !== sourceManifest.version
   ) {
     throw new Error(
-      `Build output is stale at ${PACKAGE_DIRECTORY}. Run npm run build:packages.`,
+      `Build output is stale at ${packageDirectory}. Run npm run build:packages.`,
     );
   }
 };
@@ -100,6 +120,7 @@ const getOptionValue = (args: string[], index: number, flag: string) => {
 const parseOptions = (): Options => {
   const options: Options = {
     dryRun: false,
+    packageName: DEFAULT_PUBLISHABLE_PACKAGE_NAME,
     versionCheck: false,
   };
   const args = process.argv.slice(2);
@@ -116,6 +137,18 @@ const parseOptions = (): Options => {
     }
     if (argument === "--version-check") {
       options.versionCheck = true;
+      continue;
+    }
+    if (argument === "--package" || argument.startsWith("--package=")) {
+      const { nextIndex, value } = getOptionValue(args, index, "--package");
+      const selectedPackage = getPublishablePackage(value);
+      if (!selectedPackage) {
+        throw new Error(
+          `Unsupported package "${value}". Use @heswell/user-admin or @heswell/module-admin.`,
+        );
+      }
+      options.packageName = selectedPackage.name;
+      index = nextIndex;
       continue;
     }
     if (argument === "--tag" || argument.startsWith("--tag=")) {
@@ -154,8 +187,11 @@ const runNpm = (args: string[]) => {
   }
 };
 
-const checkPackageVersion = async () => {
-  const { name, version } = readManifest();
+const checkPackageVersion = async (
+  packageName: PublishablePackageName,
+  sourceManifestPath: string,
+) => {
+  const { name, version } = readManifest(packageName, sourceManifestPath);
   const response = await fetch(`${REGISTRY}/${encodeURIComponent(name)}`);
 
   if (response.status === 404) {
@@ -184,18 +220,23 @@ const checkPackageVersion = async () => {
 };
 
 const options = parseOptions();
-const sourceManifest = readManifest();
+const { directory: packageDirectory, sourceManifestPath } = getPackage(
+  options.packageName,
+);
+const sourceManifest = readManifest(options.packageName, sourceManifestPath);
 
 if (options.versionCheck) {
-  console.table([await checkPackageVersion()]);
+  console.table([
+    await checkPackageVersion(options.packageName, sourceManifestPath),
+  ]);
 } else {
   runNpm(["run", "build:packages"]);
-  assertBuiltPackageMatchesSource(sourceManifest);
-  runNpm(["pack", "--dry-run", `./${PACKAGE_DIRECTORY}`]);
+  assertBuiltPackageMatchesSource(sourceManifest, packageDirectory);
+  runNpm(["pack", "--dry-run", `./${packageDirectory}`]);
 
   const publishArgs = [
     "publish",
-    `./${PACKAGE_DIRECTORY}`,
+    `./${packageDirectory}`,
     "--registry",
     REGISTRY,
     "--access",
@@ -209,6 +250,8 @@ if (options.versionCheck) {
     await new Promise((resolve) =>
       setTimeout(resolve, PUBLISH_VERIFICATION_DELAY_MS),
     );
-    console.table([await checkPackageVersion()]);
+    console.table([
+      await checkPackageVersion(options.packageName, sourceManifestPath),
+    ]);
   }
 }

@@ -11,16 +11,17 @@ contracts and an in-memory demo store. It has three entry points:
 
 ## Publishing
 
-This repository currently publishes only `@heswell/user-admin`. Bump its
-version and the version consumed by workspace dependants with:
+This repository publishes `@heswell/user-admin` and `@heswell/module-admin`.
+Bump this package and the version consumed by workspace dependants with:
 
 ```sh
 npm run bump:versions -- --version=1.0.1
 ```
 
 Omit `--version` to increment the patch version. Prereleases use
-`n.n.n-alpha.n` or `n.n.n-beta.n`. Build the publishable package to
-`dist/user-admin` with `npm run build:packages`; `npm run pub` does this
+`n.n.n-alpha.n` or `n.n.n-beta.n`. Build all publishable packages with `npm run build:packages`, or build only
+this package with `npm run build:packages -- --package=@heswell/user-admin`.
+The package is written to `dist/user-admin`; `npm run pub` builds it
 automatically. Before publishing, inspect the package or the registry version:
 
 ```sh
@@ -29,8 +30,9 @@ npm run pub -- --version-check
 ```
 
 Publish the release with `npm run pub`, or add `--tag alpha` or `--tag beta`
-for a prerelease. The command publishes only this package from
-`packages/user-admin`.
+for a prerelease. To release module administration instead, select it with
+`npm run pub -- --package=@heswell/module-admin`; the corresponding version
+command is `npm run bump:versions -- --package=@heswell/module-admin`.
 
 ## Client-side VuuModule integration
 

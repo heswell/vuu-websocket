@@ -1,10 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_PUBLISHABLE_PACKAGE_NAME,
+  getPublishablePackage,
+  type PublishablePackageName,
+} from "./publishable-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_ROOT = path.join(ROOT, "packages");
-const TARGET_PACKAGE_NAME = "@heswell/user-admin";
 const VERSION_PATTERN =
   /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/;
 const DEPENDENCY_SECTIONS = [
@@ -21,12 +25,19 @@ type PackageJson = {
 };
 
 const printHelp = () => {
-  console.log(`Usage: npm run bump:versions -- [--version=<version>]
+  console.log(`Usage: npm run bump:versions -- [options]
 
-Updates ${TARGET_PACKAGE_NAME} and every workspace dependency on it.
+Updates @heswell/user-admin by default, or the package selected with
+--package. Workspace dependencies on the selected package are also updated.
 
 Without --version, increments the patch version. For alpha or beta releases,
 the prerelease number is incremented instead.
+
+Options:
+  --package=<name>  Select @heswell/user-admin or @heswell/module-admin.
+  --version=<version>
+                    Set the package version explicitly.
+  --help            Print this help message.
 
 Versions must be n.n.n, n.n.n-alpha.n, or n.n.n-beta.n.`);
 };
@@ -72,32 +83,45 @@ const incrementVersion = (version: string) => {
   return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
 };
 
-const getRequestedVersion = () => {
+const getOptions = () => {
   const args = process.argv.slice(2);
   if (args.includes("--help")) {
     printHelp();
     process.exit(0);
   }
 
+  let packageName: PublishablePackageName = DEFAULT_PUBLISHABLE_PACKAGE_NAME;
+  let version: string | undefined;
   for (const argument of args) {
-    if (!argument.startsWith("--version=")) {
-      throw new Error(
-        `Unknown argument "${argument}". Use --version=<version> or --help.`,
-      );
+    if (argument.startsWith("--package=")) {
+      const requestedPackage = argument.slice("--package=".length);
+      const selectedPackage = getPublishablePackage(requestedPackage);
+      if (!selectedPackage) {
+        throw new Error(
+          `Unsupported package "${requestedPackage}". Use @heswell/user-admin or @heswell/module-admin.`,
+        );
+      }
+      packageName = selectedPackage.name;
+      continue;
     }
+    if (argument.startsWith("--version=")) {
+      version = argument.slice("--version=".length);
+      if (!version) throw new Error("The --version option requires a value.");
+      continue;
+    }
+    throw new Error(
+      `Unknown argument "${argument}". Use --package=<name>, --version=<version>, or --help.`,
+    );
   }
 
-  const versionArgument = args.find((argument) =>
-    argument.startsWith("--version="),
-  );
-  if (!versionArgument) return undefined;
-
-  const version = versionArgument.slice("--version=".length);
-  if (!version) throw new Error("The --version option requires a value.");
-  return version;
+  return { packageName, version };
 };
 
-const updateDependencies = (json: PackageJson, version: string) => {
+const updateDependencies = (
+  json: PackageJson,
+  packageName: PublishablePackageName,
+  version: string,
+) => {
   let changed = false;
 
   for (const section of DEPENDENCY_SECTIONS) {
@@ -106,10 +130,10 @@ const updateDependencies = (json: PackageJson, version: string) => {
 
     const dependencyVersions = dependencies as Record<string, unknown>;
     if (
-      dependencyVersions[TARGET_PACKAGE_NAME] !== undefined &&
-      dependencyVersions[TARGET_PACKAGE_NAME] !== version
+      dependencyVersions[packageName] !== undefined &&
+      dependencyVersions[packageName] !== version
     ) {
-      dependencyVersions[TARGET_PACKAGE_NAME] = version;
+      dependencyVersions[packageName] = version;
       changed = true;
     }
   }
@@ -118,19 +142,19 @@ const updateDependencies = (json: PackageJson, version: string) => {
 };
 
 const packageFiles = findPackageJsonFiles(PACKAGES_ROOT);
+const { packageName: targetPackageName, version: requestedVersion } = getOptions();
 const targetPackageFile = packageFiles.find(
-  (filePath) => readJson(filePath).name === TARGET_PACKAGE_NAME,
+  (filePath) => readJson(filePath).name === targetPackageName,
 );
 if (!targetPackageFile) {
-  throw new Error(`Could not find ${TARGET_PACKAGE_NAME} in ${PACKAGES_ROOT}.`);
+  throw new Error(`Could not find ${targetPackageName} in ${PACKAGES_ROOT}.`);
 }
 
 const targetPackage = readJson(targetPackageFile);
 if (!targetPackage.version) {
-  throw new Error(`${TARGET_PACKAGE_NAME} does not have a version.`);
+  throw new Error(`${targetPackageName} does not have a version.`);
 }
 
-const requestedVersion = getRequestedVersion();
 const version = requestedVersion ?? incrementVersion(targetPackage.version);
 parseVersion(version);
 
@@ -144,7 +168,7 @@ for (const filePath of packageFiles) {
     changed = true;
   }
 
-  changed = updateDependencies(json, version) || changed;
+  changed = updateDependencies(json, targetPackageName, version) || changed;
   if (changed) {
     writeJson(filePath, json);
     changedFiles.push(path.relative(ROOT, filePath));
@@ -167,7 +191,7 @@ if (fs.existsSync(lockfilePath)) {
         json.version = version;
         changed = true;
       }
-      changed = updateDependencies(json, version) || changed;
+      changed = updateDependencies(json, targetPackageName, version) || changed;
     }
 
     if (changed) {
@@ -177,5 +201,5 @@ if (fs.existsSync(lockfilePath)) {
   }
 }
 
-console.log(`Updated ${TARGET_PACKAGE_NAME} to ${version}.`);
+console.log(`Updated ${targetPackageName} to ${version}.`);
 console.log(`Changed: ${changedFiles.join(", ")}`);
