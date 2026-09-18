@@ -14,6 +14,8 @@ const moduleAccessRoles = [
   { moduleName: "moduleAdmin", role: "module-admin-access" },
   { moduleName: "userAdmin", role: "user-admin-access" },
   { moduleName: "basket-trading", role: "basket-trading-access" },
+  { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
+  { moduleName: "vuu-table-viewer", role: "vuu-table-viewer-access" },
 ];
 
 describe("portal module registry", () => {
@@ -42,6 +44,8 @@ describe("portal module registry", () => {
         "module-admin-access",
         "user-admin-access",
         "basket-trading-access",
+        "vuu-table-browser-access",
+        "vuu-table-viewer-access",
       ]),
     );
 
@@ -51,6 +55,7 @@ describe("portal module registry", () => {
         id: 3,
         loginRole: "basket-trading-access",
         name: "basket-trading",
+        mfUrl: "http://localhost:5006",
         vuu: {
           connectionId: "basket",
           restUrl: "https://localhost:8445/api/authn",
@@ -97,14 +102,59 @@ describe("portal module registry", () => {
           websocketUrl: "wss://localhost:8092/websocket-user-admin",
         },
       },
+      {
+        clientIdentifier: "vuu-portal",
+        id: 4,
+        loginRole: "vuu-table-browser-access",
+        name: "vuu-table-browser",
+        title: "Browse tables",
+        description: "Discover and browse VUU tables",
+        version: 1,
+        enabled: true,
+        location: "/Tools/Tables",
+        path: "/tools/tables",
+        mfComponent: "VuuTableBrowser",
+        mfScope: "vuuTableBrowser",
+        mfUrl: "http://localhost:5004",
+        nestedModules: [
+          {
+            name: "vuu-table-viewer",
+            mfComponent: "VuuTableViewer",
+            mfScope: "vuuTableViewer",
+            mfUrl: "http://localhost:5005",
+          },
+        ],
+      },
     ]);
+  });
+
+  test("discovers the viewer only as an independently authorized browser child", () => {
+    const browserOnly = createModuleRegistry(
+      vuuServer.tableContainer,
+      VuuUserWithAuthorizations("browser-only", ["vuu-table-browser-access"]),
+    );
+    const viewerOnly = createModuleRegistry(
+      vuuServer.tableContainer,
+      VuuUserWithAuthorizations("viewer-only", ["vuu-table-viewer-access"]),
+    );
+
+    expect(browserOnly.modules).toEqual([
+      expect.objectContaining({
+        name: "vuu-table-browser",
+        path: "/tools/tables",
+      }),
+    ]);
+    expect(browserOnly.modules[0]).not.toHaveProperty("vuu");
+    expect(browserOnly.modules[0]).not.toHaveProperty("nestedModules");
+    expect(viewerOnly).toEqual({ modules: [] });
   });
 
   test("filters disabled modules and selects the latest permitted version", () => {
     const modules = vuuServer.tableContainer.getTable("modules");
     const permissions = vuuServer.tableContainer.getTable("modulePermissions");
     modules.insert([
-      4,
+      6,
+      0,
       "moduleAdmin",
       "Manage remote modules",
       "Latest module",
@@ -120,7 +170,8 @@ describe("portal module registry", () => {
       "https://localhost:8443/api/authn",
     ]);
     modules.insert([
-      5,
+      7,
+      0,
       "moduleAdmin",
       "Manage remote modules",
       "Disabled module",
@@ -135,8 +186,8 @@ describe("portal module registry", () => {
       "",
       "",
     ]);
-    permissions.insert([7, 4, "module-admin-access"]);
-    permissions.insert([8, 5, "module-admin-access"]);
+    permissions.insert([7, 6, "module-admin-access"]);
+    permissions.insert([8, 7, "module-admin-access"]);
 
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
@@ -146,7 +197,7 @@ describe("portal module registry", () => {
     expect(registry.modules).toEqual([
       expect.objectContaining({
         clientIdentifier: "vuu-portal",
-        id: 4,
+        id: 6,
         description: "Latest module",
         loginRole: "module-admin-access",
         version: 2,

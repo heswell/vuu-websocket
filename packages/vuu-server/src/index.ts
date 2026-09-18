@@ -84,6 +84,7 @@ export type {
   LoginSuccessOptions,
   ModuleRecord,
   ModuleRegistry,
+  NestedModuleRecord,
   RemoteModuleConnection,
 } from "./net/LoginSuccess";
 export type { LoginSuccessProvider } from "./core/LoginSuccessProvider";

@@ -18,7 +18,15 @@ export interface ModuleRecord {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  vuu: RemoteModuleConnection;
+  vuu?: RemoteModuleConnection;
+  nestedModules?: NestedModuleRecord[];
+}
+
+export interface NestedModuleRecord {
+  name: string;
+  mfComponent: string;
+  mfScope: string;
+  mfUrl: string;
 }
 
 export interface ModuleRegistry {

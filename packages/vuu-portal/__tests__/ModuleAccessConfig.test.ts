@@ -21,6 +21,8 @@ describe("portal module access configuration", () => {
 moduleAccess:
   moduleAdmin: module-admin-access
   userAdmin: user-admin-access
+  vuu-table-browser: vuu-table-browser-access
+  vuu-table-viewer: vuu-table-viewer-access
 `);
 
     expect(
@@ -30,6 +32,8 @@ moduleAccess:
     ).toEqual([
       { moduleName: "moduleAdmin", role: "module-admin-access" },
       { moduleName: "userAdmin", role: "user-admin-access" },
+      { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
+      { moduleName: "vuu-table-viewer", role: "vuu-table-viewer-access" },
     ]);
   });
 

@@ -5,6 +5,7 @@ export type ModuleAccessRole = {
 
 export type ModuleDefinition = {
   id: number;
+  parentModuleId: number;
   name: string;
   title: string;
   description: string;
@@ -15,13 +16,16 @@ export type ModuleDefinition = {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  vuuConnectionId: string;
-  vuuWebsocketUrl: string;
-  vuuRestUrl: string;
+  vuu?: {
+    connectionId: string;
+    websocketUrl: string;
+    restUrl: string;
+  };
 };
 
 export type ModuleRow = [
   id: number,
+  parentModuleId: number,
   name: string,
   title: string,
   description: string,
@@ -46,6 +50,7 @@ export type ModulePermissionRow = [
 export const DEFAULT_MODULE_DEFINITIONS = [
   {
     id: 1,
+    parentModuleId: 0,
     name: "moduleAdmin",
     title: "Manage remote modules",
     description: "Create new remote module, update existing modules",
@@ -56,12 +61,15 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfComponent: "ModuleAdmin",
     mfScope: "ModuleAdmin",
     mfUrl: "http://localhost:5002",
-    vuuConnectionId: "module-admin",
-    vuuWebsocketUrl: "wss://localhost:8091/websocket-portal",
-    vuuRestUrl: "https://localhost:8443/api/authn",
+    vuu: {
+      connectionId: "module-admin",
+      websocketUrl: "wss://localhost:8091/websocket-portal",
+      restUrl: "https://localhost:8443/api/authn",
+    },
   },
   {
     id: 2,
+    parentModuleId: 0,
     name: "userAdmin",
     title: "Manage users",
     description: "Add, remove and update users",
@@ -72,12 +80,15 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfComponent: "UserAdmin",
     mfScope: "UserAdmin",
     mfUrl: "http://localhost:5003",
-    vuuConnectionId: "user-admin",
-    vuuWebsocketUrl: "wss://localhost:8092/websocket-user-admin",
-    vuuRestUrl: "https://localhost:8444/api/authn",
+    vuu: {
+      connectionId: "user-admin",
+      websocketUrl: "wss://localhost:8092/websocket-user-admin",
+      restUrl: "https://localhost:8444/api/authn",
+    },
   },
   {
     id: 3,
+    parentModuleId: 0,
     name: "basket-trading",
     title: "Basket trading",
     description: "Basket Trading",
@@ -87,10 +98,40 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     path: "/basket/trade",
     mfComponent: "VuuBasketTradingFeature",
     mfScope: "basketTrading",
+    mfUrl: "http://localhost:5006",
+    vuu: {
+      connectionId: "basket",
+      websocketUrl: "wss://localhost:8093/websocket-basket-trading",
+      restUrl: "https://localhost:8445/api/authn",
+    },
+  },
+  {
+    id: 4,
+    parentModuleId: 0,
+    name: "vuu-table-browser",
+    title: "Browse tables",
+    description: "Discover and browse VUU tables",
+    version: 1,
+    enabled: true,
+    location: "/Tools/Tables",
+    path: "/tools/tables",
+    mfComponent: "VuuTableBrowser",
+    mfScope: "vuuTableBrowser",
+    mfUrl: "http://localhost:5004",
+  },
+  {
+    id: 5,
+    parentModuleId: 4,
+    name: "vuu-table-viewer",
+    title: "View table",
+    description: "View a selected VUU table",
+    version: 1,
+    enabled: true,
+    location: "",
+    path: "",
+    mfComponent: "VuuTableViewer",
+    mfScope: "vuuTableViewer",
     mfUrl: "http://localhost:5005",
-    vuuConnectionId: "basket",
-    vuuWebsocketUrl: "wss://localhost:8093/websocket-basket-trading",
-    vuuRestUrl: "https://localhost:8445/api/authn",
   },
 ] as const satisfies readonly ModuleDefinition[];
 
@@ -99,6 +140,7 @@ export const moduleDefinitionsToRows = (
 ): ModuleRow[] =>
   modules.map((module) => [
     module.id,
+    module.parentModuleId,
     module.name,
     module.title,
     module.description,
@@ -109,9 +151,9 @@ export const moduleDefinitionsToRows = (
     module.mfComponent,
     module.mfScope,
     module.mfUrl,
-    module.vuuConnectionId,
-    module.vuuWebsocketUrl,
-    module.vuuRestUrl,
+    module.vuu?.connectionId ?? "",
+    module.vuu?.websocketUrl ?? "",
+    module.vuu?.restUrl ?? "",
   ]);
 
 export const modulePermissionsFor = (

@@ -4,3 +4,5 @@ moduleAccess:
   moduleAdmin: module-admin-access
   userAdmin: user-admin-access
   basket-trading: basket-trading-access
+  vuu-table-browser: vuu-table-browser-access
+  vuu-table-viewer: vuu-table-viewer-access
