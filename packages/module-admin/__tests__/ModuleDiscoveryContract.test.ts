@@ -10,6 +10,7 @@ describe("module discovery contract", () => {
     expect(moduleDefinitionsToRows(DEFAULT_MODULE_DEFINITIONS)).toEqual([
       [
         1,
+        0,
         "moduleAdmin",
         "Manage remote modules",
         "Create new remote module, update existing modules",
@@ -26,6 +27,40 @@ describe("module discovery contract", () => {
       ],
       expect.any(Array),
       expect.any(Array),
+      [
+        4,
+        0,
+        "vuu-table-browser",
+        "Browse tables",
+        "Discover and browse VUU tables",
+        1,
+        true,
+        "/Tools/Tables",
+        "/tools/tables",
+        "VuuTableBrowser",
+        "vuuTableBrowser",
+        "http://localhost:5004",
+        "",
+        "",
+        "",
+      ],
+      [
+        5,
+        4,
+        "vuu-table-viewer",
+        "View table",
+        "View a selected VUU table",
+        1,
+        true,
+        "",
+        "",
+        "VuuTableViewer",
+        "vuuTableViewer",
+        "http://localhost:5005",
+        "",
+        "",
+        "",
+      ],
     ]);
   });
 
@@ -34,10 +69,14 @@ describe("module discovery contract", () => {
       modulePermissionsFor(DEFAULT_MODULE_DEFINITIONS, [
         { moduleName: "moduleAdmin", role: "module-admin-access" },
         { moduleName: "userAdmin", role: "user-admin-access" },
+        { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
+        { moduleName: "vuu-table-viewer", role: "vuu-table-viewer-access" },
       ]),
     ).toEqual([
       [1, 1, "module-admin-access"],
       [2, 2, "user-admin-access"],
+      [3, 4, "vuu-table-browser-access"],
+      [4, 5, "vuu-table-viewer-access"],
     ]);
   });
 

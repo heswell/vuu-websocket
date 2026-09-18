@@ -2,6 +2,7 @@ import type {
   DataTable,
   ModuleRecord,
   ModuleRegistry,
+  NestedModuleRecord,
   TableContainer,
   VuuUser,
 } from "@heswell/vuu-server";
@@ -11,6 +12,10 @@ const PORTAL_CLIENT_IDENTIFIER = "vuu-portal";
 type ModulePermission = {
   moduleId: number;
   role: string;
+};
+
+type DiscoveredModuleRecord = ModuleRecord & {
+  parentModuleId: number;
 };
 
 export function createModuleRegistry(
@@ -26,10 +31,11 @@ export function createModuleRegistry(
   };
 }
 
-function readModules(table: DataTable): ModuleRecord[] {
+function readModules(table: DataTable): DiscoveredModuleRecord[] {
   return table.rows.map((row) => ({
     clientIdentifier: PORTAL_CLIENT_IDENTIFIER,
     id: numberValue(table, row, "id"),
+    parentModuleId: numberValue(table, row, "parentModuleId"),
     loginRole: "",
     name: stringValue(table, row, "name"),
     title: stringValue(table, row, "title"),
@@ -41,18 +47,23 @@ function readModules(table: DataTable): ModuleRecord[] {
     mfComponent: stringValue(table, row, "mfComponent"),
     mfScope: stringValue(table, row, "mfScope"),
     mfUrl: stringValue(table, row, "mfUrl"),
-    vuu: remoteConnection(table, row),
+    ...remoteConnection(table, row),
   }));
 }
 
 function remoteConnection(table: DataTable, row: unknown[]) {
   const restUrl = stringValue(table, row, "vuuRestUrl");
   const websocketUrl = stringValue(table, row, "vuuWebsocketUrl");
-  return {
-    connectionId: stringValue(table, row, "vuuConnectionId"),
-    ...(restUrl ? { restUrl } : {}),
-    ...(websocketUrl ? { websocketUrl } : {}),
-  };
+  const connectionId = stringValue(table, row, "vuuConnectionId");
+  return connectionId
+    ? {
+        vuu: {
+          connectionId,
+          ...(restUrl ? { restUrl } : {}),
+          ...(websocketUrl ? { websocketUrl } : {}),
+        },
+      }
+    : {};
 }
 
 function readModulePermissions(table: DataTable): ModulePermission[] {
@@ -63,7 +74,7 @@ function readModulePermissions(table: DataTable): ModulePermission[] {
 }
 
 function selectModules(
-  modules: ModuleRecord[],
+  modules: DiscoveredModuleRecord[],
   modulePermissions: ModulePermission[],
   authorizations: string[],
 ) {
@@ -76,7 +87,7 @@ function selectModules(
     }
   });
 
-  const latestByName = new Map<string, ModuleRecord>();
+  const latestByName = new Map<string, DiscoveredModuleRecord>();
   modules.forEach((module) => {
     const loginRole = permittedModuleRoles.get(module.id);
     if (!module.enabled || !loginRole) {
@@ -94,9 +105,26 @@ function selectModules(
     }
   });
 
-  return [...latestByName.values()].sort((left, right) =>
-    left.name.localeCompare(right.name),
-  );
+  const permittedModules = [...latestByName.values()];
+  return permittedModules
+    .filter((module) => module.parentModuleId === 0)
+    .map(({ parentModuleId: _parentModuleId, ...module }) => {
+      const nestedModules = permittedModules
+        .filter((candidate) => candidate.parentModuleId === module.id)
+        .map<NestedModuleRecord>(
+          ({ name, mfComponent, mfScope, mfUrl }) => ({
+            name,
+            mfComponent,
+            mfScope,
+            mfUrl,
+          }),
+        );
+      return {
+        ...module,
+        ...(nestedModules.length > 0 ? { nestedModules } : {}),
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function stringValue(table: DataTable, row: unknown[], column: string) {

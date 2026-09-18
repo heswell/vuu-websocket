@@ -17,7 +17,8 @@ type LoginSuccess = {
 Other VUU servers omit `moduleRegistry`. The former authenticated
 `GET /module-registry` browser endpoint does not exist.
 
-Each record contains module-federation metadata and a required VUU connection:
+Each top-level record contains module-federation metadata. A remote that owns
+its own VUU target includes a VUU connection:
 
 ```ts
 type ModuleRecord = {
@@ -32,13 +33,25 @@ type ModuleRecord = {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  vuu: {
+  vuu?: {
     connectionId: string;
     restUrl?: string;
     websocketUrl?: string;
   };
+  nestedModules?: NestedModuleRecord[];
+};
+
+type NestedModuleRecord = {
+  name: string;
+  mfComponent: string;
+  mfScope: string;
+  mfUrl: string;
 };
 ```
 
 Only enabled records permitted by the authenticated user's roles are returned.
 For duplicate names, the highest version wins, followed by the highest id.
+
+A module with a non-zero parent module id is returned only through its
+authorized parent record's `nestedModules` array. Nested records contain
+federation metadata only and never create portal routes or VUU connections.

@@ -17,6 +17,8 @@ describe("Keycloak user and role configuration", () => {
         "user-admin-access",
         "basket-trading-access",
         "module-admin-access",
+        "vuu-table-browser-access",
+        "vuu-table-viewer-access",
       ],
       "vuu-portal-server": ["module-admin-read", "module-admin-admin"],
       "vuu-user-admin": ["read", "admin"],
@@ -52,6 +54,10 @@ describe("Keycloak user and role configuration", () => {
         { clientId: "vuu-portal", roleName: "module-admin-access" },
         { clientId: "vuu-portal-server", roleName: "module-admin-read" },
         { clientId: "vuu-portal-server", roleName: "module-admin-admin" },
+      ],
+      "/vuu/table-browser/users": [
+        { clientId: "vuu-portal", roleName: "vuu-table-browser-access" },
+        { clientId: "vuu-portal", roleName: "vuu-table-viewer-access" },
       ],
     });
   });
@@ -120,6 +126,7 @@ describe("Keycloak user and role configuration", () => {
           "/vuu/module-admin/administrators",
           "/vuu/user-admin/administrators",
           "/vuu/basket-trading/traders",
+          "/vuu/table-browser/users",
         ],
       },
     ]);

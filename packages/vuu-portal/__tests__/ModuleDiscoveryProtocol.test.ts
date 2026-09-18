@@ -31,6 +31,7 @@ const { ModuleDiscoveryModule } = await import(
 
 const moduleColumns = [
   "id",
+  "parentModuleId",
   "name",
   "title",
   "description",

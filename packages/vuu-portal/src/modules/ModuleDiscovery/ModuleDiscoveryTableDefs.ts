@@ -3,6 +3,7 @@ import { TableDef, VUU_DEFAULT_COLUMNS } from "@heswell/vuu-server";
 export const modulesTable = TableDef({
   columns: [
     { name: "id", dataType: "int" },
+    { name: "parentModuleId", dataType: "int" },
     { name: "name", dataType: "string" },
     { name: "title", dataType: "string" },
     { name: "description", dataType: "string" },
