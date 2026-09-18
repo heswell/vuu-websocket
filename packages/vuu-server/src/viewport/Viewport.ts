@@ -262,10 +262,6 @@ export class Viewport extends DataView {
     this.#viewPortDef = viewPortDef;
   }
 
-  get columns() {
-    return this.#viewPortDef.columns;
-  }
-
   get enabled() {
     return this.#enabled;
   }

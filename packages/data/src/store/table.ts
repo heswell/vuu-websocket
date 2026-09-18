@@ -219,7 +219,10 @@ export class Table extends EventEmitter<TableEvents> {
     return null;
   }
 
-  pullRowAsArray(key: string, columns: Column[]) {
+  pullRowAsArray(
+    key: string,
+    columns: readonly Pick<Column, "name">[],
+  ) {
     const row = this.getRowAtKey(key, true);
     return columns.map((column) => row[this.columnMap[column.name]]);
   }
