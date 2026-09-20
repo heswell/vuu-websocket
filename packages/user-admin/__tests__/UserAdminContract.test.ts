@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  getRoleDisplayName,
   USER_ADMIN_RPC_CONTRACT,
   USER_ADMIN_TABLE_SCHEMAS,
 } from "../src/contracts";
@@ -32,5 +33,17 @@ describe("user admin browser contract", () => {
       "userId",
       "assignments",
     ]);
+    expect(USER_ADMIN_TABLE_SCHEMAS.roles.columns).toContainEqual({
+      name: "role_display_name",
+      serverDataType: "string",
+    });
+    expect(USER_ADMIN_TABLE_SCHEMAS.groups.columns).toContainEqual({
+      name: "group_display_name",
+      serverDataType: "string",
+    });
+    expect(getRoleDisplayName(
+      { name: "vuu-user-admin-read" },
+      { clientId: "vuu-user-admin" },
+    )).toBe("read");
   });
 });

@@ -140,6 +140,9 @@ on the group options for the server-owned least-privilege choice. The legacy
 client permissions, use `serializeUserModuleAccessPermissions` to produce the
 canonical sorted and duplicate-free
 `[{ clientIdentifier, accessRole, groupIds }]` payload.
+Access options also provide `groupDisplayName` and `roleDisplayName` alongside
+the canonical names and IDs for compact UI labels when the parent context is
+already visible.
 
 Do not make HTTP or identity-provider requests from this client module. The
 demo module is purely local. The production client connects to the

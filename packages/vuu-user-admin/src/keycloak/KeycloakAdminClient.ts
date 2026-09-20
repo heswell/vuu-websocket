@@ -1,6 +1,8 @@
 import { ConfigFactory } from "@heswell/vuu-server";
 import {
   assertVuuClientId,
+  getGroupDisplayName,
+  getRoleDisplayName,
   isVuuClientId,
   VUU_PORTAL_CLIENT_IDENTIFIER,
   type UserAdminUserEdit,
@@ -900,9 +902,11 @@ export function buildUserModuleAccessOptions(
         return {
           groupId: group.id,
           groupName: group.name,
+          groupDisplayName: getGroupDisplayName(group),
           ...(group.path ? { groupPath: group.path } : {}),
           roleId: role.id,
           roleName: role.name,
+          roleDisplayName: getRoleDisplayName(role, portalClient),
           ...(privilege ? { privilege } : {}),
           isDefault: false,
         };

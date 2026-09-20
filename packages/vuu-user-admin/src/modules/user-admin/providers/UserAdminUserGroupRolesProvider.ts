@@ -1,5 +1,9 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
-import type { UserAdminSnapshot } from "@heswell/user-admin";
+import {
+  getGroupDisplayName,
+  getRoleDisplayName,
+  type UserAdminSnapshot,
+} from "@heswell/user-admin";
 import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
 import { reconcileTableRows } from "./reconcileTableRows";
 import { lastLogin } from "./snapshotCounts";
@@ -33,9 +37,11 @@ export class UserAdminUserGroupRolesProvider extends Provider {
               lastLogin(user),
               group.id,
               group.name,
+              getGroupDisplayName(group),
               group.path ?? "",
               role.id,
               role.name,
+              getRoleDisplayName(role, client),
               client?.id ?? "",
               client?.clientId ?? "",
               client?.name ?? client?.clientId ?? "",

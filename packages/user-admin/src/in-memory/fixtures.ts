@@ -8,39 +8,41 @@ const clients = {
 } as const;
 
 const roleDefinitions = [
-  [clients.portal, "user-admin-access"],
-  [clients.portal, "module-admin-access"],
-  [clients.portal, "basket-trading-access"],
-  [clients.userAdmin, "read"],
-  [clients.userAdmin, "admin"],
-  [clients.portalServer, "module-admin-read"],
-  [clients.portalServer, "module-admin-admin"],
-  [clients.basketTrading, "read"],
-  [clients.basketTrading, "trade"],
+  [clients.portal, "user-admin-access", "access"],
+  [clients.portal, "module-admin-access", "access"],
+  [clients.portal, "basket-trading-access", "access"],
+  [clients.userAdmin, "read", "read"],
+  [clients.userAdmin, "admin", "admin"],
+  [clients.portalServer, "module-admin-read", "read"],
+  [clients.portalServer, "module-admin-admin", "admin"],
+  [clients.basketTrading, "read", "read"],
+  [clients.basketTrading, "trade", "trade"],
 ] as const;
 
 const roleByClientAndName = new Map(
-  roleDefinitions.map(([client, name]) => [`${client.id}:${name}`, {
+  roleDefinitions.map(([client, name, roleDisplayName]) => [`${client.id}:${name}`, {
     id: `${client.id}:${name}`,
     name,
+    roleDisplayName,
     clientRole: true,
     containerId: client.id,
   }]),
 );
 
 const groupDefinitions = [
-  { id: "group-user-admin-read", accessRole: "user-admin-access", isDefault: true },
-  { id: "group-user-admin-admin", accessRole: "user-admin-access", isDefault: false },
-  { id: "group-module-admin-read", accessRole: "module-admin-access", isDefault: true },
-  { id: "group-module-admin-admin", accessRole: "module-admin-access", isDefault: false },
-  { id: "group-basket-trading-read", accessRole: "basket-trading-access", isDefault: true },
-  { id: "group-basket-trading-trade", accessRole: "basket-trading-access", isDefault: false },
+  { id: "group-user-admin-read", groupDisplayName: "read", accessRole: "user-admin-access", isDefault: true },
+  { id: "group-user-admin-admin", groupDisplayName: "admin", accessRole: "user-admin-access", isDefault: false },
+  { id: "group-module-admin-read", groupDisplayName: "read", accessRole: "module-admin-access", isDefault: true },
+  { id: "group-module-admin-admin", groupDisplayName: "admin", accessRole: "module-admin-access", isDefault: false },
+  { id: "group-basket-trading-read", groupDisplayName: "read", accessRole: "basket-trading-access", isDefault: true },
+  { id: "group-basket-trading-trade", groupDisplayName: "trade", accessRole: "basket-trading-access", isDefault: false },
 ] as const;
 
 export const createUserAdminModuleAccessFixture = (): Partial<UserAdminSnapshot> => {
-  const groups = groupDefinitions.map(({ id, accessRole, isDefault }) => ({
+  const groups = groupDefinitions.map(({ id, groupDisplayName, accessRole, isDefault }) => ({
     id,
     name: id,
+    groupDisplayName,
     path: `/${id}`,
     ...(isDefault ? { moduleAccessDefaultRoles: [accessRole] } : {}),
   }));

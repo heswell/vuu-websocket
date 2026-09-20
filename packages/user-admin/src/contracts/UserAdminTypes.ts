@@ -19,6 +19,7 @@ export type UserAdminUser = {
 export type UserAdminGroup = {
   id: string;
   name: string;
+  groupDisplayName?: string;
   path?: string;
   parentId?: string;
   createdTimestamp?: number;
@@ -44,6 +45,7 @@ export type UserAdminClient = {
 export type UserAdminRole = {
   id: string;
   name: string;
+  roleDisplayName?: string;
   description?: string;
   clientRole?: boolean;
   containerId?: string;
@@ -65,6 +67,21 @@ export type UserAdminSnapshot = {
 };
 
 export type UserAdminSnapshotSource = () => Promise<UserAdminSnapshot>;
+
+export const getGroupDisplayName = (
+  group: Pick<UserAdminGroup, "name" | "groupDisplayName">,
+) => group.groupDisplayName ?? group.name;
+
+export const getRoleDisplayName = (
+  role: Pick<UserAdminRole, "name" | "roleDisplayName">,
+  client?: Pick<UserAdminClient, "clientId">,
+) => {
+  if (role.roleDisplayName) return role.roleDisplayName;
+  const clientPrefix = client ? `${client.clientId}-` : "";
+  return clientPrefix && role.name.startsWith(clientPrefix)
+    ? role.name.slice(clientPrefix.length)
+    : role.name;
+};
 
 export type UserAdminEditableUserChanges = Partial<
   Pick<UserAdminUser, "username" | "email" | "firstName" | "lastName" | "enabled" | "emailVerified">

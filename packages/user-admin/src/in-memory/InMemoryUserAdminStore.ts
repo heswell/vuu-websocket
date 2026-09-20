@@ -12,6 +12,10 @@ import type {
   UserAdminSnapshot,
   UserAdminUser,
 } from "../contracts/UserAdminTypes";
+import {
+  getGroupDisplayName,
+  getRoleDisplayName,
+} from "../contracts/UserAdminTypes";
 
 type ModuleAccessPlan = {
   currentGroupIds: string[];
@@ -241,9 +245,11 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
             groups: groups.map((group) => ({
               groupId: group.id,
               groupName: group.name,
+              groupDisplayName: getGroupDisplayName(group),
               groupPath: group.path,
               roleId: role.id,
               roleName: role.name,
+              roleDisplayName: getRoleDisplayName(role, portal),
               isDefault: group.id === defaultGroupId,
             })),
             selectedGroupIds,

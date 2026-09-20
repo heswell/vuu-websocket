@@ -53,6 +53,8 @@ neither entry point imports the VUU server feature.
   `{ userId, assignments }`, where `assignments` is a JSON-encoded array of
   `{ accessRole, groupId }` objects. Options include every eligible group,
   `selectedGroupIds` contains every selected eligible group, and the
+  `groupDisplayName` and `roleDisplayName` fields provide context-relative
+  labels without changing canonical group or role names. The
   deprecated `selectedGroupId` contains only its first value for legacy
   consumers. Each role has exactly one server-owned `isDefault` group;
   consumers must not infer this policy from group names. Saving reconciles only
