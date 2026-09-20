@@ -237,7 +237,7 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
             .map(({ id }) => id);
           return {
             clientIdentifier: portal.clientId,
-            loginRole: role.name,
+            accessRole: role.name,
             groups: groups.map((group) => ({
               groupId: group.id,
               groupName: group.name,
@@ -290,19 +290,19 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
   ) {
     const options = await this.getUserModuleAccessOptions(userId);
     const groupsByRole = new Map(options.modules.map((module) => [
-      module.loginRole,
+      module.accessRole,
       new Set(module.groups.map(({ groupId }) => groupId)),
     ]));
     const requestedGroupIds = new Set<string>();
     const assignmentsByKey = new Set<string>();
-    for (const { loginRole, groupId } of assignments) {
-      const assignmentKey = `${loginRole}\u0000${groupId}`;
+    for (const { accessRole, groupId } of assignments) {
+      const assignmentKey = `${accessRole}\u0000${groupId}`;
       if (assignmentsByKey.has(assignmentKey)) {
-        throw new Error(`Duplicate module access assignment: ${loginRole} -> ${groupId}`);
+        throw new Error(`Duplicate module access assignment: ${accessRole} -> ${groupId}`);
       }
       assignmentsByKey.add(assignmentKey);
-      if (!groupsByRole.get(loginRole)?.has(groupId)) {
-        throw new Error(`Invalid module access assignment: ${loginRole} -> ${groupId}`);
+      if (!groupsByRole.get(accessRole)?.has(groupId)) {
+        throw new Error(`Invalid module access assignment: ${accessRole} -> ${groupId}`);
       }
       requestedGroupIds.add(groupId);
     }

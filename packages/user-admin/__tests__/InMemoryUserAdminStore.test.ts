@@ -47,7 +47,7 @@ describe("InMemoryUserAdminStore", () => {
 
     const options = await store.getUserModuleAccessOptions(user.id);
     const userAdmin = options.modules.find(
-      ({ loginRole }) => loginRole === "user-admin-access",
+      ({ accessRole }) => accessRole === "user-admin-access",
     );
 
     expect(userAdmin?.selectedGroupIds).toEqual([
@@ -100,7 +100,7 @@ describe("InMemoryUserAdminStore", () => {
     if (!defaultGroup) throw new Error("Missing default group in test fixture");
 
     await store.setUserModuleAccess(user.id, [{
-      loginRole: options.modules[0].loginRole,
+      accessRole: options.modules[0].accessRole,
       groupId: defaultGroup.groupId,
     }]);
 
@@ -113,16 +113,16 @@ describe("InMemoryUserAdminStore", () => {
     const snapshot = fixtureSnapshot();
     const store = new InMemoryUserAdminStore(snapshot);
     const assignments = [
-      { loginRole: "user-admin-access", groupId: "group-user-admin-read" },
-      { loginRole: "user-admin-access", groupId: "group-user-admin-admin" },
+      { accessRole: "user-admin-access", groupId: "group-user-admin-read" },
+      { accessRole: "user-admin-access", groupId: "group-user-admin-admin" },
     ] as const;
 
     await store.setUserModuleAccess(user.id, assignments);
     expect((await store.getUserModuleAccessOptions(user.id)).modules.find(
-      ({ loginRole }) => loginRole === "basket-trading-access",
+      ({ accessRole }) => accessRole === "basket-trading-access",
     )?.selectedGroupIds).toEqual([]);
     expect((await store.getUserModuleAccessOptions(user.id)).modules.find(
-      ({ loginRole }) => loginRole === "user-admin-access",
+      ({ accessRole }) => accessRole === "user-admin-access",
     )?.selectedGroupIds).toEqual([
       "group-user-admin-admin",
       "group-user-admin-read",
@@ -131,7 +131,7 @@ describe("InMemoryUserAdminStore", () => {
     await store.setUserModuleAccess(user.id, [assignments[0]]);
 
     expect((await store.getUserModuleAccessOptions(user.id)).modules.find(
-      ({ loginRole }) => loginRole === "user-admin-access",
+      ({ accessRole }) => accessRole === "user-admin-access",
     )?.selectedGroupIds).toEqual(["group-user-admin-read"]);
   });
 
@@ -149,7 +149,7 @@ describe("InMemoryUserAdminStore", () => {
     });
 
     await store.setUserModuleAccess(user.id, [{
-      loginRole: "basket-trading-access",
+      accessRole: "basket-trading-access",
       groupId: "group-basket-trading-read",
     }]);
     await store.setUserModuleAccess(user.id, []);
@@ -163,18 +163,18 @@ describe("InMemoryUserAdminStore", () => {
     const store = new InMemoryUserAdminStore(fixtureSnapshot());
 
     await expect(store.setUserModuleAccess(user.id, [
-      { loginRole: "user-admin-access", groupId: "group-user-admin-read" },
-      { loginRole: "user-admin-access", groupId: "group-user-admin-read" },
+      { accessRole: "user-admin-access", groupId: "group-user-admin-read" },
+      { accessRole: "user-admin-access", groupId: "group-user-admin-read" },
     ])).rejects.toThrow(
       "Duplicate module access assignment: user-admin-access -> group-user-admin-read",
     );
     await expect(store.setUserModuleAccess(user.id, [
-      { loginRole: "missing-access", groupId: "group-user-admin-read" },
+      { accessRole: "missing-access", groupId: "group-user-admin-read" },
     ])).rejects.toThrow(
       "Invalid module access assignment: missing-access -> group-user-admin-read",
     );
     await expect(store.setUserModuleAccess(user.id, [
-      { loginRole: "user-admin-access", groupId: "group-module-admin-read" },
+      { accessRole: "user-admin-access", groupId: "group-module-admin-read" },
     ])).rejects.toThrow(
       "Invalid module access assignment: user-admin-access -> group-module-admin-read",
     );
@@ -187,7 +187,7 @@ describe("InMemoryUserAdminStore", () => {
       userId: user.id,
       changes: { username: "changed" },
       assignments: [{
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupId: "not-eligible",
       }],
     }])).rejects.toThrow(
@@ -202,17 +202,17 @@ describe("InMemoryUserAdminStore", () => {
     const permissions = normalizeUserModuleAccessPermissions([
       {
         clientIdentifier: "vuu-portal",
-        loginRole: "module-admin-access",
+        accessRole: "module-admin-access",
         groupIds: ["module-admin", "module-read", "module-admin"],
       },
       {
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupIds: ["user-read"],
       },
       {
         clientIdentifier: "vuu-portal",
-        loginRole: "module-admin-access",
+        accessRole: "module-admin-access",
         groupIds: ["module-read"],
       },
     ]);
@@ -220,19 +220,19 @@ describe("InMemoryUserAdminStore", () => {
     expect(permissions).toEqual([
       {
         clientIdentifier: "vuu-portal",
-        loginRole: "module-admin-access",
+        accessRole: "module-admin-access",
         groupIds: ["module-admin", "module-read"],
       },
       {
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupIds: ["user-read"],
       },
     ]);
     expect(serializeUserModuleAccessPermissions(permissions)).toBe(
-      '[{"clientIdentifier":"vuu-portal","loginRole":"module-admin-access",' +
+      '[{"clientIdentifier":"vuu-portal","accessRole":"module-admin-access",' +
       '"groupIds":["module-admin","module-read"]},{"clientIdentifier":"vuu-portal",' +
-      '"loginRole":"user-admin-access","groupIds":["user-read"]}]',
+      '"accessRole":"user-admin-access","groupIds":["user-read"]}]',
     );
   });
 });

@@ -23,7 +23,7 @@ describe("LoginSuccess", () => {
         {
           clientIdentifier: "vuu-portal",
           id: 1,
-          loginRole: "module-admin-access",
+          accessRole: "module-admin-access",
           name: "moduleAdmin",
           title: "Manage remote modules",
           description: "Create new remote module, update existing modules",
@@ -63,7 +63,7 @@ describe("LoginSuccess", () => {
             {
               clientIdentifier: "vuu-portal",
               id: 1,
-              loginRole: "module-admin-access",
+              accessRole: "module-admin-access",
               name: "moduleAdmin",
               title: user.name,
               description: user.authorizations.join(","),

@@ -492,7 +492,7 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     const options = await client.getUserModuleAccessOptions(userId);
     const modules = new Map(
       options.modules.map((module) => [
-        `${module.clientIdentifier}\u0000${module.loginRole}`,
+        `${module.clientIdentifier}\u0000${module.accessRole}`,
         module,
       ]),
     );
@@ -500,20 +500,20 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     for (const permission of permissions) {
       assertVuuClientId(permission.clientIdentifier);
       const module = modules.get(
-        `${permission.clientIdentifier}\u0000${permission.loginRole}`,
+        `${permission.clientIdentifier}\u0000${permission.accessRole}`,
       );
       if (!module) {
         throw new Error(
-          `Invalid permissions application: ${permission.clientIdentifier} -> ${permission.loginRole}`,
+          `Invalid permissions application: ${permission.clientIdentifier} -> ${permission.accessRole}`,
         );
       }
       for (const groupId of permission.groupIds) {
         if (!module.groups.some((group) => group.groupId === groupId)) {
           throw new Error(
-            `Invalid permissions group: ${groupId} does not grant ${permission.loginRole}`,
+            `Invalid permissions group: ${groupId} does not grant ${permission.accessRole}`,
           );
         }
-        assignments.push({ loginRole: permission.loginRole, groupId });
+        assignments.push({ accessRole: permission.accessRole, groupId });
       }
     }
     return assignments;
@@ -579,14 +579,14 @@ function parseUserModulePermissions(value: unknown): UserModuleAccessPermission[
     throw new Error("Invalid permissions: expected JSON array");
   }
 
-  const loginRoles = new Set<string>();
+  const accessRoles = new Set<string>();
   const permissions = parsed.map((item, index) => {
     if (typeof item !== "object" || item === null || Array.isArray(item)) {
       throw new Error(`Invalid permissions application at index ${index}`);
     }
     const record = item as Record<string, unknown>;
     const unknownFields = Object.keys(record).filter(
-      (field) => !["clientIdentifier", "loginRole", "groupIds"].includes(field),
+      (field) => !["clientIdentifier", "accessRole", "groupIds"].includes(field),
     );
     if (unknownFields.length) {
       throw new Error(
@@ -597,14 +597,14 @@ function parseUserModulePermissions(value: unknown): UserModuleAccessPermission[
       record.clientIdentifier,
       `permissions[${index}].clientIdentifier`,
     );
-    const loginRole = ensureRequiredNonEmptyString(
-      record.loginRole,
-      `permissions[${index}].loginRole`,
+    const accessRole = ensureRequiredNonEmptyString(
+      record.accessRole,
+      `permissions[${index}].accessRole`,
     );
-    if (loginRoles.has(loginRole)) {
-      throw new Error(`Duplicate permissions application role "${loginRole}"`);
+    if (accessRoles.has(accessRole)) {
+      throw new Error(`Duplicate permissions application role "${accessRole}"`);
     }
-    loginRoles.add(loginRole);
+    accessRoles.add(accessRole);
     if (
       !Array.isArray(record.groupIds) ||
       record.groupIds.some(
@@ -615,9 +615,9 @@ function parseUserModulePermissions(value: unknown): UserModuleAccessPermission[
     }
     const groupIds = (record.groupIds as string[]).map((groupId) => groupId.trim());
     if (new Set(groupIds).size !== groupIds.length) {
-      throw new Error(`Duplicate group ID in permissions application "${loginRole}"`);
+      throw new Error(`Duplicate group ID in permissions application "${accessRole}"`);
     }
-    return { clientIdentifier, loginRole, groupIds };
+    return { clientIdentifier, accessRole, groupIds };
   });
 
   return normalizeUserModuleAccessPermissions(permissions);
@@ -641,24 +641,24 @@ function parseModuleAccessAssignments(value: unknown) {
     throw new Error('Invalid RPC param "assignments": expected JSON array');
   }
 
-  const loginRoles = new Set<string>();
+  const accessRoles = new Set<string>();
   return parsed.map((assignment, index) => {
     if (typeof assignment !== "object" || assignment === null || Array.isArray(assignment)) {
       throw new Error(`Invalid module access assignment at index ${index}`);
     }
     const record = assignment as Record<string, unknown>;
-    const loginRole = ensureRequiredNonEmptyString(
-      record.loginRole,
-      `assignments[${index}].loginRole`,
+    const accessRole = ensureRequiredNonEmptyString(
+      record.accessRole,
+      `assignments[${index}].accessRole`,
     );
     const groupId = ensureRequiredNonEmptyString(
       record.groupId,
       `assignments[${index}].groupId`,
     );
-    if (loginRoles.has(loginRole)) {
-      throw new Error(`Duplicate module access assignment for role "${loginRole}"`);
+    if (accessRoles.has(accessRole)) {
+      throw new Error(`Duplicate module access assignment for role "${accessRole}"`);
     }
-    loginRoles.add(loginRole);
-    return { loginRole, groupId };
+    accessRoles.add(accessRole);
+    return { accessRole, groupId };
   });
 }

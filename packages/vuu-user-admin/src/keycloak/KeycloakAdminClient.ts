@@ -923,7 +923,7 @@ export function buildUserModuleAccessOptions(
 
     const module: UserModuleAccessModule = {
       clientIdentifier: portalClient.clientId,
-      loginRole: role.name,
+      accessRole: role.name,
       groups,
       selectedGroupIds,
       ...(selectedGroupIds[0] ? { selectedGroupId: selectedGroupIds[0] } : {}),
@@ -945,21 +945,21 @@ export function planUserModuleAccessChanges(
   assignments: readonly UserModuleAccessAssignment[],
 ): UserModuleAccessChangePlan {
   const options = buildUserModuleAccessOptions(snapshot, userId);
-  const modulesByRole = new Map(options.modules.map((module) => [module.loginRole, module]));
+  const modulesByRole = new Map(options.modules.map((module) => [module.accessRole, module]));
   const groupIds = new Set(snapshot.groups.map(({ id }) => id));
   const desiredGroupIds = new Set<string>();
 
   for (const assignment of assignments) {
-    const module = modulesByRole.get(assignment.loginRole);
+    const module = modulesByRole.get(assignment.accessRole);
     if (!module) {
-      throw new Error(`Unknown module access role: ${assignment.loginRole}`);
+      throw new Error(`Unknown module access role: ${assignment.accessRole}`);
     }
     if (!groupIds.has(assignment.groupId)) {
       throw new Error(`Keycloak group not found: ${assignment.groupId}`);
     }
     if (!module.groups.some(({ groupId }) => groupId === assignment.groupId)) {
       throw new Error(
-        `Group ${assignment.groupId} does not grant module access role ${assignment.loginRole}`,
+        `Group ${assignment.groupId} does not grant module access role ${assignment.accessRole}`,
       );
     }
     if (desiredGroupIds.has(assignment.groupId)) continue;
@@ -978,7 +978,7 @@ export function planUserModuleAccessChanges(
   for (const module of options.modules) {
     for (const group of module.groups) {
       const roles = moduleRolesByGroup.get(group.groupId) ?? new Set<string>();
-      roles.add(module.loginRole);
+      roles.add(module.accessRole);
       moduleRolesByGroup.set(group.groupId, roles);
     }
   }
@@ -987,7 +987,7 @@ export function planUserModuleAccessChanges(
     const assignedRoles = new Set(
       assignments
         .filter(({ groupId: assignedGroupId }) => assignedGroupId === groupId)
-        .map(({ loginRole }) => loginRole),
+        .map(({ accessRole }) => accessRole),
     );
     const omittedRole = [...roles].find((role) => !assignedRoles.has(role));
     if (omittedRole) {

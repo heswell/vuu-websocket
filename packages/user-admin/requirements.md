@@ -51,14 +51,14 @@ neither entry point imports the VUU server feature.
 - Module-oriented access is exposed through `getUserModuleAccessOptions` with
   `{ userId }` and `setUserModuleAccess` with
   `{ userId, assignments }`, where `assignments` is a JSON-encoded array of
-  `{ loginRole, groupId }` objects. Options include every eligible group,
+  `{ accessRole, groupId }` objects. Options include every eligible group,
   `selectedGroupIds` contains every selected eligible group, and the
   deprecated `selectedGroupId` contains only its first value for legacy
   consumers. Each role has exactly one server-owned `isDefault` group;
   consumers must not infer this policy from group names. Saving reconciles only
   access-bearing group memberships and preserves unrelated groups.
 - The canonical serialized permissions value is an array of
-  `{ clientIdentifier, loginRole, groupIds }` objects. Use
+  `{ clientIdentifier, accessRole, groupIds }` objects. Use
   `normalizeUserModuleAccessPermissions` or
   `serializeUserModuleAccessPermissions` to merge duplicate applications,
   deduplicate group IDs, and sort roles and group IDs deterministically.

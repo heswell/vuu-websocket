@@ -38,7 +38,7 @@ export const userModuleAccess = (snapshot: UserAdminSnapshot, userId: string) =>
       .filter(({ user }) => user.id === userId)
       .map(({ group }) => group.id),
   );
-  const loginRoles = new Set(
+  const accessRoles = new Set(
     snapshot.groupRoles
       .filter(
         ({ group, role, client }) =>
@@ -48,7 +48,7 @@ export const userModuleAccess = (snapshot: UserAdminSnapshot, userId: string) =>
       )
       .map(({ role }) => role.name),
   );
-  const roles = [...loginRoles].sort((left, right) =>
+  const roles = [...accessRoles].sort((left, right) =>
     left < right ? -1 : left > right ? 1 : 0,
   );
   return {

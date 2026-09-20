@@ -51,13 +51,13 @@ export type GetUserModuleAccessOptionsRpcParams = {
 };
 
 export type UserModuleAccessAssignment = {
-  loginRole: string;
+  accessRole: string;
   groupId: string;
 };
 
 export type UserModuleAccessPermission = {
   clientIdentifier: string;
-  loginRole: string;
+  accessRole: string;
   groupIds: string[];
 };
 
@@ -85,7 +85,7 @@ export type UserModuleAccessGroup = {
  */
 export type UserModuleAccessModule = {
   clientIdentifier: string;
-  loginRole: string;
+  accessRole: string;
   groups: UserModuleAccessGroup[];
   selectedGroupIds: string[];
   /**
@@ -104,25 +104,25 @@ export function normalizeUserModuleAccessPermissions(
 ): UserModuleAccessPermissions {
   const groupsByClient = new Map<string, Map<string, Set<string>>>();
 
-  for (const { clientIdentifier, loginRole, groupIds } of permissions) {
+  for (const { clientIdentifier, accessRole, groupIds } of permissions) {
     const roles = groupsByClient.get(clientIdentifier) ??
       new Map<string, Set<string>>();
-    const groups = roles.get(loginRole) ?? new Set<string>();
+    const groups = roles.get(accessRole) ?? new Set<string>();
     for (const groupId of groupIds) groups.add(groupId);
-    roles.set(loginRole, groups);
+    roles.set(accessRole, groups);
     groupsByClient.set(clientIdentifier, roles);
   }
 
   return [...groupsByClient.entries()].flatMap(([clientIdentifier, roles]) =>
-    [...roles.entries()].map(([loginRole, groupIds]) => ({
+    [...roles.entries()].map(([accessRole, groupIds]) => ({
       clientIdentifier,
-      loginRole,
+      accessRole,
       groupIds: [...groupIds].sort((left, right) => left.localeCompare(right)),
     })),
   )
     .sort(
       (left, right) =>
-        left.loginRole.localeCompare(right.loginRole) ||
+        left.accessRole.localeCompare(right.accessRole) ||
         left.clientIdentifier.localeCompare(right.clientIdentifier),
     );
 }

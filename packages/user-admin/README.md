@@ -139,7 +139,7 @@ on the group options for the server-owned least-privilege choice. The legacy
 `selectedGroupId` field is retained as the first selected ID. For serialized
 client permissions, use `serializeUserModuleAccessPermissions` to produce the
 canonical sorted and duplicate-free
-`[{ clientIdentifier, loginRole, groupIds }]` payload.
+`[{ clientIdentifier, accessRole, groupIds }]` payload.
 
 Do not make HTTP or identity-provider requests from this client module. The
 demo module is purely local. The production client connects to the

@@ -36,7 +36,7 @@ function readModules(table: DataTable): DiscoveredModuleRecord[] {
     clientIdentifier: PORTAL_CLIENT_IDENTIFIER,
     id: numberValue(table, row, "id"),
     parentModuleId: numberValue(table, row, "parentModuleId"),
-    loginRole: "",
+    accessRole: "",
     name: stringValue(table, row, "name"),
     title: stringValue(table, row, "title"),
     description: stringValue(table, row, "description"),
@@ -89,12 +89,12 @@ function selectModules(
 
   const latestByName = new Map<string, DiscoveredModuleRecord>();
   modules.forEach((module) => {
-    const loginRole = permittedModuleRoles.get(module.id);
-    if (!module.enabled || !loginRole) {
+    const accessRole = permittedModuleRoles.get(module.id);
+    if (!module.enabled || !accessRole) {
       return;
     }
 
-    const moduleWithAccess = { ...module, loginRole };
+    const moduleWithAccess = { ...module, accessRole };
     const current = latestByName.get(module.name);
     if (
       !current ||

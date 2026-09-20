@@ -600,7 +600,7 @@ describe("Keycloak admin backend", () => {
       getUserModuleAccessOptions: async () => ({
         modules: [{
           clientIdentifier: "vuu-portal",
-          loginRole: "orders-access",
+          accessRole: "orders-access",
           selectedGroupIds: ["users"],
           selectedGroupId: "users",
           groups: [{
@@ -635,7 +635,7 @@ describe("Keycloak admin backend", () => {
     expect(buildUserModuleAccessOptions(moduleAccessSnapshot, "u1")).toEqual({
       modules: [{
         clientIdentifier: "vuu-portal",
-        loginRole: "orders-access",
+        accessRole: "orders-access",
         selectedGroupIds: ["users"],
         selectedGroupId: "users",
         groups: [
@@ -677,7 +677,7 @@ describe("Keycloak admin backend", () => {
     const result = await service.processRpcRequest("setUserModuleAccess", {
       namedParams: {
         userId: "u1",
-        assignments: JSON.stringify([{ loginRole: "orders-access", groupId: "traders" }]),
+        assignments: JSON.stringify([{ accessRole: "orders-access", groupId: "traders" }]),
       },
       viewport: {} as never,
       ctx: {} as never,
@@ -685,7 +685,7 @@ describe("Keycloak admin backend", () => {
     expect(result).toEqual({ type: "SUCCESS_RESULT", data: undefined });
     expect(assignments).toEqual([{
       userId: "u1",
-      assignments: [{ loginRole: "orders-access", groupId: "traders" }],
+      assignments: [{ accessRole: "orders-access", groupId: "traders" }],
     }]);
   });
 
@@ -711,8 +711,8 @@ describe("Keycloak admin backend", () => {
     );
     const invalidAssignments = [
       "not-json",
-      JSON.stringify([{ loginRole: "unknown-access", groupId: "users" }]),
-      JSON.stringify([{ loginRole: "orders-access", groupId: "missing" }]),
+      JSON.stringify([{ accessRole: "unknown-access", groupId: "users" }]),
+      JSON.stringify([{ accessRole: "orders-access", groupId: "missing" }]),
     ];
     for (const assignments of invalidAssignments) {
       const result = await service.processRpcRequest("setUserModuleAccess", {
@@ -727,13 +727,13 @@ describe("Keycloak admin backend", () => {
   test("rejects unknown module and group assignments", () => {
     expect(() =>
       planUserModuleAccessChanges(moduleAccessSnapshot, "u1", [{
-        loginRole: "unknown-access",
+        accessRole: "unknown-access",
         groupId: "users",
       }]),
     ).toThrow("Unknown module access role: unknown-access");
     expect(() =>
       planUserModuleAccessChanges(moduleAccessSnapshot, "u1", [{
-        loginRole: "orders-access",
+        accessRole: "orders-access",
         groupId: "missing",
       }]),
     ).toThrow("Keycloak group not found: missing");

@@ -58,7 +58,7 @@ function createContext() {
     getUserModuleAccessOptions: async () => ({
       modules: [{
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         selectedGroupIds: [],
         groups: [
           {
@@ -132,7 +132,7 @@ describe("User Admin user edit sessions", () => {
       key: "u1",
       data: JSON.stringify([{
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupIds: ["group-user-admin-admin", "group-user-admin-read"],
       }]),
     });
@@ -144,8 +144,8 @@ describe("User Admin user edit sessions", () => {
         userId: "u1",
         changes: {},
         assignments: [
-          { loginRole: "user-admin-access", groupId: "group-user-admin-admin" },
-          { loginRole: "user-admin-access", groupId: "group-user-admin-read" },
+          { accessRole: "user-admin-access", groupId: "group-user-admin-admin" },
+          { accessRole: "user-admin-access", groupId: "group-user-admin-read" },
         ],
       },
     ]]);
@@ -181,7 +181,7 @@ describe("User Admin user edit sessions", () => {
       key: "u1",
       data: JSON.stringify([{
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupIds: ["not-eligible"],
         unexpected: true,
       }]),
@@ -202,7 +202,7 @@ describe("User Admin user edit sessions", () => {
       key: "u1",
       data: JSON.stringify([{
         clientIdentifier: "vuu-portal",
-        loginRole: "user-admin-access",
+        accessRole: "user-admin-access",
         groupIds: ["not-eligible"],
       }]),
     });
