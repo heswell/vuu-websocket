@@ -3,6 +3,7 @@ import {
   assertVuuClientId,
   isVuuClientId,
   VUU_PORTAL_CLIENT_IDENTIFIER,
+  type UserAdminUserEdit,
   type UserModuleAccessAssignment,
   type UserModuleAccessModule,
   type UserModuleAccessOptions,
@@ -351,6 +352,95 @@ export class KeycloakAdminClient {
     });
     if (temporary_password) {
       await this.setUserPassword(userId, temporary_password);
+    }
+  }
+
+  async applyUserEdits(edits: readonly UserAdminUserEdit[]) {
+    if (!edits.length) return;
+
+    const snapshot = await this.readSnapshot();
+    const plans = edits.map((edit) => {
+      if (!snapshot.users.some(({ id }) => id === edit.userId)) {
+        throw new Error(`Keycloak user not found: ${edit.userId}`);
+      }
+      return {
+        edit,
+        plan: edit.assignments === undefined
+          ? undefined
+          : planUserModuleAccessChanges(snapshot, edit.userId, edit.assignments),
+      };
+    });
+    const originalUsers = new Map(
+      snapshot.users.map((user) => [user.id, user]),
+    );
+    const rollbackGroups: Array<{
+      userId: string;
+      groupId: string;
+      add: boolean;
+    }> = [];
+    const updatedUsers: KeycloakUser[] = [];
+
+    try {
+      for (const { edit, plan } of plans) {
+        const user = originalUsers.get(edit.userId)!;
+        if (Object.keys(edit.changes).length) {
+          await this.updateUser({ userId: edit.userId, ...edit.changes });
+          updatedUsers.push(user);
+        }
+        if (plan) {
+          for (const groupId of plan.addGroupIds) {
+            await this.addUserToGroup({ userId: edit.userId }, { groupId });
+            rollbackGroups.push({ userId: edit.userId, groupId, add: false });
+          }
+          for (const groupId of plan.removeGroupIds) {
+            await this.removeUserFromGroup({ userId: edit.userId }, { groupId });
+            rollbackGroups.push({ userId: edit.userId, groupId, add: true });
+          }
+        }
+      }
+    } catch (error) {
+      const rollbackErrors: unknown[] = [];
+      for (const rollback of rollbackGroups.reverse()) {
+        try {
+          if (rollback.add) {
+            await this.addUserToGroup(
+              { userId: rollback.userId },
+              { groupId: rollback.groupId },
+            );
+          } else {
+            await this.removeUserFromGroup(
+              { userId: rollback.userId },
+              { groupId: rollback.groupId },
+            );
+          }
+        } catch (rollbackError) {
+          rollbackErrors.push(rollbackError);
+        }
+      }
+      for (const user of updatedUsers.reverse()) {
+        try {
+          await this.updateUser({
+            userId: user.id,
+            username: user.username,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            enabled: user.enabled,
+            emailVerified: user.emailVerified,
+          });
+        } catch (rollbackError) {
+          rollbackErrors.push(rollbackError);
+        }
+      }
+      if (rollbackErrors.length) {
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}; ` +
+          `rollback failed: ${rollbackErrors.map((rollbackError) =>
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          ).join("; ")}`,
+        );
+      }
+      throw error;
     }
   }
 

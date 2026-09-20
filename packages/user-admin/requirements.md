@@ -62,6 +62,10 @@ neither entry point imports the VUU server feature.
   `normalizeUserModuleAccessPermissions` or
   `serializeUserModuleAccessPermissions` to merge duplicate applications,
   deduplicate group IDs, and sort roles and group IDs deterministically.
+- The `USER_ADMIN.users` source schema has no `permissions` column. The VUU
+  server adds `permissions` only to users edit-session tables, validates and
+  canonicalizes its serialized value before saving, and reconciles managed
+  application-access memberships without changing unrelated memberships.
 - The UI RPC contract is exported from `KeycloakAdminContract.ts`. Supported
   RPC names are `addUser`, `updateUser`, `deleteUser`, `addGroup`,
   `updateGroup`, `deleteGroup`, `addClient`, `updateClient`, `addRole`,

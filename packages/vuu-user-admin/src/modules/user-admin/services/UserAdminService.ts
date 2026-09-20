@@ -1,10 +1,21 @@
 import {
   CreateSessionTableRpcHandler,
+  InMemSessionDataTable,
+  type Column,
+  type DataTable,
   type RpcParams,
   type TableContainer,
 } from "@heswell/vuu-server";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import { assertVuuClientId, type UserAdminOperations } from "@heswell/user-admin";
+import {
+  assertVuuClientId,
+  normalizeUserModuleAccessPermissions,
+  type UserAdminEditableUserChanges,
+  type UserAdminOperations,
+  type UserAdminUserEdit,
+  type UserModuleAccessAssignment,
+  type UserModuleAccessPermission,
+} from "@heswell/user-admin";
 
 type Params = Record<string, unknown>;
 
@@ -79,6 +90,47 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     this.registerRpc("getUserModuleAccessOptions", this.getUserModuleAccessOptions);
     this.registerRpc("setUserModuleAccess", this.setUserModuleAccess);
   }
+
+  protected getSessionTableCustomColumns(sourceTable: DataTable): Column[] {
+    return sourceTable.tableDef.name === "users"
+      ? [{ name: "permissions", dataType: "string" }]
+      : [];
+  }
+
+  protected handleEndEditSession = async (params: RpcParams<Params>) => {
+    const { namedParams, viewport } = params;
+    const sessionTable = viewport.dataTable;
+    if (
+      !(sessionTable instanceof InMemSessionDataTable) ||
+      sessionTable.tableDef.name !== "users" ||
+      !namedParams.save
+    ) {
+      return super.handleEndEditSession(params);
+    }
+
+    const prepared = this.prepareSessionSave(
+      sessionTable,
+      namedParams.force === true,
+    );
+    if ("type" in prepared) return prepared;
+
+    try {
+      const client = await this.createOperations();
+      const edits = await this.prepareUserEdits(prepared, client);
+      if (edits.length) {
+        if (client.applyUserEdits) {
+          await client.applyUserEdits(edits);
+        } else {
+          await this.applyUserEditsFallback(client, edits);
+        }
+      }
+      this.applySessionSave(sessionTable, prepared);
+      await this.refreshAfterMutation("session:users");
+      return success();
+    } catch (error) {
+      return failure(toErrorMessage(error));
+    }
+  };
 
   private readonly addUser = async ({ namedParams }: RpcParams<Params>) => {
     try {
@@ -392,6 +444,183 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     }
   }
 
+  private async prepareUserEdits(
+    prepared: {
+      sourceTable: DataTable;
+      changes: Array<{
+        action: string;
+        cellUpdates: Record<string, unknown>;
+        sourceRow?: unknown[];
+      }>;
+    },
+    client: UserAdminOperations,
+  ): Promise<UserAdminUserEdit[]> {
+    const { sourceTable } = prepared;
+    const edits: UserAdminUserEdit[] = [];
+    for (const change of prepared.changes) {
+      if (change.action !== "" || !change.sourceRow) {
+        if (change.cellUpdates.permissions !== undefined) {
+          throw new Error("permissions can only be edited for an existing user");
+        }
+        continue;
+      }
+      const userId = String(change.sourceRow[sourceTable.columnMap.user_id]);
+      const changes = parseEditableUserChanges(change.cellUpdates);
+      const assignments = Object.prototype.hasOwnProperty.call(
+        change.cellUpdates,
+        "permissions",
+      )
+        ? await this.parseAndValidatePermissions(
+            client,
+            userId,
+            change.cellUpdates.permissions,
+          )
+        : undefined;
+      if (Object.keys(changes).length || assignments !== undefined) {
+        edits.push({ userId, changes, assignments });
+      }
+    }
+    return edits;
+  }
+
+  private async parseAndValidatePermissions(
+    client: UserAdminOperations,
+    userId: string,
+    value: unknown,
+  ): Promise<UserModuleAccessAssignment[]> {
+    const permissions = parseUserModulePermissions(value);
+    const options = await client.getUserModuleAccessOptions(userId);
+    const modules = new Map(
+      options.modules.map((module) => [
+        `${module.clientIdentifier}\u0000${module.loginRole}`,
+        module,
+      ]),
+    );
+    const assignments: UserModuleAccessAssignment[] = [];
+    for (const permission of permissions) {
+      assertVuuClientId(permission.clientIdentifier);
+      const module = modules.get(
+        `${permission.clientIdentifier}\u0000${permission.loginRole}`,
+      );
+      if (!module) {
+        throw new Error(
+          `Invalid permissions application: ${permission.clientIdentifier} -> ${permission.loginRole}`,
+        );
+      }
+      for (const groupId of permission.groupIds) {
+        if (!module.groups.some((group) => group.groupId === groupId)) {
+          throw new Error(
+            `Invalid permissions group: ${groupId} does not grant ${permission.loginRole}`,
+          );
+        }
+        assignments.push({ loginRole: permission.loginRole, groupId });
+      }
+    }
+    return assignments;
+  }
+
+  private async applyUserEditsFallback(
+    client: UserAdminOperations,
+    edits: readonly UserAdminUserEdit[],
+  ) {
+    for (const { userId, changes, assignments } of edits) {
+      if (Object.keys(changes).length) await client.updateUser({ userId, ...changes });
+      if (assignments !== undefined) {
+        await client.setUserModuleAccess(userId, assignments);
+      }
+    }
+  }
+
+}
+
+const editableUserFields = {
+  username: "username",
+  email: "email",
+  first_name: "firstName",
+  last_name: "lastName",
+  enabled: "enabled",
+  email_verified: "emailVerified",
+} as const;
+
+function parseEditableUserChanges(
+  cellUpdates: Record<string, unknown>,
+): UserAdminEditableUserChanges {
+  const changes: UserAdminEditableUserChanges = {};
+  for (const [column, value] of Object.entries(cellUpdates)) {
+    if (column === "permissions") continue;
+    const field = editableUserFields[column as keyof typeof editableUserFields];
+    if (!field) continue;
+    if (field === "enabled" || field === "emailVerified") {
+      if (typeof value !== "boolean") {
+        throw new Error(`Invalid users session value for "${column}"`);
+      }
+      changes[field] = value;
+    } else {
+      if (typeof value !== "string") {
+        throw new Error(`Invalid users session value for "${column}"`);
+      }
+      changes[field] = value;
+    }
+  }
+  return changes;
+}
+
+function parseUserModulePermissions(value: unknown): UserModuleAccessPermission[] {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("Invalid permissions: expected JSON array");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid permissions: expected JSON array");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid permissions: expected JSON array");
+  }
+
+  const loginRoles = new Set<string>();
+  const permissions = parsed.map((item, index) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      throw new Error(`Invalid permissions application at index ${index}`);
+    }
+    const record = item as Record<string, unknown>;
+    const unknownFields = Object.keys(record).filter(
+      (field) => !["clientIdentifier", "loginRole", "groupIds"].includes(field),
+    );
+    if (unknownFields.length) {
+      throw new Error(
+        `Invalid permissions application at index ${index}: unknown field "${unknownFields[0]}"`,
+      );
+    }
+    const clientIdentifier = ensureRequiredNonEmptyString(
+      record.clientIdentifier,
+      `permissions[${index}].clientIdentifier`,
+    );
+    const loginRole = ensureRequiredNonEmptyString(
+      record.loginRole,
+      `permissions[${index}].loginRole`,
+    );
+    if (loginRoles.has(loginRole)) {
+      throw new Error(`Duplicate permissions application role "${loginRole}"`);
+    }
+    loginRoles.add(loginRole);
+    if (
+      !Array.isArray(record.groupIds) ||
+      record.groupIds.some(
+        (groupId) => typeof groupId !== "string" || groupId.trim() === "",
+      )
+    ) {
+      throw new Error(`Invalid permissions[${index}].groupIds`);
+    }
+    const groupIds = (record.groupIds as string[]).map((groupId) => groupId.trim());
+    if (new Set(groupIds).size !== groupIds.length) {
+      throw new Error(`Duplicate group ID in permissions application "${loginRole}"`);
+    }
+    return { clientIdentifier, loginRole, groupIds };
+  });
+
+  return normalizeUserModuleAccessPermissions(permissions);
 }
 
 function parseModuleAccessAssignments(value: unknown) {

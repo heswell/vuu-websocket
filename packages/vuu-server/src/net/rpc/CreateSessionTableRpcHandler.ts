@@ -6,6 +6,7 @@ import { Viewport } from "../../viewport/Viewport";
 import { EndEditSessionRpcHandler } from "./EndEditSessionRpcHandler";
 import { RpcParams } from "./Rpc";
 import { RpcNames } from "../../util/RpcNames";
+import type { Column } from "../../api/TableDef";
 
 export type SessionTableCopyOption = "All" | "Empty" | "Selected";
 export type EditSessionMode =
@@ -87,6 +88,7 @@ export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
     const sessionTable = this.tableContainer.createSimpleSessionTable(
       sourceTable,
       ctx.session,
+      this.getSessionTableCustomColumns(sourceTable),
     );
 
     try {
@@ -112,6 +114,10 @@ export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
     }
 
     return sessionTable;
+  }
+
+  protected getSessionTableCustomColumns(_sourceTable: DataTable): Column[] {
+    return [];
   }
 
   constructor(tableContainer: TableContainer) {

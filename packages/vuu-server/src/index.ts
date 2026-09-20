@@ -2,6 +2,10 @@ export { ViewServerModule as Module } from "./core/module/VsModule";
 export { type Column, Columns } from "./core/table/Column";
 export type { TableContainer } from "./core/table/TableContainer";
 export type { DataTable } from "./core/table/InMemDataTable";
+export {
+  InMemSessionDataTable,
+  isSessionDataTable,
+} from "./core/table/InMemSessionDataTable";
 export { ProviderContainer } from "./provider/ProviderContainer";
 export { NullProvider, Provider, RemoteProvider } from "./provider/Provider";
 export type {
@@ -19,7 +23,11 @@ export {
   type EditSessionMode,
   type SessionTableCopyOption,
 } from "./net/rpc/CreateSessionTableRpcHandler";
-export { EndEditSessionRpcHandler } from "./net/rpc/EndEditSessionRpcHandler";
+export {
+  EndEditSessionRpcHandler,
+  type PreparedSessionChange,
+  type PreparedSessionSave,
+} from "./net/rpc/EndEditSessionRpcHandler";
 export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
 export {
   JoinTableProvider,

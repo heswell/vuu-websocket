@@ -10,11 +10,23 @@ import { EditTableRpcHandler } from "./EditTableRpcHandler";
 import { RpcParams } from "./Rpc";
 import { RpcNames } from "../../util/RpcNames";
 
+export type PreparedSessionChange = SessionRowChange & {
+  sourceRow?: VuuDataRow;
+};
+
+export type PreparedSessionSave = {
+  sourceTable: DataTable;
+  changes: PreparedSessionChange[];
+};
+
 export class EndEditSessionRpcHandler extends EditTableRpcHandler {
-  endEditSession = ({
+  endEditSession = (params: RpcParams): RpcResult | Promise<RpcResult> =>
+    this.handleEndEditSession(params);
+
+  protected handleEndEditSession = ({
     namedParams: { force, save },
     viewport,
-  }: RpcParams): RpcResult => {
+  }: RpcParams): RpcResult | Promise<RpcResult> => {
     const sessionTable = viewport.dataTable;
     if (!(sessionTable instanceof InMemSessionDataTable)) {
       return {
@@ -28,13 +40,22 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       return { type: "SUCCESS_RESULT", data: undefined };
     }
 
+    const prepared = this.prepareSessionSave(sessionTable, force);
+    if ("type" in prepared) return prepared;
+
+    this.applySessionSave(sessionTable, prepared);
+    return { type: "SUCCESS_RESULT", data: undefined };
+  };
+
+  protected prepareSessionSave(
+    sessionTable: InMemSessionDataTable,
+    force?: boolean,
+  ): PreparedSessionSave | RpcResult {
     const sourceTable = this.tableContainer.getTable<DataTable>(
       sessionTable.tableDef.name,
     );
     const { columnMap } = sourceTable;
-    const preparedChanges: Array<
-      SessionRowChange & { sourceRow?: VuuDataRow }
-    > = [];
+    const preparedChanges: PreparedSessionChange[] = [];
     let hasDuplicateKey = false;
     let hasStaleUpdate = false;
 
@@ -104,6 +125,14 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       };
     }
 
+    return { sourceTable, changes: preparedChanges };
+  }
+
+  protected applySessionSave(
+    sessionTable: InMemSessionDataTable,
+    { sourceTable, changes }: PreparedSessionSave,
+  ) {
+    const { columnMap } = sourceTable;
     for (const {
       action,
       key,
@@ -121,7 +150,8 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       } else if (sourceRow) {
         const updatedRow = sourceRow.slice();
         for (const [column, value] of Object.entries(cellUpdates)) {
-          updatedRow[columnMap[column]] = value;
+          const columnIndex = columnMap[column];
+          if (columnIndex !== undefined) updatedRow[columnIndex] = value;
         }
         updatedRow[columnMap.vuuUpdatedTimestamp] = Date.now();
         sourceTable.update(sourceTable.rowIndexAtKey(key), updatedRow);
@@ -129,8 +159,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     }
 
     this.tableContainer.removeSessionTable(sessionTable.name);
-    return { type: "SUCCESS_RESULT", data: undefined };
-  };
+  }
 
   private setSessionRowMessage(
     sessionTable: InMemSessionDataTable,

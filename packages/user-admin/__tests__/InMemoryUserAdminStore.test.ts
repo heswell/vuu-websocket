@@ -180,6 +180,24 @@ describe("InMemoryUserAdminStore", () => {
     );
   });
 
+  test("validates all user edits before applying any user or membership change", async () => {
+    const store = new InMemoryUserAdminStore(fixtureSnapshot());
+
+    await expect(store.applyUserEdits!([{
+      userId: user.id,
+      changes: { username: "changed" },
+      assignments: [{
+        loginRole: "user-admin-access",
+        groupId: "not-eligible",
+      }],
+    }])).rejects.toThrow(
+      "Invalid module access assignment: user-admin-access -> not-eligible",
+    );
+
+    expect((await store.snapshot()).users[0]?.username).toBe("alice");
+    expect((await store.snapshot()).userGroups).toEqual([]);
+  });
+
   test("normalizes canonical permissions deterministically", () => {
     const permissions = normalizeUserModuleAccessPermissions([
       {

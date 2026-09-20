@@ -66,6 +66,16 @@ export type UserAdminSnapshot = {
 
 export type UserAdminSnapshotSource = () => Promise<UserAdminSnapshot>;
 
+export type UserAdminEditableUserChanges = Partial<
+  Pick<UserAdminUser, "username" | "email" | "firstName" | "lastName" | "enabled" | "emailVerified">
+>;
+
+export type UserAdminUserEdit = {
+  userId: string;
+  changes: UserAdminEditableUserChanges;
+  assignments?: readonly UserModuleAccessAssignment[];
+};
+
 export type UserAdminOperations = {
   addUser: (params: {
     username: string;
@@ -139,6 +149,7 @@ export type UserAdminOperations = {
     userId: string,
     assignments: readonly UserModuleAccessAssignment[],
   ) => Promise<void>;
+  applyUserEdits?: (edits: readonly UserAdminUserEdit[]) => Promise<void>;
 };
 
 export function clientForRole(
