@@ -1,65 +1,73 @@
 import type { UserAdminSnapshot } from "../contracts/UserAdminTypes";
 
-const portalClient = { id: "portal-client", clientId: "vuu-portal" };
+const clients = {
+  portal: { id: "portal-client", clientId: "vuu-portal" },
+  userAdmin: { id: "user-admin-client", clientId: "vuu-user-admin" },
+  portalServer: { id: "portal-server-client", clientId: "vuu-portal-server" },
+  basketTrading: { id: "basket-trading-client", clientId: "vuu-basket-trading" },
+} as const;
 
-const roleNames = [
-  "user-admin-access",
-  "user-admin-admin",
-  "module-admin-access",
-  "module-admin-admin",
-  "basket-trading-access",
-  "basket-trading-trade",
+const roleDefinitions = [
+  [clients.portal, "user-admin-access"],
+  [clients.portal, "module-admin-access"],
+  [clients.portal, "basket-trading-access"],
+  [clients.userAdmin, "read"],
+  [clients.userAdmin, "admin"],
+  [clients.portalServer, "module-admin-read"],
+  [clients.portalServer, "module-admin-admin"],
+  [clients.basketTrading, "read"],
+  [clients.basketTrading, "trade"],
 ] as const;
 
-const roleByName = new Map(
-  roleNames.map((name) => [name, {
-    id: name,
+const roleByClientAndName = new Map(
+  roleDefinitions.map(([client, name]) => [`${client.id}:${name}`, {
+    id: `${client.id}:${name}`,
     name,
     clientRole: true,
-    containerId: portalClient.id,
+    containerId: client.id,
   }]),
 );
 
 const groupDefinitions = [
-  ["group-user-admin-read", "group-user-admin-read", "user-admin-access", true],
-  ["group-user-admin-admin", "group-user-admin-admin", "user-admin-access", false],
-  ["group-module-admin-read", "group-module-admin-read", "module-admin-access", true],
-  ["group-module-admin-admin", "group-module-admin-admin", "module-admin-access", false],
-  ["group-basket-trading-read", "group-basket-trading-read", "basket-trading-access", true],
-  ["group-basket-trading-trade", "group-basket-trading-trade", "basket-trading-access", false],
+  { id: "group-user-admin-read", accessRole: "user-admin-access", isDefault: true },
+  { id: "group-user-admin-admin", accessRole: "user-admin-access", isDefault: false },
+  { id: "group-module-admin-read", accessRole: "module-admin-access", isDefault: true },
+  { id: "group-module-admin-admin", accessRole: "module-admin-access", isDefault: false },
+  { id: "group-basket-trading-read", accessRole: "basket-trading-access", isDefault: true },
+  { id: "group-basket-trading-trade", accessRole: "basket-trading-access", isDefault: false },
 ] as const;
 
 export const createUserAdminModuleAccessFixture = (): Partial<UserAdminSnapshot> => {
-  const groups = groupDefinitions.map(([id, name, defaultRole, isDefault]) => ({
+  const groups = groupDefinitions.map(({ id, accessRole, isDefault }) => ({
     id,
-    name,
+    name: id,
     path: `/${id}`,
-    ...(isDefault ? { moduleAccessDefaultRoles: [defaultRole] } : {}),
+    ...(isDefault ? { moduleAccessDefaultRoles: [accessRole] } : {}),
   }));
   const groupById = new Map(groups.map((group) => [group.id, group]));
   const groupRoleDefinitions = [
-    ["group-user-admin-read", ["user-admin-access"]],
-    ["group-user-admin-admin", ["user-admin-access", "user-admin-admin"]],
-    ["group-module-admin-read", ["module-admin-access"]],
-    ["group-module-admin-admin", ["module-admin-access", "module-admin-admin"]],
-    ["group-basket-trading-read", ["basket-trading-access"]],
-    ["group-basket-trading-trade", ["basket-trading-access", "basket-trading-trade"]],
+    ["group-user-admin-read", [[clients.portal, "user-admin-access"], [clients.userAdmin, "read"]]],
+    ["group-user-admin-admin", [[clients.portal, "user-admin-access"], [clients.userAdmin, "read"], [clients.userAdmin, "admin"]]],
+    ["group-module-admin-read", [[clients.portal, "module-admin-access"], [clients.portalServer, "module-admin-read"]]],
+    ["group-module-admin-admin", [[clients.portal, "module-admin-access"], [clients.portalServer, "module-admin-read"], [clients.portalServer, "module-admin-admin"]]],
+    ["group-basket-trading-read", [[clients.portal, "basket-trading-access"], [clients.basketTrading, "read"]]],
+    ["group-basket-trading-trade", [[clients.portal, "basket-trading-access"], [clients.basketTrading, "read"], [clients.basketTrading, "trade"]]],
   ] as const;
 
   return {
     users: [],
     groups,
-    clients: [portalClient],
-    clientRoles: roleNames.map((name) => ({
-      client: portalClient,
-      role: roleByName.get(name)!,
+    clients: Object.values(clients),
+    clientRoles: roleDefinitions.map(([client, name]) => ({
+      client,
+      role: roleByClientAndName.get(`${client.id}:${name}`)!,
     })),
     userGroups: [],
-    groupRoles: groupRoleDefinitions.flatMap(([groupId, names]) =>
-      names.map((name) => ({
+    groupRoles: groupRoleDefinitions.flatMap(([groupId, roles]) =>
+      roles.map(([client, name]) => ({
         group: groupById.get(groupId)!,
-        client: portalClient,
-        role: roleByName.get(name)!,
+        client,
+        role: roleByClientAndName.get(`${client.id}:${name}`)!,
       })),
     ),
     timestamp: 0,

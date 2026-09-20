@@ -57,6 +57,18 @@ describe("InMemoryUserAdminStore", () => {
     expect(userAdmin?.selectedGroupId).toBe("group-user-admin-admin");
     expect(userAdmin?.groups.filter(({ isDefault }) => isDefault).map(({ groupId }) => groupId))
       .toEqual(["group-user-admin-read"]);
+    expect([
+      ["group-user-admin-read", "read"],
+      ["group-user-admin-admin", "read"],
+      ["group-module-admin-read", "module-admin-read"],
+      ["group-module-admin-admin", "module-admin-read"],
+      ["group-basket-trading-read", "read"],
+      ["group-basket-trading-trade", "read"],
+    ].every(([groupId, roleName]) =>
+      snapshot.groupRoles.some(
+        ({ group, role }) => group.id === groupId && role.name === roleName,
+      ),
+    )).toBe(true);
     expect(options.modules).toHaveLength(3);
   });
 
