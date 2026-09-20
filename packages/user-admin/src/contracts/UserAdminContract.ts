@@ -55,6 +55,14 @@ export type UserModuleAccessAssignment = {
   groupId: string;
 };
 
+export type UserModuleAccessPermission = {
+  clientIdentifier: string;
+  loginRole: string;
+  groupIds: string[];
+};
+
+export type UserModuleAccessPermissions = UserModuleAccessPermission[];
+
 export type SetUserModuleAccessRpcParams = {
   userId: string;
   /** JSON-encoded UserModuleAccessAssignment[]. */
@@ -71,16 +79,59 @@ export type UserModuleAccessGroup = {
   isDefault: boolean;
 };
 
+/**
+ * Access options expose every group that grants an application access role.
+ * `isDefault` is supplied by the server-owned least-privilege policy.
+ */
 export type UserModuleAccessModule = {
   clientIdentifier: string;
   loginRole: string;
   groups: UserModuleAccessGroup[];
+  selectedGroupIds: string[];
+  /**
+   * @deprecated Use selectedGroupIds. This is the first selected group for
+   * clients that still consume the legacy singular field.
+   */
   selectedGroupId?: string;
 };
 
 export type UserModuleAccessOptions = {
   modules: UserModuleAccessModule[];
 };
+
+export function normalizeUserModuleAccessPermissions(
+  permissions: readonly UserModuleAccessPermission[],
+): UserModuleAccessPermissions {
+  const groupsByClient = new Map<string, Map<string, Set<string>>>();
+
+  for (const { clientIdentifier, loginRole, groupIds } of permissions) {
+    const roles = groupsByClient.get(clientIdentifier) ??
+      new Map<string, Set<string>>();
+    const groups = roles.get(loginRole) ?? new Set<string>();
+    for (const groupId of groupIds) groups.add(groupId);
+    roles.set(loginRole, groups);
+    groupsByClient.set(clientIdentifier, roles);
+  }
+
+  return [...groupsByClient.entries()].flatMap(([clientIdentifier, roles]) =>
+    [...roles.entries()].map(([loginRole, groupIds]) => ({
+      clientIdentifier,
+      loginRole,
+      groupIds: [...groupIds].sort((left, right) => left.localeCompare(right)),
+    })),
+  )
+    .sort(
+      (left, right) =>
+        left.loginRole.localeCompare(right.loginRole) ||
+        left.clientIdentifier.localeCompare(right.clientIdentifier),
+    );
+}
+
+export function serializeUserModuleAccessPermissions(
+  permissions: readonly UserModuleAccessPermission[],
+): string {
+  return JSON.stringify(normalizeUserModuleAccessPermissions(permissions));
+}
 
 export const USER_ADMIN_RPC_CONTRACT = {
   addUser: ["username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],

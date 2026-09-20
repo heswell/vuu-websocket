@@ -601,6 +601,7 @@ describe("Keycloak admin backend", () => {
         modules: [{
           clientIdentifier: "vuu-portal",
           loginRole: "orders-access",
+          selectedGroupIds: ["users"],
           selectedGroupId: "users",
           groups: [{
             groupId: "users",
@@ -635,6 +636,7 @@ describe("Keycloak admin backend", () => {
       modules: [{
         clientIdentifier: "vuu-portal",
         loginRole: "orders-access",
+        selectedGroupIds: ["users"],
         selectedGroupId: "users",
         groups: [
           {

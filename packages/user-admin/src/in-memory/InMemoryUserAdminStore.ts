@@ -201,25 +201,46 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
       ({ clientId }) => clientId === VUU_PORTAL_CLIENT_IDENTIFIER,
     );
     if (!portal) return { modules: [] };
+
+    const groupsById = new Map(this.#snapshot.groups.map((group) => [group.id, group]));
     return {
       modules: this.#snapshot.clientRoles
         .filter(({ client, role }) => client.id === portal.id && role.name.endsWith("-access"))
+        .sort((left, right) => left.role.name.localeCompare(right.role.name))
         .map(({ role }) => {
           const groups = this.#snapshot.groupRoles
             .filter(({ client, role: candidate }) => client?.id === portal.id && candidate.id === role.id)
-            .map(({ group }) => ({
+            .map(({ group }) => groupsById.get(group.id) ?? group)
+            .filter((group, index, allGroups) =>
+              allGroups.findIndex(({ id }) => id === group.id) === index,
+            )
+            .sort((left, right) => left.id.localeCompare(right.id));
+          const defaultGroups = groups.filter(({ moduleAccessDefaultRoles }) =>
+            moduleAccessDefaultRoles?.includes(role.name),
+          );
+          if (defaultGroups.length !== 1) {
+            throw new Error(
+              `Invalid default-group configuration for module access role "${role.name}": ` +
+              `expected exactly one eligible default group, found ${defaultGroups.length}`,
+            );
+          }
+          const defaultGroupId = defaultGroups[0].id;
+          const selectedGroupIds = groups
+            .filter(({ id }) => userGroupIds.has(id))
+            .map(({ id }) => id);
+          return {
+            clientIdentifier: portal.clientId,
+            loginRole: role.name,
+            groups: groups.map((group) => ({
               groupId: group.id,
               groupName: group.name,
               groupPath: group.path,
               roleId: role.id,
               roleName: role.name,
-              isDefault: false,
-            }));
-          return {
-            clientIdentifier: portal.clientId,
-            loginRole: role.name,
-            groups,
-            selectedGroupId: groups.find(({ groupId }) => userGroupIds.has(groupId))?.groupId,
+              isDefault: group.id === defaultGroupId,
+            })),
+            selectedGroupIds,
+            ...(selectedGroupIds[0] ? { selectedGroupId: selectedGroupIds[0] } : {}),
           };
         }),
     };
@@ -232,7 +253,13 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
       new Set(module.groups.map(({ groupId }) => groupId)),
     ]));
     const requestedGroupIds = new Set<string>();
+    const assignmentsByKey = new Set<string>();
     for (const { loginRole, groupId } of assignments) {
+      const assignmentKey = `${loginRole}\u0000${groupId}`;
+      if (assignmentsByKey.has(assignmentKey)) {
+        throw new Error(`Duplicate module access assignment: ${loginRole} -> ${groupId}`);
+      }
+      assignmentsByKey.add(assignmentKey);
       if (!groupsByRole.get(loginRole)?.has(groupId)) {
         throw new Error(`Invalid module access assignment: ${loginRole} -> ${groupId}`);
       }
@@ -246,7 +273,7 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
       .map(({ group }) => group.id);
     await this.syncUserGroups(userId, [
       ...current.filter((groupId) => !managedGroupIds.has(groupId)),
-      ...requestedGroupIds,
+      ...[...requestedGroupIds].sort((left, right) => left.localeCompare(right)),
     ]);
   }
 

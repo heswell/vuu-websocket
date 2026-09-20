@@ -826,18 +826,17 @@ export function buildUserModuleAccessOptions(
       leastPrivilege.isDefault = true;
     }
 
-    const selectedGroups = groups.filter(({ groupId }) => userGroupIds.has(groupId));
-    const selectedGroup = [...selectedGroups].sort(
-      (left, right) =>
-        privilegeCount(right) - privilegeCount(left) ||
-        compareModuleAccessGroups(left, right),
-    )[0];
+    const selectedGroupIds = groups
+      .filter(({ groupId }) => userGroupIds.has(groupId))
+      .map(({ groupId }) => groupId)
+      .sort((left, right) => left.localeCompare(right));
 
     const module: UserModuleAccessModule = {
       clientIdentifier: portalClient.clientId,
       loginRole: role.name,
       groups,
-      ...(selectedGroup ? { selectedGroupId: selectedGroup.groupId } : {}),
+      selectedGroupIds,
+      ...(selectedGroupIds[0] ? { selectedGroupId: selectedGroupIds[0] } : {}),
     };
     return module;
   });

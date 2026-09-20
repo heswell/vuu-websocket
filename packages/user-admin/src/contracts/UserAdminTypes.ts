@@ -22,6 +22,12 @@ export type UserAdminGroup = {
   path?: string;
   parentId?: string;
   createdTimestamp?: number;
+  /**
+   * Explicit least-privilege policy for portal module access roles. A group
+   * may be the default for more than one role, but each role must identify
+   * exactly one default group among its eligible groups.
+   */
+  moduleAccessDefaultRoles?: string[];
 };
 
 export type UserAdminClient = {
