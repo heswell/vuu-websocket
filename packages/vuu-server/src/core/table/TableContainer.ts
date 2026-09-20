@@ -5,7 +5,7 @@ import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
 import { ProxySessionDataTable } from "./ProxySessionDataTable";
-import { schemaToSessionTableDef } from "../../api/TableDef";
+import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
 
 export class TableContainer {
   constructor(private joinProvider: JoinTableProvider) {
@@ -39,10 +39,11 @@ export class TableContainer {
   createSimpleSessionTable(
     baseTable: DataTable,
     clientSession: ClientSessionId,
+    customColumns: Column[] = [],
   ) {
     const table = new InMemSessionDataTable(
       clientSession.sessionId,
-      schemaToSessionTableDef(baseTable.tableDef),
+      schemaToSessionTableDef(baseTable.tableDef, customColumns),
       this.joinProvider,
     );
     this.#tables.set(table.name, table);

@@ -51,10 +51,23 @@ neither entry point imports the VUU server feature.
 - Module-oriented access is exposed through `getUserModuleAccessOptions` with
   `{ userId }` and `setUserModuleAccess` with
   `{ userId, assignments }`, where `assignments` is a JSON-encoded array of
-  `{ loginRole, groupId }` objects. Options are derived from current
-  `vuu-portal` `*-access` roles and the groups carrying those roles; saving
-  reconciles only those access-bearing group memberships and preserves
-  unrelated groups.
+  `{ accessRole, groupId }` objects. Options include every eligible group,
+  `selectedGroupIds` contains every selected eligible group, and the
+  `groupDisplayName` and `roleDisplayName` fields provide context-relative
+  labels without changing canonical group or role names. The
+  deprecated `selectedGroupId` contains only its first value for legacy
+  consumers. Each role has exactly one server-owned `isDefault` group;
+  consumers must not infer this policy from group names. Saving reconciles only
+  access-bearing group memberships and preserves unrelated groups.
+- The canonical serialized permissions value is an array of
+  `{ clientIdentifier, accessRole, groupIds }` objects. Use
+  `normalizeUserModuleAccessPermissions` or
+  `serializeUserModuleAccessPermissions` to merge duplicate applications,
+  deduplicate group IDs, and sort roles and group IDs deterministically.
+- The `USER_ADMIN.users` source schema has no `permissions` column. The VUU
+  server adds `permissions` only to users edit-session tables, validates and
+  canonicalizes its serialized value before saving, and reconciles managed
+  application-access memberships without changing unrelated memberships.
 - The UI RPC contract is exported from `KeycloakAdminContract.ts`. Supported
   RPC names are `addUser`, `updateUser`, `deleteUser`, `addGroup`,
   `updateGroup`, `deleteGroup`, `addClient`, `updateClient`, `addRole`,

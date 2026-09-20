@@ -19,7 +19,10 @@ export class DefaultRpcHandler extends RpcHandler {
     this.#rpcHandlerMap.set(functionName, handlerFunc);
   }
 
-  processRpcRequest(rpcName: string, rpcParams: RpcParams): RpcResult {
+  processRpcRequest(
+    rpcName: string,
+    rpcParams: RpcParams,
+  ): RpcResult | Promise<RpcResult> {
     const rpcHandler = this.#rpcHandlerMap.get(rpcName);
     if (rpcHandler) {
       return rpcHandler(rpcParams);

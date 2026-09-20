@@ -1,8 +1,11 @@
 import { ConfigFactory } from "@heswell/vuu-server";
 import {
   assertVuuClientId,
+  getGroupDisplayName,
+  getRoleDisplayName,
   isVuuClientId,
   VUU_PORTAL_CLIENT_IDENTIFIER,
+  type UserAdminUserEdit,
   type UserModuleAccessAssignment,
   type UserModuleAccessModule,
   type UserModuleAccessOptions,
@@ -351,6 +354,95 @@ export class KeycloakAdminClient {
     });
     if (temporary_password) {
       await this.setUserPassword(userId, temporary_password);
+    }
+  }
+
+  async applyUserEdits(edits: readonly UserAdminUserEdit[]) {
+    if (!edits.length) return;
+
+    const snapshot = await this.readSnapshot();
+    const plans = edits.map((edit) => {
+      if (!snapshot.users.some(({ id }) => id === edit.userId)) {
+        throw new Error(`Keycloak user not found: ${edit.userId}`);
+      }
+      return {
+        edit,
+        plan: edit.assignments === undefined
+          ? undefined
+          : planUserModuleAccessChanges(snapshot, edit.userId, edit.assignments),
+      };
+    });
+    const originalUsers = new Map(
+      snapshot.users.map((user) => [user.id, user]),
+    );
+    const rollbackGroups: Array<{
+      userId: string;
+      groupId: string;
+      add: boolean;
+    }> = [];
+    const updatedUsers: KeycloakUser[] = [];
+
+    try {
+      for (const { edit, plan } of plans) {
+        const user = originalUsers.get(edit.userId)!;
+        if (Object.keys(edit.changes).length) {
+          await this.updateUser({ userId: edit.userId, ...edit.changes });
+          updatedUsers.push(user);
+        }
+        if (plan) {
+          for (const groupId of plan.addGroupIds) {
+            await this.addUserToGroup({ userId: edit.userId }, { groupId });
+            rollbackGroups.push({ userId: edit.userId, groupId, add: false });
+          }
+          for (const groupId of plan.removeGroupIds) {
+            await this.removeUserFromGroup({ userId: edit.userId }, { groupId });
+            rollbackGroups.push({ userId: edit.userId, groupId, add: true });
+          }
+        }
+      }
+    } catch (error) {
+      const rollbackErrors: unknown[] = [];
+      for (const rollback of rollbackGroups.reverse()) {
+        try {
+          if (rollback.add) {
+            await this.addUserToGroup(
+              { userId: rollback.userId },
+              { groupId: rollback.groupId },
+            );
+          } else {
+            await this.removeUserFromGroup(
+              { userId: rollback.userId },
+              { groupId: rollback.groupId },
+            );
+          }
+        } catch (rollbackError) {
+          rollbackErrors.push(rollbackError);
+        }
+      }
+      for (const user of updatedUsers.reverse()) {
+        try {
+          await this.updateUser({
+            userId: user.id,
+            username: user.username,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            enabled: user.enabled,
+            emailVerified: user.emailVerified,
+          });
+        } catch (rollbackError) {
+          rollbackErrors.push(rollbackError);
+        }
+      }
+      if (rollbackErrors.length) {
+        throw new Error(
+          `${error instanceof Error ? error.message : String(error)}; ` +
+          `rollback failed: ${rollbackErrors.map((rollbackError) =>
+            rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          ).join("; ")}`,
+        );
+      }
+      throw error;
     }
   }
 
@@ -810,9 +902,11 @@ export function buildUserModuleAccessOptions(
         return {
           groupId: group.id,
           groupName: group.name,
+          groupDisplayName: getGroupDisplayName(group),
           ...(group.path ? { groupPath: group.path } : {}),
           roleId: role.id,
           roleName: role.name,
+          roleDisplayName: getRoleDisplayName(role, portalClient),
           ...(privilege ? { privilege } : {}),
           isDefault: false,
         };
@@ -826,18 +920,17 @@ export function buildUserModuleAccessOptions(
       leastPrivilege.isDefault = true;
     }
 
-    const selectedGroups = groups.filter(({ groupId }) => userGroupIds.has(groupId));
-    const selectedGroup = [...selectedGroups].sort(
-      (left, right) =>
-        privilegeCount(right) - privilegeCount(left) ||
-        compareModuleAccessGroups(left, right),
-    )[0];
+    const selectedGroupIds = groups
+      .filter(({ groupId }) => userGroupIds.has(groupId))
+      .map(({ groupId }) => groupId)
+      .sort((left, right) => left.localeCompare(right));
 
     const module: UserModuleAccessModule = {
       clientIdentifier: portalClient.clientId,
-      loginRole: role.name,
+      accessRole: role.name,
       groups,
-      ...(selectedGroup ? { selectedGroupId: selectedGroup.groupId } : {}),
+      selectedGroupIds,
+      ...(selectedGroupIds[0] ? { selectedGroupId: selectedGroupIds[0] } : {}),
     };
     return module;
   });
@@ -856,21 +949,21 @@ export function planUserModuleAccessChanges(
   assignments: readonly UserModuleAccessAssignment[],
 ): UserModuleAccessChangePlan {
   const options = buildUserModuleAccessOptions(snapshot, userId);
-  const modulesByRole = new Map(options.modules.map((module) => [module.loginRole, module]));
+  const modulesByRole = new Map(options.modules.map((module) => [module.accessRole, module]));
   const groupIds = new Set(snapshot.groups.map(({ id }) => id));
   const desiredGroupIds = new Set<string>();
 
   for (const assignment of assignments) {
-    const module = modulesByRole.get(assignment.loginRole);
+    const module = modulesByRole.get(assignment.accessRole);
     if (!module) {
-      throw new Error(`Unknown module access role: ${assignment.loginRole}`);
+      throw new Error(`Unknown module access role: ${assignment.accessRole}`);
     }
     if (!groupIds.has(assignment.groupId)) {
       throw new Error(`Keycloak group not found: ${assignment.groupId}`);
     }
     if (!module.groups.some(({ groupId }) => groupId === assignment.groupId)) {
       throw new Error(
-        `Group ${assignment.groupId} does not grant module access role ${assignment.loginRole}`,
+        `Group ${assignment.groupId} does not grant module access role ${assignment.accessRole}`,
       );
     }
     if (desiredGroupIds.has(assignment.groupId)) continue;
@@ -889,7 +982,7 @@ export function planUserModuleAccessChanges(
   for (const module of options.modules) {
     for (const group of module.groups) {
       const roles = moduleRolesByGroup.get(group.groupId) ?? new Set<string>();
-      roles.add(module.loginRole);
+      roles.add(module.accessRole);
       moduleRolesByGroup.set(group.groupId, roles);
     }
   }
@@ -898,7 +991,7 @@ export function planUserModuleAccessChanges(
     const assignedRoles = new Set(
       assignments
         .filter(({ groupId: assignedGroupId }) => assignedGroupId === groupId)
-        .map(({ loginRole }) => loginRole),
+        .map(({ accessRole }) => accessRole),
     );
     const omittedRole = [...roles].find((role) => !assignedRoles.has(role));
     if (omittedRole) {

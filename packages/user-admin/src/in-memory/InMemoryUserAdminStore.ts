@@ -4,6 +4,7 @@ import {
   type UserModuleAccessOptions,
 } from "../contracts/UserAdminContract";
 import type {
+  UserAdminEditableUserChanges,
   UserAdminClient,
   UserAdminGroup,
   UserAdminOperations,
@@ -11,6 +12,16 @@ import type {
   UserAdminSnapshot,
   UserAdminUser,
 } from "../contracts/UserAdminTypes";
+import {
+  getGroupDisplayName,
+  getRoleDisplayName,
+} from "../contracts/UserAdminTypes";
+
+type ModuleAccessPlan = {
+  currentGroupIds: string[];
+  managedGroupIds: Set<string>;
+  requestedGroupIds: Set<string>;
+};
 
 export class InMemoryUserAdminStore implements UserAdminOperations {
   #nextId = 0;
@@ -201,53 +212,139 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
       ({ clientId }) => clientId === VUU_PORTAL_CLIENT_IDENTIFIER,
     );
     if (!portal) return { modules: [] };
+
+    const groupsById = new Map(this.#snapshot.groups.map((group) => [group.id, group]));
     return {
       modules: this.#snapshot.clientRoles
         .filter(({ client, role }) => client.id === portal.id && role.name.endsWith("-access"))
+        .sort((left, right) => left.role.name.localeCompare(right.role.name))
         .map(({ role }) => {
           const groups = this.#snapshot.groupRoles
             .filter(({ client, role: candidate }) => client?.id === portal.id && candidate.id === role.id)
-            .map(({ group }) => ({
+            .map(({ group }) => groupsById.get(group.id) ?? group)
+            .filter((group, index, allGroups) =>
+              allGroups.findIndex(({ id }) => id === group.id) === index,
+            )
+            .sort((left, right) => left.id.localeCompare(right.id));
+          const defaultGroups = groups.filter(({ moduleAccessDefaultRoles }) =>
+            moduleAccessDefaultRoles?.includes(role.name),
+          );
+          if (defaultGroups.length !== 1) {
+            throw new Error(
+              `Invalid default-group configuration for module access role "${role.name}": ` +
+              `expected exactly one eligible default group, found ${defaultGroups.length}`,
+            );
+          }
+          const defaultGroupId = defaultGroups[0].id;
+          const selectedGroupIds = groups
+            .filter(({ id }) => userGroupIds.has(id))
+            .map(({ id }) => id);
+          return {
+            clientIdentifier: portal.clientId,
+            accessRole: role.name,
+            groups: groups.map((group) => ({
               groupId: group.id,
               groupName: group.name,
+              groupDisplayName: getGroupDisplayName(group),
               groupPath: group.path,
               roleId: role.id,
               roleName: role.name,
-              isDefault: false,
-            }));
-          return {
-            clientIdentifier: portal.clientId,
-            loginRole: role.name,
-            groups,
-            selectedGroupId: groups.find(({ groupId }) => userGroupIds.has(groupId))?.groupId,
+              roleDisplayName: getRoleDisplayName(role, portal),
+              isDefault: group.id === defaultGroupId,
+            })),
+            selectedGroupIds,
+            ...(selectedGroupIds[0] ? { selectedGroupId: selectedGroupIds[0] } : {}),
           };
         }),
     };
   }
 
   async setUserModuleAccess(userId: string, assignments: readonly UserModuleAccessAssignment[]) {
+    await this.applyModuleAccessPlan(userId, await this.planModuleAccess(userId, assignments));
+  }
+
+  async applyUserEdits(
+    edits: ReadonlyArray<{
+      userId: string;
+      changes: UserAdminEditableUserChanges;
+      assignments?: readonly UserModuleAccessAssignment[];
+    }>,
+  ) {
+    const plans = await Promise.all(
+      edits.map(async ({ userId, assignments }) => ({
+        userId,
+        plan: assignments === undefined
+          ? undefined
+          : await this.planModuleAccess(userId, assignments),
+      })),
+    );
+    const users = edits.map(({ userId, changes }) => ({
+      user: this.user(userId),
+      changes,
+    }));
+
+    for (const { user, changes } of users) Object.assign(user, changes);
+    for (const { userId, plan } of plans) {
+      if (plan) this.applyModuleAccessPlanSync(userId, plan);
+    }
+    if (edits.length) this.touch();
+  }
+
+  private async planModuleAccess(
+    userId: string,
+    assignments: readonly UserModuleAccessAssignment[],
+  ) {
     const options = await this.getUserModuleAccessOptions(userId);
     const groupsByRole = new Map(options.modules.map((module) => [
-      module.loginRole,
+      module.accessRole,
       new Set(module.groups.map(({ groupId }) => groupId)),
     ]));
     const requestedGroupIds = new Set<string>();
-    for (const { loginRole, groupId } of assignments) {
-      if (!groupsByRole.get(loginRole)?.has(groupId)) {
-        throw new Error(`Invalid module access assignment: ${loginRole} -> ${groupId}`);
+    const assignmentsByKey = new Set<string>();
+    for (const { accessRole, groupId } of assignments) {
+      const assignmentKey = `${accessRole}\u0000${groupId}`;
+      if (assignmentsByKey.has(assignmentKey)) {
+        throw new Error(`Duplicate module access assignment: ${accessRole} -> ${groupId}`);
+      }
+      assignmentsByKey.add(assignmentKey);
+      if (!groupsByRole.get(accessRole)?.has(groupId)) {
+        throw new Error(`Invalid module access assignment: ${accessRole} -> ${groupId}`);
       }
       requestedGroupIds.add(groupId);
     }
     const managedGroupIds = new Set(
       options.modules.flatMap((module) => module.groups.map(({ groupId }) => groupId)),
     );
-    const current = this.#snapshot.userGroups
+    const currentGroupIds = this.#snapshot.userGroups
       .filter(({ user }) => user.id === userId)
       .map(({ group }) => group.id);
-    await this.syncUserGroups(userId, [
-      ...current.filter((groupId) => !managedGroupIds.has(groupId)),
-      ...requestedGroupIds,
-    ]);
+    return {
+      currentGroupIds,
+      managedGroupIds,
+      requestedGroupIds,
+    } satisfies ModuleAccessPlan;
+  }
+
+  private async applyModuleAccessPlan(userId: string, plan: ModuleAccessPlan) {
+    this.applyModuleAccessPlanSync(userId, plan);
+    this.touch();
+  }
+
+  private applyModuleAccessPlanSync(
+    userId: string,
+    { currentGroupIds, managedGroupIds, requestedGroupIds }: ModuleAccessPlan,
+  ) {
+    const user = this.user(userId);
+    const groupIds = [
+      ...currentGroupIds.filter((groupId) => !managedGroupIds.has(groupId)),
+      ...[...requestedGroupIds].sort((left, right) => left.localeCompare(right)),
+    ];
+    this.#snapshot.userGroups = this.#snapshot.userGroups.filter(
+      ({ user: candidate }) => candidate.id !== user.id,
+    );
+    this.#snapshot.userGroups.push(
+      ...groupIds.map((groupId) => ({ user, group: this.group(groupId) })),
+    );
   }
 
   private id(prefix: string) {

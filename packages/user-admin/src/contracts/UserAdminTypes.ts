@@ -19,9 +19,16 @@ export type UserAdminUser = {
 export type UserAdminGroup = {
   id: string;
   name: string;
+  groupDisplayName?: string;
   path?: string;
   parentId?: string;
   createdTimestamp?: number;
+  /**
+   * Explicit least-privilege policy for portal module access roles. A group
+   * may be the default for more than one role, but each role must identify
+   * exactly one default group among its eligible groups.
+   */
+  moduleAccessDefaultRoles?: string[];
 };
 
 export type UserAdminClient = {
@@ -38,6 +45,7 @@ export type UserAdminClient = {
 export type UserAdminRole = {
   id: string;
   name: string;
+  roleDisplayName?: string;
   description?: string;
   clientRole?: boolean;
   containerId?: string;
@@ -59,6 +67,31 @@ export type UserAdminSnapshot = {
 };
 
 export type UserAdminSnapshotSource = () => Promise<UserAdminSnapshot>;
+
+export const getGroupDisplayName = (
+  group: Pick<UserAdminGroup, "name" | "groupDisplayName">,
+) => group.groupDisplayName ?? group.name;
+
+export const getRoleDisplayName = (
+  role: Pick<UserAdminRole, "name" | "roleDisplayName">,
+  client?: Pick<UserAdminClient, "clientId">,
+) => {
+  if (role.roleDisplayName) return role.roleDisplayName;
+  const clientPrefix = client ? `${client.clientId}-` : "";
+  return clientPrefix && role.name.startsWith(clientPrefix)
+    ? role.name.slice(clientPrefix.length)
+    : role.name;
+};
+
+export type UserAdminEditableUserChanges = Partial<
+  Pick<UserAdminUser, "username" | "email" | "firstName" | "lastName" | "enabled" | "emailVerified">
+>;
+
+export type UserAdminUserEdit = {
+  userId: string;
+  changes: UserAdminEditableUserChanges;
+  assignments?: readonly UserModuleAccessAssignment[];
+};
 
 export type UserAdminOperations = {
   addUser: (params: {
@@ -133,6 +166,7 @@ export type UserAdminOperations = {
     userId: string,
     assignments: readonly UserModuleAccessAssignment[],
   ) => Promise<void>;
+  applyUserEdits?: (edits: readonly UserAdminUserEdit[]) => Promise<void>;
 };
 
 export function clientForRole(

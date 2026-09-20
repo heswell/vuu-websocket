@@ -71,8 +71,10 @@ export interface SessionTableDef extends TableDef { }
 
 export const schemaToSessionTableDef = (
   tableDef: TableDef,
+  customColumns: Column[] = [],
 ): SessionTableDef => {
   const extraColumns = [
+    ...customColumns,
     ...(tableDef.columns.some(({ name }) => name === "vuuMsg")
       ? []
       : [{ name: "vuuMsg", dataType: "string" as const }]),

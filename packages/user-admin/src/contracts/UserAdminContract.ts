@@ -51,9 +51,17 @@ export type GetUserModuleAccessOptionsRpcParams = {
 };
 
 export type UserModuleAccessAssignment = {
-  loginRole: string;
+  accessRole: string;
   groupId: string;
 };
+
+export type UserModuleAccessPermission = {
+  clientIdentifier: string;
+  accessRole: string;
+  groupIds: string[];
+};
+
+export type UserModuleAccessPermissions = UserModuleAccessPermission[];
 
 export type SetUserModuleAccessRpcParams = {
   userId: string;
@@ -64,23 +72,68 @@ export type SetUserModuleAccessRpcParams = {
 export type UserModuleAccessGroup = {
   groupId: string;
   groupName: string;
+  groupDisplayName: string;
   groupPath?: string;
   roleId: string;
   roleName: string;
+  roleDisplayName: string;
   privilege?: string;
   isDefault: boolean;
 };
 
+/**
+ * Access options expose every group that grants an application access role.
+ * `isDefault` is supplied by the server-owned least-privilege policy.
+ */
 export type UserModuleAccessModule = {
   clientIdentifier: string;
-  loginRole: string;
+  accessRole: string;
   groups: UserModuleAccessGroup[];
+  selectedGroupIds: string[];
+  /**
+   * @deprecated Use selectedGroupIds. This is the first selected group for
+   * clients that still consume the legacy singular field.
+   */
   selectedGroupId?: string;
 };
 
 export type UserModuleAccessOptions = {
   modules: UserModuleAccessModule[];
 };
+
+export function normalizeUserModuleAccessPermissions(
+  permissions: readonly UserModuleAccessPermission[],
+): UserModuleAccessPermissions {
+  const groupsByClient = new Map<string, Map<string, Set<string>>>();
+
+  for (const { clientIdentifier, accessRole, groupIds } of permissions) {
+    const roles = groupsByClient.get(clientIdentifier) ??
+      new Map<string, Set<string>>();
+    const groups = roles.get(accessRole) ?? new Set<string>();
+    for (const groupId of groupIds) groups.add(groupId);
+    roles.set(accessRole, groups);
+    groupsByClient.set(clientIdentifier, roles);
+  }
+
+  return [...groupsByClient.entries()].flatMap(([clientIdentifier, roles]) =>
+    [...roles.entries()].map(([accessRole, groupIds]) => ({
+      clientIdentifier,
+      accessRole,
+      groupIds: [...groupIds].sort((left, right) => left.localeCompare(right)),
+    })),
+  )
+    .sort(
+      (left, right) =>
+        left.accessRole.localeCompare(right.accessRole) ||
+        left.clientIdentifier.localeCompare(right.clientIdentifier),
+    );
+}
+
+export function serializeUserModuleAccessPermissions(
+  permissions: readonly UserModuleAccessPermission[],
+): string {
+  return JSON.stringify(normalizeUserModuleAccessPermissions(permissions));
+}
 
 export const USER_ADMIN_RPC_CONTRACT = {
   addUser: ["username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
@@ -112,11 +165,11 @@ export const USER_ADMIN_TABLE_CONTRACT = {
     "role_count", "module_access", "module_access_count",
   ],
   groups: [
-    "group_id", "group_path", "parent_group_id", "user_count",
+    "group_id", "group_display_name", "group_path", "parent_group_id", "user_count",
     "role_count",
   ],
   roles: [
-    "role_id", "role_name", "client_id", "client_identifier", "client_name",
+    "role_id", "role_name", "role_display_name", "client_id", "client_identifier", "client_name",
     "description", "group_count", "user_count",
   ],
   clients: [
@@ -124,17 +177,19 @@ export const USER_ADMIN_TABLE_CONTRACT = {
   ],
   user_groups: [
     "membership_id", "user_id", "username", "group_id", "group_name",
-    "group_path",
+    "group_display_name", "group_path",
   ],
   group_roles: [
-    "assignment_id", "group_id", "group_name", "role_id", "role_name",
+    "assignment_id", "group_id", "group_name", "group_display_name",
+    "role_id", "role_name", "role_display_name",
     "client_id", "client_identifier", "client_name",
   ],
   user_group_roles: [
     "id", "membership_id", "assignment_id", "user_id", "username", "email",
     "first_name", "last_name", "enabled", "email_verified",
     "password_update_required", "last_login", "group_id", "group_name",
-    "group_path", "role_id", "role_name", "client_id", "client_identifier",
+    "group_display_name", "group_path", "role_id", "role_name",
+    "role_display_name", "client_id", "client_identifier",
     "client_name",
   ],
 } as const;
@@ -178,6 +233,7 @@ const columnTypes: Record<string, UserAdminColumnDataType> = {
   first_name: "string",
   group_count: "int",
   group_id: "string",
+  group_display_name: "string",
   group_name: "string",
   group_path: "string",
   id: "string",
@@ -191,6 +247,7 @@ const columnTypes: Record<string, UserAdminColumnDataType> = {
   role_count: "int",
   role_id: "string",
   role_name: "string",
+  role_display_name: "string",
   user_count: "int",
   user_id: "string",
   username: "string",

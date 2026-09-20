@@ -1,6 +1,7 @@
 import { Provider, type TableContainer } from "@heswell/vuu-server";
 import {
   clientForRole,
+  getRoleDisplayName,
   type UserAdminSnapshot,
 } from "@heswell/user-admin";
 import { getUserAdminSnapshot } from "../UserAdminSnapshotStore";
@@ -19,6 +20,7 @@ export class UserAdminRolesProvider extends Provider {
       return [
         role.id,
         role.name,
+        getRoleDisplayName(role, client),
         client.id,
         client.clientId,
         client.name ?? client.clientId,
