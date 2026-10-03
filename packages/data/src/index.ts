@@ -6,6 +6,7 @@ export {
 } from "./store/DataView.ts";
 export { type DataViewConfig } from "./store/DataView.ts";
 export * from "./store/table.ts";
+export type { RowPredicate } from "./store/rowset/index.ts";
 
 export const filter = {
   SET_FILTER_DATA_COLUMNS,

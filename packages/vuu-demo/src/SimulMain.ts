@@ -11,6 +11,7 @@ import {
 import { PricesModule } from "./modules/prices";
 import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
+import { SimulatedNotificationsModule } from "./modules/notifications";
 import { TestModule } from "./modules/test/TestModule";
 // import { EditableModule } from "./modules/editable";
 // import { PermissionModule } from "./modules/permission";
@@ -38,7 +39,8 @@ export default async function main() {
     loginTokenService,
   )
     .withModule(PricesModule())
-    .withModule(SimulationModule());
+    .withModule(SimulationModule())
+    .withModule(SimulatedNotificationsModule());
   // .withModule(TestModule());
   // .withModule(EditableModule())
   // .withModule(PermissionModule())

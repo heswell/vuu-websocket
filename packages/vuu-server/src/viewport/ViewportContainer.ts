@@ -114,6 +114,14 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
     viewport.requestId = requestId;
 
+    const { permissionFunction } = table.tableDef;
+    if (permissionFunction) {
+      viewport.permissionFilter = permissionFunction(
+        viewport,
+        this.tableContainer,
+      );
+    }
+
     this.#viewports.set(id, viewport);
     const viewports = this.#sessionViewportMap.get(sessionId);
     if (viewports) {

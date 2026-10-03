@@ -25,6 +25,10 @@ import { VuuUser } from "../core/auths/VuuUser";
 import { PublishQueue } from "../util/PublishQueue";
 import { DataResponse } from "@heswell/data/src/store/rowset";
 import { isSessionDataTable } from "../core/table/InMemSessionDataTable";
+import {
+  AllowAllPermissionFilter,
+  PermissionFilter,
+} from "../core/filter/PermissionFilter";
 
 type ViewPortUpdateType = "SIZE" | "ROW";
 export interface ViewPortSelection {
@@ -243,6 +247,8 @@ export class Viewport extends DataView {
   #outboundQ: PublishQueue<ViewPortUpdate>;
   #viewPortDef: ViewPortDef;
   #viewPortVisualLink?: RuntimeViewPortVisualLink;
+  #user: VuuUser;
+  #permissionFilter: PermissionFilter | undefined;
 
   constructor(
     id: string,
@@ -257,6 +263,7 @@ export class Viewport extends DataView {
     viewPortDef: ViewPortDef,
   ) {
     super(id, table, config);
+    this.#user = user;
     this.#clientSessionId = clientSessionId;
     this.#outboundQ = outboundQ;
     this.#viewPortDef = viewPortDef;
@@ -264,6 +271,24 @@ export class Viewport extends DataView {
 
   get enabled() {
     return this.#enabled;
+  }
+
+  get user() {
+    return this.#user;
+  }
+
+  get permissionFilter() {
+    return this.#permissionFilter;
+  }
+
+  set permissionFilter(permissionFilter: PermissionFilter | undefined) {
+    this.#permissionFilter = permissionFilter;
+    this.setPermissionFilter(
+      permissionFilter === undefined ||
+        permissionFilter === AllowAllPermissionFilter
+        ? undefined
+        : permissionFilter.createPredicate(this.table.columnMap),
+    );
   }
 
   set enabled(enabled: boolean) {

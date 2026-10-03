@@ -16,7 +16,12 @@ import {
 } from "@vuu-ui/vuu-utils";
 import { buildColumnMap, toColumn } from "./columnUtils.ts";
 import { Range, resetRange } from "./rangeUtils.ts";
-import { DataResponse, GroupRowSet, RowSet } from "./rowset/index.ts";
+import {
+  DataResponse,
+  GroupRowSet,
+  RowSet,
+  type RowPredicate,
+} from "./rowset/index.ts";
 import { RowInsertHandler, RowUpdateHandler, Table } from "./table.ts";
 import UpdateQueue from "./update-queue.ts";
 import { DataSourceConfig, WithFullConfig } from "@vuu-ui/vuu-data-types";
@@ -129,6 +134,20 @@ export default class DataView extends EventEmitter<DataViewEvents> {
 
   get table() {
     return this.#table;
+  }
+
+  /**
+   * Restrict the rows visible in this view, independently of any client filter.
+   * Permission filtering is not currently supported for grouped views.
+   */
+  setPermissionFilter(permissionFilter: RowPredicate | undefined) {
+    if (this.rowSet instanceof RowSet) {
+      this.rowSet.setPermissionFilter(permissionFilter);
+    } else {
+      throw Error(
+        "[DataView] setPermissionFilter not supported on grouped DataView",
+      );
+    }
   }
 
   private rowInserted: RowInsertHandler = (rowIdx, row) => {
@@ -335,6 +354,11 @@ export default class DataView extends EventEmitter<DataViewEvents> {
         }
       }
     } else {
+      if (rowSet.permissionFilter) {
+        throw Error(
+          "[DataView] group not supported on DataView with permission filter",
+        );
+      }
       this.rowSet = new GroupRowSet(rowSet, groupBy);
     }
 
