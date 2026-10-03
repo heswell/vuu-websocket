@@ -2,12 +2,22 @@ import type {
   DataTable,
   ModuleRecord,
   ModuleRegistry,
-  NestedModuleRecord,
   TableContainer,
   VuuUser,
 } from "@heswell/vuu-server";
 
-const PORTAL_CLIENT_IDENTIFIER = "vuu-portal";
+/**
+ * Derives a module's own client identifier from its name, e.g.
+ * `userAdmin` -> `vuu-user-admin`. The UI keys each module's saved state by
+ * this value, so it must be unique per module.
+ */
+export function moduleClientIdentifier(name: string) {
+  const kebab = name
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/[\s_]+/g, "-")
+    .toLowerCase();
+  return kebab.startsWith("vuu-") ? kebab : `vuu-${kebab}`;
+}
 
 type ModulePermission = {
   moduleId: number;
@@ -25,30 +35,38 @@ export function createModuleRegistry(
   return {
     modules: selectModules(
       readModules(tableContainer.getTable<DataTable>("modules")),
-      readModulePermissions(tableContainer.getTable<DataTable>("modulePermissions")),
+      readModulePermissions(
+        tableContainer.getTable<DataTable>("modulePermissions"),
+      ),
       user.authorizations,
     ),
   };
 }
 
 function readModules(table: DataTable): DiscoveredModuleRecord[] {
-  return table.rows.map((row) => ({
-    clientIdentifier: PORTAL_CLIENT_IDENTIFIER,
-    id: numberValue(table, row, "id"),
-    parentModuleId: numberValue(table, row, "parentModuleId"),
-    accessRole: "",
-    name: stringValue(table, row, "name"),
-    title: stringValue(table, row, "title"),
-    description: stringValue(table, row, "description"),
-    version: numberValue(table, row, "version"),
-    enabled: booleanValue(table, row, "enabled"),
-    location: stringValue(table, row, "location"),
-    path: stringValue(table, row, "path"),
-    mfComponent: stringValue(table, row, "mfComponent"),
-    mfScope: stringValue(table, row, "mfScope"),
-    mfUrl: stringValue(table, row, "mfUrl"),
-    ...remoteConnection(table, row),
-  }));
+  return table.rows.map((row) => {
+    const name = stringValue(table, row, "name");
+    const parentModuleId = numberValue(table, row, "parentModuleId");
+    return {
+      clientIdentifier: moduleClientIdentifier(name),
+      id: numberValue(table, row, "id"),
+      parentModuleId,
+      accessRole: "",
+      name,
+      title: stringValue(table, row, "title"),
+      description: stringValue(table, row, "description"),
+      version: numberValue(table, row, "version"),
+      enabled: booleanValue(table, row, "enabled"),
+      // Nested modules have no navigation entry of their own.
+      navLocation:
+        parentModuleId === 0 ? stringValue(table, row, "location") : "",
+      path: stringValue(table, row, "path"),
+      mfComponent: stringValue(table, row, "mfComponent"),
+      mfScope: stringValue(table, row, "mfScope"),
+      mfUrl: stringValue(table, row, "mfUrl"),
+      ...remoteConnection(table, row),
+    };
+  });
 }
 
 function remoteConnection(table: DataTable, row: unknown[]) {
@@ -105,25 +123,16 @@ function selectModules(
     }
   });
 
+  // Nested modules are listed alongside their parent (with an empty
+  // navLocation), and only when the parent is also available.
   const permittedModules = [...latestByName.values()];
+  const permittedIds = new Set(permittedModules.map(({ id }) => id));
   return permittedModules
-    .filter((module) => module.parentModuleId === 0)
-    .map(({ parentModuleId: _parentModuleId, ...module }) => {
-      const nestedModules = permittedModules
-        .filter((candidate) => candidate.parentModuleId === module.id)
-        .map<NestedModuleRecord>(
-          ({ name, mfComponent, mfScope, mfUrl }) => ({
-            name,
-            mfComponent,
-            mfScope,
-            mfUrl,
-          }),
-        );
-      return {
-        ...module,
-        ...(nestedModules.length > 0 ? { nestedModules } : {}),
-      };
-    })
+    .filter(
+      ({ parentModuleId }) =>
+        parentModuleId === 0 || permittedIds.has(parentModuleId),
+    )
+    .map(({ parentModuleId: _parentModuleId, ...module }) => module)
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 

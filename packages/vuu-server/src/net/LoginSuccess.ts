@@ -4,7 +4,12 @@ export interface RemoteModuleConnection {
   websocketUrl?: string;
 }
 
+/**
+ * A portal module as sent in LOGIN_SUCCESS. Mirrors the UI's
+ * `VuuModuleDescriptor` (`@vuu-ui/vuu-protocol-types`).
+ */
 export interface ModuleRecord {
+  /** The module's own client, also the UI's key for its saved state. */
   clientIdentifier: string;
   id: number;
   accessRole: string;
@@ -13,20 +18,18 @@ export interface ModuleRecord {
   description: string;
   version: number;
   enabled: boolean;
-  location: string;
+  /**
+   * Navigation entry, e.g. `/Trading/Baskets`. Empty for a nested module,
+   * which is rendered from within another module rather than navigated to.
+   */
+  navLocation: string;
+  navIconName?: string;
+  navIconUrl?: string;
   path: string;
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
   vuu?: RemoteModuleConnection;
-  nestedModules?: NestedModuleRecord[];
-}
-
-export interface NestedModuleRecord {
-  name: string;
-  mfComponent: string;
-  mfScope: string;
-  mfUrl: string;
 }
 
 export interface ModuleRegistry {
