@@ -208,6 +208,7 @@ describe("Keycloak admin backend", () => {
       });
       expect(rows).toEqual([[
         "users",
+        "users",
         "/vuu/basket-trading/users",
         "basket",
         0,
@@ -513,8 +514,8 @@ describe("Keycloak admin backend", () => {
     expect(
       rows.map((row) => ({
         roleName: row[1],
-        clientIdentifier: row[3],
-        clientName: row[4],
+        clientIdentifier: row[4],
+        clientName: row[5],
       })),
     ).toEqual([
       {
@@ -610,7 +611,7 @@ describe("Keycloak admin backend", () => {
             groupPath: "/vuu/orders/users",
             roleId: "orders-access",
             roleName: "orders-access",
-            roleDisplayName: "orders-access",
+            roleDisplayName: "access",
             privilege: "read",
             isDefault: true,
           }],
@@ -648,7 +649,7 @@ describe("Keycloak admin backend", () => {
             groupPath: "/vuu/orders/traders",
             roleId: "orders-access",
             roleName: "orders-access",
-            roleDisplayName: "orders-access",
+            roleDisplayName: "access",
             privilege: "trade",
             isDefault: false,
           },
@@ -659,7 +660,7 @@ describe("Keycloak admin backend", () => {
             groupPath: "/vuu/orders/users",
             roleId: "orders-access",
             roleName: "orders-access",
-            roleDisplayName: "orders-access",
+            roleDisplayName: "access",
             privilege: "read",
             isDefault: true,
           },

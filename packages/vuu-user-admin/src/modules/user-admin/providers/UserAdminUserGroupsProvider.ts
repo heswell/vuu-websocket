@@ -19,7 +19,7 @@ export class UserAdminUserGroupsProvider extends Provider {
       group.id,
       group.name,
       getGroupDisplayName(group),
-      group.path ?? "",
+      group.path ?? `/${group.name}`,
       snapshot.timestamp,
       snapshot.timestamp,
       "",

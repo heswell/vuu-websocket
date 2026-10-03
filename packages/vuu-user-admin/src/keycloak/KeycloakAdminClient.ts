@@ -385,8 +385,14 @@ export class KeycloakAdminClient {
     try {
       for (const { edit, plan } of plans) {
         const user = originalUsers.get(edit.userId)!;
-        if (Object.keys(edit.changes).length) {
-          await this.updateUser({ userId: edit.userId, ...edit.changes });
+        if (Object.keys(edit.changes).length || edit.temporaryPassword) {
+          await this.updateUser({
+            userId: edit.userId,
+            ...edit.changes,
+            ...(edit.temporaryPassword
+              ? { temporary_password: edit.temporaryPassword }
+              : {}),
+          });
           updatedUsers.push(user);
         }
         if (plan) {

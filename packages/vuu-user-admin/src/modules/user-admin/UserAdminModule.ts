@@ -35,6 +35,7 @@ const adminViewport = (
   tableContainer: TableContainer,
   createOperations: () => Promise<UserAdminOperations>,
   refreshAfterMutation: (reason: string) => Promise<void>,
+  readSnapshot: UserAdminSnapshotSource,
 ): ReturnType<typeof ViewPortDef> => {
   const columns: Column[] = table.schema.columns.map(
     ({ name, serverDataType: dataType }, index) => ({
@@ -45,7 +46,12 @@ const adminViewport = (
   );
   return ViewPortDef(
     columns,
-    new UserAdminService(tableContainer, createOperations, refreshAfterMutation),
+    new UserAdminService(
+      tableContainer,
+      createOperations,
+      refreshAfterMutation,
+      readSnapshot,
+    ),
   );
 };
 
@@ -53,6 +59,11 @@ export type UserAdminModuleOptions = {
   createOperations: () => Promise<UserAdminOperations>;
   refreshAfterMutation: (reason: string) => Promise<void>;
   snapshotSource: UserAdminSnapshotSource;
+  /**
+   * Reads current identity-provider state when validating edits. Defaults to
+   * snapshotSource, which may be cached.
+   */
+  readSnapshot?: UserAdminSnapshotSource;
 };
 
 const unavailable = async () => {
@@ -63,50 +74,62 @@ export const UserAdminModule = ({
   createOperations = unavailable,
   refreshAfterMutation = unavailable,
   snapshotSource = unavailable,
+  readSnapshot = snapshotSource,
 }: Partial<UserAdminModuleOptions> = {}) => {
   configureUserAdminSnapshotSource(snapshotSource);
+  const viewport = (
+    table: DataTable,
+    tableContainer: TableContainer,
+  ) =>
+    adminViewport(
+      table,
+      tableContainer,
+      createOperations,
+      refreshAfterMutation,
+      readSnapshot,
+    );
   return ModuleFactory.withNameSpace("USER_ADMIN")
     .addTable(
       usersTable,
       (table) => new UserAdminUsersProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       groupsTable,
       (table) => new UserAdminGroupsProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       clientsTable,
       (table) => new UserAdminClientsProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       rolesTable,
       (table) => new UserAdminRolesProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       userGroupsTable,
       (table) => new UserAdminUserGroupsProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       groupRolesTable,
       (table) => new UserAdminGroupRolesProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .addTable(
       userGroupRolesTable,
       (table) => new UserAdminUserGroupRolesProvider(table),
       (table, _provider, _providerContainer, tableContainer) =>
-        adminViewport(table, tableContainer, createOperations, refreshAfterMutation),
+        viewport(table, tableContainer),
     )
     .asModule();
 };

@@ -38,7 +38,7 @@ export class UserAdminUserGroupRolesProvider extends Provider {
               group.id,
               group.name,
               getGroupDisplayName(group),
-              group.path ?? "",
+              group.path ?? `/${group.name}`,
               role.id,
               role.name,
               getRoleDisplayName(role, client),

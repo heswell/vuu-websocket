@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  getGroupDisplayName,
   getRoleDisplayName,
   USER_ADMIN_RPC_CONTRACT,
   USER_ADMIN_TABLE_SCHEMAS,
@@ -45,5 +46,12 @@ describe("user admin browser contract", () => {
       { name: "vuu-user-admin-read" },
       { clientId: "vuu-user-admin" },
     )).toBe("read");
+    expect(getGroupDisplayName({ name: "basket-trading-read" })).toBe("read");
+    expect(getRoleDisplayName({ name: "basket-trading-access" })).toBe("access");
+    expect(getGroupDisplayName({ name: "admins" })).toBe("admins");
+    expect(getGroupDisplayName({
+      name: "basket-trading-read",
+      groupDisplayName: "Read only",
+    })).toBe("Read only");
   });
 });
