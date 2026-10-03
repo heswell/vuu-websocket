@@ -17,18 +17,23 @@ type LoginSuccess = {
 Other VUU servers omit `moduleRegistry`. The former authenticated
 `GET /module-registry` browser endpoint does not exist.
 
-Each top-level record contains module-federation metadata. A remote that owns
-its own VUU target includes a VUU connection:
+Each record contains module-federation metadata and matches the UI's
+`VuuModuleDescriptor` (`@vuu-ui/vuu-protocol-types`). A remote that owns its
+own VUU target includes a VUU connection:
 
 ```ts
 type ModuleRecord = {
+  clientIdentifier: string;
+  accessRole: string;
   id: number;
   name: string;
   title: string;
   description: string;
   version: number;
   enabled: boolean;
-  location: string;
+  navLocation: string;
+  navIconName?: string;
+  navIconUrl?: string;
   path: string;
   mfComponent: string;
   mfScope: string;
@@ -38,20 +43,18 @@ type ModuleRecord = {
     restUrl?: string;
     websocketUrl?: string;
   };
-  nestedModules?: NestedModuleRecord[];
-};
-
-type NestedModuleRecord = {
-  name: string;
-  mfComponent: string;
-  mfScope: string;
-  mfUrl: string;
 };
 ```
 
 Only enabled records permitted by the authenticated user's roles are returned.
 For duplicate names, the highest version wins, followed by the highest id.
 
-A module with a non-zero parent module id is returned only through its
-authorized parent record's `nestedModules` array. Nested records contain
-federation metadata only and never create portal routes or VUU connections.
+`navLocation` is the module table's `location` column. `accessRole` is the
+role that granted access. `clientIdentifier` is the module's own client,
+derived from its name (`userAdmin` -> `vuu-user-admin`; names that already
+start with `vuu-` are unchanged). The UI keys each module's saved state by it.
+
+A module with a non-zero parent module id is a nested module. It is listed
+alongside the other records with an empty `navLocation`, so it has no
+navigation entry and is rendered from within another module. It is returned
+only when both it and its parent are authorized.

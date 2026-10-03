@@ -21,7 +21,7 @@ describe("LoginSuccess", () => {
     const moduleRegistry = {
       modules: [
         {
-          clientIdentifier: "vuu-portal",
+          clientIdentifier: "vuu-module-admin",
           id: 1,
           accessRole: "module-admin-access",
           name: "moduleAdmin",
@@ -29,7 +29,7 @@ describe("LoginSuccess", () => {
           description: "Create new remote module, update existing modules",
           version: 1,
           enabled: true,
-          location: "/Modules/Manage Modules",
+          navLocation: "/Modules/Manage Modules",
           path: "/modules/admin",
           mfComponent: "ModuleAdmin",
           mfScope: "ModuleAdmin",
@@ -61,7 +61,7 @@ describe("LoginSuccess", () => {
         moduleRegistry: {
           modules: [
             {
-              clientIdentifier: "vuu-portal",
+              clientIdentifier: "vuu-module-admin",
               id: 1,
               accessRole: "module-admin-access",
               name: "moduleAdmin",
@@ -69,7 +69,7 @@ describe("LoginSuccess", () => {
               description: user.authorizations.join(","),
               version: 1,
               enabled: true,
-              location: "/Modules/Manage Modules",
+              navLocation: "/Modules/Manage Modules",
               path: "/modules/admin",
               mfComponent: "ModuleAdmin",
               mfScope: "ModuleAdmin",

@@ -7,7 +7,10 @@ import {
   VuuUserWithAuthorizations,
   VuuWebSocketOptions,
 } from "@heswell/vuu-server";
-import { createModuleRegistry } from "../src/ModuleRegistry";
+import {
+  createModuleRegistry,
+  moduleClientIdentifier,
+} from "../src/ModuleRegistry";
 import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 
 const moduleAccessRoles = [
@@ -51,7 +54,7 @@ describe("portal module registry", () => {
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
-        clientIdentifier: "vuu-portal",
+        clientIdentifier: "vuu-basket-trading",
         id: 3,
         accessRole: "basket-trading-access",
         name: "basket-trading",
@@ -63,7 +66,7 @@ describe("portal module registry", () => {
         },
       }),
       {
-        clientIdentifier: "vuu-portal",
+        clientIdentifier: "vuu-module-admin",
         id: 1,
         accessRole: "module-admin-access",
         name: "moduleAdmin",
@@ -71,7 +74,7 @@ describe("portal module registry", () => {
         description: "Create new remote module, update existing modules",
         version: 1,
         enabled: true,
-        location: "/Modules/Manage Modules",
+        navLocation: "/Modules/Manage Modules",
         path: "/modules/admin",
         mfComponent: "ModuleAdmin",
         mfScope: "ModuleAdmin",
@@ -83,7 +86,7 @@ describe("portal module registry", () => {
         },
       },
       {
-        clientIdentifier: "vuu-portal",
+        clientIdentifier: "vuu-user-admin",
         id: 2,
         accessRole: "user-admin-access",
         name: "userAdmin",
@@ -91,7 +94,7 @@ describe("portal module registry", () => {
         description: "Add, remove and update users",
         version: 1,
         enabled: true,
-        location: "/Users/Manage Users",
+        navLocation: "/Users/Manage Users",
         path: "/users/admin",
         mfComponent: "UserAdmin",
         mfScope: "UserAdmin",
@@ -103,7 +106,7 @@ describe("portal module registry", () => {
         },
       },
       {
-        clientIdentifier: "vuu-portal",
+        clientIdentifier: "vuu-table-browser",
         id: 4,
         accessRole: "vuu-table-browser-access",
         name: "vuu-table-browser",
@@ -111,21 +114,35 @@ describe("portal module registry", () => {
         description: "Discover and browse VUU tables",
         version: 1,
         enabled: true,
-        location: "/Tools/Tables",
+        navLocation: "/Tools/Tables",
         path: "/tools/tables",
         mfComponent: "VuuTableBrowser",
         mfScope: "vuuTableBrowser",
         mfUrl: "http://localhost:5004",
-        nestedModules: [
-          {
-            name: "vuu-table-viewer",
-            mfComponent: "VuuTableViewer",
-            mfScope: "vuuTableViewer",
-            mfUrl: "http://localhost:5005",
-          },
-        ],
+      },
+      {
+        clientIdentifier: "vuu-table-viewer",
+        id: 5,
+        accessRole: "vuu-table-viewer-access",
+        name: "vuu-table-viewer",
+        title: "View table",
+        description: "View a selected VUU table",
+        version: 1,
+        enabled: true,
+        navLocation: "",
+        path: "",
+        mfComponent: "VuuTableViewer",
+        mfScope: "vuuTableViewer",
+        mfUrl: "http://localhost:5005",
       },
     ]);
+  });
+
+  test("gives every module its own client identifier", () => {
+    expect(moduleClientIdentifier("userAdmin")).toBe("vuu-user-admin");
+    expect(moduleClientIdentifier("moduleAdmin")).toBe("vuu-module-admin");
+    expect(moduleClientIdentifier("basket-trading")).toBe("vuu-basket-trading");
+    expect(moduleClientIdentifier("vuu-table-viewer")).toBe("vuu-table-viewer");
   });
 
   test("discovers the viewer only as an independently authorized browser child", () => {
@@ -145,7 +162,6 @@ describe("portal module registry", () => {
       }),
     ]);
     expect(browserOnly.modules[0]).not.toHaveProperty("vuu");
-    expect(browserOnly.modules[0]).not.toHaveProperty("nestedModules");
     expect(viewerOnly).toEqual({ modules: [] });
   });
 
@@ -196,7 +212,7 @@ describe("portal module registry", () => {
 
     expect(registry.modules).toEqual([
       expect.objectContaining({
-        clientIdentifier: "vuu-portal",
+        clientIdentifier: "vuu-module-admin",
         id: 6,
         description: "Latest module",
         accessRole: "module-admin-access",
