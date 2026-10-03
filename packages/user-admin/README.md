@@ -142,7 +142,15 @@ canonical sorted and duplicate-free
 `[{ clientIdentifier, accessRole, groupIds }]` payload.
 Access options also provide `groupDisplayName` and `roleDisplayName` alongside
 the canonical names and IDs for compact UI labels when the parent context is
-already visible.
+already visible. Compute them with `getDisplayName`, `getGroupDisplayName`, or
+`getRoleDisplayName`. Each returns the configured display name if set,
+otherwise the text after the last hyphen.
+
+The UI persists users, groups, and roles through VUU edit sessions, not
+individual RPCs. The extra session columns are listed in
+`USER_ADMIN_SESSION_COLUMNS` (exported by `@heswell/vuu-user-admin`'s
+`UserAdminService`). [requirements.md](./requirements.md) describes which
+columns are editable and how they are validated when the session is saved.
 
 Do not make HTTP or identity-provider requests from this client module. The
 demo module is purely local. The production client connects to the

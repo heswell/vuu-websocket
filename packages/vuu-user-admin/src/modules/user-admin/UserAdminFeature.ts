@@ -18,7 +18,7 @@ export type UserAdminFeature = {
 
 export type UserAdminFeatureOptions = Omit<
   UserAdminModuleOptions,
-  "refreshAfterMutation"
+  "refreshAfterMutation" | "readSnapshot"
 > & {
   refreshSnapshot?: UserAdminSnapshotSource;
 };
@@ -37,6 +37,7 @@ export const createUserAdminFeature = (
   return {
     module: UserAdminModule({
       ...options,
+      readSnapshot: options.refreshSnapshot ?? options.snapshotSource,
       refreshAfterMutation,
     }),
     install: (tableContainer, providerContainer) => {

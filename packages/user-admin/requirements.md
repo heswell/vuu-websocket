@@ -46,12 +46,35 @@ neither entry point imports the VUU server feature.
   `vuuUpdatedTimestamp` audit columns for row timestamps; `users`, `groups`,
   and `roles` do not expose a separate `created_at` column.
 - Supported add, edit, delete, and relationship-assignment RPCs validate their
-  inputs, call Keycloak directly, and then refresh the snapshot. VUU edit
-  sessions are not used as a persistence mechanism.
+  inputs, call Keycloak directly, and then refresh the snapshot.
+- Edit sessions on `users`, `groups`, and `roles` are persisted when the UI
+  ends them with `save: true`. Every change is validated before Keycloak is
+  modified. The draft session rows are never written to the source table; the
+  admin tables are refreshed from Keycloak instead. If validation or
+  persistence fails, an error is returned and the session stays open.
+  - `users`: existing rows only. `email`, `first_name`, `last_name`, `enabled`,
+    `email_verified`, `temporary_password`, and `permissions` are editable;
+    `username` is read-only.
+  - `groups`: new rows create a group from `group_name` (required, unique, no
+    spaces or slashes) and assign every role in `role_assignments`. On
+    existing rows, only `role_assignments` is editable, and the group's roles
+    are reconciled to match it. `role_assignments` is a JSON array of `roles`
+    table `role_id` values owned by `vuu-*` clients.
+  - `roles`: new rows create a client role from `role_name`, `description`,
+    `client_id`, and `client_identifier`. The two client columns must identify
+    the same `vuu-*` client, and the role name must be unique for that client.
+    On existing rows, only `role_name` and `description` are editable.
+- Usernames are unique, ignoring case.
+- `groupDisplayName` and `roleDisplayName` use the configured display name if
+  one is set. Otherwise they use the text after the last hyphen in the name,
+  falling back to the full name (for example, `user-admin-access` becomes
+  `access`).
 - Module-oriented access is exposed through `getUserModuleAccessOptions` with
   `{ userId }` and `setUserModuleAccess` with
   `{ userId, assignments }`, where `assignments` is a JSON-encoded array of
-  `{ accessRole, groupId }` objects. Options include every eligible group,
+  `{ accessRole, groupId }` objects. A user may hold several groups for the
+  same access role; only exact duplicate pairs are rejected. Options include
+  every eligible group,
   `selectedGroupIds` contains every selected eligible group, and the
   `groupDisplayName` and `roleDisplayName` fields provide context-relative
   labels without changing canonical group or role names. The
@@ -64,10 +87,18 @@ neither entry point imports the VUU server feature.
   `normalizeUserModuleAccessPermissions` or
   `serializeUserModuleAccessPermissions` to merge duplicate applications,
   deduplicate group IDs, and sort roles and group IDs deterministically.
-- The `USER_ADMIN.users` source schema has no `permissions` column. The VUU
-  server adds `permissions` only to users edit-session tables, validates and
-  canonicalizes its serialized value before saving, and reconciles managed
-  application-access memberships without changing unrelated memberships.
+- Source schemas have no edit-only columns. The VUU server adds them only to
+  edit-session tables: `permissions` and `temporary_password` on `users`, and
+  `group_name` and `role_assignments` on `groups`.
+- `permissions` holds the user's complete desired application access. The
+  server validates and canonicalizes it before saving, and reconciles managed
+  application-access memberships without changing unrelated memberships. Each
+  entry is matched to an access role by `accessRole`. `clientIdentifier`
+  identifies the application's own client: it may be empty, and must start
+  with `vuu-` if set. Applications missing from the array lose their
+  access-bearing groups.
+- `temporary_password` is write-only. A non-empty value resets the user's
+  password and requires the user to change it at next login.
 - The UI RPC contract is exported from `KeycloakAdminContract.ts`. Supported
   RPC names are `addUser`, `updateUser`, `deleteUser`, `addGroup`,
   `updateGroup`, `deleteGroup`, `addClient`, `updateClient`, `addRole`,

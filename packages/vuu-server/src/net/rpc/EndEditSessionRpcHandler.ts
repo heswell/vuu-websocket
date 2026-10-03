@@ -23,10 +23,10 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
   endEditSession = (params: RpcParams): RpcResult | Promise<RpcResult> =>
     this.handleEndEditSession(params);
 
-  protected handleEndEditSession = ({
+  protected handleEndEditSession({
     namedParams: { force, save },
     viewport,
-  }: RpcParams): RpcResult | Promise<RpcResult> => {
+  }: RpcParams): RpcResult | Promise<RpcResult> {
     const sessionTable = viewport.dataTable;
     if (!(sessionTable instanceof InMemSessionDataTable)) {
       return {
@@ -45,7 +45,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
 
     this.applySessionSave(sessionTable, prepared);
     return { type: "SUCCESS_RESULT", data: undefined };
-  };
+  }
 
   protected prepareSessionSave(
     sessionTable: InMemSessionDataTable,
@@ -139,7 +139,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       row,
       cellUpdates,
       sourceRow,
-    } of preparedChanges) {
+    } of changes) {
       if (action === "addRow") {
         const newSourceRow = sourceTable.schema.columns.map(
           ({ name }) => row[sessionTable.columnMap[name]],

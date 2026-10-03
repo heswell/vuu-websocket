@@ -16,7 +16,7 @@ export class UserAdminGroupsProvider extends Provider {
     const rows = leafGroups(snapshot).map((group) => [
       group.id,
       getGroupDisplayName(group),
-      group.path ?? "",
+      group.path ?? `/${group.name}`,
       group.parentId ?? "",
       groupUserCount(snapshot, group.id),
       groupRoleCount(snapshot, group.id),

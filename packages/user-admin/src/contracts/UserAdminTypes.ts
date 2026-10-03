@@ -68,20 +68,22 @@ export type UserAdminSnapshot = {
 
 export type UserAdminSnapshotSource = () => Promise<UserAdminSnapshot>;
 
+/**
+ * Display names follow the portal naming convention: an explicitly configured
+ * display name wins, otherwise the final hyphen-separated segment of the name
+ * is used (`basket-trading-read` -> `read`).
+ */
+export const getDisplayName = (name: string, configuredDisplayName?: string) =>
+  configuredDisplayName || name.split("-").at(-1) || name;
+
 export const getGroupDisplayName = (
   group: Pick<UserAdminGroup, "name" | "groupDisplayName">,
-) => group.groupDisplayName ?? group.name;
+) => getDisplayName(group.name, group.groupDisplayName);
 
 export const getRoleDisplayName = (
   role: Pick<UserAdminRole, "name" | "roleDisplayName">,
-  client?: Pick<UserAdminClient, "clientId">,
-) => {
-  if (role.roleDisplayName) return role.roleDisplayName;
-  const clientPrefix = client ? `${client.clientId}-` : "";
-  return clientPrefix && role.name.startsWith(clientPrefix)
-    ? role.name.slice(clientPrefix.length)
-    : role.name;
-};
+  _client?: Pick<UserAdminClient, "clientId">,
+) => getDisplayName(role.name, role.roleDisplayName);
 
 export type UserAdminEditableUserChanges = Partial<
   Pick<UserAdminUser, "username" | "email" | "firstName" | "lastName" | "enabled" | "emailVerified">
@@ -90,6 +92,8 @@ export type UserAdminEditableUserChanges = Partial<
 export type UserAdminUserEdit = {
   userId: string;
   changes: UserAdminEditableUserChanges;
+  /** Write-only; sets a temporary password that must be changed at next login. */
+  temporaryPassword?: string;
   assignments?: readonly UserModuleAccessAssignment[];
 };
 
