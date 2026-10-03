@@ -45,6 +45,7 @@ const moduleColumns = [
   "vuuConnectionId",
   "vuuWebsocketUrl",
   "vuuRestUrl",
+  "navIconUrl",
 ];
 
 describe("module discovery protocol", () => {

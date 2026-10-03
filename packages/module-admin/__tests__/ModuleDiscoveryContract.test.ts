@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   DEFAULT_MODULE_DEFINITIONS,
+  MODULE_NAV_ICONS,
   moduleDefinitionsToRows,
   modulePermissionsFor,
 } from "../src/contracts";
@@ -19,11 +20,12 @@ describe("module discovery contract", () => {
         "/Modules/Manage Modules",
         "/modules/admin",
         "ModuleAdmin",
-        "ModuleAdmin",
+        "moduleAdmin",
         "http://localhost:5002",
         "module-admin",
         "wss://localhost:8091/websocket-portal",
         "https://localhost:8443/api/authn",
+        MODULE_NAV_ICONS.modules,
       ],
       expect.any(Array),
       expect.any(Array),
@@ -43,6 +45,7 @@ describe("module discovery contract", () => {
         "",
         "",
         "",
+        MODULE_NAV_ICONS.tables,
       ],
       [
         5,
@@ -57,6 +60,7 @@ describe("module discovery contract", () => {
         "VuuTableViewer",
         "vuuTableViewer",
         "http://localhost:5005",
+        "",
         "",
         "",
         "",
