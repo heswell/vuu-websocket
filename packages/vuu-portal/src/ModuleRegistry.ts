@@ -64,9 +64,18 @@ function readModules(table: DataTable): DiscoveredModuleRecord[] {
       mfComponent: stringValue(table, row, "mfComponent"),
       mfScope: stringValue(table, row, "mfScope"),
       mfUrl: stringValue(table, row, "mfUrl"),
+      ...navIcon(table, row),
       ...remoteConnection(table, row),
     };
   });
+}
+
+function navIcon(table: DataTable, row: unknown[]) {
+  // Optional: rows written before the column existed leave it unset.
+  const navIconUrl = row[columnIndex(table, "navIconUrl")];
+  return typeof navIconUrl === "string" && navIconUrl
+    ? { navIconUrl }
+    : {};
 }
 
 function remoteConnection(table: DataTable, row: unknown[]) {

@@ -17,6 +17,7 @@ export const modulesTable = TableDef({
     { name: "vuuConnectionId", dataType: "string" },
     { name: "vuuWebsocketUrl", dataType: "string" },
     { name: "vuuRestUrl", dataType: "string" },
+    { name: "navIconUrl", dataType: "string" },
     ...VUU_DEFAULT_COLUMNS
   ],
   keyField: "id",

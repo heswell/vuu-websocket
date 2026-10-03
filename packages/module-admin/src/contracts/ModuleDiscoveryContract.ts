@@ -16,6 +16,8 @@ export type ModuleDefinition = {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
+  /** Navigation icon as a data URL (SVG). */
+  navIconUrl?: string;
   vuu?: {
     connectionId: string;
     websocketUrl: string;
@@ -39,6 +41,7 @@ export type ModuleRow = [
   vuuConnectionId: string,
   vuuWebsocketUrl: string,
   vuuRestUrl: string,
+  navIconUrl: string,
 ];
 
 export type ModulePermissionRow = [
@@ -46,6 +49,26 @@ export type ModulePermissionRow = [
   moduleId: number,
   role: string,
 ];
+
+const svgIcon = (body: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`,
+  )}`;
+
+export const MODULE_NAV_ICONS = {
+  modules: svgIcon(
+    '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  ),
+  users: svgIcon(
+    '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 4a4 4 0 0 1 0 8"/><path d="M22 21v-1a6 6 0 0 0-4-5.6"/>',
+  ),
+  trading: svgIcon(
+    '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>',
+  ),
+  tables: svgIcon(
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/>',
+  ),
+} as const;
 
 export const DEFAULT_MODULE_DEFINITIONS = [
   {
@@ -59,8 +82,9 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     location: "/Modules/Manage Modules",
     path: "/modules/admin",
     mfComponent: "ModuleAdmin",
-    mfScope: "ModuleAdmin",
+    mfScope: "moduleAdmin",
     mfUrl: "http://localhost:5002",
+    navIconUrl: MODULE_NAV_ICONS.modules,
     vuu: {
       connectionId: "module-admin",
       websocketUrl: "wss://localhost:8091/websocket-portal",
@@ -78,8 +102,9 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     location: "/Users/Manage Users",
     path: "/users/admin",
     mfComponent: "UserAdmin",
-    mfScope: "UserAdmin",
+    mfScope: "userAdmin",
     mfUrl: "http://localhost:5003",
+    navIconUrl: MODULE_NAV_ICONS.users,
     vuu: {
       connectionId: "user-admin",
       websocketUrl: "wss://localhost:8092/websocket-user-admin",
@@ -99,6 +124,7 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfComponent: "VuuBasketTradingFeature",
     mfScope: "basketTrading",
     mfUrl: "http://localhost:5006",
+    navIconUrl: MODULE_NAV_ICONS.trading,
     vuu: {
       connectionId: "basket",
       websocketUrl: "wss://localhost:8093/websocket-basket-trading",
@@ -118,6 +144,7 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfComponent: "VuuTableBrowser",
     mfScope: "vuuTableBrowser",
     mfUrl: "http://localhost:5004",
+    navIconUrl: MODULE_NAV_ICONS.tables,
   },
   {
     id: 5,
@@ -154,6 +181,7 @@ export const moduleDefinitionsToRows = (
     module.vuu?.connectionId ?? "",
     module.vuu?.websocketUrl ?? "",
     module.vuu?.restUrl ?? "",
+    module.navIconUrl ?? "",
   ]);
 
 export const modulePermissionsFor = (

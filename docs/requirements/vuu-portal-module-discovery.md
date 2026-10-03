@@ -49,7 +49,10 @@ type ModuleRecord = {
 Only enabled records permitted by the authenticated user's roles are returned.
 For duplicate names, the highest version wins, followed by the highest id.
 
-`navLocation` is the module table's `location` column. `accessRole` is the
+`navLocation` is the module table's `location` column. `navIconUrl` (an SVG
+data URL) comes from the optional `navIconUrl` column and is omitted when
+empty. `mfScope` must equal the remote's module-federation name (for example
+`userAdmin`), or the UI cannot load it. `accessRole` is the
 role that granted access. `clientIdentifier` is the module's own client,
 derived from its name (`userAdmin` -> `vuu-user-admin`; names that already
 start with `vuu-` are unchanged). The UI keys each module's saved state by it.

@@ -11,6 +11,7 @@ import {
   createModuleRegistry,
   moduleClientIdentifier,
 } from "../src/ModuleRegistry";
+import { MODULE_NAV_ICONS } from "@heswell/module-admin";
 import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 
 const moduleAccessRoles = [
@@ -59,6 +60,7 @@ describe("portal module registry", () => {
         accessRole: "basket-trading-access",
         name: "basket-trading",
         mfUrl: "http://localhost:5006",
+        navIconUrl: MODULE_NAV_ICONS.trading,
         vuu: {
           connectionId: "basket",
           restUrl: "https://localhost:8445/api/authn",
@@ -77,8 +79,9 @@ describe("portal module registry", () => {
         navLocation: "/Modules/Manage Modules",
         path: "/modules/admin",
         mfComponent: "ModuleAdmin",
-        mfScope: "ModuleAdmin",
+        mfScope: "moduleAdmin",
         mfUrl: "http://localhost:5002",
+        navIconUrl: MODULE_NAV_ICONS.modules,
         vuu: {
           connectionId: "module-admin",
           restUrl: "https://localhost:8443/api/authn",
@@ -97,8 +100,9 @@ describe("portal module registry", () => {
         navLocation: "/Users/Manage Users",
         path: "/users/admin",
         mfComponent: "UserAdmin",
-        mfScope: "UserAdmin",
+        mfScope: "userAdmin",
         mfUrl: "http://localhost:5003",
+        navIconUrl: MODULE_NAV_ICONS.users,
         vuu: {
           connectionId: "user-admin",
           restUrl: "https://localhost:8444/api/authn",
@@ -119,6 +123,7 @@ describe("portal module registry", () => {
         mfComponent: "VuuTableBrowser",
         mfScope: "vuuTableBrowser",
         mfUrl: "http://localhost:5004",
+        navIconUrl: MODULE_NAV_ICONS.tables,
       },
       {
         clientIdentifier: "vuu-table-viewer",
