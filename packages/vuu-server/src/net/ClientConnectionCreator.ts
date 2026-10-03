@@ -34,7 +34,7 @@ interface OutboundMessageHandler {
 }
 
 export interface MessageHandler
-  extends InboundMessageHandler, OutboundMessageHandler { }
+  extends InboundMessageHandler, OutboundMessageHandler {}
 
 class DefaultMessageHandlerImpl implements MessageHandler {
   constructor(
@@ -46,10 +46,8 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     private flowController: FlowController,
     private sessionContainer: ClientSessionContainer,
     private moduleContainer: ModuleContainer,
-  ) { }
+  ) {}
   handle = async (msg: VuuClientMessage) => {
-
-
     const ctx = RequestContext(
       msg.requestId,
       this.user,
@@ -100,31 +98,19 @@ class DefaultMessageHandlerImpl implements MessageHandler {
       if (!withinRange(update.index, update.vp.range)) {
         return undefined;
       }
-
-      const dataToSend = update.table.pullRowAsArray(
-        update.key.key,
-        update.vp.columns,
+      const { data, rowKey, sel } = update.row;
+      return RowUpdate(
+        update.vpRequestId,
+        update.vp.id,
+        update.size,
+        update.index,
+        rowKey,
+        RowUpdateType.Update,
+        performance.now(),
+        sel,
+        data,
       );
-
-      const isSelected = update.vp.selectedKeys.has(update.key.key) ? 1 : 0;
-
-      if (dataToSend.length == 0) {
-        return undefined;
-      } else {
-        return RowUpdate(
-          update.vpRequestId,
-          update.vp.id,
-          update.size,
-          update.index,
-          update.key.key,
-          RowUpdateType.Update,
-          performance.now(),
-          isSelected,
-          dataToSend,
-        );
-      }
     } else {
-      console.log(`SVR[VP] Size: vpid=${update.vp.id} size=${update.vp.size}`);
       return RowUpdate(
         update.vpRequestId,
         update.vp.id,
@@ -200,7 +186,7 @@ class ClientSessionIdImpl implements ClientSessionId {
   constructor(
     public sessionId: string,
     public channelId: string,
-  ) { }
+  ) {}
 
   toString() {
     return `sessionId: ${this.sessionId}, channelId: ${this.channelId}`;

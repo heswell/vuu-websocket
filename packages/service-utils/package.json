@@ -14,7 +14,7 @@
     "@vuu-ui/vuu-data-types": "2.1.4"
   },
   "dependencies": {
-    "@heswell/data": "3.0.0",
+    "@heswell/vuu-table": "3.0.0",
     "pino": "9.6.0"
   }
 }

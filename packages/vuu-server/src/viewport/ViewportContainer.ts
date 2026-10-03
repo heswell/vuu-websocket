@@ -1,4 +1,3 @@
-import { Table } from "@heswell/data";
 import type {
   RpcResult,
   VuuLinkDescriptor,
@@ -94,11 +93,18 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     clientSessionId: ClientSessionId,
     outboundQueue: PublishQueue<ViewPortUpdate>,
     table: DataTable,
-    { columns, filterSpec, groupBy, range, sort }: VuuViewportCreateRequest,
+    {
+      aggregations,
+      columns,
+      filterSpec,
+      groupBy,
+      range,
+      sort,
+    }: VuuViewportCreateRequest,
   ) {
     const { sessionId } = clientSessionId;
     const id = ViewPortId.oneNew();
-    console.log(`[ViewportContainer] create vp ${id}, table ${table.name}`)
+    console.log(`[ViewportContainer] create vp ${id}, table ${table.name}`);
     const viewPortDef = this.getViewPortDefinition(table);
     const viewport = new Viewport(
       id,
@@ -108,7 +114,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       { columns, filterSpec, groupBy, sort },
       range,
       table,
-      { columns, filterSpec, groupBy, range, sort },
+      { aggregations, columns, filterSpec, groupBy, range, sort },
       viewPortDef,
     );
 
@@ -163,6 +169,12 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
   removeViewport(viewportId: string) {
     const viewport = this.getViewportById(viewportId);
+    // remove any visual links for which this viewport is the parent
+    for (const vp of this.#viewports.values()) {
+      if (vp.visualLink?.parentVp === viewport) {
+        vp.removeVisualLink();
+      }
+    }
     viewport.destroy();
     this.#viewports.delete(viewportId);
     const viewports = this.#sessionViewportMap.get(viewport.sessionId);
@@ -282,7 +294,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
   deselectAll(viewPortId: string) {
     const viewport = this.getViewportById(viewPortId);
-    const { selectedRowCount } = viewport.deselectRow("", false);
+    const { selectedRowCount } = viewport.deselectAll();
     return selectedRowCount;
   }
 
@@ -315,6 +327,14 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     child.setVisualLink(
       ViewPortVisualLink(child, parent, childColumn, parentColumn),
     );
+  }
+
+  openTreeNode(viewPortId: string, treeKey: string) {
+    this.getViewportById(viewPortId).openTreeNode(treeKey);
+  }
+
+  closeTreeNode(viewPortId: string, treeKey: string) {
+    this.getViewportById(viewPortId).closeTreeNode(treeKey);
   }
 
   unlinkViewPorts(childVpId: string) {

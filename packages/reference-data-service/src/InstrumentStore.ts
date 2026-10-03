@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { IDataStore, DataStoreEvents } from "@heswell/service-utils";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { instrumentsSchema } from "./tableSchemas";

@@ -1,4 +1,4 @@
-import type { Table } from "@heswell/data";
+import type { Table } from "@heswell/vuu-table";
 import { Provider } from "@heswell/vuu-server";
 import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 

@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import type { Table } from "@heswell/vuu-table";
 import { JoinTableDef, TableDef } from "../../api/TableDef";
 import { TableContainer } from "../../core/table/TableContainer";
 import { type JoinTableProvider } from "../../provider/JoinTableProvider";
@@ -9,22 +9,23 @@ export const vuuInMemPlugin = {
   joinTableFactory: (
     tableDef: JoinTableDef,
     tableContainer: TableContainer,
-    joinProvider: JoinTableProvider
+    joinProvider: JoinTableProvider,
   ) => {
     const baseTable = tableContainer.getTable(tableDef.baseTable.name) as Table;
     const joinTable = tableContainer.getTable(
-      tableDef.joins.table.name
+      tableDef.joins.table.name,
     ) as Table;
 
-    const table = new JoinTable(tableDef, baseTable, joinTable, joinProvider);
+    const table = new JoinTable(tableDef, baseTable, joinTable);
 
     tableContainer.addTable(table);
     joinProvider.addJoinTable(table);
+    return table;
   },
   tableFactory: (
     tableDef: TableDef,
     tableContainer: TableContainer,
-    joinProvider: JoinTableProvider
+    joinProvider: JoinTableProvider,
   ) => {
     const table = new InMemDataTable(tableDef, joinProvider);
     tableContainer.addTable(table);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import {
   loadTableFromRemoteResource,

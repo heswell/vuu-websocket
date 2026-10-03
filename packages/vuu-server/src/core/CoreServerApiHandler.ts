@@ -1,5 +1,7 @@
 import {
+  ClientToServerCloseTreeNode,
   ClientToServerMenuSelectRPC,
+  ClientToServerOpenTreeNode,
   DeselectAllRequest,
   DeselectRowRequest,
   SelectRowRangeRequest,
@@ -114,10 +116,14 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processDeselectAllRequest(body, ctx);
       case "SELECT_ROW_RANGE":
         return this.processSelectRowRangeRequest(body, ctx);
-      // case "CREATE_VISUAL_LINK":
-      //   return this.processCreateVisualLinkRequest(requestId, body, session);
-      // case "REMOVE_VISUAL_LINK":
-      //   return this.processRemoveVisualLinkRequest(requestId, body, session);
+      case "OPEN_TREE_NODE":
+        return this.processOpenTreeNodeRequest(body, ctx);
+      case "CLOSE_TREE_NODE":
+        return this.processCloseTreeNodeRequest(body, ctx);
+      case "CREATE_VISUAL_LINK":
+        return this.processCreateVisualLinkRequest(body, ctx);
+      case "REMOVE_VISUAL_LINK":
+        return this.processRemoveVisualLinkRequest(body, ctx);
       // case "DESELECT_ROW":
       //   return this.processDeselectRowRequest(requestId, body, session);
       // case "SELECT_ROW_RANGE":
@@ -268,7 +274,9 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     if (hasViewPortContext(msg)) {
-      console.log(`[CoreServerApiHandler] RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`)
+      console.log(
+        `[CoreServerApiHandler] RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`,
+      );
       return this.handleViewportRpcRequest(msg, msg.context.viewPortId, ctx);
     } else {
       console.warn(
@@ -432,42 +440,71 @@ export class CoreServerApiHandler implements ServerApi {
 
   //--------------------------------------------------
 
+  private processOpenTreeNodeRequest(
+    { vpId, treeKey }: ClientToServerOpenTreeNode,
+    ctx: RequestContext,
+  ) {
+    try {
+      this.viewPortContainer.openTreeNode(vpId, treeKey);
+      return vsMsg({ type: "OPEN_TREE_SUCCESS" }, ctx);
+    } catch (e) {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
+  }
+
+  private processCloseTreeNodeRequest(
+    { vpId, treeKey }: ClientToServerCloseTreeNode,
+    ctx: RequestContext,
+  ) {
+    try {
+      this.viewPortContainer.closeTreeNode(vpId, treeKey);
+      return vsMsg({ type: "CLOSE_TREE_SUCCESS" }, ctx);
+    } catch (e) {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
+  }
+
   private processCreateVisualLinkRequest(
-    requestId: string,
     {
       childVpId,
       parentVpId,
       childColumnName,
       parentColumnName,
     }: VuuCreateVisualLink,
-    session: ISession,
+    ctx: RequestContext,
   ) {
-    this.viewPortContainer.linkViewPorts(
-      childVpId,
-      parentVpId,
-      childColumnName,
-      parentColumnName,
-    );
-
-    session.enqueue(requestId, {
-      childVpId,
-      childColumnName,
-      parentVpId,
-      parentColumnName,
-      type: "CREATE_VISUAL_LINK_SUCCESS",
-    });
+    try {
+      this.viewPortContainer.linkViewPorts(
+        childVpId,
+        parentVpId,
+        childColumnName,
+        parentColumnName,
+      );
+      return vsMsg(
+        {
+          childVpId,
+          childColumnName,
+          parentVpId,
+          parentColumnName,
+          type: "CREATE_VISUAL_LINK_SUCCESS",
+        },
+        ctx,
+      );
+    } catch (e) {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
   }
 
   private processRemoveVisualLinkRequest(
-    requestId: string,
     { childVpId }: VuuRemoveVisualLink,
-    session: ISession,
+    ctx: RequestContext,
   ) {
-    this.viewPortContainer.unlinkViewPorts(childVpId);
-    session.enqueue(requestId, {
-      childVpId,
-      type: "REMOVE_VISUAL_LINK_SUCCESS",
-    });
+    try {
+      this.viewPortContainer.unlinkViewPorts(childVpId);
+      return vsMsg({ childVpId, type: "REMOVE_VISUAL_LINK_SUCCESS" }, ctx);
+    } catch (e) {
+      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+    }
   }
 
   private processViewPortMenuSelectionRpcCall(

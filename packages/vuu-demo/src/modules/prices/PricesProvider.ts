@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { Provider } from "@heswell/vuu-server";
 import logger from "../../logger";
 import { ResourceMessage, SnapshotBatch, Upsert } from "@heswell/service-utils";

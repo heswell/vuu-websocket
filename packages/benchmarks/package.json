@@ -1,0 +1,16 @@
+{
+  "name": "@heswell/benchmarks",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Performance benchmarks comparing legacy @heswell/data DataView with @heswell/vuu-viewport",
+  "type": "module",
+  "scripts": {
+    "bench": "bun ./src/run.ts",
+    "bench:1m": "bun ./src/run.ts --rows=1000000"
+  },
+  "dependencies": {
+    "@heswell/data": "3.0.0",
+    "@heswell/vuu-table": "3.0.0",
+    "@heswell/vuu-viewport": "3.0.0"
+  }
+}

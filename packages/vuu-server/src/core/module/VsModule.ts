@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { IProvider } from "../../provider/Provider";
 import { VuuLink } from "@vuu-ui/vuu-protocol-types";
 import { IService, ServiceMessage } from "../../Service";

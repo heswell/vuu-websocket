@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { RpcNamedParams, VuuMenu } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "./provider/ProviderContainer";
 import { ViewPortDef } from "./api/ViewPortDef";

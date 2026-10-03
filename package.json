@@ -24,6 +24,8 @@
     "start:prices": "bun ./scripts/start-prices.ts",
     "start:refdata": "bun ./scripts/start-refdata.ts",
     "debug": "bun --inspect ./start.ts",
+    "bench": "bun ./packages/benchmarks/src/run.ts",
+    "bench:1m": "bun ./packages/benchmarks/src/run.ts --rows=1000000 --engine=vuu-viewport",
     "test": "echo \"Error: no test specified\" && exit 1",
     "bump:versions": "bun ./scripts/bump-versions.ts",
     "pub": "bun ./scripts/publish.ts",

@@ -1,4 +1,4 @@
-import type { RowPredicate } from "@heswell/data";
+import type { RowPredicate } from "@heswell/vuu-viewport";
 import type {
   VuuDataRow,
   VuuRowDataItemType,

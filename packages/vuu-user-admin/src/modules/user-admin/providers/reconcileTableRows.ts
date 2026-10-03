@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
 const SYSTEM_TIMESTAMP_COLUMNS = ["vuuCreatedTimestamp", "vuuUpdatedTimestamp"];

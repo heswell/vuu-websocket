@@ -203,9 +203,9 @@ describe("Viewport permission filtering", () => {
 
   test("client filter is combined with permission filter", () => {
     const { viewport } = createViewport("steve");
-    viewport.filter({ filter: 'audience = "all"' });
+    viewport.changeViewport({ filterSpec: { filter: 'audience = "all"' } });
     expect(visibleKeys(viewport)).toEqual(["n1"]);
-    viewport.filter({ filter: "" });
+    viewport.changeViewport({ filterSpec: { filter: "" } });
     expect(visibleKeys(viewport)).toEqual(["n1", "n3"]);
   });
 });

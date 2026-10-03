@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { IProvider } from "./Provider";
 import { JoinTableProvider } from "./JoinTableProvider";
 import { TableContainer } from "../core/table/TableContainer";

@@ -1,4 +1,4 @@
-import { buildColumnMap } from "@heswell/data";
+import { buildColumnMap } from "@heswell/vuu-table";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 // prettier-ignore

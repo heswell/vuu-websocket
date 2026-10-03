@@ -9,7 +9,7 @@ import {
   VuuTable,
 } from "@vuu-ui/vuu-protocol-types";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { ServerWebSocket } from "bun";
 import { JoinTableProvider } from "./provider/JoinTableProvider";
 
