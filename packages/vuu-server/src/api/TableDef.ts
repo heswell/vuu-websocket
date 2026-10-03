@@ -2,6 +2,7 @@ import { VuuColumnDataType, VuuTable } from "@vuu-ui/vuu-protocol-types";
 
 import { ViewServerModule } from "../core/module/VsModule";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
+import type { PermissionFunction } from "../core/filter/PermissionFilter";
 
 export type Column = {
   name: string;
@@ -59,6 +60,11 @@ export interface TableDefConfig {
   keyField: string;
   name: string;
   links: VisualLinks;
+  /**
+   * Creates a PermissionFilter for each viewport created on this table,
+   * restricting the rows visible to the viewport user.
+   */
+  permissionFunction?: PermissionFunction;
 }
 
 export interface TableDef extends TableDefConfig {
@@ -107,16 +113,19 @@ class TableDefImpl implements TableDef {
   keyField: string;
   links: VisualLinks;
   name: string;
+  permissionFunction?: PermissionFunction;
 
   #module: ViewServerModule | null = null;
 
   constructor(options: TableDefConfig) {
-    const { columns, joinFields, keyField, name, links } = options;
+    const { columns, joinFields, keyField, name, links, permissionFunction } =
+      options;
     this.columns = columns;
     this.joinFields = joinFields;
     this.keyField = keyField;
     this.links = links;
     this.name = name;
+    this.permissionFunction = permissionFunction;
   }
   getModule() {
     if (this.#module === null) {

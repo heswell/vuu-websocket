@@ -25,8 +25,15 @@ const SINGLE_COLUMN = 1;
 
 const NO_OPTIONS: RowSetConstructorOptions = {};
 
+/**
+ * A row level predicate applied to every row in addition to any client filter.
+ * Used to restrict the rows visible in a viewport (e.g. by user permissions).
+ */
+export type RowPredicate = (row: VuuDataRow) => boolean;
+
 export type RowSetConstructorOptions = {
   filter?: Filter;
+  permissionFilter?: RowPredicate;
   range?: VuuRange;
   sortSet?: SortSet;
 };
@@ -36,7 +43,7 @@ export class RowSet extends BaseRowSet {
     viewportId: string,
     table: Table,
     columns: string[],
-    { filter, range, sortSet }: RowSetConstructorOptions = NO_OPTIONS,
+    { filter, permissionFilter, range, sortSet }: RowSetConstructorOptions = NO_OPTIONS,
   ) {
     super(viewportId, table, columns);
     const { columnMap } = table;
@@ -52,10 +59,86 @@ export class RowSet extends BaseRowSet {
       this.range = range;
     }
 
+    this.#permissionFilter = permissionFilter;
+
     if (filter) {
       this.currentFilter = filter;
       this.filter(filter);
+    } else if (permissionFilter) {
+      this.applyFilterPredicate();
     }
+  }
+
+  #permissionFilter: RowPredicate | undefined;
+
+  get permissionFilter() {
+    return this.#permissionFilter;
+  }
+
+  setPermissionFilter(permissionFilter: RowPredicate | undefined) {
+    this.#permissionFilter = permissionFilter;
+    if (this.hasActiveFilter) {
+      this.applyFilterPredicate();
+    } else {
+      this.sortedIndex.filterSet = undefined;
+    }
+  }
+
+  /**
+   * true if either a client filter or a permission filter is in effect,
+   * in which case the sortedIndex will always have a filterSet.
+   */
+  protected get hasActiveFilter() {
+    return (
+      this.currentFilter !== undefined || this.#permissionFilter !== undefined
+    );
+  }
+
+  private createFilterPredicate(
+    filter = this.currentFilter,
+  ): RowPredicate | undefined {
+    const permissionFilter = this.#permissionFilter;
+    const clientFilter = filter
+      ? filterPredicate(this._table.columnMap, filter)
+      : undefined;
+    if (permissionFilter && clientFilter) {
+      return (row) => permissionFilter(row) && clientFilter(row);
+    } else {
+      return permissionFilter ?? clientFilter;
+    }
+  }
+
+  /**
+   * Rebuild the filterSet from scratch, using permission filter
+   * and current client filter.
+   */
+  private applyFilterPredicate() {
+    const fn = this.createFilterPredicate();
+    if (fn) {
+      const { sortSet } = this.sortedIndex;
+      const { rows } = this._table;
+      const newFilterSet: number[] = [];
+      for (let i = 0; i < sortSet.length; i++) {
+        if (fn(rows[sortSet[i][0]])) {
+          newFilterSet.push(i);
+        }
+      }
+      this.sortedIndex.filterSet = newFilterSet;
+    } else {
+      this.sortedIndex.filterSet = undefined;
+    }
+  }
+
+  private isInFilterSet(rowIdx: number) {
+    const { filterSet, sortSet } = this.sortedIndex;
+    if (filterSet) {
+      for (const sortIdx of filterSet) {
+        if (sortSet[sortIdx][0] === rowIdx) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   setRange(range = this.range, useDelta = true): DataResponse {
@@ -287,9 +370,8 @@ export class RowSet extends BaseRowSet {
 
     this.sortCols = sortCols.length > 0 ? sortCols : undefined;
 
-    if (filterSet && this.currentFilter) {
-      const fn = filterPredicate(columnMap, this.currentFilter);
-
+    const fn = filterSet ? this.createFilterPredicate() : undefined;
+    if (fn) {
       const getRowIndex = (idx: number) => sortSet[idx][0];
       const newFilterSet: number[] = [];
 
@@ -309,7 +391,11 @@ export class RowSet extends BaseRowSet {
 
   clearFilter() {
     this.currentFilter = undefined;
-    this.sortedIndex.filterSet = undefined;
+    if (this.#permissionFilter) {
+      this.applyFilterPredicate();
+    } else {
+      this.sortedIndex.filterSet = undefined;
+    }
   }
 
   filter(filter: Filter) {
@@ -321,7 +407,7 @@ export class RowSet extends BaseRowSet {
       this.currentFilter,
     );
 
-    const fn = filterPredicate(columnMap, filter);
+    const fn = this.createFilterPredicate(filter) as RowPredicate;
     const { table } = this;
     const { filterSet, sortSet } = this.sortedIndex;
 
@@ -349,12 +435,25 @@ export class RowSet extends BaseRowSet {
     console.log(`filter took ${end - start} ms`);
   }
 
-  update(rowIdx: number, _: VuuDataRow): DataResponse | undefined {
-    if (this.currentFilter === undefined && this.sortCols === undefined) {
+  update(rowIdx: number, row: VuuDataRow): DataResponse | undefined {
+    if (this.hasActiveFilter) {
+      // an update may move a row into or out of the filtered set
+      const fn = this.createFilterPredicate() as RowPredicate;
+      if (fn(row) !== this.isInFilterSet(rowIdx)) {
+        const previousSize = this.size;
+        this.applyFilterPredicate();
+        return {
+          ...this.currentRange(),
+          sizeMessageRequired: this.size !== previousSize,
+        };
+      }
+    }
+
+    if (!this.hasActiveFilter && this.sortCols === undefined) {
       if (rowIdx >= this.range.from && rowIdx < this.range.to) {
         return { rows: this.slice(rowIdx, rowIdx + 1), size: this.size };
       }
-    } else if (this.currentFilter === undefined) {
+    } else if (!this.hasActiveFilter) {
       // if we've sorted the data we're going to have to search for the rowIndex
       const sortedIdx = this.sortedIndex.sortSet.findIndex(
         ([idx]) => idx === rowIdx,
@@ -396,7 +495,12 @@ export class RowSet extends BaseRowSet {
 
   delete(rowIndex: number, row: VuuDataRow): DataResponse {
     const { sortSet } = this.sortedIndex;
-    if (this.sortCols === undefined) {
+    if (this.hasActiveFilter) {
+      this.sortedIndex.removeRowIndex(rowIndex);
+      this.applyFilterPredicate();
+      this.sortedIndex.refreshKeyMaps();
+      return this.currentRange();
+    } else if (this.sortCols === undefined) {
       // the sortSet is still in table order
       sortSet.length -= 1;
 
@@ -423,6 +527,20 @@ export class RowSet extends BaseRowSet {
     const { columnMap } = this._table;
     const { sortSet } = this.sortedIndex;
 
+    if (this.hasActiveFilter) {
+      this.sortedIndex.addRowIndex(rowIndex);
+      const isVisible = (this.createFilterPredicate() as RowPredicate)(row);
+      if (this.sortCols !== undefined) {
+        // sorting invalidates filterSet positions, even for a hidden row
+        this.sortedIndex.sort(this.sortCols);
+        this.applyFilterPredicate();
+      } else if (isVisible) {
+        this.applyFilterPredicate();
+      }
+      this.sortedIndex.refreshKeyMaps();
+      return isVisible ? this.currentRange() : { rows: [], size: this.size };
+    }
+
     // TODO multi column sort sort DSC
     if (this.sortCols === undefined && this.currentFilter === undefined) {
       // simplest scenario, row will be at end of sortset ...
@@ -440,10 +558,7 @@ export class RowSet extends BaseRowSet {
           size: this.size,
         };
       }
-    } else if (
-      this.sortCols !== undefined &&
-      this.currentFilter === undefined
-    ) {
+    } else if (this.sortCols !== undefined) {
       // data is sorted
       // 1) get the values from new row for the sorted columns
 

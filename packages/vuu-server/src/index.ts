@@ -16,6 +16,7 @@ export type {
 export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
 export type { RpcParams } from "./net/rpc/Rpc";
+export { RpcErrorResult, RpcSuccessResult } from "./net/rpc/RpcResult";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
 export {
@@ -45,8 +46,22 @@ export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
 export * from "./core/VuuServerApplication";
 export { NoAction } from "./viewport/ViewPortAction";
+export { Viewport } from "./viewport/Viewport";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
+export type { ServiceFactory } from "./core/module/ModuleFactory";
+export { NotificationModule } from "./core/module/notifications/NotificationModule";
+export {
+  NotificationsSchema,
+  type ColumnDefinition,
+} from "./core/module/notifications/NotificationsSchema";
+export {
+  AllowAllPermissionFilter,
+  DenyAllPermissionFilter,
+  PermissionFilter,
+  type PermissionFunction,
+  type RowData,
+} from "./core/filter/PermissionFilter";
 export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";
 export * from "./toolbox/thread/LifecycleContainer";
 export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";

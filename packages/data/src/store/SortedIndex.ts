@@ -86,6 +86,40 @@ export class SortedIndex {
   }
 
   /**
+   * Register a row appended to the underlying table. The new entry is added
+   * at the end of the sortSet, caller is responsible for re-sorting if needed.
+   */
+  addRowIndex(rowIndex: number) {
+    this.#sortSet.push([rowIndex, 0, 0]);
+  }
+
+  /**
+   * Remove the sortSet entry for a row deleted from the underlying table.
+   * Table deletes shift all subsequent row indices down by one.
+   */
+  removeRowIndex(rowIndex: number) {
+    const sortSet = this.#sortSet;
+    let writeIdx = 0;
+    for (let i = 0; i < sortSet.length; i++) {
+      const entry = sortSet[i];
+      if (entry[0] !== rowIndex) {
+        if (entry[0] > rowIndex) {
+          entry[0] -= 1;
+        }
+        sortSet[writeIdx++] = entry;
+      }
+    }
+    sortSet.length = writeIdx;
+  }
+
+  refreshKeyMaps() {
+    this.setMapKeys(this.#sortKeyMap, this.#sortSet);
+    if (this.#filterSet) {
+      this.setMapKeys(this.#filterKeyMap, this.#sortSet, this.#filterSet);
+    }
+  }
+
+  /**
    * Initialise an empty sortset,
    * allowing for two sort columns.
    * We are only currently supporting one or two columns sorting.
