@@ -13,8 +13,7 @@ or inside a browser (the eventual replacement for vuu-ui's
 | `@heswell/vuu-viewport` | `ViewportEngine` / `DataEngine` interfaces and the `InMemoryViewport` engine.    |
 
 The legacy `@heswell/data` package (`DataView`, `RowSet`, `GroupRowSet`) is no
-longer used by the server. It is retained only as the baseline for benchmarks
-(and by `packages/web`).
+longer used by the server. It is retained only as the baseline for benchmarks.
 
 ```mermaid
 flowchart LR
