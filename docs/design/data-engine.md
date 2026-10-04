@@ -1,5 +1,9 @@
 # Data engine: `@heswell/vuu-table` and `@heswell/vuu-viewport`
 
+> For a detailed walkthrough of the internals (data structures, event
+> handling, merge strategy, grouping, selection and the client diff), see
+> [data-engine-internals.md](./data-engine-internals.md).
+
 The core data management engine (tables plus viewport analytics: windowing,
 sorting, filtering, grouping, selection, visual linking, permissioning and
 joins) is split into two runtime-agnostic packages. They have no dependency on
