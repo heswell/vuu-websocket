@@ -171,8 +171,12 @@ export abstract class RemoteProvider extends Provider {
     this.requestStop();
   }
 
+  /**
+   * columns defaults to the columns of the table. Rows are mapped to the
+   * table's column order by name, so the order requested here is irrelevant.
+   */
   abstract remoteServiceDetails(): {
-    columns: string[];
+    columns?: string[];
     remoteResourceMessageType?: RemoteResourceMessageType[];
     resource: string;
     url: string;

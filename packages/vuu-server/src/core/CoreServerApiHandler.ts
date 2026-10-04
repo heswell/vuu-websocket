@@ -27,6 +27,7 @@ import { hasViewPortContext } from "@vuu-ui/vuu-utils";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import {
   ChangeViewPortRangeSuccess,
+  ChangeViewPortSuccess,
   CreateViewPortReject,
   CreateViewPortSuccess,
   DeselectAllSuccess,
@@ -225,11 +226,16 @@ export class CoreServerApiHandler implements ServerApi {
     { viewPortId, ...options }: VuuViewportChangeRequest,
     ctx: RequestContext,
   ) {
-    const viewport = this.viewPortContainer.getViewportById(viewPortId);
     try {
+      const viewport = this.viewPortContainer.getViewportById(viewPortId);
       viewport.changeViewport(options);
+      return vsMsg(ChangeViewPortSuccess(viewPortId, options), ctx);
     } catch (e) {
       console.error(e);
+      return errorMsg(
+        `Failed to change viewport ${viewPortId}: ${(e as Error).message}`,
+        ctx,
+      );
     }
   }
 

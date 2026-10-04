@@ -8,17 +8,6 @@ const remoteResourceMessageType: RemoteResourceMessageType[] = [
 export class InstrumentProvider extends RemoteProvider {
   remoteServiceDetails() {
     return {
-      columns: [
-        "bbg",
-        "currency",
-        "description",
-        "exchange",
-        "isin",
-        "lotSize",
-        "ric",
-        "vuuCreatedTimestamp",
-        "vuuUpdatedTimestamp",
-      ],
       resource: "instruments",
       remoteResourceMessageType,
       url: ConfigFactory.load().getString("services.refdata.url"),

@@ -18,6 +18,8 @@ import type {
   VuuTableListResponse,
   VuuTableMetaResponse,
   VuuViewportCreateFailResponse,
+  VuuViewportChangeRequest,
+  VuuViewportChangeResponse,
   VuuViewportCreateRequest,
   VuuViewportCreateSuccessResponse,
   VuuViewportMenusResponse,
@@ -103,6 +105,19 @@ export const CreateViewPortSuccess = (
   sort: msg.sort,
   table,
   type: "CREATE_VP_SUCCESS",
+  viewPortId,
+});
+
+export const ChangeViewPortSuccess = (
+  viewPortId: string,
+  msg: Omit<VuuViewportChangeRequest, "type" | "viewPortId">,
+): VuuViewportChangeResponse => ({
+  aggregations: msg.aggregations,
+  columns: msg.columns,
+  filterSpec: msg.filterSpec,
+  groupBy: msg.groupBy,
+  sort: msg.sort,
+  type: "CHANGE_VP_SUCCESS",
   viewPortId,
 });
 
