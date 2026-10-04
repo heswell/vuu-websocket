@@ -74,20 +74,32 @@ export const LoginSuccess = (
   ...options,
 });
 
+// Defaults match the Scala server's RangeSettings().
+export const DEFAULT_MAX_RANGE_END = 2_147_483_647;
+export const DEFAULT_MAX_RANGE_WIDTH = 1_000;
+
 export const GetTableMetaResponse = (
   table: VuuTable,
   columns: string[],
   dataTypes: VuuColumnDataType[],
   key: string,
+  editableColumns: string[] = [],
+  maxRangeEnd = DEFAULT_MAX_RANGE_END,
+  maxRangeWidth = DEFAULT_MAX_RANGE_WIDTH,
 ): VuuTableMetaResponse => ({
   columns,
   dataTypes,
+  editableColumns,
   key,
+  maxRangeEnd,
+  maxRangeWidth,
   table,
   type: "TABLE_META_RESP",
 });
 
-export const GetTableListResponse = (tables: VuuTable[]): VuuTableListResponse => ({
+export const GetTableListResponse = (
+  tables: VuuTable[],
+): VuuTableListResponse => ({
   tables,
   type: "TABLE_LIST_RESP",
 });
