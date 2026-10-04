@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { JoinTableProvider } from "../../provider/JoinTableProvider";
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { DataTable } from "./InMemDataTable";

@@ -1,0 +1,22 @@
+{
+  "name": "@heswell/vuu-table",
+  "version": "3.0.0",
+  "description": "Runtime agnostic (browser or server) Vuu table store, including join tables",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "author": "heswell",
+  "license": "MIT",
+  "devDependencies": {
+    "@vuu-ui/vuu-data-types": "2.1.4",
+    "@vuu-ui/vuu-protocol-types": "2.1.4"
+  }
+}

@@ -7,20 +7,16 @@ const VUU_TIMESTAMP_COLUMNS: Column[] = [
 ];
 
 export const instruments = TableDef({
-  // columns: Columns.fromNames(
-  //   "bbg:string",
-  //   "currency:string",
-  //   "description:string",
-  //   "exchange:string",
-  //   "isin:string",
-  //   "lotSize:int",
-  //   "ric:string",
-  // ),
   columns: [
-    { name: "exchange", dataType: "string" },
-    { name: "isin", dataType: "string" },
-    { name: "lotSize", dataType: "int" },
-    { name: "ric", dataType: "string" },
+    ...Columns.fromNames(
+      "bbg:string",
+      "currency:string",
+      "description:string",
+      "exchange:string",
+      "isin:string",
+      "lotSize:int",
+      "ric:string",
+    ),
     ...VUU_TIMESTAMP_COLUMNS,
   ],
   joinFields: "ric",

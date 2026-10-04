@@ -1,78 +1,30 @@
 import {
-  VuuServerConfig,
-  VuuServer,
-  LifecycleContainer,
-  VuuWebSocketOptions,
   ConfigFactory,
-  Config,
-  VuuSslByCertAndKey,
-  LoginTokenService,
+  createConfiguredAuthProviders,
+  createVuuServerApplication,
 } from "@heswell/vuu-server";
 import { PricesModule } from "./modules/prices";
-import { OrdersModule } from "./modules/orders";
 import { SimulationModule } from "./modules/simul";
 import { SimulatedNotificationsModule } from "./modules/notifications";
-import { TestModule } from "./modules/test/TestModule";
+// import { OrdersModule } from "./modules/orders";
+// import { TestModule } from "./modules/test/TestModule";
 // import { EditableModule } from "./modules/editable";
 // import { PermissionModule } from "./modules/permission";
 // import { BasketModule } from "./modules/baskets";
-import path from "path";
-
-const certPath = path.join(import.meta.dir, "../certs");
 
 export default async function main() {
-  const httpServerOptions = {};
-  const webSocketOptions = {
-    certPath,
-    webSocketPort: process.env.WEBSOCKET_PORT ?? 8091,
-  };
+  const config = ConfigFactory.load();
+  const application = createVuuServerApplication({
+    authProviders: createConfiguredAuthProviders(config),
+    config,
+    defaultHttpsPort: 8443,
+    defaultWebSocketPort: 8091,
+    modules: [
+      PricesModule(),
+      SimulationModule(),
+      SimulatedNotificationsModule(),
+    ],
+  });
 
-  const loginTokenService = LoginTokenService();
-
-  const defaultConfig = ConfigFactory.load();
-
-  const lifecycle = new LifecycleContainer();
-
-  const config = VuuServerConfig(
-    createWebSocketOptions(defaultConfig),
-    httpServerOptions,
-    loginTokenService,
-  )
-    .withModule(PricesModule())
-    .withModule(SimulationModule())
-    .withModule(SimulatedNotificationsModule());
-  // .withModule(TestModule());
-  // .withModule(EditableModule())
-  // .withModule(PermissionModule())
-  // .withModule(BasketModule());
-
-  new VuuServer(config, lifecycle);
-
-  lifecycle.autoShutdownHook();
-  await lifecycle.start();
-}
-
-
-const ConfigKeys = {
-  sslEnabled: "vuu.ssl",
-  certPath: "vuu.certPath",
-  keyPath: "vuu.keyPath",
-  websocketPort: "vuu.websocket.port",
-} as const;
-
-function createWebSocketOptions(c: Config): VuuWebSocketOptions {
-  const options = VuuWebSocketOptions()
-    .withUri("/websocket")
-    .withWsPort(
-      Number(
-        process.env.WEBSOCKET_PORT ??
-          c.getNumber(ConfigKeys.websocketPort, 8091),
-      ),
-    );
-
-  if (c.getBoolean(ConfigKeys.sslEnabled)) {
-    return options.withSsl(VuuSslByCertAndKey(c.getPath(ConfigKeys.certPath), c.getPath(ConfigKeys.keyPath)))
-  } else {
-    return options.withSslDisabled()
-  }
+  await application.start();
 }

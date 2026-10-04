@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import {
   type IDataStore,
   loadTableFromRemoteResource,
@@ -10,8 +10,10 @@ import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import logger from "./logger";
 import { instrumentsSchema, pricesSchema } from "./tableSchemas";
 import { PriceDto } from "./PriceDto";
+import { loadConfig } from "./config";
 
-const refDataServiceUrl = `ws://localhost:${process.env.REFDATA_URL}`;
+const refDataServiceUrl = () =>
+  loadConfig().getString("services.refdata.url");
 
 // TODO error handler
 async function loadInstruments(
@@ -23,7 +25,7 @@ async function loadInstruments(
     columns: ["ric"],
     resource: "instruments",
     table,
-    url: refDataServiceUrl,
+    url: refDataServiceUrl(),
   });
   const end = performance.now();
   console.log(

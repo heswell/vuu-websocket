@@ -66,6 +66,7 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
           .splice(0, hpCount)
           .concat(this.queue.splice(0, i - hpCount));
       } else if (this.length) {
+        this.length = 0;
         return this.highPriorityQueue
           .splice(0, hpCount)
           .concat(this.queue.splice(0, this.queue.length));

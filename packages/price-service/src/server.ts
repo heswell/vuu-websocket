@@ -6,6 +6,7 @@ import { uuid } from "@vuu-ui/vuu-utils";
 import logger from "./logger";
 import { startGeneratingUpdates, stopGeneratingUpdates } from "./price-factory";
 import priceStore from "./PriceStore";
+import { loadConfig } from "./config";
 
 export async function start() {
   console.log(`[PRICES:service:server] start`);
@@ -14,7 +15,7 @@ export async function start() {
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",
 
-    port: process.env.PRICES_URL,
+    port: loadConfig().getNumber("service.port"),
 
     fetch(req, server) {
       const sessionId = uuid();

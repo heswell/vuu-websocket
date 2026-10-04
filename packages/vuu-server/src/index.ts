@@ -33,7 +33,6 @@ export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
 export {
   JoinTableProvider,
 } from "./provider/JoinTableProvider";
-export type { JoinEventType } from "./provider/JoinTableProvider";
 export type {
   DataTableDefinition,
   TableColumn,

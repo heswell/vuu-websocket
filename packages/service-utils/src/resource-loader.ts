@@ -1,4 +1,8 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
+import type {
+  VuuDataRow,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
 import { ResourceMessage } from "./StoreDataStreamSource";
 
 export interface ResourceRequest {
@@ -13,6 +17,38 @@ export type RemoteResourceMessageType = RemoteResourceUpdateType | "snapshot";
 
 type RemoveSocketListener = () => void;
 
+type RowMapper = (row: VuuDataRow) => VuuDataRow;
+
+/**
+ * Remote services return rows with values in the order of the requested
+ * columns. Map them to the column order of the target table, by name, so that
+ * a provider requesting columns in a different order (or a superset of the
+ * table columns) cannot corrupt the table.
+ */
+export const createRowMapper = (
+  remoteColumns: string[],
+  tableColumns: string[],
+): RowMapper | undefined => {
+  if (
+    remoteColumns.length === tableColumns.length &&
+    remoteColumns.every((name, i) => name === tableColumns[i])
+  ) {
+    return undefined;
+  }
+  const sourceIndices = tableColumns.map((name) => remoteColumns.indexOf(name));
+  const colCount = sourceIndices.length;
+  return (row) => {
+    const out: VuuDataRow = new Array(colCount);
+    for (let i = 0; i < colCount; i++) {
+      const sourceIndex = sourceIndices[i];
+      out[i] = (
+        sourceIndex === -1 ? undefined : row[sourceIndex]
+      ) as VuuRowDataItemType;
+    }
+    return out;
+  };
+};
+
 export interface RemoteResourceSocket {
   onClose(listener: (event: Event) => void): RemoveSocketListener;
   onError(listener: (event: Event) => void): RemoveSocketListener;
@@ -22,9 +58,7 @@ export interface RemoteResourceSocket {
   send(data: string): void;
 }
 
-export type RemoteResourceSocketFactory = (
-  url: string,
-) => RemoteResourceSocket;
+export type RemoteResourceSocketFactory = (url: string) => RemoteResourceSocket;
 
 const defaultSocketFactory: RemoteResourceSocketFactory = (url) => {
   const socket = new WebSocket(url);
@@ -47,9 +81,12 @@ const defaultSocketFactory: RemoteResourceSocketFactory = (url) => {
 
 // TODO make this a class with a loadSNapshot method, to give client finer grained control
 export class RemoteResourceLoader {
-  constructor(private table: Table, private url: string) {
+  constructor(
+    private table: Table,
+    private url: string,
+  ) {
     console.log(
-      `[service-utils:RemoteResourceLoader] created for ${this.table.name} at ${this.url}`
+      `[service-utils:RemoteResourceLoader] created for ${this.table.name} at ${this.url}`,
     );
   }
   async loadSnapshot() {}
@@ -75,6 +112,9 @@ export const loadTableFromRemoteResource = async ({
   table: Table;
   url: string;
 }) => {
+  const tableColumns = table.schema.columns.map(({ name }) => name);
+  const requestColumns = columns ?? tableColumns;
+  const toTableRow = createRowMapper(requestColumns, tableColumns);
   const requestSnapshot = remoteResourceMessageType.includes("snapshot");
   const requestInserts = remoteResourceMessageType.includes("insert");
   const requestUpdates = remoteResourceMessageType.includes("update");
@@ -131,79 +171,87 @@ export const loadTableFromRemoteResource = async ({
     removeListeners.push(
       socket.onMessage((evt) => {
         if (terminal || signal?.aborted) {
-        return;
+          return;
         }
         try {
-        const message = JSON.parse(evt.data as string) as ResourceMessage;
+          const message = JSON.parse(evt.data as string) as ResourceMessage;
 
-        if (message.type === "snapshot-count") {
-          console.log(
-            `[service-utils:loadTableFromRemoteResource] final snapshot ${message.count} ${resource} rows received`,
-          );
-          ready = true;
-          resolve(message.count);
-          if (!requestUpdates && !requestInserts) {
-            terminate(true);
+          if (message.type === "snapshot-count") {
+            console.log(
+              `[service-utils:loadTableFromRemoteResource] final snapshot ${message.count} ${resource} rows received`,
+            );
+            ready = true;
+            resolve(message.count);
+            if (!requestUpdates && !requestInserts) {
+              terminate(true);
+            }
+          } else if (message.type === "snapshot-batch") {
+            for (const row of message.rows) {
+              table.insert(toTableRow ? toTableRow(row) : row);
+            }
+          } else if (message.type === "insert") {
+            table.insert(toTableRow ? toTableRow(message.row) : message.row);
+          } else if (message.type === "inserts") {
+            console.log(`inserts received`);
+          } else {
+            fail(
+              new Error(
+                `[service-utils] unexpected message from remote resource service`,
+              ),
+            );
           }
-        } else if (message.type === "snapshot-batch") {
-          for (const row of message.rows) {
-            table.insert(row);
-          }
-        } else if (message.type === "insert") {
-          table.insert(message.row);
-        } else if (message.type === "inserts") {
-          console.log(`inserts received`);
-        } else {
-          fail(
-            new Error(
-              `[service-utils] unexpected message from remote resource service`,
-            ),
-          );
-        }
         } catch (error: unknown) {
-        fail(error);
+          fail(error);
         }
       }),
       socket.onOpen(() => {
         if (terminal) {
-        return;
+          return;
         }
         console.log(
-        `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`,
+          `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`,
         );
         if (requestSnapshot && requestInserts) {
-        socket?.send(
-          JSON.stringify({ type: "subscription", columns, resource }),
-        );
+          socket?.send(
+            JSON.stringify({
+              type: "subscription",
+              columns: requestColumns,
+              resource,
+            }),
+          );
         } else if (requestSnapshot) {
-        socket?.send(
-          JSON.stringify({ type: "snapshot", columns, resource }),
-        );
+          socket?.send(
+            JSON.stringify({
+              type: "snapshot",
+              columns: requestColumns,
+              resource,
+            }),
+          );
         }
       }),
       socket.onError(() => {
         console.error(
-        `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url}`,
+          `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url}`,
         );
         fail(
-        new Error(
-          `[service-utils:loadTableFromRemoteResource] connection error ${resource} at ${url}`,
-        ),
+          new Error(
+            `[service-utils:loadTableFromRemoteResource] connection error ${resource} at ${url}`,
+          ),
         );
       }),
       socket.onClose(() => {
         console.log(
-        `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`,
+          `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`,
         );
         if (ready) {
-        terminate(false);
+          terminate(false);
         } else {
-        fail(
-          new Error(
-            `[service-utils:loadTableFromRemoteResource] connection closed before initial snapshot ${resource} at ${url}`,
-          ),
-          false,
-        );
+          fail(
+            new Error(
+              `[service-utils:loadTableFromRemoteResource] connection closed before initial snapshot ${resource} at ${url}`,
+            ),
+            false,
+          );
         }
       }),
     );

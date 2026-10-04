@@ -122,6 +122,71 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
     });
   });
 
+  describe("CoreServerApiHandler CHANGE_VP", () => {
+    const changeRequest = {
+      type: "CHANGE_VP",
+      viewPortId: "vp-1",
+      aggregations: [],
+      columns: ["ccy", "price"],
+      filterSpec: { filter: "" },
+      groupBy: ["ccy"],
+      sort: { sortDefs: [] },
+    };
+
+    test("applies the change and returns CHANGE_VP_SUCCESS", async () => {
+      let changedWith: unknown;
+      const viewPortContainer = {
+        getViewportById: () => ({
+          changeViewport: (options: unknown) => {
+            changedWith = options;
+          },
+        }),
+      };
+      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer as any,
+        {} as any,
+        {} as any,
+      );
+
+      const response = await handler.process(
+        { requestId: "req-change-1", sessionId: "sess-1", body: changeRequest } as any,
+        buildContext("req-change-1"),
+      );
+
+      const { type: _, viewPortId: __, ...options } = changeRequest;
+      expect(changedWith).toMatchObject(options);
+      expect(response).toEqual({
+        body: { ...changeRequest, type: "CHANGE_VP_SUCCESS" },
+        module: "CORE",
+        requestId: "req-change-1",
+        sessionId: "sess-1",
+      });
+    });
+
+    test("returns ERROR when the viewport does not exist", async () => {
+      const viewPortContainer = {
+        getViewportById: () => {
+          throw new Error("no viewport");
+        },
+      };
+      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer as any,
+        {} as any,
+        {} as any,
+      );
+
+      const response = (await handler.process(
+        { requestId: "req-change-2", sessionId: "sess-1", body: changeRequest } as any,
+        buildContext("req-change-2"),
+      )) as any;
+
+      expect(response.body.type).toBe("ERROR");
+      expect(response.requestId).toBe("req-change-2");
+    });
+  });
+
   describe("CoreServerApiHandler selection", () => {
     test("handles DESELECT_ALL and returns DESELECT_ALL_SUCCESS", async () => {
       let deselectedViewportId: string | undefined;

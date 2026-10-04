@@ -1,9 +1,8 @@
-import { Table } from "@heswell/data";
-import { Provider } from "@heswell/vuu-server";
+import { Table } from "@heswell/vuu-table";
+import { ConfigFactory, Provider } from "@heswell/vuu-server";
 import logger from "../../logger";
 import { ResourceMessage, SnapshotBatch, Upsert } from "@heswell/service-utils";
 
-const priceServiceUrl = `ws://localhost:${process.env.PRICES_URL}`;
 let messageCount = 0;
 
 export class PricesProvider extends Provider {
@@ -20,13 +19,15 @@ export class PricesProvider extends Provider {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
         this.#rejectLoad = reject;
+        const priceServiceUrl = ConfigFactory.load().getString(
+          "services.prices.url",
+        );
         try {
           const socket = new WebSocket(priceServiceUrl);
           this.#socket = socket;
           socket.addEventListener("message", (evt) => {
             const serviceMessage = JSON.parse(evt.data as string) as
-              | ResourceMessage
-              | { type: "HB" };
+              ResourceMessage | { type: "HB" };
             if (Array.isArray(serviceMessage)) {
               // logger.info(
               //   `[PRICES:module:PricesProvider] ${priceServiceMessage.length} messages from PriceService`
@@ -80,15 +81,15 @@ export class PricesProvider extends Provider {
           });
           socket.addEventListener("open", (event) => {
             console.log(
-              `[PRICES:module:PricesProvider] websocket open, subscribing to all prices`
+              `[PRICES:module:PricesProvider] websocket open, subscribing to all prices`,
             );
             socket.send(
-              JSON.stringify({ type: "subscribe", resource: "prices" })
+              JSON.stringify({ type: "subscribe", resource: "prices" }),
             );
           });
         } catch (err) {
           console.log(
-            `[PRICES:module:PricesProvider] unable to connect to ${priceServiceUrl}`
+            `[PRICES:module:PricesProvider] unable to connect to ${priceServiceUrl}`,
           );
           this.failLoad(err);
         }
@@ -103,7 +104,9 @@ export class PricesProvider extends Provider {
 
   requestStop() {
     this.failLoad(
-      new Error("[PRICES:module:PricesProvider] stopped before initial snapshot"),
+      new Error(
+        "[PRICES:module:PricesProvider] stopped before initial snapshot",
+      ),
     );
     this.#socket?.close();
     this.#socket = undefined;

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 import {
+  createRowMapper,
   loadTableFromRemoteResource,
   RemoteResourceSocket,
 } from "../src/resource-loader";
@@ -48,6 +49,74 @@ describe("loadTableFromRemoteResource readiness", () => {
   });
 });
 
+describe("loadTableFromRemoteResource column mapping", () => {
+  const instrumentSchema: TableSchema = {
+    columns: [
+      { name: "exchange", serverDataType: "string" },
+      { name: "ric", serverDataType: "string" },
+      { name: "lotSize", serverDataType: "int" },
+    ],
+    key: "ric",
+    table: { module: "TEST", table: "instruments" },
+  };
+
+  test("requests table columns when provider does not specify columns", async () => {
+    const socket = new TestRemoteResourceSocket();
+    const table = new Table({ schema: instrumentSchema });
+    const load = loadTableFromRemoteResource({
+      resource: "instruments",
+      socketFactory: () => socket,
+      table,
+      url: "ws://test",
+    });
+    socket.emitOpen();
+    expect(JSON.parse(socket.sent[0]).columns).toEqual([
+      "exchange",
+      "ric",
+      "lotSize",
+    ]);
+    socket.emitMessage({
+      type: "snapshot-batch",
+      rows: [["XLON", "VOD.L", 100]],
+    });
+    socket.emitMessage({ type: "snapshot-count", count: 1 });
+    await load;
+    expect(table.rows).toEqual([["XLON", "VOD.L", 100]]);
+  });
+
+  test("maps rows by column name when requested columns differ from table", async () => {
+    const socket = new TestRemoteResourceSocket();
+    const table = new Table({ schema: instrumentSchema });
+    const load = loadTableFromRemoteResource({
+      columns: ["bbg", "ric", "currency", "exchange", "lotSize"],
+      resource: "instruments",
+      socketFactory: () => socket,
+      table,
+      url: "ws://test",
+    });
+    socket.emitOpen();
+    socket.emitMessage({
+      type: "snapshot-batch",
+      rows: [
+        ["VOD LN", "VOD.L", "GBP", "XLON", 100],
+        ["BARC LN", "BARC.L", "GBP", "XLON", 200],
+      ],
+    });
+    socket.emitMessage({ type: "snapshot-count", count: 2 });
+    await load;
+    expect(table.rows).toEqual([
+      ["XLON", "VOD.L", 100],
+      ["XLON", "BARC.L", 200],
+    ]);
+    expect(table.rowIndexAtKey("BARC.L")).toBe(1);
+  });
+
+  test("createRowMapper is a no-op when column order matches", () => {
+    expect(createRowMapper(["a", "b"], ["a", "b"])).toBeUndefined();
+    expect(createRowMapper(["b", "a"], ["a", "b"])?.([2, 1])).toEqual([1, 2]);
+  });
+});
+
 class TestRemoteResourceSocket implements RemoteResourceSocket {
   closeCount = 0;
   readonly #closeListeners = new Set<(event: Event) => void>();
@@ -68,7 +137,11 @@ class TestRemoteResourceSocket implements RemoteResourceSocket {
     this.closeCount += 1;
   }
 
-  send() {}
+  readonly sent: string[] = [];
+
+  send(data: string) {
+    this.sent.push(data);
+  }
 
   onClose(listener: (event: Event) => void) {
     this.#closeListeners.add(listener);
@@ -93,6 +166,21 @@ class TestRemoteResourceSocket implements RemoteResourceSocket {
   emitClose() {
     for (const listener of this.#closeListeners) {
       listener(new Event("close"));
+    }
+  }
+
+  emitOpen() {
+    for (const listener of this.#openListeners) {
+      listener(new Event("open"));
+    }
+  }
+
+  emitMessage(message: unknown) {
+    const event = new MessageEvent("message", {
+      data: JSON.stringify(message),
+    });
+    for (const listener of this.#messageListeners) {
+      listener(event);
     }
   }
 

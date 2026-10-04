@@ -8,7 +8,7 @@ import { TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
 import tableDefContainer from "./TableDefContainer";
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { ProviderContainer } from "../../provider/ProviderContainer";
 import { ViewPortDef } from "../../api/ViewPortDef";
 import { TableContainer } from "../table/TableContainer";

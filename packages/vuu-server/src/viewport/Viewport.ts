@@ -1,17 +1,20 @@
-import {
+import type {
   VuuFilter,
   VuuGroupBy,
   VuuRange,
   VuuSort,
   VuuViewportChangeRequest,
 } from "@vuu-ui/vuu-protocol-types";
+import { EventEmitter } from "@vuu-ui/vuu-utils";
+import type { Table } from "@heswell/vuu-table";
 import {
-  DataView,
-  DataViewConfig,
-  RowUpdateHandler,
-  Table,
-  tableRowsMessageBody,
-} from "@heswell/data";
+  inMemoryDataEngine,
+  type DataEngine,
+  type ViewportBatch,
+  type ViewportConfig,
+  type ViewportEngine,
+  type ViewportRow,
+} from "@heswell/vuu-viewport";
 import { ViewPortDef } from "../api/ViewPortDef";
 import { Column } from "../api/TableDef";
 import {
@@ -19,11 +22,9 @@ import {
   isDataTable,
   RowKeyUpdate,
 } from "../core/table/InMemDataTable";
-import { SelectionEventHandler } from "@heswell/data";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { VuuUser } from "../core/auths/VuuUser";
 import { PublishQueue } from "../util/PublishQueue";
-import { DataResponse } from "@heswell/data/src/store/rowset";
 import { isSessionDataTable } from "../core/table/InMemSessionDataTable";
 import {
   AllowAllPermissionFilter,
@@ -31,8 +32,17 @@ import {
 } from "../core/filter/PermissionFilter";
 
 type ViewPortUpdateType = "SIZE" | "ROW";
+
 export interface ViewPortSelection {
+  rowKeys: ReadonlySet<string>;
   viewPort: Viewport;
+}
+
+export function ViewPortSelection(
+  rowKeys: ReadonlySet<string>,
+  viewPort: Viewport,
+): ViewPortSelection {
+  return { rowKeys, viewPort };
 }
 
 // TODO this needs some work
@@ -43,11 +53,9 @@ export type ViewPortStructuralFields = {
   sort: VuuSort;
 };
 
-export function ViewPortSelection(viewPort: Viewport) {
-  return new (class implements ViewPortSelection {
-    constructor(public viewPort: Viewport) {}
-  })(viewPort);
-}
+export type ViewportCreateConfig = Partial<ViewportConfig> & {
+  range?: VuuRange;
+};
 
 export interface ViewPortUpdate {
   index: number;
@@ -58,14 +66,16 @@ export interface ViewPortUpdate {
   ts: number;
   vp: Viewport;
   vpUpdate: ViewPortUpdateType;
+  /** materialized row data, as computed by the viewport engine */
+  row?: ViewportRow;
 }
-export interface ViewPortRowUpdate extends Omit<ViewPortUpdate, "table"> {
-  table: Table;
+export interface ViewPortRowUpdate extends ViewPortUpdate {
+  row: ViewportRow;
 }
 
 export const isViewPortRowUpdate = (
   vpu: ViewPortUpdate,
-): vpu is ViewPortRowUpdate => vpu.vpUpdate === "ROW" && vpu.table !== null;
+): vpu is ViewPortRowUpdate => vpu.vpUpdate === "ROW" && vpu.row !== undefined;
 
 export class ViewPortUpdateImpl implements ViewPortUpdate {
   constructor(
@@ -77,6 +87,7 @@ export class ViewPortUpdateImpl implements ViewPortUpdate {
     public vpUpdate: ViewPortUpdateType,
     public size: number,
     public ts: number,
+    public row?: ViewportRow,
   ) {}
 }
 
@@ -89,6 +100,7 @@ export const ViewPortUpdate = (
   vpUpdate: ViewPortUpdateType,
   size: number,
   ts: number,
+  row?: ViewportRow,
 ): ViewPortUpdate =>
   new ViewPortUpdateImpl(
     vpRequestId,
@@ -99,6 +111,7 @@ export const ViewPortUpdate = (
     vpUpdate,
     size,
     ts,
+    row,
   );
 
 export interface ViewPortVisualLink {
@@ -108,6 +121,12 @@ export interface ViewPortVisualLink {
   parentColumn: Column;
 }
 
+/**
+ * Restricts the rows of the child viewport to those where childColumn
+ * matches the parentColumn value of any row selected in the parent. With
+ * no selection in the parent, the child is unrestricted. The link is
+ * applied as a filter independent of the child's own client filter.
+ */
 export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
   constructor(
     public childVp: Viewport,
@@ -116,78 +135,19 @@ export class RuntimeViewPortVisualLink implements ViewPortVisualLink {
     public parentColumn: Column,
   ) {
     parentVp.on("row-selection", this.handleSelectionEvent);
+    this.handleSelectionEvent();
   }
 
   remove() {
     this.parentVp.removeListener("row-selection", this.handleSelectionEvent);
-    const dataResponse = this.childVp.filter({ filter: "" });
-    if (dataResponse) {
-      const { rows, size } = dataResponse;
-      this.childVp.enqueue(
-        tableRowsMessageBody(rows, size, this.childVp.id, true),
-      );
-    }
+    this.childVp.setLinkFilter(undefined);
   }
 
-  private handleSelectionEvent: SelectionEventHandler = () => {
-    const { selectedKeys } = this.parentVp;
-    if (selectedKeys.size === 0) {
-      const dataResponse = this.childVp.filter({ filter: "" });
-      if (dataResponse) {
-        const { rows, size } = dataResponse;
-        this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true),
-        );
-      }
-    } else if (selectedKeys.size === 1) {
-      const [key] = this.parentVp.selectedKeys;
-      const filter = `${this.childColumn.name} = "${key}"`;
-      // // TODO need a way to ensure that this triggers update
-      // console.log(`set filter ${filter}`);
-      const dataResponse = this.childVp.filter({ filter });
-      if (dataResponse) {
-        const { rows, size } = dataResponse;
-        this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true),
-        );
-      }
-    } else {
-      const [key] = this.parentVp.selectedKeys;
-      const values = Array.from(selectedKeys)
-        .map((value) => `"${value}"`)
-        .join(",");
-      const filter = `${this.childColumn.name} in [${values}]`;
-      // // TODO need a way to ensure that this triggers update
-      // console.log(`set filter ${filter}`);
-      const dataResponse = this.childVp.filter({ filter });
-      if (dataResponse) {
-        const { rows, size } = dataResponse;
-        this.childVp.enqueue(
-          tableRowsMessageBody(rows, size, this.childVp.id, true),
-        );
-      }
-    }
-
-    // 1) is the parentColumn the key of parent table, if so we have the selected values already
-    // 2) if not, we must get the selected values using the selected keys
-
-    // //todo simple if the targetColumnName is the key. If it isn't we need
-    // // to find each row and determine the foreign key value
-
-    // const selectedValues = this.pickUniqueSelectedValues(selection);
-    // if (selectedValues.length === 0) {
-    //   this.#childViewport.baseFilter = undefined;
-    // } else if (selectedValues.length === 1) {
-    //   this.#childViewport.baseFilter = {
-    //     filter: `${this.#childColumnName} = "${selectedValues[0]}"`,
-    //   };
-    // } else {
-    //   this.#childViewport.baseFilter = {
-    //     filter: `${this.#childColumnName} in ["${selectedValues.join(
-    //       '","'
-    //     )}"]`,
-    //   };
-    // }
+  private handleSelectionEvent = () => {
+    const values = this.parentVp.getSelectedValues(this.parentColumn.name);
+    this.childVp.setLinkFilter(
+      values.size === 0 ? undefined : { column: this.childColumn.name, values },
+    );
   };
 }
 
@@ -240,37 +200,152 @@ class ViewPortRangeImpl implements ViewPortRange {
 export const ViewPortRange = (from: number, to: number): ViewPortRange =>
   new ViewPortRangeImpl(from, to);
 
-export class Viewport extends DataView {
-  #enabled: boolean = true;
+// ---------------------------------------------------------------------------
+// Flush scheduling. Table changes are queued within each viewport engine,
+// dirty viewports are flushed together once the current burst of
+// (synchronous) table updates has completed. This coalesces many updates to
+// the same row and amortises sort/filter maintenance across the burst.
+// ---------------------------------------------------------------------------
+
+const dirtyViewports = new Set<Viewport>();
+let flushScheduled = false;
+
+const scheduleFlush =
+  typeof setImmediate === "function"
+    ? (fn: () => void) => setImmediate(fn)
+    : (fn: () => void) => setTimeout(fn, 0);
+
+const markDirty = (viewport: Viewport) => {
+  dirtyViewports.add(viewport);
+  if (!flushScheduled) {
+    flushScheduled = true;
+    scheduleFlush(flushViewports);
+  }
+};
+
+/**
+ * Flush all viewports with pending changes. Invoked automatically, exposed
+ * for tests and for hosts that want deterministic flushing.
+ */
+export function flushViewports() {
+  flushScheduled = false;
+  if (dirtyViewports.size === 0) return;
+  const viewports = Array.from(dirtyViewports);
+  dirtyViewports.clear();
+  for (const viewport of viewports) {
+    viewport.flush();
+  }
+}
+
+let defaultDataEngine: DataEngine = inMemoryDataEngine;
+
+/**
+ * Replace the analytics engine used for new viewports, e.g. to evaluate an
+ * alternative implementation. Existing viewports are unaffected.
+ */
+export const setDefaultDataEngine = (engine: DataEngine) => {
+  defaultDataEngine = engine;
+};
+
+export const getDefaultDataEngine = () => defaultDataEngine;
+
+export type ViewportEvents = {
+  "row-selection": () => void;
+};
+
+const NO_SIZE = -1;
+
+export class Viewport extends EventEmitter<ViewportEvents> {
   #clientSessionId: ClientSessionId;
-  #requestId: string = "";
+  #enabled: boolean = true;
+  #engine: ViewportEngine;
+  #id: string;
   #outboundQ: PublishQueue<ViewPortUpdate>;
+  #permissionFilter: PermissionFilter | undefined;
+  #requestId: string = "";
+  #table: DataTable;
+  #user: VuuUser;
   #viewPortDef: ViewPortDef;
   #viewPortVisualLink?: RuntimeViewPortVisualLink;
-  #user: VuuUser;
-  #permissionFilter: PermissionFilter | undefined;
 
   constructor(
     id: string,
     user: VuuUser,
     clientSessionId: ClientSessionId,
     outboundQ: PublishQueue<ViewPortUpdate>,
-    structuralFields: ViewPortStructuralFields,
+    _structuralFields: ViewPortStructuralFields,
     range: VuuRange,
     table: DataTable,
-    config: DataViewConfig,
+    config: ViewportCreateConfig,
     // in scala, this is passed with config as 'structural'
     viewPortDef: ViewPortDef,
+    dataEngine: DataEngine = defaultDataEngine,
   ) {
-    super(id, table, config);
+    super();
+    this.#id = id;
     this.#user = user;
     this.#clientSessionId = clientSessionId;
     this.#outboundQ = outboundQ;
     this.#viewPortDef = viewPortDef;
+    this.#table = table;
+    this.#engine = dataEngine.createViewport(table as unknown as Table, {
+      id,
+      aggregations: config.aggregations,
+      columns: this.expandColumns(config.columns),
+      filterSpec: config.filterSpec,
+      groupBy: config.groupBy,
+      sort: config.sort,
+      range: config.range ?? range,
+      onPendingChanges: () => markDirty(this),
+    });
+  }
+
+  private expandColumns(columns?: string[]) {
+    if (columns && columns.length === 1 && columns[0] === "*") {
+      return this.#table.schema.columns.map((c) => c.name);
+    }
+    return columns;
+  }
+
+  get id() {
+    return this.#id;
+  }
+
+  get engine() {
+    return this.#engine;
+  }
+
+  get table() {
+    return this.#table;
+  }
+
+  get columns() {
+    return this.#engine.config.columns;
+  }
+
+  get config() {
+    return this.#engine.config;
+  }
+
+  get range() {
+    return this.#engine.range;
+  }
+
+  get size() {
+    return this.#engine.size;
   }
 
   get enabled() {
     return this.#enabled;
+  }
+
+  set enabled(enabled: boolean) {
+    const wasEnabled = this.#enabled;
+    this.#enabled = enabled;
+    if (enabled && !wasEnabled) {
+      // changes were not published whilst disabled, resend everything
+      this.postDataForCurrentRange();
+    }
   }
 
   get user() {
@@ -283,28 +358,22 @@ export class Viewport extends DataView {
 
   set permissionFilter(permissionFilter: PermissionFilter | undefined) {
     this.#permissionFilter = permissionFilter;
-    this.setPermissionFilter(
-      permissionFilter === undefined ||
-        permissionFilter === AllowAllPermissionFilter
-        ? undefined
-        : permissionFilter.createPredicate(this.table.columnMap),
+    this.post(
+      this.#engine.setPermissionFilter(
+        permissionFilter === undefined ||
+          permissionFilter === AllowAllPermissionFilter
+          ? undefined
+          : permissionFilter.createPredicate(this.#table.columnMap),
+      ),
     );
   }
 
-  set enabled(enabled: boolean) {
-    this.#enabled = enabled;
-  }
-
   get dataTable() {
-    if (isDataTable(this.table) || isSessionDataTable(this.table)) {
-      return this.table as DataTable;
+    if (isDataTable(this.#table) || isSessionDataTable(this.#table)) {
+      return this.#table;
     } else {
       throw Error(`[Viewport] table is not a DataTable`);
     }
-  }
-
-  get keys() {
-    return this.rowSet.keys;
   }
 
   get sessionId() {
@@ -323,29 +392,88 @@ export class Viewport extends DataView {
     return this.#viewPortDef;
   }
 
-  getSelection() {
-    return this.selectedRowKeyIndex;
+  get hasGroupBy() {
+    return this.#engine.config.groupBy.length > 0;
   }
 
-  /** deprecated */
-  select(selection: number[]) {
-    const response = super.select(selection);
-    setTimeout(() => {
-      this.emit("row-selection");
-    }, 0);
-    return response;
+  /**
+   * Keys of selected table rows. When grouped, a selected group row
+   * contributes all of its leaf rows.
+   */
+  get selectedKeys(): ReadonlySet<string> {
+    return this.hasGroupBy
+      ? new Set(this.#engine.getSelectedRowKeys())
+      : this.#engine.selectedKeys;
+  }
+
+  get selectedRowCount() {
+    return this.#engine.selectedKeys.size;
+  }
+
+  get visualLink() {
+    return this.#viewPortVisualLink;
+  }
+
+  /** Apply queued table changes and publish resulting row updates */
+  flush() {
+    const batch = this.#engine.flush();
+    this.post(batch);
+    return batch;
+  }
+
+  getDataForCurrentRange() {
+    return this.#engine.getCurrentRange();
+  }
+
+  postDataForCurrentRange() {
+    this.post(this.#engine.getCurrentRange(), true);
+  }
+
+  setRange(range: VuuRange) {
+    return this.post(this.#engine.setRange(range));
+  }
+
+  changeViewport({
+    aggregations,
+    columns,
+    filterSpec,
+    groupBy,
+    sort,
+  }: Partial<Omit<VuuViewportChangeRequest, "viewPortId" | "type">>) {
+    const batch = this.post(
+      this.#engine.setConfig({
+        aggregations,
+        columns: this.expandColumns(columns),
+        filterSpec,
+        groupBy,
+        sort,
+      }),
+    );
+    return batch;
+  }
+
+  openTreeNode(treeKey: string) {
+    return this.post(this.#engine.openTreeNode(treeKey));
+  }
+
+  closeTreeNode(treeKey: string) {
+    return this.post(this.#engine.closeTreeNode(treeKey));
   }
 
   selectRow(rowKey: string, preserveExistingSelection: boolean) {
-    const dataResponse = super.selectRow(rowKey, preserveExistingSelection);
-    this.postDataResponse(dataResponse);
-    return dataResponse;
+    return this.selectionChanged(
+      this.#engine.selectRow(rowKey, preserveExistingSelection),
+    );
   }
 
   deselectRow(rowKey: string, preserveExistingSelection: boolean) {
-    const dataResponse = super.deselectRow(rowKey, preserveExistingSelection);
-    this.postDataResponse(dataResponse);
-    return dataResponse;
+    return this.selectionChanged(
+      this.#engine.deselectRow(rowKey, preserveExistingSelection),
+    );
+  }
+
+  deselectAll() {
+    return this.selectionChanged(this.#engine.deselectAll());
   }
 
   selectRowRange(
@@ -353,31 +481,38 @@ export class Viewport extends DataView {
     toRowKey: string,
     preserveExistingSelection: boolean,
   ) {
-    const dataResponse = super.selectRowRange(
-      fromRowKey,
-      toRowKey,
-      preserveExistingSelection,
+    return this.selectionChanged(
+      this.#engine.selectRowRange(
+        fromRowKey,
+        toRowKey,
+        preserveExistingSelection,
+      ),
     );
-    this.postDataResponse(dataResponse);
-    return dataResponse;
   }
 
-  changeViewport(
-    options: Omit<VuuViewportChangeRequest, "viewPortId">,
-  ): DataResponse | undefined {
-    const dataResponse = super.changeViewport(options);
-    this.postDataResponse(dataResponse);
-    return dataResponse;
+  private selectionChanged(batch: ViewportBatch) {
+    this.post(batch);
+    this.emit("row-selection");
+    return { ...batch, selectedRowCount: this.selectedRowCount };
   }
 
-  setRange(range: VuuRange, useDelta?: boolean) {
-    const dataResponse = super.setRange(range, useDelta);
-    this.postDataResponse(dataResponse);
-    return dataResponse;
+  /** distinct values of column across the table rows selected in this viewport */
+  getSelectedValues(column: string) {
+    return this.#engine.getSelectedValues(column);
+  }
+
+  getUniqueValues(column: string, startsWith?: string, limit?: number) {
+    return this.#engine.getUniqueValues(column, startsWith, limit);
+  }
+
+  setLinkFilter(linkFilter: Parameters<ViewportEngine["setLinkFilter"]>[0]) {
+    return this.post(this.#engine.setLinkFilter(linkFilter));
   }
 
   setVisualLink(link: RuntimeViewPortVisualLink) {
-    console.log(`[Viewport] setVisualLink`);
+    if (this.#viewPortVisualLink) {
+      this.#viewPortVisualLink.remove();
+    }
     this.#viewPortVisualLink = link;
   }
 
@@ -386,49 +521,61 @@ export class Viewport extends DataView {
       this.#viewPortVisualLink.remove();
       this.#viewPortVisualLink = undefined;
     } else {
-      throw Error(`[Viewport] removeVisualLink - no visual link in plave`);
+      throw Error(`[Viewport] removeVisualLink - no visual link in place`);
     }
   }
 
-  postDataForCurrentRange() {
-    const { rows, size } = this.getDataForCurrentRange();
-    this.postDataResponse({ rows, size, sizeMessageRequired: true });
+  destroy() {
+    dirtyViewports.delete(this);
+    if (this.#viewPortVisualLink) {
+      this.#viewPortVisualLink.remove();
+      this.#viewPortVisualLink = undefined;
+    }
+    this.#engine.destroy();
+    this.removeAllListeners();
   }
 
-  postDataResponse(dataResponse: DataResponse | void) {
-    if (dataResponse && this.#enabled) {
-      const { size, rows, sizeMessageRequired } = dataResponse;
-      const time = Date.now();
-
-      if (sizeMessageRequired) {
-        this.#outboundQ.pushHighPriority(
-          ViewPortUpdate(
-            this.#requestId,
-            this,
-            null,
-            RowKeyUpdate("SIZE", null),
-            -1,
-            "SIZE",
-            size,
-            time,
-          ),
-        );
-      }
-
-      for (const row of rows) {
-        this.#outboundQ.pushHighPriority(
-          ViewPortUpdate(
-            this.#requestId,
-            this,
-            this.table,
-            RowKeyUpdate(row.rowKey, this.table),
-            row.rowIndex,
-            "ROW",
-            size,
-            time,
-          ),
-        );
-      }
+  private post(batch: ViewportBatch, forceSizeMessage = false) {
+    if (!this.#enabled) {
+      return batch;
     }
+    const { rows, size, sizeChanged } = batch;
+    const time = Date.now();
+    const table = this.#table as unknown as Table;
+    const outboundQ = this.#outboundQ;
+    const requestId = this.#requestId;
+
+    if (sizeChanged || forceSizeMessage) {
+      outboundQ.pushHighPriority(
+        ViewPortUpdate(
+          requestId,
+          this,
+          null,
+          RowKeyUpdate("SIZE", null),
+          NO_SIZE,
+          "SIZE",
+          size,
+          time,
+        ),
+      );
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      outboundQ.pushHighPriority(
+        ViewPortUpdate(
+          requestId,
+          this,
+          table,
+          RowKeyUpdate(row.rowKey, table),
+          row.rowIndex,
+          "ROW",
+          size,
+          time,
+          row,
+        ),
+      );
+    }
+    return batch;
   }
 }

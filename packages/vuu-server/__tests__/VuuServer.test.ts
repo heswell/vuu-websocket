@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { loadTableFromRemoteResource } from "../../service-utils/src/resource-loader";
 import { TableDef } from "../src/api/TableDef";
 import { VuuServer } from "../src/core/VuuServer";

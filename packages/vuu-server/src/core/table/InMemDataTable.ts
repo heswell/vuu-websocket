@@ -1,11 +1,10 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { JoinTableProvider } from "../../provider/JoinTableProvider";
 import { Column, TableDef } from "../../api/TableDef";
 import { IProvider, Provider } from "../../provider/Provider";
 import { ColumnValueProvider } from "./ColumnValueProvider";
 import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { ColumnMap } from "@vuu-ui/vuu-utils";
-import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { TableSchema } from "@vuu-ui/vuu-data-types";
 
 export interface RowKeyUpdate {
@@ -32,18 +31,18 @@ export interface DataTable {
   columnForName: (columnName: string) => Column;
   columnMap: ColumnMap;
   columnValueProvider: ColumnValueProvider;
-  delete: (key: string) => void;
+  delete: (key: string) => unknown;
   getRowAtKey(key: string, throwIfMissing?: true): VuuDataRow;
   getRowAtKey(key: string, throwIfMissing: false): VuuDataRow | undefined;
   indexOfKeyField: number;
-  insert: (row: VuuDataRow, emitEvent?: boolean) => void;
+  insert: (row: VuuDataRow, emitEvent?: boolean) => unknown;
   provider: IProvider | undefined;
   name: string;
   rowIndexAtKey: (key: string) => number;
   rows: VuuDataRow[];
   schema: TableSchema;
   tableDef: TableDef;
-  update: (rowIndex: number, row: VuuDataRow, column?: string) => void;
+  update: (rowIndex: number, row: VuuDataRow, column?: string) => unknown;
   upsert: (row: VuuDataRow, emitEvent?: boolean) => void;
 }
 
@@ -52,8 +51,12 @@ export class InMemDataTable extends Table implements DataTable {
   #provider: IProvider | undefined;
   #tableDef: TableDef;
 
-  constructor(tableDef: TableDef, joinProvider: JoinTableProvider) {
-    super({ schema: tableDef.schema, joinProvider });
+  /**
+   * @param _joinProvider retained for api compatibility, join tables now
+   * listen directly to their source tables.
+   */
+  constructor(tableDef: TableDef, _joinProvider?: JoinTableProvider) {
+    super(tableDef.schema);
     this.#tableDef = tableDef;
     this.#columnValueProvider = new ColumnValueProvider(this);
   }
@@ -97,4 +100,5 @@ export class InMemDataTable extends Table implements DataTable {
 }
 
 export const isDataTable = (table: object): table is DataTable =>
-  table.constructor === InMemDataTable;
+  table.constructor === InMemDataTable ||
+  (table as { isJoinTable?: boolean }).isJoinTable === true;

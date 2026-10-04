@@ -1,16 +1,32 @@
-import { Table } from "@heswell/data";
-import { JoinTableDef } from "../../api/TableDef";
-import { JoinTableProvider } from "../../provider/JoinTableProvider";
-import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { JoinTable as MaterializedJoinTable, Table } from "@heswell/vuu-table";
+import { Column, JoinTableDef } from "../../api/TableDef";
+import { ColumnValueProvider } from "./ColumnValueProvider";
+import type { IProvider } from "../../provider/Provider";
 
-export class JoinTable extends Table {
+/**
+ * Server join table. A materialized left outer join, maintained
+ * incrementally from change events on the base and right tables, so that
+ * viewports over a join table are as cheap as those over a simple table.
+ */
+export class JoinTable extends MaterializedJoinTable {
+  readonly isJoinTable = true;
+  readonly columnValueProvider: ColumnValueProvider;
+  provider: IProvider | undefined = undefined;
+
   constructor(
-    private tableDef: JoinTableDef,
-    private baseTable: Table,
-    private joinTable: Table,
-    joinProvider: JoinTableProvider
+    public readonly tableDef: JoinTableDef,
+    baseTable: Table,
+    joinTable: Table,
   ) {
-    super({ joinProvider, schema: tableDef.schema });
+    const { left, right } = tableDef.joins.joinSpec;
+    super({
+      schema: tableDef.schema,
+      baseTable,
+      joinTable,
+      leftColumn: left,
+      rightColumn: right,
+    });
+    this.columnValueProvider = new ColumnValueProvider(this);
   }
 
   get name() {
@@ -21,49 +37,13 @@ export class JoinTable extends Table {
     return this.tableDef;
   }
 
-  get rowCount() {
-    return this.baseTable.rowCount;
-  }
-
-  insertKey(rowKey: string) {
-    const rowIdx = this.baseTable.rowIndexAtKey(rowKey);
-    if (rowIdx !== -1) {
-      this.emit("rowInserted", rowIdx, this.rowAt(rowIdx));
+  columnForName(columnName: string): Column {
+    const column = this.tableDef.columns.find((c) => c.name === columnName);
+    if (column) {
+      return column;
     }
-  }
-
-  publishUpdateForKey(rowKey: string) {
-    const rowIdx = this.baseTable.rowIndexAtKey(rowKey);
-    if (rowIdx !== -1) {
-      this.emit("rowUpdated", rowIdx, this.rowAt(rowIdx));
-    }
-  }
-
-  get rows() {
-    return this.baseTable.rows;
-  }
-
-  rowAt(rowIdx: number) {
-    const baseRow = this.baseTable.rowAt(rowIdx);
-    const { left, right } = this.tableDef.joins.joinSpec;
-    const joinValue = baseRow[this.baseTable.columnMap[left]];
-    const rightColumnIndex = this.joinTable.columnMap[right];
-    const joinIndex =
-      rightColumnIndex === this.joinTable.indexOfKeyField
-        ? this.joinTable.rowIndexAtKey(String(joinValue))
-        : this.joinTable.rows.findIndex(
-            (row) => row[rightColumnIndex] === joinValue,
-          );
-    const joinRow = this.joinTable.rowAt(joinIndex);
-
-    return this.tableDef.joinColumns.map(({ name }) => {
-      const baseColumnIndex = this.baseTable.columnMap[name];
-      if (baseColumnIndex !== undefined) {
-        return baseRow[baseColumnIndex];
-      }
-
-      const joinColumnIndex = this.joinTable.columnMap[name];
-      return joinRow?.[joinColumnIndex] ?? null;
-    }) as VuuDataRow;
+    throw Error(
+      `[JoinTable] columnForName ${this.tableDef.name} has no column ${columnName}`,
+    );
   }
 }

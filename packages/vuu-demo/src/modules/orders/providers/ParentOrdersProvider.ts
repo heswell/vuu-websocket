@@ -1,8 +1,7 @@
-import { Provider } from "@heswell/vuu-server";
+import { ConfigFactory, Provider } from "@heswell/vuu-server";
 import logger from "../../../logger";
 import { ResourceMessage, SnapshotBatch, Upsert } from "@heswell/service-utils";
 
-const ordersServiceUrl = `ws://localhost:${process.env.ORDERS_URL}`;
 let messageCount = 0;
 
 export class ParentOrdersProvider extends Provider {
@@ -15,19 +14,21 @@ export class ParentOrdersProvider extends Provider {
     if (this.#loadPromise === undefined) {
       this.#loadPromise = new Promise((resolve, reject) => {
         this.#rejectLoad = reject;
+        const ordersServiceUrl = ConfigFactory.load().getString(
+          "services.orders.url",
+        );
         console.log(
-          `[ORDERS:module:OrdersProvider] load parent orders, subscribing to orders service on ${ordersServiceUrl}`
+          `[ORDERS:module:OrdersProvider] load parent orders, subscribing to orders service on ${ordersServiceUrl}`,
         );
         try {
           const socket = new WebSocket(ordersServiceUrl);
           this.#socket = socket;
           socket.addEventListener("message", (evt) => {
             const serviceMessage = JSON.parse(evt.data as string) as
-              | ResourceMessage
-              | { type: "HB" };
+              ResourceMessage | { type: "HB" };
             if (Array.isArray(serviceMessage)) {
               console.log(
-                `[ORDERS:module:ParentOrdersModule] ${serviceMessage.length} messages from OrdersService`
+                `[ORDERS:module:ParentOrdersModule] ${serviceMessage.length} messages from OrdersService`,
               );
               for (const message of serviceMessage) {
                 const { row } = message as Upsert;
@@ -47,7 +48,7 @@ export class ParentOrdersProvider extends Provider {
                 }
               } else if (serviceMessage.type === "snapshot-count") {
                 logger.info(
-                  `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${serviceMessage.count} rows loaded`
+                  `[ORDERS:module:ParentOrdersProvider] bulk-insert-complete, ${serviceMessage.count} rows loaded`,
                 );
                 this.loaded = true;
                 this.#loadSettled = true;
@@ -58,17 +59,17 @@ export class ParentOrdersProvider extends Provider {
                 //   messageCount += 1;
               } else {
                 console.log(
-                  `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${serviceMessage.type}'`
+                  `[ORDERS:module:ParentOrdersProvider] orderServiceMessage IN, unexpected orderServiceMessage type '${serviceMessage.type}'`,
                 );
               }
             }
           });
           socket.addEventListener("open", (event) => {
             logger.info(
-              `[ORDERS:module:OrdersProvider] websocket open, subscribing to all orders`
+              `[ORDERS:module:OrdersProvider] websocket open, subscribing to all orders`,
             );
             socket.send(
-              JSON.stringify({ type: "subscribe", resource: "parentOrders" })
+              JSON.stringify({ type: "subscribe", resource: "parentOrders" }),
             );
           });
           socket.addEventListener("error", () => {
@@ -99,7 +100,9 @@ export class ParentOrdersProvider extends Provider {
 
   requestStop() {
     this.failLoad(
-      new Error("[ORDERS:module:OrdersProvider] stopped before initial snapshot"),
+      new Error(
+        "[ORDERS:module:OrdersProvider] stopped before initial snapshot",
+      ),
     );
     this.#socket?.close();
     this.#socket = undefined;

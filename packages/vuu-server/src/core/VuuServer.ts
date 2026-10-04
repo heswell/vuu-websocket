@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { isJoinTableDef, JoinTableDef, TableDef } from "../api/TableDef";
 import { vuuInMemPlugin } from "../feature/inmem/VuuInMemPlugin";
 import { IProvider } from "../provider/Provider";

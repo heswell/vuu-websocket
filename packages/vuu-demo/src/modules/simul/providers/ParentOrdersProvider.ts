@@ -1,4 +1,4 @@
-import { Table } from "@heswell/data";
+import { Table } from "@heswell/vuu-table";
 import { Provider, TableContainer } from "@heswell/vuu-server";
 import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { getRandom, random } from "../../../utils";
