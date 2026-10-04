@@ -74,7 +74,7 @@ packages/
   vuu-server/         hosts both packages
     src/core/table/   DataTable / JoinTable subclasses (TableDef, providers)
     src/viewport/Viewport.ts  protocol wrapper, flush scheduler, visual links
-  benchmarks/         legacy DataView vs new engine
+  benchmarks/         performance scenarios, per engine adapter
 ```
 
 The only external runtime dependencies are `@vuu-ui/vuu-protocol-types`
@@ -850,8 +850,8 @@ columnar engine):
 5. Register it with `setDefaultDataEngine(engine)` on the server, or pass it
    to the `Viewport` constructor for a single table.
 6. Add an adapter in `packages/benchmarks/src/adapters/` (implement
-   `EngineAdapter`) and run `bun run bench` to compare it with the legacy and
-   in-memory engines across the same scenarios.
+   `EngineAdapter`), register it in `src/run.ts` and run `bun run bench` to
+   compare it with the in-memory engine across the same scenarios.
 7. Run the `InMemoryViewport` test suite against it. The randomized
    consistency tests are engine-agnostic in spirit: they compare engine
    output with a brute-force sort/filter/group of the table.
@@ -876,8 +876,8 @@ columnar engine):
   protocol-level tests through the server `Viewport` and request handler
   (including `CHANGE_VP_SUCCESS` and visual links).
 - `packages/benchmarks`: `bun run bench` (100k rows) and `bun run bench:1m`
-  run identical scenarios against the legacy `DataView` and the new engine.
-  Results and analysis are in [data-engine.md](./data-engine.md#benchmarks).
+  run the scenarios against each engine adapter. Baselines are committed in
+  `packages/benchmarks/results/`; see [data-engine.md](./data-engine.md#benchmarks).
 
 ## 22. Known limitations and future work
 
@@ -895,6 +895,3 @@ columnar engine):
 - **String ordering** is by code unit, not locale.
 - **Link and permission filter changes** do a full rebuild rather than
   narrowing.
-- **Legacy `packages/data`** (DataView, RowSet, GroupRowSet) is still in the
-  repo for benchmark comparison. Its GroupRowSet tests fail, and it can be
-  removed once the browser host has moved to the new engine.

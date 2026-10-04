@@ -127,8 +127,8 @@ const tickScenario = (
 });
 
 export const buildScenarios = (rowCount: number): Scenario<any>[] => {
-  // structural changes are O(n) per operation in the legacy engine, so these
-  // counts are kept modest to allow the legacy runs to complete
+  // counts are kept modest so that results remain comparable with the
+  // committed baselines in results/
   const tickCount = Math.min(rowCount, 20_000);
   const structuralTickCount = Math.min(rowCount / 10, 2_000);
   const insertCount = Math.min(rowCount / 10, 1_000);

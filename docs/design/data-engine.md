@@ -16,9 +16,6 @@ or inside a browser (the eventual replacement for vuu-ui's
 | `@heswell/vuu-table`    | Row store (`Table`), materialized left join (`JoinTable`), change notifications. |
 | `@heswell/vuu-viewport` | `ViewportEngine` / `DataEngine` interfaces and the `InMemoryViewport` engine.    |
 
-The legacy `@heswell/data` package (`DataView`, `RowSet`, `GroupRowSet`) is no
-longer used by the server. It is retained only as the baseline for benchmarks.
-
 ```mermaid
 flowchart LR
   P[Providers] -->|insert/update/delete| T[vuu-table Table / JoinTable]
@@ -156,24 +153,21 @@ That work is the next phase. It is not part of this change.
 
 ## Benchmarks
 
-`packages/benchmarks` runs the same scenarios against the legacy `DataView` and
-the new engine, from the repo root:
+`packages/benchmarks` runs a fixed set of scenarios (view creation, sort,
+filter, scroll, ticks, inserts, deletes and grouping) against every registered
+engine adapter. Run them from the repo root:
 
 ```sh
-bun run bench                       # 100k rows, legacy vs vuu-viewport
-bun run bench:1m                    # 1M rows, vuu-viewport only
+bun run bench                       # 100k rows
+bun run bench:1m                    # 1M rows
 bun packages/benchmarks/src/run.ts --rows=250000 --iterations=5 \
   --engine=vuu-viewport --filter=sort --out=results.md
 ```
 
-Results are in `packages/benchmarks/results/`. At 100k rows the new engine is:
-
-- 2–8x faster to create, sort and filter views;
-- 2–5 orders of magnitude faster for ticks, inserts and deletes, where the
-  legacy DataView rescans or resorts on each event.
-
-Legacy grouping no longer works (`GroupBy contains invalid column(s)`), so the
-grouping scenarios have results only for the new engine.
+Baseline results are committed in `packages/benchmarks/results/` (`100k.md`,
+`1m.md`). Rerun them after changes to the engine and compare. To evaluate an
+alternative engine, add an `EngineAdapter` in `src/adapters/` and register it
+in `src/run.ts`; with two engines the runner adds a speedup column.
 
 ## Known limitations
 

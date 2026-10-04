@@ -1,9 +1,6 @@
 import { JoinTable } from "../core/table/JoinTable";
 import { JoinTableDef } from "../api/TableDef";
-import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { DefaultLifecycleEnabled } from "../toolbox/thread/LifecycleContainer";
-
-export type JoinEventType = "insert" | "update" | "delete";
 
 class JoinDefToJoinTable {
   constructor(
@@ -32,15 +29,4 @@ export class JoinTableProvider extends DefaultLifecycleEnabled {
       new JoinDefToJoinTable(joinTable.getTableDef(), joinTable),
     );
   }
-
-  /**
-   * @deprecated retained for compatibility with the legacy @heswell/data
-   * Table. Join tables are maintained by table listeners.
-   */
-  sendEvent(
-    _tableName: string,
-    _eventType: JoinEventType,
-    _rowKey: string,
-    _rowData?: VuuDataRow,
-  ) {}
 }

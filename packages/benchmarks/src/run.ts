@@ -1,14 +1,14 @@
 /**
- * Benchmark runner. Compares the legacy @heswell/data DataView with the
- * @heswell/vuu-viewport InMemoryViewport engine.
+ * Benchmark runner. Runs each scenario against every registered engine
+ * adapter (currently the @heswell/vuu-viewport InMemoryViewport engine).
+ * Add an adapter to compare an alternative engine.
  *
  *   bun packages/benchmarks/src/run.ts [--rows=100000] [--iterations=5]
- *     [--engine=legacy|vuu-viewport] [--filter=<scenario substring>]
+ *     [--engine=<adapter name>] [--filter=<scenario substring>]
  *     [--out=<path to markdown results file>] [--budget=<ms>]
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { legacyAdapter } from "./adapters/legacy.ts";
 import { nextAdapter } from "./adapters/next.ts";
 import { generateRows } from "./data.ts";
 import { buildScenarios, type Scenario } from "./scenarios.ts";
@@ -23,7 +23,7 @@ const args = Object.fromEntries(
 
 const rowCount = Number(args.rows ?? 100_000);
 const iterations = Number(args.iterations ?? 5);
-const engines: EngineAdapter[] = [legacyAdapter, nextAdapter].filter(
+const engines: EngineAdapter[] = [nextAdapter].filter(
   (a) => !args.engine || a.name === args.engine,
 );
 
@@ -45,7 +45,7 @@ const measure = (
 ): Result => {
   const times: number[] = [];
   let check = "";
-  // legacy code logs on hot paths, silence for both engines
+  // silence any logging on hot paths
   const { log, info, debug } = console;
   console.log = console.info = console.debug = () => undefined;
   try {
