@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type {
   ServerToClientTableRows,
+  VuuRpcServiceResponse,
   VuuServerMessage,
   VuuViewportCreateSuccessResponse,
 } from "@vuu-ui/vuu-protocol-types";
@@ -24,8 +25,9 @@ const {
 const {
   DEFAULT_MODULE_DEFINITIONS,
   moduleDefinitionsToRows,
+  toManagedModules,
 } = await import("@heswell/module-admin");
-const { ModuleDiscoveryModule } = await import(
+const { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } = await import(
   "../src/modules/ModuleDiscovery/ModuleDiscoveryModule"
 );
 
@@ -63,14 +65,14 @@ describe("module discovery protocol", () => {
     lifecycle = new LifecycleContainer();
     const loginTokenService = LoginTokenService();
     const token = loginTokenService.getToken(
-      VuuUserWithAuthorizations("module-admin"),
+      VuuUserWithAuthorizations("module-admin", ["module-admin-access"]),
     );
     const server = new VuuServer(
       VuuServerConfig(
         VuuWebSocketOptions().withWsPort(0),
         {},
         loginTokenService,
-      ).withModule(ModuleDiscoveryModule([])),
+      ).withModule(ModuleDiscoveryModule(new ModuleState(new InMemoryModuleStore(toManagedModules(DEFAULT_MODULE_DEFINITIONS, [], Date.now())), toManagedModules(DEFAULT_MODULE_DEFINITIONS, [], Date.now())))),
       lifecycle,
     );
     await lifecycle.start();
@@ -115,6 +117,43 @@ describe("module discovery protocol", () => {
     expect(createVpSuccess.columns).toEqual(moduleColumns);
     expect(row?.data).toEqual(moduleDefinitionsToRows(DEFAULT_MODULE_DEFINITIONS)[0]);
     expect(row?.data).toHaveLength(createVpSuccess.columns.length);
+
+    const rpcResponse = waitForMessage<VuuRpcServiceResponse>(
+      socket,
+      (body): body is VuuRpcServiceResponse =>
+        body.type === "RPC_RESPONSE" &&
+        (body.rpcName as string) === "createModule",
+    );
+    socket.send(
+      JSON.stringify({
+        body: {
+          context: { type: "VIEWPORT_CONTEXT", viewPortId: createVpSuccess.viewPortId },
+          params: {
+            module: JSON.stringify({
+              name: "protocol-module",
+              title: "Protocol module",
+              enabled: true,
+              location: "/Tools/Protocol",
+              path: "/protocol",
+              mfComponent: "ProtocolModule",
+              mfScope: "protocolModule",
+              mfUrl: "https://example.com/protocol.js",
+              accessRole: "protocol-access",
+            }),
+          },
+          rpcName: "createModule",
+          type: "RPC_REQUEST",
+        },
+        module: "MODULE_DISCOVERY",
+        requestId: "create-module-rpc",
+        sessionId: connection.sessionId,
+      }),
+    );
+
+    expect((await rpcResponse).result).toEqual({
+      type: "SUCCESS_RESULT",
+      data: { id: 6, version: 1 },
+    });
   });
 });
 

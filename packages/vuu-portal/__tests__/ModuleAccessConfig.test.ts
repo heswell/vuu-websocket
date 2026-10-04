@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {
   loadModuleAccessRoles,
+  InMemoryModuleStore,
   ModuleDiscoveryModule,
+  ModuleState,
 } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
+import { DEFAULT_MODULE_DEFINITIONS, toManagedModules } from "@heswell/module-admin";
 
 const temporaryDirectories: string[] = [];
+const testRoot = path.join(import.meta.dir, ".test-output", "module-access");
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
@@ -49,15 +52,14 @@ moduleAccess:
 
   test("rejects access configuration for an unknown module", () => {
     expect(() =>
-      ModuleDiscoveryModule([{ moduleName: "unknown", role: "unknown-access" }]),
+      ModuleDiscoveryModule(new ModuleState(new InMemoryModuleStore(), toManagedModules(DEFAULT_MODULE_DEFINITIONS, [{ moduleName: "unknown", role: "unknown-access" }], Date.now()))),
     ).toThrow("references unknown module 'unknown'");
   });
 });
 
 function writeConfig(contents: string) {
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "vuu-portal-module-access-"),
-  );
+  const directory = path.join(testRoot, String(temporaryDirectories.length));
+  fs.mkdirSync(directory, { recursive: true });
   temporaryDirectories.push(directory);
   const filePath = path.join(directory, "module-access.yaml");
   fs.writeFileSync(filePath, contents);

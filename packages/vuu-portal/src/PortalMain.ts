@@ -5,7 +5,8 @@ import {
 } from "@heswell/vuu-server";
 import { createModuleRegistry } from "./ModuleRegistry";
 import {
-  loadModuleAccessRoles,
+  loadModuleAdminRole,
+  loadModuleState,
   ModuleDiscoveryModule,
 } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 
@@ -21,7 +22,9 @@ export default async function main() {
       moduleRegistry: createModuleRegistry(tableContainer, user),
     }),
     modules: [
-      ModuleDiscoveryModule(loadModuleAccessRoles(defaultConfig)),
+      ModuleDiscoveryModule(loadModuleState(defaultConfig), {
+        adminRole: loadModuleAdminRole(defaultConfig),
+      }),
     ],
   });
 

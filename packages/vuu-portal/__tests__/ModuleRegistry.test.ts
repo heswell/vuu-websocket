@@ -1,4 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class {
+    disconnect() {}
+    observe() {}
+    unobserve() {}
+  };
+}
 import {
   LifecycleContainer,
   LoginTokenService,
@@ -11,8 +19,8 @@ import {
   createModuleRegistry,
   moduleClientIdentifier,
 } from "../src/ModuleRegistry";
-import { MODULE_NAV_ICONS } from "@heswell/module-admin";
-import { ModuleDiscoveryModule } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
+import { DEFAULT_MODULE_DEFINITIONS, MODULE_NAV_ICONS, toManagedModules } from "@heswell/module-admin";
+import { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 
 const moduleAccessRoles = [
   { moduleName: "moduleAdmin", role: "module-admin-access" },
@@ -32,7 +40,7 @@ describe("portal module registry", () => {
       VuuWebSocketOptions().withWsPort(0),
       {},
       LoginTokenService(),
-    ).withModule(ModuleDiscoveryModule(moduleAccessRoles));
+    ).withModule(ModuleDiscoveryModule(moduleState(moduleAccessRoles)));
     vuuServer = new VuuServer(config, lifecycle);
     await lifecycle.start();
   });
@@ -170,6 +178,22 @@ describe("portal module registry", () => {
     expect(viewerOnly).toEqual({ modules: [] });
   });
 
+
+  test("child modules inherit the parent permission when they have no permission row", () => {
+    const permissions = vuuServer.tableContainer.getTable("modulePermissions");
+    permissions.delete("5");
+
+    const registry = createModuleRegistry(
+      vuuServer.tableContainer,
+      VuuUserWithAuthorizations("browser-only", ["vuu-table-browser-access"]),
+    );
+
+    expect(registry.modules).toEqual([
+      expect.objectContaining({ name: "vuu-table-browser", accessRole: "vuu-table-browser-access" }),
+      expect.objectContaining({ name: "vuu-table-viewer", accessRole: "vuu-table-browser-access" }),
+    ]);
+  });
+
   test("filters disabled modules and selects the latest permitted version", () => {
     const modules = vuuServer.tableContainer.getTable("modules");
     const permissions = vuuServer.tableContainer.getTable("modulePermissions");
@@ -248,3 +272,9 @@ describe("portal module registry", () => {
     expect(registry).toEqual({ modules: [] });
   });
 });
+
+
+function moduleState(roles: typeof moduleAccessRoles) {
+  const modules = toManagedModules(DEFAULT_MODULE_DEFINITIONS, roles, Date.now());
+  return new ModuleState(new InMemoryModuleStore(modules), modules);
+}
