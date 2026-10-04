@@ -22,6 +22,11 @@ export interface ViewportOptions extends Partial<ViewportConfig> {
   range?: VuuRange;
   permissionFilter?: RowPredicate;
   /**
+   * A Vuu filter applied in addition to (not replaced by) the client
+   * filterSpec, e.g. a freeze filter or a host-imposed restriction.
+   */
+  baseFilterSpec?: VuuFilter;
+  /**
    * Invoked (at most once between flushes) when table changes have been
    * received that may affect the client. The host should schedule a call
    * to flush(). Hosts are free to choose the batching strategy (microtask,
@@ -83,6 +88,12 @@ export interface ViewportEngine {
   setConfig(config: Partial<ViewportConfig>): ViewportBatch;
   setPermissionFilter(predicate: RowPredicate | undefined): ViewportBatch;
   setLinkFilter(linkFilter: LinkFilter | undefined): ViewportBatch;
+  /**
+   * Set the base filter. Composed (AND) with the permission, link and client
+   * filters: permission, link, base, client. Undefined or "" clears it.
+   */
+  setBaseFilter(filterSpec: VuuFilter | undefined): ViewportBatch;
+  readonly baseFilterSpec: VuuFilter;
 
   openTreeNode(treeKey: string): ViewportBatch;
   closeTreeNode(treeKey: string): ViewportBatch;

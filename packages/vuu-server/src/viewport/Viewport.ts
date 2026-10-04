@@ -513,6 +513,15 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     return this.post(this.#engine.setLinkFilter(linkFilter));
   }
 
+  get baseFilterSpec() {
+    return this.#engine.baseFilterSpec;
+  }
+
+  /** A filter composed with, rather than replaced by, the client filter. */
+  setBaseFilter(filterSpec: VuuFilter | undefined) {
+    return this.post(this.#engine.setBaseFilter(filterSpec));
+  }
+
   setVisualLink(link: RuntimeViewPortVisualLink) {
     if (this.#viewPortVisualLink) {
       this.#viewPortVisualLink.remove();

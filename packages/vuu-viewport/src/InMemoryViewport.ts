@@ -1,6 +1,7 @@
 import type { RowSource, TableListener, VuuDataRow } from "@heswell/vuu-table";
 import type { Filter } from "@vuu-ui/vuu-filter-types";
 import type {
+  VuuFilter,
   VuuRange,
   VuuRowDataItemType,
   VuuSort,
@@ -26,6 +27,7 @@ import type {
 } from "./types.ts";
 
 const EMPTY_SORT: VuuSort = { sortDefs: [] };
+const EMPTY_FILTER: VuuFilter = { filter: "" };
 const NULL_RANGE: VuuRange = { from: 0, to: 0 };
 const TREE_COLUMN_COUNT = 6;
 
@@ -91,6 +93,8 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
 
   // filtering
   #clientFilter: { filter: Filter; predicate: RowPredicate } | undefined;
+  #baseFilterSpec: VuuFilter = EMPTY_FILTER;
+  #baseFilter: { filter: Filter; predicate: RowPredicate } | undefined;
   #permissionFilter: RowPredicate | undefined;
   #linkFilter: LinkFilter | undefined;
   #predicate: RowPredicate | undefined;
@@ -138,6 +142,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       aggregations = [],
       range = NULL_RANGE,
       permissionFilter,
+      baseFilterSpec = EMPTY_FILTER,
       onPendingChanges,
     }: ViewportOptions,
   ) {
@@ -147,6 +152,11 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     this.#range = range;
     this.#onPendingChanges = onPendingChanges;
     this.#permissionFilter = permissionFilter;
+    this.#baseFilterSpec = baseFilterSpec;
+    this.#baseFilter = parseAndCompileFilter(
+      baseFilterSpec.filter,
+      table.columnMap,
+    );
     this.#clientFilter = parseAndCompileFilter(
       filterSpec.filter,
       table.columnMap,
@@ -512,6 +522,32 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return this.#linkFilter;
   }
 
+  get baseFilterSpec(): VuuFilter {
+    return this.#baseFilterSpec;
+  }
+
+  setBaseFilter(filterSpec: VuuFilter = EMPTY_FILTER) {
+    const previousFilter = this.#baseFilter?.filter;
+    if (filterSpec.filter === this.#baseFilterSpec.filter) {
+      this.#baseFilterSpec = filterSpec;
+      return this.flush();
+    }
+    this.#baseFilterSpec = filterSpec;
+    this.#baseFilter = parseAndCompileFilter(
+      filterSpec.filter,
+      this.table.columnMap,
+    );
+    if (filterNarrows(this.#baseFilter?.filter, previousFilter)) {
+      this.applyPending();
+      this.composePredicate();
+      this.narrowIndex();
+      if (this.#tree) this.#treeDirty = true;
+      this.applyPending();
+      return this.collect();
+    }
+    return this.refilter();
+  }
+
   openTreeNode(treeKey: string) {
     const tree = this.#tree;
     if (tree && !tree.expanded.has(treeKey)) {
@@ -770,6 +806,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
         col === undefined ? () => false : (row) => values.has(row[col]),
       );
     }
+    if (this.#baseFilter) predicates.push(this.#baseFilter.predicate);
     if (this.#clientFilter) predicates.push(this.#clientFilter.predicate);
 
     if (predicates.length === 0) {
@@ -779,9 +816,12 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     } else if (predicates.length === 2) {
       const [p1, p2] = predicates;
       this.#predicate = (row) => p1(row) && p2(row);
-    } else {
+    } else if (predicates.length === 3) {
       const [p1, p2, p3] = predicates;
       this.#predicate = (row) => p1(row) && p2(row) && p3(row);
+    } else {
+      const [p1, p2, p3, p4] = predicates;
+      this.#predicate = (row) => p1(row) && p2(row) && p3(row) && p4(row);
     }
   }
 

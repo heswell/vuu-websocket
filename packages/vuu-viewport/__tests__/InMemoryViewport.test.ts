@@ -201,6 +201,111 @@ describe("InMemoryViewport flat", () => {
     );
   });
 
+  test("base filter composes with client, link and permission filters", () => {
+    const table = createTable(300);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config({ filterSpec: { filter: "price > 20" } }),
+      range: { from: 0, to: 300 },
+      baseFilterSpec: { filter: "qty < 50" },
+      permissionFilter: (row) => row[2] !== "XPAR",
+    });
+    const count = (fn: (r: VuuDataRow) => boolean) =>
+      table.rows.filter(
+        (r) =>
+          r[2] !== "XPAR" &&
+          (r[4] as number) < 50 &&
+          (r[3] as number) > 20 &&
+          fn(r),
+      ).length;
+    expect(vp.getCurrentRange().size).toBe(count(() => true));
+    expect(vp.baseFilterSpec).toEqual({ filter: "qty < 50" });
+
+    // changing the client filter does not remove the base filter
+    vp.setConfig({ filterSpec: { filter: 'ccy = "EUR"' } });
+    expect(vp.size).toBe(
+      table.rows.filter(
+        (r) => r[2] !== "XPAR" && (r[4] as number) < 50 && r[1] === "EUR",
+      ).length,
+    );
+    vp.setConfig({ filterSpec: { filter: "price > 20" } });
+
+    // all four slots together
+    vp.setLinkFilter({ column: "ccy", values: new Set(["GBP"]) });
+    expect(vp.size).toBe(count((r) => r[1] === "GBP"));
+
+    // changing the base filter does not remove link or client filters
+    vp.setBaseFilter({ filter: "qty > 49" });
+    expect(vp.size).toBe(
+      table.rows.filter(
+        (r) =>
+          r[2] !== "XPAR" &&
+          (r[4] as number) >= 50 &&
+          (r[3] as number) > 20 &&
+          r[1] === "GBP",
+      ).length,
+    );
+
+    vp.setLinkFilter(undefined);
+    vp.setPermissionFilter(undefined);
+    vp.setBaseFilter(undefined);
+    expect(vp.baseFilterSpec).toEqual({ filter: "" });
+    expect(vp.size).toBe(
+      table.rows.filter((r) => (r[3] as number) > 20).length,
+    );
+  });
+
+  test("base filter: narrowing keeps sort, applies to live updates and groups", () => {
+    const table = createTable(400);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config({
+        columns: ["id", "ccy", "price", "qty"],
+        sort: { sortDefs: [{ column: "price", sortType: "D" }] },
+      }),
+      range: { from: 0, to: 400 },
+      baseFilterSpec: { filter: "qty < 80" },
+    });
+    const client = new ClientModel().apply(vp.getCurrentRange());
+
+    // narrowing (old AND new) path
+    client.apply(vp.setBaseFilter({ filter: 'qty < 80 and ccy = "EUR"' }));
+    const expected = table.rows
+      .filter((r) => (r[4] as number) < 80 && r[1] === "EUR")
+      .sort((a, b) => (b[3] as number) - (a[3] as number))
+      .map((r) => r[0]);
+    expect(client.size).toBe(expected.length);
+    expect(client.window(0, client.size).map((d) => d?.[0])).toEqual(expected);
+
+    // live updates are filtered by the base filter
+    const outKey = expected[0] as string;
+    table.updateByKey(outKey, { qty: 99 });
+    client.apply(vp.flush());
+    expect(client.size).toBe(expected.length - 1);
+    table.updateByKey(outKey, { qty: 1 });
+    table.insert(["id-new", "GBP", 1, 1]);
+    client.apply(vp.flush());
+    expect(client.size).toBe(expected.length);
+
+    // freeze-style base filter survives grouping
+    vp.setConfig({ groupBy: ["ccy"] });
+    expect(vp.size).toBe(1);
+    vp.setBaseFilter(undefined);
+    expect(vp.size).toBe(4);
+  });
+
+  test("invalid base filter rejects all rows", () => {
+    const table = createTable(20);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config(),
+      range: { from: 0, to: 20 },
+    });
+    expect(vp.getCurrentRange().size).toBe(20);
+    vp.setBaseFilter({ filter: "qty <<< 3" });
+    expect(vp.size).toBe(0);
+  });
+
   test("narrowing filter keeps sort", () => {
     const table = createTable(300);
     const vp = new InMemoryViewport(table, {

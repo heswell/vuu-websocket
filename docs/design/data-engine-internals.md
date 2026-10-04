@@ -477,22 +477,31 @@ An empty query compiles to `undefined` (no client filter).
 
 ### Predicate composition
 
-The effective predicate is the AND of up to three parts:
+The effective predicate is the AND of up to four parts, in this order:
 
-| Part       | Set by                            | Source                                                                        |
-| ---------- | --------------------------------- | ----------------------------------------------------------------------------- |
-| permission | `setPermissionFilter(predicate)`  | `TableDef.permissionFunction` → `PermissionFilter.createPredicate(columnMap)` |
-| link       | `setLinkFilter({column, values})` | visual link from a parent viewport's selection                                |
-| client     | `setConfig({filterSpec})`         | the user's filter                                                             |
+| Part       | Set by                                                     | Source                                                                                           |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| permission | `setPermissionFilter(predicate)`                           | `TableDef.permissionFunction` → `PermissionFilter.createPredicate(columnMap)`                    |
+| link       | `setLinkFilter({column, values})`                          | visual link from a parent viewport's selection                                                   |
+| base       | `setBaseFilter(filterSpec)` or the `baseFilterSpec` option | a host-imposed Vuu filter, e.g. vuu-ui's `freeze()` (`vuuCreatedTimestamp < ts`) or `baseFilter` |
+| client     | `setConfig({filterSpec})`                                  | the user's filter                                                                                |
 
-`composePredicate` skips absent parts and specialises for 1, 2 or 3 parts.
+`composePredicate` skips absent parts and specialises for 1 to 4 parts.
 With none, `#predicate` is `undefined` and the scan loops skip predicate
 calls entirely. The link filter is `(row) => values.has(row[col])`. The parts
 are kept separately, so changing one does not require re-parsing the others.
 
+The base filter is a separate slot so that, unlike vuu-ui's `ArrayDataSource`
+(where `freeze()` and visual links both write `baseFilter`), a freeze, a
+visual link and the user's filter never overwrite each other. An invalid base
+filter compiles to `rejectAll`, as for the client filter. The server's
+`Viewport.setBaseFilter` exposes it to hosts; it is not part of the Vuu
+protocol.
+
 ### Narrowing
 
-When only the client filter changes and the sort is unchanged,
+When only the client filter changes and the sort is unchanged (or only
+the base filter changes),
 `filterNarrows(newFilter, oldFilter)` checks structurally whether the new
 filter is the old one AND something extra (e.g. the user typed one more
 clause). If so, `narrowIndex` filters the existing sorted index **in place**

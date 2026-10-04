@@ -256,6 +256,28 @@ describe("Viewport (server)", () => {
     expect(child.size).toBe(5);
   });
 
+  test("base filter is independent of client filter and visual link", () => {
+    const { createViewport, currencies, orders, viewportContainer } = setup();
+    const parent = createViewport(currencies, ["id", "name"]);
+    const child = createViewport(orders, ["id", "ccy"]);
+    child.setBaseFilter({ filter: "qty < 350" });
+    expect(child.size).toBe(3);
+    expect(child.baseFilterSpec).toEqual({ filter: "qty < 350" });
+
+    child.changeViewport({ filterSpec: { filter: "qty > 150" } });
+    expect(child.size).toBe(2);
+
+    viewportContainer.linkViewPorts(child.id, parent.id, "ccy", "id");
+    parent.selectRow("EUR", false);
+    expect(child.getDataForCurrentRange().rows.map((r) => r.rowKey)).toEqual([
+      "o3",
+    ]);
+
+    viewportContainer.unlinkViewPorts(child.id);
+    child.setBaseFilter(undefined);
+    expect(child.size).toBe(3);
+  });
+
   test("removing parent viewport removes visual link", () => {
     const { createViewport, currencies, orders, viewportContainer } = setup();
     const parent = createViewport(currencies, ["id"]);
