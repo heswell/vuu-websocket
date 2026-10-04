@@ -10,8 +10,10 @@ import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import logger from "./logger";
 import { ParentOrderDto } from "./order-service-types";
 import { instrumentsSchema, parentOrdersSchema } from "./tableSchemas";
+import { loadConfig } from "./config";
 
-const refDataServiceUrl = `ws://localhost:${process.env.REFDATA_URL}`;
+const refDataServiceUrl = () =>
+  loadConfig().getString("services.refdata.url");
 
 // TODO error handler
 async function loadInstruments(
@@ -21,7 +23,7 @@ async function loadInstruments(
   loadTableFromRemoteResource({
     resource: "instruments",
     table,
-    url: refDataServiceUrl,
+    url: refDataServiceUrl(),
   }).then(() => {
     console.log(
       `[ORDERS:service:OrderStore] ready (${table.rowCount} instruments loaded)`

@@ -6,6 +6,7 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@heswell/service-utils": "1.0.0",
     "@heswell/vuu-table": "3.0.0"
   }
 }

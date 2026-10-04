@@ -11,3 +11,4 @@ export {
 export * from "./SessionContainer";
 export * from "./WebSocketConnectionHandler";
 export * from "./WebSocketSink";
+export { ConfigFactory, type Config } from "./ConfigFactory";

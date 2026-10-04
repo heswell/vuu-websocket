@@ -1,7 +1,5 @@
 import { RemoteResourceMessageType } from "@heswell/service-utils/src/resource-loader";
-import { RemoteProvider } from "@heswell/vuu-server";
-
-const refDataServiceUrl = `ws://localhost:${process.env.REFDATA_URL}`;
+import { ConfigFactory, RemoteProvider } from "@heswell/vuu-server";
 
 const remoteResourceMessageType: RemoteResourceMessageType[] = [
   "snapshot",
@@ -23,7 +21,7 @@ export class InstrumentProvider extends RemoteProvider {
       ],
       resource: "instruments",
       remoteResourceMessageType,
-      url: refDataServiceUrl,
+      url: ConfigFactory.load().getString("services.refdata.url"),
     };
   }
 }

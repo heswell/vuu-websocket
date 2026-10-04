@@ -4,6 +4,7 @@ import "./InstrumentStore";
 import logger from "./logger";
 import { parseArgs, type ParseArgsOptionsConfig } from "@heswell/service-utils";
 import path from "path";
+import { loadConfig } from "./config";
 
 export interface WebsocketData {
   sessionId: string;
@@ -22,7 +23,7 @@ export async function start() {
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",
 
-    port: process.env.REFDATA_URL,
+    port: loadConfig().getNumber("service.port"),
 
     fetch(req, server) {
       const sessionId = uuid();

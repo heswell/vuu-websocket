@@ -6,6 +6,7 @@ import { uuid } from "@vuu-ui/vuu-utils";
 import logger from "./logger";
 import { startNewOrderCreation, stopNewOrderCreation } from "./order-factory";
 import orderStore from "./OrderStore";
+import { loadConfig } from "./config";
 
 export async function start() {
   console.log(`[ORDERS:service:server] start`);
@@ -14,7 +15,7 @@ export async function start() {
     // keyFile: "./certs/myCA.key",
     // passphrase: "1234",
 
-    port: process.env.ORDERS_URL,
+    port: loadConfig().getNumber("service.port"),
 
     fetch(req, server) {
       const sessionId = uuid();
