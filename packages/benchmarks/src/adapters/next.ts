@@ -21,6 +21,15 @@ class NextView implements BenchView {
   flush() {
     return this.vp.flush().rows.length;
   }
+  selectAll() {
+    return this.vp.selectAll().rows.length;
+  }
+  get selectedRowCount() {
+    return this.vp.selectedRowCount;
+  }
+  selectedRowKeys() {
+    return this.vp.getSelectedRowKeys().length;
+  }
   get size() {
     return this.vp.size;
   }

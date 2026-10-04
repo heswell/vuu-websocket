@@ -407,7 +407,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
   }
 
   get selectedRowCount() {
-    return this.#engine.selectedKeys.size;
+    return this.#engine.selectedRowCount;
   }
 
   get visualLink() {
@@ -470,6 +470,10 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     return this.selectionChanged(
       this.#engine.deselectRow(rowKey, preserveExistingSelection),
     );
+  }
+
+  selectAll() {
+    return this.selectionChanged(this.#engine.selectAll());
   }
 
   deselectAll() {

@@ -109,12 +109,14 @@ const tickScenario = (
   config: Partial<ViewportConfig>,
   kind: "qty" | "price" | "ccy",
   count: number,
+  selectAll = false,
 ): Scenario<TickState> => ({
   name,
-  setup: (ctx) => ({
-    ...createTableAndView(ctx, config),
-    updates: generateUpdates(ctx.rows, count, kind),
-  }),
+  setup: (ctx) => {
+    const state = createTableAndView(ctx, config);
+    if (selectAll) state.view.selectAll();
+    return { ...state, updates: generateUpdates(ctx.rows, count, kind) };
+  },
   run: ({ table, view, updates }) => {
     for (let i = 0; i < updates.length; i++) {
       table.upsert(updates[i]);
@@ -277,6 +279,36 @@ export const buildScenarios = (rowCount: number): Scenario<any>[] => {
       groupByCcyExchange,
       "qty",
       tickCount,
+    ),
+    {
+      name: "select all (filtered+sorted)",
+      setup: (ctx: ScenarioContext) =>
+        createTableAndView(ctx, { ...filterCcyIn, ...sortByPrice }),
+      run: ({ view }: ViewState) => {
+        view.selectAll();
+        return view.selectedRowCount;
+      },
+      teardown: destroyView,
+    },
+    {
+      name: "selected row keys after select all (filtered+sorted)",
+      setup: (ctx: ScenarioContext) => {
+        const state = createTableAndView(ctx, {
+          ...filterCcyIn,
+          ...sortByPrice,
+        });
+        state.view.selectAll();
+        return state;
+      },
+      run: ({ view }: ViewState) => view.selectedRowKeys(),
+      teardown: destroyView,
+    },
+    tickScenario(
+      `${structuralTickCount} ticks, filter column, select all (filtered+sorted)`,
+      { ...filterCcyIn, ...sortByPrice },
+      "ccy",
+      structuralTickCount,
+      true,
     ),
   ];
 };

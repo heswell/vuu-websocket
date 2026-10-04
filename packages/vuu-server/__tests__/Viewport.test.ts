@@ -220,6 +220,42 @@ describe("Viewport (server)", () => {
     expect(child.size).toBe(4);
   });
 
+  test("select all selects rows added later and drives visual links", () => {
+    const { createViewport, currencies, orders, viewportContainer } = setup();
+    const parent = createViewport(currencies, ["id", "name"]);
+    const child = createViewport(orders, ["id", "ccy"]);
+    viewportContainer.linkViewPorts(child.id, parent.id, "ccy", "id");
+    orders.insert(["o5", "JPY", 50, 500]);
+    flushViewports();
+    expect(child.size).toBe(5);
+
+    parent.selectRow("GBP", false);
+    expect(child.size).toBe(1);
+
+    expect(viewportContainer.selectAll(parent.id)).toBe(3);
+    expect(child.size).toBe(4);
+    expect(parent.getDataForCurrentRange().rows.every((r) => r.sel === 1)).toBe(
+      true,
+    );
+
+    currencies.insert(["JPY", "Yen"]);
+    flushViewports();
+    expect(parent.selectedRowCount).toBe(4);
+    expect(Array.from(parent.selectedKeys).sort()).toEqual([
+      "EUR",
+      "GBP",
+      "JPY",
+      "USD",
+    ]);
+
+    const { selectedRowCount } = parent.deselectRow("EUR", true);
+    expect(selectedRowCount).toBe(3);
+    expect(child.size).toBe(3);
+
+    expect(viewportContainer.deselectAll(parent.id)).toBe(0);
+    expect(child.size).toBe(5);
+  });
+
   test("removing parent viewport removes visual link", () => {
     const { createViewport, currencies, orders, viewportContainer } = setup();
     const parent = createViewport(currencies, ["id"]);

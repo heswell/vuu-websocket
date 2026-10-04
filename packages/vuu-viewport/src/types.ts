@@ -65,7 +65,14 @@ export interface ViewportEngine {
   readonly config: Readonly<ViewportConfig>;
   readonly range: VuuRange;
   readonly size: number;
+  /**
+   * Keys (tree keys when grouped) of selected rows in the viewport. Built on
+   * demand, O(size), while select-all is active.
+   */
   readonly selectedKeys: ReadonlySet<string>;
+  readonly selectedRowCount: number;
+  /** true between selectAll() and the next non-additive selection change */
+  readonly isSelectAll: boolean;
   readonly table: RowSource;
 
   /** Apply any pending table changes, return changes to send to client. */
@@ -90,6 +97,11 @@ export interface ViewportEngine {
     toRowKey: string,
     preserveExistingSelection: boolean,
   ): ViewportBatch;
+  /**
+   * Select every row, including rows that enter the viewport later, until
+   * a selection change that does not preserve the existing selection.
+   */
+  selectAll(): ViewportBatch;
   deselectAll(): ViewportBatch;
   /** distinct values of column across the (source table) rows of selected rows */
   getSelectedValues(column: string): Set<VuuRowDataItemType>;

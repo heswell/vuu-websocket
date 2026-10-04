@@ -664,6 +664,33 @@ For visual linking and RPC handlers:
 - `getSelectedValues(column)` returns the distinct values of `column` over
   those rows. This is what a child viewport filters on.
 
+### Select all
+
+`selectAll()` puts the viewport into a **live** select-all mode, matching
+vuu-ui's ArrayDataSource (`"*"`), rather than Scala's snapshot of the
+current keys. The state is a `#selectAll` flag plus a `#deselected` set of
+exceptions; `#selected` is not populated.
+
+- Every row in the view is selected, including rows that enter it later
+  through inserts, updates that now pass the filter, or re-inserts after a
+  delete.
+- `deselectRow(key, true)` adds an exception. `selectRow`/`selectRowRange`
+  with `preserve` remove exceptions. A non-preserving select or deselect,
+  or `deselectAll()`, leaves select-all mode.
+- Exceptions persist while a row is filtered out. They are dropped when the
+  row is deleted, so a re-inserted row is selected again.
+- `selectedRowCount` is O(exceptions): `indexLen` minus the exceptions still
+  present (flat), or the visible keys not excepted (grouped).
+  `selectedKeys` and `getSelectedRowKeys()` are built on demand. When
+  grouped, an excepted group excludes all leaves beneath it.
+- `collect()` tests `#deselected` instead of `#selected`, so the cost per
+  tick is unchanged.
+
+The server handles `SELECT_ALL` by replying `SELECT_ALL_SUCCESS` with
+`selectedRowCount`, or `SELECT_ALL_REJECT`. Linked child viewports are
+refreshed when select-all is applied, but not when rows enter the parent
+afterwards ([§22](#22-known-limitations-and-future-work)).
+
 ## 15. Producing client updates
 
 `collect()` builds the `rows` of a batch by comparing the current window
@@ -883,7 +910,9 @@ columnar engine):
 
 - **Visual link refresh on parent updates.** The child's link filter is
   recomputed on parent _selection_ changes only. If the linked column of a
-  selected parent row changes, the child is not refiltered.
+  selected parent row changes, the child is not refiltered. Likewise, rows
+  that enter a parent in select-all mode are selected in the parent but are
+  not added to the child's link filter until the next selection change.
 - **Group order under aggregate sort** is refreshed on rebuild, not on every
   aggregate tick ([§13](#13-grouping-and-aggregation)).
 - **High/Low and Distinct** fall back to a full tree rebuild when the

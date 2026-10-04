@@ -18,7 +18,8 @@ const buildContext = (requestId: string) =>
   }) as any;
 
 const createHandler = async (tableContainer: any) => {
-  const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+  const { CoreServerApiHandler } =
+    await import("../src/core/CoreServerApiHandler");
   return new CoreServerApiHandler({} as any, tableContainer, {} as any);
 };
 
@@ -59,7 +60,8 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
           removedViewportId = viewPortId;
         },
       };
-      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
       const handler = new CoreServerApiHandler(
         viewPortContainer as any,
         tableContainer as any,
@@ -94,7 +96,8 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
           throw new Error("viewport not found");
         },
       };
-      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
       const handler = new CoreServerApiHandler(
         viewPortContainer as any,
         tableContainer as any,
@@ -142,7 +145,8 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
           },
         }),
       };
-      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
       const handler = new CoreServerApiHandler(
         viewPortContainer as any,
         {} as any,
@@ -150,7 +154,11 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
       );
 
       const response = await handler.process(
-        { requestId: "req-change-1", sessionId: "sess-1", body: changeRequest } as any,
+        {
+          requestId: "req-change-1",
+          sessionId: "sess-1",
+          body: changeRequest,
+        } as any,
         buildContext("req-change-1"),
       );
 
@@ -170,7 +178,8 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
           throw new Error("no viewport");
         },
       };
-      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
       const handler = new CoreServerApiHandler(
         viewPortContainer as any,
         {} as any,
@@ -178,7 +187,11 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
       );
 
       const response = (await handler.process(
-        { requestId: "req-change-2", sessionId: "sess-1", body: changeRequest } as any,
+        {
+          requestId: "req-change-2",
+          sessionId: "sess-1",
+          body: changeRequest,
+        } as any,
         buildContext("req-change-2"),
       )) as any;
 
@@ -188,6 +201,58 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
   });
 
   describe("CoreServerApiHandler selection", () => {
+    const processSelectAll = async (viewPortContainer: any) => {
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
+      const handler = new CoreServerApiHandler(
+        viewPortContainer,
+        {} as any,
+        {} as any,
+      );
+      return handler.process(
+        {
+          requestId: "req-select-all",
+          sessionId: "sess-1",
+          body: { type: "SELECT_ALL", vpId: "vp-1" },
+        } as any,
+        buildContext("req-select-all"),
+      );
+    };
+
+    test("handles SELECT_ALL and returns SELECT_ALL_SUCCESS", async () => {
+      let selectedViewportId: string | undefined;
+      const response = await processSelectAll({
+        selectAll: (viewPortId: string) => {
+          selectedViewportId = viewPortId;
+          return 42;
+        },
+      });
+      expect(selectedViewportId).toBe("vp-1");
+      expect(response).toEqual({
+        body: {
+          selectedRowCount: 42,
+          type: "SELECT_ALL_SUCCESS",
+          vpId: "vp-1",
+        },
+        module: "CORE",
+        requestId: "req-select-all",
+        sessionId: "sess-1",
+      });
+    });
+
+    test("returns SELECT_ALL_REJECT when select all fails", async () => {
+      const response = await processSelectAll({
+        selectAll: () => {
+          throw Error("no such viewport");
+        },
+      });
+      expect(response?.body).toEqual({
+        errorMsg: "Failed to process request req-select-all",
+        type: "SELECT_ALL_REJECT",
+        vpId: "vp-1",
+      });
+    });
+
     test("handles DESELECT_ALL and returns DESELECT_ALL_SUCCESS", async () => {
       let deselectedViewportId: string | undefined;
       const tableContainer = {};
@@ -197,7 +262,8 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
           return 0;
         },
       };
-      const { CoreServerApiHandler } = await import("../src/core/CoreServerApiHandler");
+      const { CoreServerApiHandler } =
+        await import("../src/core/CoreServerApiHandler");
       const handler = new CoreServerApiHandler(
         viewPortContainer as any,
         tableContainer as any,
