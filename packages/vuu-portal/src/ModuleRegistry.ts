@@ -105,10 +105,12 @@ function selectModules(
   modulePermissions: ModulePermission[],
   authorizations: string[],
 ) {
+  const moduleRoles = new Map<number, string>();
   const permittedModuleRoles = new Map<number, string>();
   const roles = new Set(authorizations);
 
   modulePermissions.forEach(({ moduleId, role }) => {
+    moduleRoles.set(moduleId, role);
     if (roles.has(role)) {
       permittedModuleRoles.set(moduleId, role);
     }
@@ -116,7 +118,11 @@ function selectModules(
 
   const latestByName = new Map<string, DiscoveredModuleRecord>();
   modules.forEach((module) => {
-    const accessRole = permittedModuleRoles.get(module.id);
+    const accessRole = accessRoleForModule(
+      module,
+      moduleRoles,
+      permittedModuleRoles,
+    );
     if (!module.enabled || !accessRole) {
       return;
     }
@@ -143,6 +149,19 @@ function selectModules(
     )
     .map(({ parentModuleId: _parentModuleId, ...module }) => module)
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function accessRoleForModule(
+  module: DiscoveredModuleRecord,
+  moduleRoles: Map<number, string>,
+  permittedModuleRoles: Map<number, string>,
+) {
+  const ownRole = permittedModuleRoles.get(module.id);
+  if (ownRole) return ownRole;
+  if (module.parentModuleId !== 0 && !moduleRoles.has(module.id)) {
+    return permittedModuleRoles.get(module.parentModuleId) ?? "";
+  }
+  return "";
 }
 
 function stringValue(table: DataTable, row: unknown[], column: string) {

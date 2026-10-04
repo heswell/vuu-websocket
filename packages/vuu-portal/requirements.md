@@ -13,9 +13,22 @@
 - `LOGIN_SUCCESS` includes `moduleRegistry: { modules: ModuleRecord[] }`.
 - No browser-facing `/module-registry` HTTP endpoint is installed.
 - The server registers `MODULE_DISCOVERY`, including editable `modules` and
-  `modulePermissions` tables.
+  `modulePermissions` tables. Module definitions are loaded from
+  `vuu.portal.modulesFile` (default `modules.yaml`) and persisted after every
+  successful module-admin mutation. If the file is missing, it is seeded from
+  the built-in catalog plus `module-access.yaml`; `module-access.yaml` is
+  seed-only after that.
 - Registry selection includes only enabled, role-permitted modules and chooses
-  the highest version, then highest id, for each module name.
+  the highest version, then highest id, for each module name. Child modules
+  without their own permission row inherit their parent module role and are only
+  exposed when the parent is permitted.
+
+
+Module administration RPCs are viewport RPCs available on both discovery
+tables: `createModule`, `updateModule`, `setModuleEnabled`, and `deleteModule`.
+Structured config payloads are JSON strings matching
+`@heswell/module-admin/contracts`; mutations are version-checked where relevant
+and update the `modules` and `modulePermissions` tables plus `modules.yaml`.
 
 The built-in records route:
 

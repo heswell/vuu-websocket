@@ -1,5 +1,5 @@
-# Maps each portal module to the Keycloak client role required to access it.
-# This file is intended to become writable through module administration later.
+# Seed-only map from portal module names to the Keycloak client role required to access them.
+# Used only to create modules.yaml on first startup; runtime edits are persisted there.
 moduleAccess:
   moduleAdmin: module-admin-access
   userAdmin: user-admin-access
