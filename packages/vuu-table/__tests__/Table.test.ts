@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { JoinTable, Table, type TableSchema } from "../src/index.ts";
+import {
+  JoinTable,
+  Table,
+  type TableSchema,
+  type VuuDataRow,
+} from "../src/index.ts";
 
 const orderSchema: TableSchema = {
   table: { module: "TEST", table: "orders" },
@@ -123,5 +128,25 @@ describe("JoinTable", () => {
     join.addListener({ onUpdate: (_, row) => updates.push(row) });
     prices.upsert(["AAA.L", 7]);
     expect(updates).toEqual([["o1", "AAA.L", 100, 7]]);
+  });
+
+  test("bigint key and join values", () => {
+    const orders = new Table(orderSchema);
+    const prices = new Table(priceSchema);
+    const id = (2n ** 60n) as unknown as string;
+    prices.insert([123n, 1.5] as unknown as VuuDataRow);
+    orders.insert([id, 123n, 100] as unknown as VuuDataRow);
+    const join = new JoinTable({
+      schema: joinSchema,
+      baseTable: orders,
+      joinTable: prices,
+      leftColumn: "ric",
+      rightColumn: "ric",
+    });
+    const key = (2n ** 60n).toString();
+    expect(orders.rowIndexAtKey(key)).toBe(0);
+    expect(join.getRowAtKey(key)[3]).toBe(1.5);
+    prices.upsert([123n, 2] as unknown as VuuDataRow);
+    expect(join.getRowAtKey(key)[3]).toBe(2);
   });
 });

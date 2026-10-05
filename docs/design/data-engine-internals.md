@@ -755,6 +755,27 @@ Six tree columns precede the projected columns:
 
 The `rowKey` of a grouped `ViewportRow` is the tree key.
 
+### BigInt values
+
+Tables may hold `bigint` cell values (e.g. `long` timestamps or ids beyond
+2^53). Rows remain typed as the protocol `VuuDataRow`; bigint support is a
+runtime capability and hosts cast `VuuDataRowWithBigint` (exported by
+`@heswell/vuu-table`) when inserting. Helpers live in `vuu-viewport/src/values.ts`.
+
+| Area               | Behaviour                                                                                                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Output             | `projectRow` and group labels convert bigint via `toProtocolValue`: a `number` when within ±(2^53−1), otherwise its decimal string. Published rows are always `JSON.stringify`-safe. Internal state is untouched. |
+| Keys / joins       | Table keys and join lookups use `String(value)`, so bigint keys work and match string keys of the same digits.                                                                                                    |
+| Sort               | `extractKeys` treats safe bigints as numeric keys (fast path; may mix with numbers). An unsafe bigint makes the column fall back to the generic comparator, which compares bigints exactly.                       |
+| Filter `= != in`   | Filter literals are numbers; the compiled predicate also accepts the equivalent bigint (`withIntegerAliases` / `integerAlias`), so `qty = 5` matches `5n`. Visual link values are aliased the same way.           |
+| Filter `< > ` etc. | Relational operators compare number and bigint natively.                                                                                                                                                          |
+| Aggregates         | Values pass through `toNumber` (Float64): sums/averages over very large bigints lose precision.                                                                                                                   |
+| Typeahead          | `getUniqueValues` uses `String(value)`.                                                                                                                                                                           |
+
+vuu-ui's `ArrayDataSource` always emits bigints as strings; this engine emits
+safe values as numbers, matching how the Scala server sends `long` as JSON
+numbers.
+
 ### Client behaviour this design depends on (vuu-ui `vuu-data-remote`)
 
 - `toClientRowTree` destructures `[depth, isExpanded, , isLeaf, , count, ...rest]`.

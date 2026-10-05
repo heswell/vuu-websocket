@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Columns, TableDef, VuuUser } from "@heswell/vuu-server";
+import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { InMemDataTable } from "../src/core/table/InMemDataTable";
 import { TableContainer } from "../src/core/table/TableContainer";
 import type { ViewServerModule } from "../src/core/module/VsModule";
@@ -310,6 +311,30 @@ describe("Viewport (server)", () => {
     expect(vp.getUniqueValues("ccy", "e")).toEqual(["EUR"]);
     vp.changeViewport({ filterSpec: { filter: "qty > 350" } });
     expect(vp.getUniqueValues("ccy")).toEqual(["USD"]);
+  });
+});
+
+describe("bigint values (server)", () => {
+  test("bigint row values are published as JSON-safe values", () => {
+    const { createViewport, drain } = setup();
+    const trades = createTable("trades", "id:string", "ts:long", "qty:long");
+    trades.insert([
+      "t1",
+      1_700_000_000_001n,
+      2n ** 60n,
+    ] as unknown as VuuDataRow);
+    trades.insert(["t2", 1_700_000_000_000n, 5n] as unknown as VuuDataRow);
+    const vp = createViewport(trades, ["id", "ts", "qty"], { sort: "ts" });
+    const updates = drain();
+    expect(() => JSON.stringify(updates)).not.toThrow();
+    expect(updates.filter(isViewPortRowUpdate).map((u) => u.row.data)).toEqual([
+      ["t2", 1_700_000_000_000, 5],
+      ["t1", 1_700_000_000_001, (2n ** 60n).toString()],
+    ]);
+    vp.changeViewport({ filterSpec: { filter: "qty = 5" } });
+    expect(vp.getDataForCurrentRange().rows.map((r) => r.rowKey)).toEqual([
+      "t2",
+    ]);
   });
 });
 

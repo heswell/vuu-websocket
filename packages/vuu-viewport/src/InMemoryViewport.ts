@@ -7,6 +7,7 @@ import type {
   VuuSort,
 } from "@vuu-ui/vuu-protocol-types";
 import { filterNarrows, parseAndCompileFilter } from "./filter.ts";
+import { toProtocolValue, withIntegerAliases } from "./values.ts";
 import { aggValue, GroupTree, type GroupNode } from "./GroupTree.ts";
 import {
   createComparator,
@@ -801,7 +802,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     if (this.#permissionFilter) predicates.push(this.#permissionFilter);
     if (this.#linkFilter) {
       const col = this.table.columnMap[this.#linkFilter.column];
-      const { values } = this.#linkFilter;
+      const values = withIntegerAliases(this.#linkFilter.values);
       predicates.push(
         col === undefined ? () => false : (row) => values.has(row[col]),
       );
@@ -1125,7 +1126,15 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     const data: (VuuRowDataItemType | null)[] = new Array(bindings.length);
     for (let i = 0; i < bindings.length; i++) {
       const col = bindings[i].col;
-      data[i] = col === -1 ? null : row[col];
+      if (col === -1) {
+        data[i] = null;
+      } else {
+        const v: unknown = row[col];
+        data[i] =
+          typeof v === "bigint"
+            ? toProtocolValue(v)
+            : (v as VuuRowDataItemType);
+      }
     }
     return data as VuuRowDataItemType[];
   }
@@ -1139,7 +1148,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     data[1] = tree.expanded.has(node.key);
     data[2] = node.key;
     data[3] = false;
-    data[4] = node.label;
+    data[4] = toProtocolValue(node.label);
     data[5] = node.childCount;
     for (let i = 0; i < bindings.length; i++) {
       const { groupLevel, aggIndex, aggType } = bindings[i];
@@ -1149,7 +1158,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       } else if (groupLevel !== -1 && groupLevel < node.depth) {
         let n: GroupNode | null = node;
         while (n && n.depth > groupLevel + 1) n = n.parent;
-        value = n ? n.label : "";
+        value = n ? toProtocolValue(n.label) : "";
       }
       data[TREE_COLUMN_COUNT + i] = value;
     }

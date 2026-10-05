@@ -7,6 +7,14 @@ import type {
 export type { TableSchema, VuuDataRow, VuuRowDataItemType };
 
 /**
+ * Tables may hold bigint values (e.g. long columns from vuu-ui test data),
+ * although rows are typed with the protocol value types. Viewport engines
+ * sort, filter, aggregate and join on bigint values and convert them to a
+ * protocol value on output. Hosts can cast such rows to VuuDataRow.
+ */
+export type VuuDataRowWithBigint = (VuuRowDataItemType | bigint)[];
+
+/**
  * Map of column name to index position within a row array.
  */
 export type ColumnMap = Record<string, number>;
