@@ -91,6 +91,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
 
   // projection
   #bindings: ColumnBinding[] = [];
+  #tsCol: number;
 
   // filtering
   #clientFilter: { filter: Filter; predicate: RowPredicate } | undefined;
@@ -149,6 +150,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   ) {
     this.id = id;
     this.table = table;
+    this.#tsCol = table.columnMap.vuuUpdatedTimestamp ?? -1;
     this.#config = { columns, sort, filterSpec, groupBy, aggregations };
     this.#range = range;
     this.#onPendingChanges = onPendingChanges;
@@ -1121,6 +1123,13 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return String(rows[this.#index[pos]][indexOfKeyField]);
   }
 
+  private rowTs(row: VuuDataRow): number {
+    const col = this.#tsCol;
+    if (col === -1) return 0;
+    const v: unknown = row[col];
+    return typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : 0;
+  }
+
   private projectRow(row: VuuDataRow) {
     const bindings = this.#bindings;
     const data: (VuuRowDataItemType | null)[] = new Array(bindings.length);
@@ -1209,6 +1218,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             rowIndex: pos,
             rowKey: key,
             sel,
+            ts: this.rowTs(row),
             data: this.projectRow(row),
           });
         }
@@ -1233,6 +1243,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
               rowIndex: pos,
               rowKey: key,
               sel,
+              ts: this.rowTs(row),
               data: [
                 tree.leafDepth,
                 false,
@@ -1258,7 +1269,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             sentKey[slot] = key;
             sentRef[slot] = data;
             sentSel[slot] = sel;
-            rows.push({ rowIndex: pos, rowKey: key, sel, data });
+            rows.push({ rowIndex: pos, rowKey: key, sel, ts: 0, data });
           }
         }
       }

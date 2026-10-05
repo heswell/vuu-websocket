@@ -226,6 +226,7 @@ interface ViewportRow {
   rowIndex: number; // position in the viewport
   rowKey: string; // table key, or tree key when grouped
   sel: 0 | 1;
+  ts: number; // row's vuuUpdatedTimestamp, else 0 (§16)
   data: VuuRowDataItemType[]; // projected columns (+ 6 tree columns if grouped)
 }
 ```
@@ -738,6 +739,21 @@ cancel out has no size change, and therefore no SIZE message.
 
 `data` is the projected column values, in the order of `config.columns`.
 `rowKey` is the table key.
+
+### Row timestamp
+
+`ViewportRow.ts` is the last update time of the underlying table row: the
+value of its `vuuUpdatedTimestamp` column (resolved once per viewport; need not
+be projected; bigint converted to number), or `0` if the table has no such
+column. `Table` stamps that column on insert and update. Group rows always
+have `ts = 0`. For a `JoinTable` it is whatever the join schema maps into
+`vuuUpdatedTimestamp` (normally the base row's), so a right-side change does
+not advance it.
+
+Browser hosts map it to `DataSourceRow[TIMESTAMP]` (vuu-ui's `ArrayDataSource`
+always sets 0). The server does **not** send it on the wire: protocol
+`RowUpdate.ts` stays the publish time, which vuu-ui's `insertRow` relies on to
+discard an older update for the same row index.
 
 ### Grouped rows
 

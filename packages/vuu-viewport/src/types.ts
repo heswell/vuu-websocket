@@ -40,6 +40,12 @@ export interface ViewportRow {
   rowKey: string;
   sel: 0 | 1;
   /**
+   * Last update time of the underlying table row, taken from the
+   * `vuuUpdatedTimestamp` column (epoch millis) if the table has one, else 0.
+   * Always 0 for group rows. Not the time the update was published.
+   */
+  ts: number;
+  /**
    * Projected column values. For grouped viewports, data is prefixed by the
    * six tree columns [depth, isExpanded, treeKey, isLeaf, label, childCount].
    */
