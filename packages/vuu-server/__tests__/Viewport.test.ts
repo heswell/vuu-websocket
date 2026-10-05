@@ -378,4 +378,37 @@ describe("JoinTable (server)", () => {
       ["o3", ["o3", "Euro (EUR)"]],
     ]);
   });
+
+  test("inner join viewport tracks right table inserts and deletes", async () => {
+    const { JoinTable } = await import("../src/core/table/JoinTable");
+    const { JoinTableDef, Join, JoinSpec, VisualLinks } =
+      await import("../src/api/TableDef");
+    const { orders, currencies, createViewport, drain } = setup();
+    currencies.delete("GBP");
+    const joinDef = JoinTableDef({
+      name: "ordersCcyInner",
+      baseTable: orders.tableDef,
+      joinColumns: Columns.fromNames("id:string", "ccy:string", "name:string"),
+      joins: Join(currencies.tableDef, JoinSpec("ccy", "id", "InnerJoin")),
+      joinFields: [],
+      links: VisualLinks(),
+    });
+    joinDef.setModule({ name: "TEST" } as ViewServerModule);
+    const join = new JoinTable(joinDef, orders, currencies);
+    const vp = createViewport(
+      join as unknown as InMemDataTable,
+      ["id", "name"],
+      { sort: "id" },
+    );
+    const keys = () => vp.getDataForCurrentRange().rows.map((r) => r.rowKey);
+    expect(keys()).toEqual(["o1", "o3", "o4"]);
+    drain();
+    currencies.insert(["GBP", "Sterling"]);
+    flushViewports();
+    expect(keys()).toEqual(["o1", "o2", "o3", "o4"]);
+    currencies.delete("EUR");
+    flushViewports();
+    expect(keys()).toEqual(["o2", "o4"]);
+    expect(drain().some((u) => u.vpUpdate === "SIZE")).toBe(true);
+  });
 });

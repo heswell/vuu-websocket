@@ -64,7 +64,7 @@ packages/
   vuu-table/          @heswell/vuu-table
     src/types.ts      RowSource, TableListener, TableSchema, ColumnMap
     src/Table.ts      row store
-    src/JoinTable.ts  materialized left outer join
+    src/JoinTable.ts  materialized left outer / inner join
   vuu-viewport/       @heswell/vuu-viewport  (depends on vuu-table)
     src/types.ts      ViewportEngine, DataEngine, ViewportBatch, ...
     src/sort.ts       sort spec, key extraction, sortIndex
@@ -149,8 +149,9 @@ implements it, including `JoinTable`, can be viewed.
 ## 4. JoinTable
 
 `JoinTable` (`vuu-table/src/JoinTable.ts`) extends `Table` and holds a
-**materialized left outer join** of a base table and a right table.
-Viewports over a join are therefore exactly as cheap as viewports over a
+**materialized join** of a base table and a right table: left outer by
+default, or inner with `joinType: "inner"` (the server maps
+`JoinSpec(..., "InnerJoin")` to this). Viewports over a join are therefore exactly as cheap as viewports over a
 simple table: there is no per-read join.
 
 ```mermaid
@@ -182,13 +183,18 @@ When the right join column is the right table's key (the usual case, e.g.
 
 ### Event propagation
 
-| Event               | Join action                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| base insert         | Build the join row and `insert` it. Index the base key under its join value.                                                                                                                |
-| base update         | Rebuild the join row and `update` it. If the join value changed, move the base key between index sets.                                                                                      |
-| base delete         | Delete the join row and unindex it.                                                                                                                                                         |
-| right insert/update | For every base key under that join value, rebuild and `update` the join row.                                                                                                                |
-| right delete        | Same, with right columns set to `null`. With a non-key right column, `unindexRightRow` rescans the right table for another row with the same join value, so that a duplicate can take over. |
+Every change that can affect a base row goes through `sync(key, baseRow)`,
+which looks up the matching right row and inserts, updates or (inner join, no
+right row) deletes the join row. For a left outer join the row always exists,
+so `sync` is an update.
+
+| Event               | Join action                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| base insert         | Index the base key under its join value, then `sync` (insert; inner join skips rows without a right match).                                                                                                                          |
+| base update         | If the join value changed, move the base key between index sets. Then `sync` (inner join may insert or delete).                                                                                                                      |
+| base delete         | Delete the join row (if present) and unindex it.                                                                                                                                                                                     |
+| right insert/update | `sync` every base key under that join value (inner join inserts newly matched rows). A changed right join value also syncs the base keys under the old value.                                                                        |
+| right delete        | Same: right columns set to `null` (left outer) or the join rows deleted (inner). With a non-key right column, `unindexRightRow` rescans the right table for another row with the same join value, so that a duplicate can take over. |
 
 Join rows are rebuilt and replaced, never mutated, so downstream listeners
 always get a distinct `previous`.

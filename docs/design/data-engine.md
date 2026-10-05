@@ -36,7 +36,7 @@ flowchart LR
   `vuuUpdatedTimestamp` when the table has that column.
 - Listeners are notified synchronously with `(type, rowIdx, row, previous)`.
   Listeners are always notified, even when `emitEvent=false`.
-- `JoinTable` is a materialized left outer join of a base table and a right
+- `JoinTable` is a materialized left outer (or inner) join of a base table and a right
   table on `left`/`right` columns.
   - It listens to both tables and maintains its own rows.
   - A tick on either side produces an update on the joined row(s), so

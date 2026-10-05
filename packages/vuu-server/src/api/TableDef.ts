@@ -179,7 +179,7 @@ export const SessionTableDef = (
   return new TableDefImpl({ ...rest, links });
 };
 
-export type JoinType = "LeftOuterJoin";
+export type JoinType = "LeftOuterJoin" | "InnerJoin";
 export interface JoinSpec {
   left: string;
   right: string;
