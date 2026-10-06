@@ -5,6 +5,7 @@ import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
   getPublishablePackage,
   type PublishablePackageName,
+  PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -27,14 +28,14 @@ type PackageJson = {
 const printHelp = () => {
   console.log(`Usage: npm run bump:versions -- [options]
 
-Updates @heswell/user-admin by default, or the package selected with
+Updates ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default, or the package selected with
 --package. Workspace dependencies on the selected package are also updated.
 
 Without --version, increments the patch version. For alpha or beta releases,
 the prerelease number is incremented instead.
 
 Options:
-  --package=<name>  Select @heswell/user-admin or @heswell/module-admin.
+  --package=<name>  Select one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
   --version=<version>
                     Set the package version explicitly.
   --help            Print this help message.
@@ -98,7 +99,7 @@ const getOptions = () => {
       const selectedPackage = getPublishablePackage(requestedPackage);
       if (!selectedPackage) {
         throw new Error(
-          `Unsupported package "${requestedPackage}". Use @heswell/user-admin or @heswell/module-admin.`,
+          `Unsupported package "${requestedPackage}". Use one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.`,
         );
       }
       packageName = selectedPackage.name;
