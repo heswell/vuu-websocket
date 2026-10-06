@@ -18,14 +18,22 @@ export interface JoinTableConfig {
   leftColumn: string;
   /** column in join (right) table matched against leftColumn */
   rightColumn: string;
+  /**
+   * leftOuter (default): every base row is present, right columns are null
+   * when there is no matching right row.
+   * inner: base rows are present only while a matching right row exists.
+   */
+  joinType?: JoinType;
 }
+
+export type JoinType = "leftOuter" | "inner";
 
 type ColumnSource = 0 | 1; // 0 = base, 1 = right
 
 const NO_KEYS: ReadonlySet<string> = new Set();
 
 /**
- * Materialized left outer join of two tables. Joined rows are maintained
+ * Materialized left outer (or inner) join of two tables. Joined rows are maintained
  * incrementally as either source table changes, so a JoinTable is itself a
  * regular Table that viewports can sort, filter and group with no join cost
  * at query time.
@@ -36,7 +44,9 @@ const NO_KEYS: ReadonlySet<string> = new Set();
 export class JoinTable extends Table {
   readonly baseTable: Table;
   readonly joinTable: Table;
+  readonly joinType: JoinType;
 
+  #inner: boolean;
   #leftIdx: number;
   #rightIdx: number;
   #rightIsKey: boolean;
@@ -56,10 +66,13 @@ export class JoinTable extends Table {
     joinTable,
     leftColumn,
     rightColumn,
+    joinType = "leftOuter",
   }: JoinTableConfig) {
     super(schema);
     this.baseTable = baseTable;
     this.joinTable = joinTable;
+    this.joinType = joinType;
+    this.#inner = joinType === "inner";
 
     const leftIdx = baseTable.columnMap[leftColumn];
     const rightIdx = joinTable.columnMap[rightColumn];
@@ -92,18 +105,19 @@ export class JoinTable extends Table {
         this.indexRightRow(row);
       }
     }
+    const baseKeyIdx = baseTable.indexOfKeyField;
     for (const row of baseTable.rows) {
       this.indexBaseRow(row);
-      super.insert(this.joinRow(row));
+      this.sync(String(row[baseKeyIdx]), row);
     }
 
     this.#baseListener = {
       onInsert: (_, row) => {
         this.indexBaseRow(row);
-        super.insert(this.joinRow(row));
+        this.sync(String(row[baseKeyIdx]), row);
       },
       onUpdate: (_, row, previous) => {
-        const key = String(row[baseTable.indexOfKeyField]);
+        const key = String(row[baseKeyIdx]);
         if (previous !== row) {
           const prevJoinValue = previous[this.#leftIdx];
           if (prevJoinValue !== row[this.#leftIdx]) {
@@ -111,12 +125,14 @@ export class JoinTable extends Table {
             this.indexBaseRow(row);
           }
         }
-        this.refresh(key, row);
+        this.sync(key, row);
       },
       onDelete: (_, row) => {
-        const key = String(row[baseTable.indexOfKeyField]);
+        const key = String(row[baseKeyIdx]);
         this.unindexBaseRow(key, row[this.#leftIdx]);
-        super.delete(key);
+        if (this.rowIndexAtKey(key) !== -1) {
+          super.delete(key);
+        }
       },
       onClear: () => {
         this.#baseKeysByJoinValue.clear();
@@ -146,8 +162,12 @@ export class JoinTable extends Table {
       },
       onClear: () => {
         this.#rightKeyByJoinValue.clear();
-        for (const row of this.baseTable.rows) {
-          this.refresh(String(row[this.baseTable.indexOfKeyField]), row);
+        if (this.#inner) {
+          super.clear();
+        } else {
+          for (const row of this.baseTable.rows) {
+            this.sync(String(row[baseKeyIdx]), row);
+          }
         }
       },
     };
@@ -175,8 +195,10 @@ export class JoinTable extends Table {
     }
   }
 
-  private joinRow(baseRow: VuuDataRow): VuuDataRow {
-    const rightRow = this.findRightRow(baseRow[this.#leftIdx]);
+  private joinRow(
+    baseRow: VuuDataRow,
+    rightRow: VuuDataRow | undefined,
+  ): VuuDataRow {
     const sources = this.#sources;
     const indices = this.#sourceIndices;
     const len = sources.length;
@@ -192,10 +214,21 @@ export class JoinTable extends Table {
     return row as VuuDataRow;
   }
 
-  private refresh(key: string, baseRow: VuuDataRow) {
+  /**
+   * Bring the joined row for a base row up to date: insert, update or, for an
+   * inner join without a matching right row, delete it.
+   */
+  private sync(key: string, baseRow: VuuDataRow) {
+    const rightRow = this.findRightRow(baseRow[this.#leftIdx]);
     const rowIdx = this.rowIndexAtKey(key);
-    if (rowIdx !== -1) {
-      super.update(rowIdx, this.joinRow(baseRow));
+    if (rightRow === undefined && this.#inner) {
+      if (rowIdx !== -1) {
+        super.delete(key);
+      }
+    } else if (rowIdx === -1) {
+      super.insert(this.joinRow(baseRow, rightRow));
+    } else {
+      super.update(rowIdx, this.joinRow(baseRow, rightRow));
     }
   }
 
@@ -204,7 +237,7 @@ export class JoinTable extends Table {
     for (const key of keys) {
       const baseRow = this.baseTable.getRowAtKey(key, false);
       if (baseRow) {
-        this.refresh(key, baseRow);
+        this.sync(key, baseRow);
       }
     }
   }

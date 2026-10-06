@@ -201,6 +201,111 @@ describe("InMemoryViewport flat", () => {
     );
   });
 
+  test("base filter composes with client, link and permission filters", () => {
+    const table = createTable(300);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config({ filterSpec: { filter: "price > 20" } }),
+      range: { from: 0, to: 300 },
+      baseFilterSpec: { filter: "qty < 50" },
+      permissionFilter: (row) => row[2] !== "XPAR",
+    });
+    const count = (fn: (r: VuuDataRow) => boolean) =>
+      table.rows.filter(
+        (r) =>
+          r[2] !== "XPAR" &&
+          (r[4] as number) < 50 &&
+          (r[3] as number) > 20 &&
+          fn(r),
+      ).length;
+    expect(vp.getCurrentRange().size).toBe(count(() => true));
+    expect(vp.baseFilterSpec).toEqual({ filter: "qty < 50" });
+
+    // changing the client filter does not remove the base filter
+    vp.setConfig({ filterSpec: { filter: 'ccy = "EUR"' } });
+    expect(vp.size).toBe(
+      table.rows.filter(
+        (r) => r[2] !== "XPAR" && (r[4] as number) < 50 && r[1] === "EUR",
+      ).length,
+    );
+    vp.setConfig({ filterSpec: { filter: "price > 20" } });
+
+    // all four slots together
+    vp.setLinkFilter({ column: "ccy", values: new Set(["GBP"]) });
+    expect(vp.size).toBe(count((r) => r[1] === "GBP"));
+
+    // changing the base filter does not remove link or client filters
+    vp.setBaseFilter({ filter: "qty > 49" });
+    expect(vp.size).toBe(
+      table.rows.filter(
+        (r) =>
+          r[2] !== "XPAR" &&
+          (r[4] as number) >= 50 &&
+          (r[3] as number) > 20 &&
+          r[1] === "GBP",
+      ).length,
+    );
+
+    vp.setLinkFilter(undefined);
+    vp.setPermissionFilter(undefined);
+    vp.setBaseFilter(undefined);
+    expect(vp.baseFilterSpec).toEqual({ filter: "" });
+    expect(vp.size).toBe(
+      table.rows.filter((r) => (r[3] as number) > 20).length,
+    );
+  });
+
+  test("base filter: narrowing keeps sort, applies to live updates and groups", () => {
+    const table = createTable(400);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config({
+        columns: ["id", "ccy", "price", "qty"],
+        sort: { sortDefs: [{ column: "price", sortType: "D" }] },
+      }),
+      range: { from: 0, to: 400 },
+      baseFilterSpec: { filter: "qty < 80" },
+    });
+    const client = new ClientModel().apply(vp.getCurrentRange());
+
+    // narrowing (old AND new) path
+    client.apply(vp.setBaseFilter({ filter: 'qty < 80 and ccy = "EUR"' }));
+    const expected = table.rows
+      .filter((r) => (r[4] as number) < 80 && r[1] === "EUR")
+      .sort((a, b) => (b[3] as number) - (a[3] as number))
+      .map((r) => r[0]);
+    expect(client.size).toBe(expected.length);
+    expect(client.window(0, client.size).map((d) => d?.[0])).toEqual(expected);
+
+    // live updates are filtered by the base filter
+    const outKey = expected[0] as string;
+    table.updateByKey(outKey, { qty: 99 });
+    client.apply(vp.flush());
+    expect(client.size).toBe(expected.length - 1);
+    table.updateByKey(outKey, { qty: 1 });
+    table.insert(["id-new", "GBP", 1, 1]);
+    client.apply(vp.flush());
+    expect(client.size).toBe(expected.length);
+
+    // freeze-style base filter survives grouping
+    vp.setConfig({ groupBy: ["ccy"] });
+    expect(vp.size).toBe(1);
+    vp.setBaseFilter(undefined);
+    expect(vp.size).toBe(4);
+  });
+
+  test("invalid base filter rejects all rows", () => {
+    const table = createTable(20);
+    const vp = new InMemoryViewport(table, {
+      id: "vp1",
+      ...config(),
+      range: { from: 0, to: 20 },
+    });
+    expect(vp.getCurrentRange().size).toBe(20);
+    vp.setBaseFilter({ filter: "qty <<< 3" });
+    expect(vp.size).toBe(0);
+  });
+
   test("narrowing filter keeps sort", () => {
     const table = createTable(300);
     const vp = new InMemoryViewport(table, {
@@ -576,4 +681,134 @@ describe("InMemoryViewport grouped randomized consistency", () => {
       }
     });
   }
+});
+
+describe("InMemoryViewport select all", () => {
+  const sorted = (keys: Iterable<string>) => Array.from(keys).sort();
+
+  test("selects every row, including rows that enter later", () => {
+    const table = createTable(20);
+    const vp = new InMemoryViewport(table, {
+      id: "vp",
+      ...config({ filterSpec: { filter: 'ccy = "EUR"' } }),
+      range: { from: 0, to: 50 },
+    });
+    const client = new ClientModel().apply(vp.getCurrentRange());
+    const eur = () =>
+      table.rows.filter((r) => r[1] === "EUR").map((r) => r[0] as string);
+
+    client.apply(vp.selectAll());
+    expect(vp.isSelectAll).toBe(true);
+    expect(vp.selectedRowCount).toBe(eur().length);
+    expect([...client.rows.values()].every((r) => r.sel === 1)).toBe(true);
+
+    table.insert(["new-1", "EUR", "XLON", 1, 1]);
+    table.insert(["new-2", "GBP", "XLON", 1, 1]);
+    client.apply(vp.flush());
+    expect(vp.selectedRowCount).toBe(eur().length);
+    expect([...client.rows.values()].every((r) => r.sel === 1)).toBe(true);
+    expect(sorted(vp.getSelectedRowKeys())).toEqual(sorted(eur()));
+    expect(sorted(vp.selectedKeys)).toEqual(sorted(eur()));
+
+    // a row updated into the filter is selected too
+    const gbp = table.rows.find((r) => r[1] === "GBP")!;
+    table.upsert([gbp[0], "EUR", gbp[2], gbp[3], gbp[4]]);
+    client.apply(vp.flush());
+    expect(vp.getSelectedRowKeys()).toContain(gbp[0] as string);
+    expect(vp.selectedRowCount).toBe(eur().length);
+  });
+
+  test("additive changes adjust select all, others end it", () => {
+    const table = createTable(10);
+    const vp = new InMemoryViewport(table, {
+      id: "vp",
+      ...config(),
+      range: { from: 0, to: 10 },
+    });
+    const client = new ClientModel().apply(vp.getCurrentRange());
+    client.apply(vp.selectAll());
+
+    let batch = vp.deselectRow("id-3", true);
+    expect(batch.rows.map((r) => [r.rowKey, r.sel])).toEqual([["id-3", 0]]);
+    expect(vp.isSelectAll).toBe(true);
+    expect(vp.selectedRowCount).toBe(9);
+    expect(vp.getSelectedRowKeys()).not.toContain("id-3");
+
+    vp.deselectRow("id-4", true);
+    batch = vp.selectRowRange("id-2", "id-5", true);
+    expect(sorted(batch.rows.map((r) => r.rowKey))).toEqual(["id-3", "id-4"]);
+    expect(vp.selectedRowCount).toBe(10);
+
+    vp.deselectRow("id-6", true);
+    vp.selectRow("id-6", true);
+    expect(vp.selectedRowCount).toBe(10);
+
+    // a non additive select replaces select all
+    batch = vp.selectRow("id-1", false);
+    expect(vp.isSelectAll).toBe(false);
+    expect(batch.rows).toHaveLength(9);
+    expect(sorted(vp.selectedKeys)).toEqual(["id-1"]);
+
+    client.apply(vp.selectAll());
+    batch = vp.deselectAll();
+    expect(vp.isSelectAll).toBe(false);
+    expect(vp.selectedRowCount).toBe(0);
+    expect(batch.rows.every((r) => r.sel === 0)).toBe(true);
+    expect(batch.rows).toHaveLength(10);
+  });
+
+  test("deleted rows leave the count, reinserted keys are selected", () => {
+    const table = createTable(10);
+    const vp = new InMemoryViewport(table, {
+      id: "vp",
+      ...config(),
+      range: { from: 0, to: 20 },
+    });
+    vp.getCurrentRange();
+    vp.selectAll();
+    vp.deselectRow("id-2", true);
+    table.delete("id-2");
+    table.delete("id-5");
+    vp.flush();
+    expect(vp.selectedRowCount).toBe(8);
+    table.insert(["id-2", "EUR", "XLON", 1, 1]);
+    const batch = vp.flush();
+    expect(batch.rows.find((r) => r.rowKey === "id-2")?.sel).toBe(1);
+    expect(vp.selectedRowCount).toBe(9);
+  });
+
+  test("grouped: all rows selected, deselected group excludes its leaves", () => {
+    const table = new Table(schema);
+    table.insert(["1", "EUR", "XLON", 10, 1]);
+    table.insert(["2", "GBP", "XLON", 20, 2]);
+    table.insert(["3", "EUR", "XPAR", 30, 3]);
+    table.insert(["4", "EUR", "XLON", 40, 4]);
+    table.insert(["5", "USD", "XNYS", 50, 5]);
+    const vp = new InMemoryViewport(table, {
+      id: "vp",
+      columns: ["id", "ccy"],
+      groupBy: ["ccy"],
+      range: { from: 0, to: 20 },
+    });
+    vp.getCurrentRange();
+    let batch = vp.selectAll();
+    expect(batch.rows.map((r) => r.sel)).toEqual([1, 1, 1]);
+    expect(vp.selectedRowCount).toBe(3);
+    expect(sorted(vp.getSelectedRowKeys())).toEqual(["1", "2", "3", "4", "5"]);
+
+    batch = vp.openTreeNode("$root|EUR");
+    expect(batch.rows.every((r) => r.sel === 1)).toBe(true);
+    expect(vp.selectedRowCount).toBe(6);
+
+    vp.deselectRow("$root|EUR|3", true);
+    expect(sorted(vp.getSelectedRowKeys())).toEqual(["1", "2", "4", "5"]);
+    vp.deselectRow("$root|GBP", true);
+    expect(sorted(vp.getSelectedRowKeys())).toEqual(["1", "4", "5"]);
+    expect(vp.selectedRowCount).toBe(4);
+    expect(vp.getSelectedValues("ccy")).toEqual(new Set(["EUR", "USD"]));
+
+    table.insert(["6", "JPY", "XLON", 60, 6]);
+    vp.flush();
+    expect(vp.getSelectedRowKeys()).toContain("6");
+  });
 });

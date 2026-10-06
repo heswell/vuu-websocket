@@ -3,6 +3,7 @@ import type { Filter } from "@vuu-ui/vuu-filter-types";
 import type { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { parseFilter } from "@vuu-ui/vuu-filter-parser";
 import type { RowPredicate } from "./types.ts";
+import { integerAlias, withIntegerAliases } from "./values.ts";
 
 const rejectAll: RowPredicate = () => false;
 
@@ -61,18 +62,30 @@ export function compileFilter(
   }
 
   if (filter.op === "in") {
-    const values = new Set<VuuRowDataItemType>(
+    const values = withIntegerAliases(
       (filter.values as FilterValue[]).map(normalizeValue),
     );
     return (row) => values.has(row[idx]);
   }
 
   const value = normalizeValue(clause.value as FilterValue);
+  // matches the same integer held as a bigint (or number) in the row
+  const alias = integerAlias(value);
   switch (filter.op) {
     case "=":
-      return (row) => row[idx] === value;
+      return alias === undefined
+        ? (row) => row[idx] === value
+        : (row) => {
+            const v: unknown = row[idx];
+            return v === value || v === alias;
+          };
     case "!=":
-      return (row) => row[idx] !== value;
+      return alias === undefined
+        ? (row) => row[idx] !== value
+        : (row) => {
+            const v: unknown = row[idx];
+            return v !== value && v !== alias;
+          };
     case ">":
       return (row) => (row[idx] as number) > (value as number);
     case ">=":

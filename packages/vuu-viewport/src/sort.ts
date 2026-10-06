@@ -1,4 +1,5 @@
 import type { RowSource, VuuDataRow } from "@heswell/vuu-table";
+import { isSafeBigInt } from "./values.ts";
 import type {
   VuuRowDataItemType,
   VuuSortCol,
@@ -86,12 +87,14 @@ export function createComparator(
 }
 
 /**
- * Extract a dense numeric sort key per row for one column. Numbers and
- * booleans are used directly, strings are rank encoded (distinct values
+ * Extract a dense numeric sort key per row for one column. Numbers,
+ * booleans and bigints within the safe integer range are used directly
+ * (a column may mix number and bigint), strings are rank encoded (distinct values
  * sorted once, then each row gets the rank of its value). null/undefined map
  * to -Infinity, matching compareValues (nulls first). Returns undefined if
- * the column holds a mix of strings and numbers, in which case the caller
- * falls back to the generic comparator.
+ * the column holds a mix of strings and numbers, or a bigint outside the safe
+ * integer range, in which case the caller falls back to the generic
+ * comparator (which compares bigints exactly).
  */
 function extractKeys(
   rows: readonly VuuDataRow[],
@@ -104,7 +107,7 @@ function extractKeys(
   let numeric = false;
   for (let i = 0; i < len; i++) {
     const rowIdx = target[i];
-    const v = rows[rowIdx][col];
+    const v: unknown = rows[rowIdx][col];
     if (typeof v === "number") {
       if (strings) return undefined;
       numeric = true;
@@ -116,6 +119,10 @@ function extractKeys(
       if (strings) return undefined;
       numeric = true;
       keys[rowIdx] = v ? 1 : 0;
+    } else if (typeof v === "bigint") {
+      if (strings || !isSafeBigInt(v)) return undefined;
+      numeric = true;
+      keys[rowIdx] = Number(v);
     } else if (v === null || v === undefined) {
       keys[rowIdx] = -Infinity;
     } else {

@@ -20,6 +20,11 @@ export interface BenchView {
   openTreeNode(key: string): number;
   /** deliver any queued changes, returns number of rows that would be sent */
   flush(): number;
+  /** select every row, returns number of rows that would be sent */
+  selectAll(): number;
+  readonly selectedRowCount: number;
+  /** number of source table keys selected, as resolved for visual links */
+  selectedRowKeys(): number;
   readonly size: number;
   destroy(): void;
 }

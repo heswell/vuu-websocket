@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Columns, TableDef, VuuUser } from "@heswell/vuu-server";
+import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { InMemDataTable } from "../src/core/table/InMemDataTable";
 import { TableContainer } from "../src/core/table/TableContainer";
 import type { ViewServerModule } from "../src/core/module/VsModule";
@@ -220,6 +221,64 @@ describe("Viewport (server)", () => {
     expect(child.size).toBe(4);
   });
 
+  test("select all selects rows added later and drives visual links", () => {
+    const { createViewport, currencies, orders, viewportContainer } = setup();
+    const parent = createViewport(currencies, ["id", "name"]);
+    const child = createViewport(orders, ["id", "ccy"]);
+    viewportContainer.linkViewPorts(child.id, parent.id, "ccy", "id");
+    orders.insert(["o5", "JPY", 50, 500]);
+    flushViewports();
+    expect(child.size).toBe(5);
+
+    parent.selectRow("GBP", false);
+    expect(child.size).toBe(1);
+
+    expect(viewportContainer.selectAll(parent.id)).toBe(3);
+    expect(child.size).toBe(4);
+    expect(parent.getDataForCurrentRange().rows.every((r) => r.sel === 1)).toBe(
+      true,
+    );
+
+    currencies.insert(["JPY", "Yen"]);
+    flushViewports();
+    expect(parent.selectedRowCount).toBe(4);
+    expect(Array.from(parent.selectedKeys).sort()).toEqual([
+      "EUR",
+      "GBP",
+      "JPY",
+      "USD",
+    ]);
+
+    const { selectedRowCount } = parent.deselectRow("EUR", true);
+    expect(selectedRowCount).toBe(3);
+    expect(child.size).toBe(3);
+
+    expect(viewportContainer.deselectAll(parent.id)).toBe(0);
+    expect(child.size).toBe(5);
+  });
+
+  test("base filter is independent of client filter and visual link", () => {
+    const { createViewport, currencies, orders, viewportContainer } = setup();
+    const parent = createViewport(currencies, ["id", "name"]);
+    const child = createViewport(orders, ["id", "ccy"]);
+    child.setBaseFilter({ filter: "qty < 350" });
+    expect(child.size).toBe(3);
+    expect(child.baseFilterSpec).toEqual({ filter: "qty < 350" });
+
+    child.changeViewport({ filterSpec: { filter: "qty > 150" } });
+    expect(child.size).toBe(2);
+
+    viewportContainer.linkViewPorts(child.id, parent.id, "ccy", "id");
+    parent.selectRow("EUR", false);
+    expect(child.getDataForCurrentRange().rows.map((r) => r.rowKey)).toEqual([
+      "o3",
+    ]);
+
+    viewportContainer.unlinkViewPorts(child.id);
+    child.setBaseFilter(undefined);
+    expect(child.size).toBe(3);
+  });
+
   test("removing parent viewport removes visual link", () => {
     const { createViewport, currencies, orders, viewportContainer } = setup();
     const parent = createViewport(currencies, ["id"]);
@@ -252,6 +311,30 @@ describe("Viewport (server)", () => {
     expect(vp.getUniqueValues("ccy", "e")).toEqual(["EUR"]);
     vp.changeViewport({ filterSpec: { filter: "qty > 350" } });
     expect(vp.getUniqueValues("ccy")).toEqual(["USD"]);
+  });
+});
+
+describe("bigint values (server)", () => {
+  test("bigint row values are published as JSON-safe values", () => {
+    const { createViewport, drain } = setup();
+    const trades = createTable("trades", "id:string", "ts:long", "qty:long");
+    trades.insert([
+      "t1",
+      1_700_000_000_001n,
+      2n ** 60n,
+    ] as unknown as VuuDataRow);
+    trades.insert(["t2", 1_700_000_000_000n, 5n] as unknown as VuuDataRow);
+    const vp = createViewport(trades, ["id", "ts", "qty"], { sort: "ts" });
+    const updates = drain();
+    expect(() => JSON.stringify(updates)).not.toThrow();
+    expect(updates.filter(isViewPortRowUpdate).map((u) => u.row.data)).toEqual([
+      ["t2", 1_700_000_000_000, 5],
+      ["t1", 1_700_000_000_001, (2n ** 60n).toString()],
+    ]);
+    vp.changeViewport({ filterSpec: { filter: "qty = 5" } });
+    expect(vp.getDataForCurrentRange().rows.map((r) => r.rowKey)).toEqual([
+      "t2",
+    ]);
   });
 });
 
@@ -294,5 +377,38 @@ describe("JoinTable (server)", () => {
       ["o1", ["o1", "Euro (EUR)"]],
       ["o3", ["o3", "Euro (EUR)"]],
     ]);
+  });
+
+  test("inner join viewport tracks right table inserts and deletes", async () => {
+    const { JoinTable } = await import("../src/core/table/JoinTable");
+    const { JoinTableDef, Join, JoinSpec, VisualLinks } =
+      await import("../src/api/TableDef");
+    const { orders, currencies, createViewport, drain } = setup();
+    currencies.delete("GBP");
+    const joinDef = JoinTableDef({
+      name: "ordersCcyInner",
+      baseTable: orders.tableDef,
+      joinColumns: Columns.fromNames("id:string", "ccy:string", "name:string"),
+      joins: Join(currencies.tableDef, JoinSpec("ccy", "id", "InnerJoin")),
+      joinFields: [],
+      links: VisualLinks(),
+    });
+    joinDef.setModule({ name: "TEST" } as ViewServerModule);
+    const join = new JoinTable(joinDef, orders, currencies);
+    const vp = createViewport(
+      join as unknown as InMemDataTable,
+      ["id", "name"],
+      { sort: "id" },
+    );
+    const keys = () => vp.getDataForCurrentRange().rows.map((r) => r.rowKey);
+    expect(keys()).toEqual(["o1", "o3", "o4"]);
+    drain();
+    currencies.insert(["GBP", "Sterling"]);
+    flushViewports();
+    expect(keys()).toEqual(["o1", "o2", "o3", "o4"]);
+    currencies.delete("EUR");
+    flushViewports();
+    expect(keys()).toEqual(["o2", "o4"]);
+    expect(drain().some((u) => u.vpUpdate === "SIZE")).toBe(true);
   });
 });

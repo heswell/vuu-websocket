@@ -407,7 +407,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
   }
 
   get selectedRowCount() {
-    return this.#engine.selectedKeys.size;
+    return this.#engine.selectedRowCount;
   }
 
   get visualLink() {
@@ -472,6 +472,10 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     );
   }
 
+  selectAll() {
+    return this.selectionChanged(this.#engine.selectAll());
+  }
+
   deselectAll() {
     return this.selectionChanged(this.#engine.deselectAll());
   }
@@ -507,6 +511,15 @@ export class Viewport extends EventEmitter<ViewportEvents> {
 
   setLinkFilter(linkFilter: Parameters<ViewportEngine["setLinkFilter"]>[0]) {
     return this.post(this.#engine.setLinkFilter(linkFilter));
+  }
+
+  get baseFilterSpec() {
+    return this.#engine.baseFilterSpec;
+  }
+
+  /** A filter composed with, rather than replaced by, the client filter. */
+  setBaseFilter(filterSpec: VuuFilter | undefined) {
+    return this.post(this.#engine.setBaseFilter(filterSpec));
   }
 
   setVisualLink(link: RuntimeViewPortVisualLink) {

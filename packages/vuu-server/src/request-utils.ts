@@ -14,12 +14,15 @@ type UniqueValueStartsWithRequest = Pick<
 };
 
 export const isGetUniqueValues = (
-  message: VuuRpcServiceRequest
+  message: VuuRpcServiceRequest,
 ): message is UniqueValueRequest =>
-  message.method === "getUniqueFieldValues" && message.params.length === 2;
+  message.method === "getUniqueFieldValues" &&
+  Array.isArray(message.params) &&
+  message.params.length === 2;
 
 export const isGetUniqueValuesStartingWith = (
-  message: VuuRpcServiceRequest
+  message: VuuRpcServiceRequest,
 ): message is UniqueValueStartsWithRequest =>
   message.method === "getUniqueFieldValuesStartingWith" &&
+  Array.isArray(message.params) &&
   message.params.length === 3;

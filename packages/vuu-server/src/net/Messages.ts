@@ -2,6 +2,8 @@ import type {
   RpcResult,
   DeselectAllSuccess as VuuDeselectAllSuccess,
   DeselectRowSuccess as VuuDeselectRowSuccess,
+  SelectAllReject as VuuSelectAllReject,
+  SelectAllSuccess as VuuSelectAllSuccess,
   SelectRowSuccess as VuuSelectRowSuccess,
   SelectRowRangeSuccess as VuuSelectRowRangeSuccess,
   ServerMessageBody,
@@ -74,20 +76,32 @@ export const LoginSuccess = (
   ...options,
 });
 
+// Defaults match the Scala server's RangeSettings().
+export const DEFAULT_MAX_RANGE_END = 2_147_483_647;
+export const DEFAULT_MAX_RANGE_WIDTH = 1_000;
+
 export const GetTableMetaResponse = (
   table: VuuTable,
   columns: string[],
   dataTypes: VuuColumnDataType[],
   key: string,
+  editableColumns: string[] = [],
+  maxRangeEnd = DEFAULT_MAX_RANGE_END,
+  maxRangeWidth = DEFAULT_MAX_RANGE_WIDTH,
 ): VuuTableMetaResponse => ({
   columns,
   dataTypes,
+  editableColumns,
   key,
+  maxRangeEnd,
+  maxRangeWidth,
   table,
   type: "TABLE_META_RESP",
 });
 
-export const GetTableListResponse = (tables: VuuTable[]): VuuTableListResponse => ({
+export const GetTableListResponse = (
+  tables: VuuTable[],
+): VuuTableListResponse => ({
   tables,
   type: "TABLE_LIST_RESP",
 });
@@ -199,6 +213,24 @@ export const DeselectRowSuccess = (
 ): VuuDeselectRowSuccess => ({
   selectedRowCount,
   type: "DESELECT_ROW_SUCCESS",
+  vpId,
+});
+
+export const SelectAllSuccess = (
+  vpId: string,
+  selectedRowCount: number,
+): VuuSelectAllSuccess => ({
+  selectedRowCount,
+  type: "SELECT_ALL_SUCCESS",
+  vpId,
+});
+
+export const SelectAllReject = (
+  vpId: string,
+  errorMsg: string,
+): VuuSelectAllReject => ({
+  errorMsg,
+  type: "SELECT_ALL_REJECT",
   vpId,
 });
 

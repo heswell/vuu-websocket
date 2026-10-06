@@ -1,11 +1,13 @@
 import type { RowSource, TableListener, VuuDataRow } from "@heswell/vuu-table";
 import type { Filter } from "@vuu-ui/vuu-filter-types";
 import type {
+  VuuFilter,
   VuuRange,
   VuuRowDataItemType,
   VuuSort,
 } from "@vuu-ui/vuu-protocol-types";
 import { filterNarrows, parseAndCompileFilter } from "./filter.ts";
+import { toProtocolValue, withIntegerAliases } from "./values.ts";
 import { aggValue, GroupTree, type GroupNode } from "./GroupTree.ts";
 import {
   createComparator,
@@ -26,6 +28,7 @@ import type {
 } from "./types.ts";
 
 const EMPTY_SORT: VuuSort = { sortDefs: [] };
+const EMPTY_FILTER: VuuFilter = { filter: "" };
 const NULL_RANGE: VuuRange = { from: 0, to: 0 };
 const TREE_COLUMN_COUNT = 6;
 
@@ -88,9 +91,12 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
 
   // projection
   #bindings: ColumnBinding[] = [];
+  #tsCol: number;
 
   // filtering
   #clientFilter: { filter: Filter; predicate: RowPredicate } | undefined;
+  #baseFilterSpec: VuuFilter = EMPTY_FILTER;
+  #baseFilter: { filter: Filter; predicate: RowPredicate } | undefined;
   #permissionFilter: RowPredicate | undefined;
   #linkFilter: LinkFilter | undefined;
   #predicate: RowPredicate | undefined;
@@ -114,8 +120,11 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   #treeDirty = false;
   #flattenDirty = false;
 
-  // selection
+  // selection. In select-all mode every row is selected except the keys in
+  // #deselected, so rows that later enter the viewport are selected too.
   #selected = new Set<string>();
+  #selectAll = false;
+  #deselected = new Set<string>();
   onSelectionChange?: () => void;
 
   // client window snapshot
@@ -135,15 +144,22 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       aggregations = [],
       range = NULL_RANGE,
       permissionFilter,
+      baseFilterSpec = EMPTY_FILTER,
       onPendingChanges,
     }: ViewportOptions,
   ) {
     this.id = id;
     this.table = table;
+    this.#tsCol = table.columnMap.vuuUpdatedTimestamp ?? -1;
     this.#config = { columns, sort, filterSpec, groupBy, aggregations };
     this.#range = range;
     this.#onPendingChanges = onPendingChanges;
     this.#permissionFilter = permissionFilter;
+    this.#baseFilterSpec = baseFilterSpec;
+    this.#baseFilter = parseAndCompileFilter(
+      baseFilterSpec.filter,
+      table.columnMap,
+    );
     this.#clientFilter = parseAndCompileFilter(
       filterSpec.filter,
       table.columnMap,
@@ -180,7 +196,38 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   }
 
   get selectedKeys(): ReadonlySet<string> {
-    return this.#selected;
+    if (!this.#selectAll) return this.#selected;
+    this.applyPending();
+    const keys = new Set<string>();
+    const deselected = this.#deselected;
+    for (let pos = 0; pos < this.size; pos++) {
+      const key = this.keyAt(pos);
+      if (!deselected.has(key)) keys.add(key);
+    }
+    return keys;
+  }
+
+  get selectedRowCount() {
+    if (!this.#selectAll) return this.#selected.size;
+    this.applyPending();
+    const deselected = this.#deselected;
+    if (deselected.size === 0) return this.size;
+    if (this.#tree) {
+      let count = 0;
+      for (let pos = 0; pos < this.size; pos++) {
+        if (!deselected.has(this.keyAt(pos))) count += 1;
+      }
+      return count;
+    }
+    let count = this.#indexLen;
+    for (const key of deselected) {
+      if (this.positionOfKey(key) !== -1) count -= 1;
+    }
+    return count;
+  }
+
+  get isSelectAll() {
+    return this.#selectAll;
   }
 
   get isGrouped() {
@@ -313,7 +360,12 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     }
 
     const key = String(row[this.table.indexOfKeyField]);
-    if (this.#selected.delete(key)) {
+    if (this.#selectAll) {
+      // a later insert with the same key must be selected
+      if (!this.#deselected.delete(key) && pos !== -1) {
+        this.onSelectionChange?.();
+      }
+    } else if (this.#selected.delete(key)) {
       this.onSelectionChange?.();
     }
     if (pos !== -1) {
@@ -329,7 +381,8 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     this.#pendingList.length = 0;
     this.#forceDirty.clear();
     if (this.#tree) this.#treeDirty = true;
-    if (this.#selected.size > 0) {
+    this.#deselected.clear();
+    if (this.#selected.size > 0 || this.#selectAll) {
       this.#selected.clear();
       this.onSelectionChange?.();
     }
@@ -472,6 +525,32 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return this.#linkFilter;
   }
 
+  get baseFilterSpec(): VuuFilter {
+    return this.#baseFilterSpec;
+  }
+
+  setBaseFilter(filterSpec: VuuFilter = EMPTY_FILTER) {
+    const previousFilter = this.#baseFilter?.filter;
+    if (filterSpec.filter === this.#baseFilterSpec.filter) {
+      this.#baseFilterSpec = filterSpec;
+      return this.flush();
+    }
+    this.#baseFilterSpec = filterSpec;
+    this.#baseFilter = parseAndCompileFilter(
+      filterSpec.filter,
+      this.table.columnMap,
+    );
+    if (filterNarrows(this.#baseFilter?.filter, previousFilter)) {
+      this.applyPending();
+      this.composePredicate();
+      this.narrowIndex();
+      if (this.#tree) this.#treeDirty = true;
+      this.applyPending();
+      return this.collect();
+    }
+    return this.refilter();
+  }
+
   openTreeNode(treeKey: string) {
     const tree = this.#tree;
     if (tree && !tree.expanded.has(treeKey)) {
@@ -497,19 +576,35 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
 
   selectRow(rowKey: string, preserveExistingSelection: boolean) {
     this.applyPending();
-    if (!preserveExistingSelection) this.#selected.clear();
-    this.#selected.add(rowKey);
+    if (!preserveExistingSelection) {
+      this.clearSelection();
+      this.#selected.add(rowKey);
+    } else if (this.#selectAll) {
+      this.#deselected.delete(rowKey);
+    } else {
+      this.#selected.add(rowKey);
+    }
     this.onSelectionChange?.();
     return this.collect();
   }
 
   deselectRow(rowKey: string, preserveExistingSelection: boolean) {
     this.applyPending();
-    if (preserveExistingSelection) {
-      this.#selected.delete(rowKey);
+    if (!preserveExistingSelection) {
+      this.clearSelection();
+    } else if (this.#selectAll) {
+      this.#deselected.add(rowKey);
     } else {
-      this.#selected.clear();
+      this.#selected.delete(rowKey);
     }
+    this.onSelectionChange?.();
+    return this.collect();
+  }
+
+  selectAll() {
+    this.applyPending();
+    this.clearSelection();
+    this.#selectAll = true;
     this.onSelectionChange?.();
     return this.collect();
   }
@@ -518,19 +613,29 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return this.deselectRow("", false);
   }
 
+  private clearSelection() {
+    this.#selected.clear();
+    this.#deselected.clear();
+    this.#selectAll = false;
+  }
+
   selectRowRange(
     fromRowKey: string,
     toRowKey: string,
     preserveExistingSelection: boolean,
   ) {
     this.applyPending();
-    if (!preserveExistingSelection) this.#selected.clear();
+    if (!preserveExistingSelection) this.clearSelection();
     let fromPos = this.positionOfKey(fromRowKey);
     let toPos = this.positionOfKey(toRowKey);
     if (fromPos !== -1 && toPos !== -1) {
       if (fromPos > toPos) [fromPos, toPos] = [toPos, fromPos];
       for (let pos = fromPos; pos <= toPos; pos++) {
-        this.#selected.add(this.keyAt(pos));
+        if (this.#selectAll) {
+          this.#deselected.delete(this.keyAt(pos));
+        } else {
+          this.#selected.add(this.keyAt(pos));
+        }
       }
     }
     this.onSelectionChange?.();
@@ -538,6 +643,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   }
 
   getSelectedRowKeys(): string[] {
+    if (this.#selectAll) return this.selectAllRowKeys();
     const tree = this.#tree;
     if (tree === undefined) {
       const keys: string[] = [];
@@ -572,6 +678,40 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       }
     }
     return Array.from(keys);
+  }
+
+  /**
+   * Source table keys of all rows in the viewport, less any deselected. When
+   * grouped, a deselected group excludes all of its leaf rows.
+   */
+  private selectAllRowKeys(): string[] {
+    this.applyPending();
+    const deselected = this.#deselected;
+    const { rows, indexOfKeyField } = this.table;
+    const keys: string[] = [];
+    const tree = this.#tree;
+    if (tree === undefined) {
+      const index = this.#index;
+      for (let pos = 0; pos < this.#indexLen; pos++) {
+        const key = String(rows[index[pos]][indexOfKeyField]);
+        if (!deselected.has(key)) keys.push(key);
+      }
+      return keys;
+    }
+    const addLeaves = (node: GroupNode) => {
+      if (deselected.has(node.key)) return;
+      if (node.leaves) {
+        for (const rowIdx of node.leaves) {
+          const rowKey = String(rows[rowIdx][indexOfKeyField]);
+          if (deselected.size === 0 || !deselected.has(`${node.key}|${rowKey}`))
+            keys.push(rowKey);
+        }
+      } else if (node.children) {
+        for (const child of node.children) addLeaves(child);
+      }
+    };
+    addLeaves(tree.root);
+    return keys;
   }
 
   getSelectedValues(column: string) {
@@ -664,11 +804,12 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     if (this.#permissionFilter) predicates.push(this.#permissionFilter);
     if (this.#linkFilter) {
       const col = this.table.columnMap[this.#linkFilter.column];
-      const { values } = this.#linkFilter;
+      const values = withIntegerAliases(this.#linkFilter.values);
       predicates.push(
         col === undefined ? () => false : (row) => values.has(row[col]),
       );
     }
+    if (this.#baseFilter) predicates.push(this.#baseFilter.predicate);
     if (this.#clientFilter) predicates.push(this.#clientFilter.predicate);
 
     if (predicates.length === 0) {
@@ -678,9 +819,12 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     } else if (predicates.length === 2) {
       const [p1, p2] = predicates;
       this.#predicate = (row) => p1(row) && p2(row);
-    } else {
+    } else if (predicates.length === 3) {
       const [p1, p2, p3] = predicates;
       this.#predicate = (row) => p1(row) && p2(row) && p3(row);
+    } else {
+      const [p1, p2, p3, p4] = predicates;
+      this.#predicate = (row) => p1(row) && p2(row) && p3(row) && p4(row);
     }
   }
 
@@ -979,12 +1123,27 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return String(rows[this.#index[pos]][indexOfKeyField]);
   }
 
+  private rowTs(row: VuuDataRow): number {
+    const col = this.#tsCol;
+    if (col === -1) return 0;
+    const v: unknown = row[col];
+    return typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : 0;
+  }
+
   private projectRow(row: VuuDataRow) {
     const bindings = this.#bindings;
     const data: (VuuRowDataItemType | null)[] = new Array(bindings.length);
     for (let i = 0; i < bindings.length; i++) {
       const col = bindings[i].col;
-      data[i] = col === -1 ? null : row[col];
+      if (col === -1) {
+        data[i] = null;
+      } else {
+        const v: unknown = row[col];
+        data[i] =
+          typeof v === "bigint"
+            ? toProtocolValue(v)
+            : (v as VuuRowDataItemType);
+      }
     }
     return data as VuuRowDataItemType[];
   }
@@ -998,7 +1157,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     data[1] = tree.expanded.has(node.key);
     data[2] = node.key;
     data[3] = false;
-    data[4] = node.label;
+    data[4] = toProtocolValue(node.label);
     data[5] = node.childCount;
     for (let i = 0; i < bindings.length; i++) {
       const { groupLevel, aggIndex, aggType } = bindings[i];
@@ -1008,7 +1167,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       } else if (groupLevel !== -1 && groupLevel < node.depth) {
         let n: GroupNode | null = node;
         while (n && n.depth > groupLevel + 1) n = n.parent;
-        value = n ? n.label : "";
+        value = n ? toProtocolValue(n.label) : "";
       }
       data[TREE_COLUMN_COUNT + i] = value;
     }
@@ -1029,7 +1188,10 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     const rows: ViewportRow[] = [];
     const tableRows = this.table.rows;
     const keyIdx = this.table.indexOfKeyField;
-    const selected = this.#selected;
+    const selected = this.#selectAll ? this.#deselected : this.#selected;
+    // in select-all mode membership of the set means not selected
+    const selIfMember: 0 | 1 = this.#selectAll ? 0 : 1;
+    const selIfNotMember: 0 | 1 = this.#selectAll ? 1 : 0;
     const sentKey = this.#sentKey;
     const sentRef = this.#sentRef;
     const sentSel = this.#sentSel;
@@ -1042,7 +1204,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
         const rowIdx = this.#index[pos];
         const row = tableRows[rowIdx];
         const key = String(row[keyIdx]);
-        const sel = selected.has(key) ? 1 : 0;
+        const sel = selected.has(key) ? selIfMember : selIfNotMember;
         if (
           key !== sentKey[slot] ||
           row !== sentRef[slot] ||
@@ -1056,6 +1218,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             rowIndex: pos,
             rowKey: key,
             sel,
+            ts: this.rowTs(row),
             data: this.projectRow(row),
           });
         }
@@ -1066,7 +1229,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
           const rowKey = String(row[keyIdx]);
           const parent = tree.leafParent[entry];
           const key = `${parent?.key ?? "$root"}|${rowKey}`;
-          const sel = selected.has(key) ? 1 : 0;
+          const sel = selected.has(key) ? selIfMember : selIfNotMember;
           if (
             key !== sentKey[slot] ||
             row !== sentRef[slot] ||
@@ -1080,6 +1243,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
               rowIndex: pos,
               rowKey: key,
               sel,
+              ts: this.rowTs(row),
               data: [
                 tree.leafDepth,
                 false,
@@ -1093,7 +1257,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
           }
         } else {
           const key = entry.key;
-          const sel = selected.has(key) ? 1 : 0;
+          const sel = selected.has(key) ? selIfMember : selIfNotMember;
           const data = this.groupRowData(entry, tree);
           const previous = sentRef[slot];
           if (
@@ -1105,7 +1269,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             sentKey[slot] = key;
             sentRef[slot] = data;
             sentSel[slot] = sel;
-            rows.push({ rowIndex: pos, rowKey: key, sel, data });
+            rows.push({ rowIndex: pos, rowKey: key, sel, ts: 0, data });
           }
         }
       }

@@ -4,6 +4,7 @@ import {
   ClientToServerOpenTreeNode,
   DeselectAllRequest,
   DeselectRowRequest,
+  SelectAllRequest,
   SelectRowRangeRequest,
   SelectRowRequest,
   ServerMessageBody,
@@ -39,6 +40,8 @@ import {
   GetViewPortVisualLinksResponse,
   JsonViewServerMessage,
   RpcResponseNew,
+  SelectAllReject,
+  SelectAllSuccess,
   SelectRowRangeSuccess,
   SelectRowSuccess,
   VsMsg,
@@ -113,6 +116,8 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processSelectRowRequest(body, ctx);
       case "DESELECT_ROW":
         return this.processDeselectRowRequest(body, ctx);
+      case "SELECT_ALL":
+        return this.processSelectAllRequest(body, ctx);
       case "DESELECT_ALL":
         return this.processDeselectAllRequest(body, ctx);
       case "SELECT_ROW_RANGE":
@@ -419,6 +424,18 @@ export class CoreServerApiHandler implements ServerApi {
       msg.preserveExistingSelection,
     );
     return vsMsg(DeselectRowSuccess(msg.vpId, selectedRowCount), ctx);
+  }
+
+  private processSelectAllRequest(msg: SelectAllRequest, ctx: RequestContext) {
+    try {
+      const selectedRowCount = this.viewPortContainer.selectAll(msg.vpId);
+      return vsMsg(SelectAllSuccess(msg.vpId, selectedRowCount), ctx);
+    } catch (e) {
+      return vsMsg(
+        SelectAllReject(msg.vpId, `Failed to process request ${ctx.requestId}`),
+        ctx,
+      );
+    }
   }
 
   private processDeselectAllRequest(

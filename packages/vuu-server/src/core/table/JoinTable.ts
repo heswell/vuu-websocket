@@ -4,7 +4,7 @@ import { ColumnValueProvider } from "./ColumnValueProvider";
 import type { IProvider } from "../../provider/Provider";
 
 /**
- * Server join table. A materialized left outer join, maintained
+ * Server join table. A materialized left outer or inner join, maintained
  * incrementally from change events on the base and right tables, so that
  * viewports over a join table are as cheap as those over a simple table.
  */
@@ -18,13 +18,14 @@ export class JoinTable extends MaterializedJoinTable {
     baseTable: Table,
     joinTable: Table,
   ) {
-    const { left, right } = tableDef.joins.joinSpec;
+    const { left, right, type } = tableDef.joins.joinSpec;
     super({
       schema: tableDef.schema,
       baseTable,
       joinTable,
       leftColumn: left,
       rightColumn: right,
+      joinType: type === "InnerJoin" ? "inner" : "leftOuter",
     });
     this.columnValueProvider = new ColumnValueProvider(this);
   }

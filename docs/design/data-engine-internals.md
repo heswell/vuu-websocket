@@ -64,7 +64,7 @@ packages/
   vuu-table/          @heswell/vuu-table
     src/types.ts      RowSource, TableListener, TableSchema, ColumnMap
     src/Table.ts      row store
-    src/JoinTable.ts  materialized left outer join
+    src/JoinTable.ts  materialized left outer / inner join
   vuu-viewport/       @heswell/vuu-viewport  (depends on vuu-table)
     src/types.ts      ViewportEngine, DataEngine, ViewportBatch, ...
     src/sort.ts       sort spec, key extraction, sortIndex
@@ -149,8 +149,9 @@ implements it, including `JoinTable`, can be viewed.
 ## 4. JoinTable
 
 `JoinTable` (`vuu-table/src/JoinTable.ts`) extends `Table` and holds a
-**materialized left outer join** of a base table and a right table.
-Viewports over a join are therefore exactly as cheap as viewports over a
+**materialized join** of a base table and a right table: left outer by
+default, or inner with `joinType: "inner"` (the server maps
+`JoinSpec(..., "InnerJoin")` to this). Viewports over a join are therefore exactly as cheap as viewports over a
 simple table: there is no per-read join.
 
 ```mermaid
@@ -182,13 +183,18 @@ When the right join column is the right table's key (the usual case, e.g.
 
 ### Event propagation
 
-| Event               | Join action                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| base insert         | Build the join row and `insert` it. Index the base key under its join value.                                                                                                                |
-| base update         | Rebuild the join row and `update` it. If the join value changed, move the base key between index sets.                                                                                      |
-| base delete         | Delete the join row and unindex it.                                                                                                                                                         |
-| right insert/update | For every base key under that join value, rebuild and `update` the join row.                                                                                                                |
-| right delete        | Same, with right columns set to `null`. With a non-key right column, `unindexRightRow` rescans the right table for another row with the same join value, so that a duplicate can take over. |
+Every change that can affect a base row goes through `sync(key, baseRow)`,
+which looks up the matching right row and inserts, updates or (inner join, no
+right row) deletes the join row. For a left outer join the row always exists,
+so `sync` is an update.
+
+| Event               | Join action                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| base insert         | Index the base key under its join value, then `sync` (insert; inner join skips rows without a right match).                                                                                                                          |
+| base update         | If the join value changed, move the base key between index sets. Then `sync` (inner join may insert or delete).                                                                                                                      |
+| base delete         | Delete the join row (if present) and unindex it.                                                                                                                                                                                     |
+| right insert/update | `sync` every base key under that join value (inner join inserts newly matched rows). A changed right join value also syncs the base keys under the old value.                                                                        |
+| right delete        | Same: right columns set to `null` (left outer) or the join rows deleted (inner). With a non-key right column, `unindexRightRow` rescans the right table for another row with the same join value, so that a duplicate can take over. |
 
 Join rows are rebuilt and replaced, never mutated, so downstream listeners
 always get a distinct `previous`.
@@ -226,6 +232,7 @@ interface ViewportRow {
   rowIndex: number; // position in the viewport
   rowKey: string; // table key, or tree key when grouped
   sel: 0 | 1;
+  ts: number; // row's vuuUpdatedTimestamp, else 0 (§16)
   data: VuuRowDataItemType[]; // projected columns (+ 6 tree columns if grouped)
 }
 ```
@@ -477,22 +484,31 @@ An empty query compiles to `undefined` (no client filter).
 
 ### Predicate composition
 
-The effective predicate is the AND of up to three parts:
+The effective predicate is the AND of up to four parts, in this order:
 
-| Part       | Set by                            | Source                                                                        |
-| ---------- | --------------------------------- | ----------------------------------------------------------------------------- |
-| permission | `setPermissionFilter(predicate)`  | `TableDef.permissionFunction` → `PermissionFilter.createPredicate(columnMap)` |
-| link       | `setLinkFilter({column, values})` | visual link from a parent viewport's selection                                |
-| client     | `setConfig({filterSpec})`         | the user's filter                                                             |
+| Part       | Set by                                                     | Source                                                                                           |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| permission | `setPermissionFilter(predicate)`                           | `TableDef.permissionFunction` → `PermissionFilter.createPredicate(columnMap)`                    |
+| link       | `setLinkFilter({column, values})`                          | visual link from a parent viewport's selection                                                   |
+| base       | `setBaseFilter(filterSpec)` or the `baseFilterSpec` option | a host-imposed Vuu filter, e.g. vuu-ui's `freeze()` (`vuuCreatedTimestamp < ts`) or `baseFilter` |
+| client     | `setConfig({filterSpec})`                                  | the user's filter                                                                                |
 
-`composePredicate` skips absent parts and specialises for 1, 2 or 3 parts.
+`composePredicate` skips absent parts and specialises for 1 to 4 parts.
 With none, `#predicate` is `undefined` and the scan loops skip predicate
 calls entirely. The link filter is `(row) => values.has(row[col])`. The parts
 are kept separately, so changing one does not require re-parsing the others.
 
+The base filter is a separate slot so that, unlike vuu-ui's `ArrayDataSource`
+(where `freeze()` and visual links both write `baseFilter`), a freeze, a
+visual link and the user's filter never overwrite each other. An invalid base
+filter compiles to `rejectAll`, as for the client filter. The server's
+`Viewport.setBaseFilter` exposes it to hosts; it is not part of the Vuu
+protocol.
+
 ### Narrowing
 
-When only the client filter changes and the sort is unchanged,
+When only the client filter changes and the sort is unchanged (or only
+the base filter changes),
 `filterNarrows(newFilter, oldFilter)` checks structurally whether the new
 filter is the old one AND something extra (e.g. the user typed one more
 clause). If so, `narrowIndex` filters the existing sorted index **in place**
@@ -664,6 +680,33 @@ For visual linking and RPC handlers:
 - `getSelectedValues(column)` returns the distinct values of `column` over
   those rows. This is what a child viewport filters on.
 
+### Select all
+
+`selectAll()` puts the viewport into a **live** select-all mode, matching
+vuu-ui's ArrayDataSource (`"*"`), rather than Scala's snapshot of the
+current keys. The state is a `#selectAll` flag plus a `#deselected` set of
+exceptions; `#selected` is not populated.
+
+- Every row in the view is selected, including rows that enter it later
+  through inserts, updates that now pass the filter, or re-inserts after a
+  delete.
+- `deselectRow(key, true)` adds an exception. `selectRow`/`selectRowRange`
+  with `preserve` remove exceptions. A non-preserving select or deselect,
+  or `deselectAll()`, leaves select-all mode.
+- Exceptions persist while a row is filtered out. They are dropped when the
+  row is deleted, so a re-inserted row is selected again.
+- `selectedRowCount` is O(exceptions): `indexLen` minus the exceptions still
+  present (flat), or the visible keys not excepted (grouped).
+  `selectedKeys` and `getSelectedRowKeys()` are built on demand. When
+  grouped, an excepted group excludes all leaves beneath it.
+- `collect()` tests `#deselected` instead of `#selected`, so the cost per
+  tick is unchanged.
+
+The server handles `SELECT_ALL` by replying `SELECT_ALL_SUCCESS` with
+`selectedRowCount`, or `SELECT_ALL_REJECT`. Linked child viewports are
+refreshed when select-all is applied, but not when rows enter the parent
+afterwards ([§22](#22-known-limitations-and-future-work)).
+
 ## 15. Producing client updates
 
 `collect()` builds the `rows` of a batch by comparing the current window
@@ -703,6 +746,21 @@ cancel out has no size change, and therefore no SIZE message.
 `data` is the projected column values, in the order of `config.columns`.
 `rowKey` is the table key.
 
+### Row timestamp
+
+`ViewportRow.ts` is the last update time of the underlying table row: the
+value of its `vuuUpdatedTimestamp` column (resolved once per viewport; need not
+be projected; bigint converted to number), or `0` if the table has no such
+column. `Table` stamps that column on insert and update. Group rows always
+have `ts = 0`. For a `JoinTable` it is whatever the join schema maps into
+`vuuUpdatedTimestamp` (normally the base row's), so a right-side change does
+not advance it.
+
+Browser hosts map it to `DataSourceRow[TIMESTAMP]` (vuu-ui's `ArrayDataSource`
+always sets 0). The server does **not** send it on the wire: protocol
+`RowUpdate.ts` stays the publish time, which vuu-ui's `insertRow` relies on to
+discard an older update for the same row index.
+
 ### Grouped rows
 
 Six tree columns precede the projected columns:
@@ -718,6 +776,27 @@ Six tree columns precede the projected columns:
 | 6…  | columns    | aggregate, or group label for groupBy columns at or above this depth, else `""` | projected row values |
 
 The `rowKey` of a grouped `ViewportRow` is the tree key.
+
+### BigInt values
+
+Tables may hold `bigint` cell values (e.g. `long` timestamps or ids beyond
+2^53). Rows remain typed as the protocol `VuuDataRow`; bigint support is a
+runtime capability and hosts cast `VuuDataRowWithBigint` (exported by
+`@heswell/vuu-table`) when inserting. Helpers live in `vuu-viewport/src/values.ts`.
+
+| Area               | Behaviour                                                                                                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Output             | `projectRow` and group labels convert bigint via `toProtocolValue`: a `number` when within ±(2^53−1), otherwise its decimal string. Published rows are always `JSON.stringify`-safe. Internal state is untouched. |
+| Keys / joins       | Table keys and join lookups use `String(value)`, so bigint keys work and match string keys of the same digits.                                                                                                    |
+| Sort               | `extractKeys` treats safe bigints as numeric keys (fast path; may mix with numbers). An unsafe bigint makes the column fall back to the generic comparator, which compares bigints exactly.                       |
+| Filter `= != in`   | Filter literals are numbers; the compiled predicate also accepts the equivalent bigint (`withIntegerAliases` / `integerAlias`), so `qty = 5` matches `5n`. Visual link values are aliased the same way.           |
+| Filter `< > ` etc. | Relational operators compare number and bigint natively.                                                                                                                                                          |
+| Aggregates         | Values pass through `toNumber` (Float64): sums/averages over very large bigints lose precision.                                                                                                                   |
+| Typeahead          | `getUniqueValues` uses `String(value)`.                                                                                                                                                                           |
+
+vuu-ui's `ArrayDataSource` always emits bigints as strings; this engine emits
+safe values as numbers, matching how the Scala server sends `long` as JSON
+numbers.
 
 ### Client behaviour this design depends on (vuu-ui `vuu-data-remote`)
 
@@ -883,7 +962,9 @@ columnar engine):
 
 - **Visual link refresh on parent updates.** The child's link filter is
   recomputed on parent _selection_ changes only. If the linked column of a
-  selected parent row changes, the child is not refiltered.
+  selected parent row changes, the child is not refiltered. Likewise, rows
+  that enter a parent in select-all mode are selected in the parent but are
+  not added to the child's link filter until the next selection change.
 - **Group order under aggregate sort** is refreshed on rebuild, not on every
   aggregate tick ([§13](#13-grouping-and-aggregation)).
 - **High/Low and Distinct** fall back to a full tree rebuild when the
