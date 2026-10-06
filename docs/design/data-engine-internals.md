@@ -957,6 +957,10 @@ columnar engine):
 - `packages/benchmarks`: `bun run bench` (100k rows) and `bun run bench:1m`
   run the scenarios against each engine adapter. Baselines are committed in
   `packages/benchmarks/results/`; see [data-engine.md](./data-engine.md#benchmarks).
+- `packages/benchmarks/src/scala`: `bun run bench:scala` ports the finos/vuu
+  JMH benchmarks and, given a built finos/vuu checkout (`--vuu`), compares
+  them side by side; see
+  [data-engine.md](./data-engine.md#comparison-with-the-scala-vuu-engine).
 
 ## 22. Known limitations and future work
 

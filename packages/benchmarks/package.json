@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "bench": "bun ./src/run.ts",
-    "bench:1m": "bun ./src/run.ts --rows=1000000"
+    "bench:1m": "bun ./src/run.ts --rows=1000000",
+    "bench:scala": "bun ./src/scala/run.ts"
   },
   "dependencies": {
     "@heswell/vuu-table": "3.0.0",

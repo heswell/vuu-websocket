@@ -26,6 +26,7 @@
     "debug": "bun --inspect ./start.ts",
     "bench": "bun ./packages/benchmarks/src/run.ts",
     "bench:1m": "bun ./packages/benchmarks/src/run.ts --rows=1000000",
+    "bench:scala": "bun ./packages/benchmarks/src/scala/run.ts",
     "test": "bun test",
     "bump:versions": "bun ./scripts/bump-versions.ts",
     "pub": "bun ./scripts/publish.ts",

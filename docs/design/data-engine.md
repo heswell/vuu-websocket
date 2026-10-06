@@ -169,6 +169,70 @@ Baseline results are committed in `packages/benchmarks/results/` (`100k.md`,
 alternative engine, add an `EngineAdapter` in `src/adapters/` and register it
 in `src/run.ts`; with two engines the runner adds a speedup column.
 
+### Comparison with the Scala Vuu engine
+
+`packages/benchmarks/src/scala` ports the JMH benchmarks in finos/vuu
+(`benchmark/src/main/java/org/finos/vuu/benchmark`) to `vuu-table` and
+`vuu-viewport`. The tables, data, sizes and setup levels are the same, and the
+timing follows JMH SampleTime: fixed-duration warmup and measurement
+iterations, with every invocation timed. The runner can also run the Scala
+benchmarks and write both sets of results side by side.
+
+```sh
+# once, in a finos/vuu checkout (needs JDK 17+ and Maven)
+mvn -pl benchmark -am install -DskipTests
+
+bun run bench:scala --vuu=<path to finos/vuu>
+```
+
+`--vuu` (or `VUU_DIR`) runs JMH from the benchmark module's Maven classpath,
+which finos/vuu has used since finos/vuu#2507. For older checkouts, which
+build a shaded jar, pass `--jar=<finos/vuu>/benchmark/target/benchmarks.jar`
+instead. Without either only our side runs, and `--jmh-results=<json>` reuses
+an earlier JMH JSON result file. JMH is started with the JVM options from the
+benchmark module's `pom.xml`.
+
+Other options:
+
+- `--only=<regex>` selects benchmarks.
+- `--max-size=<n>` caps the table sizes on both sides.
+- `--full` uses the JMH annotation settings (5 x 10 s warmup and measurement).
+  The default is 3 x 1 s warmup and 5 x 1 s measurement.
+
+The latest results are in
+[`packages/benchmarks/results/scala-comparison.md`](../../packages/benchmarks/results/scala-comparison.md).
+In summary, at the time of writing (default settings, Apple M2):
+
+- Table writes are 5 to 13 times faster (inserts and updates), and deletes are
+  hundreds of times faster, because Scala deletes are O(n).
+- Iterating join rows is 20 to 90 times faster, because ours are materialized.
+- `<` filtering is about 5 times faster. `starts` filtering is about 20% slower.
+- Sorting is 10% to 50% slower than the JVM's, measured over the whole viewport
+  creation. Sorting is the main area to improve.
+- Grouping is within about 2x either way, depending on size.
+
+Read the results with these differences in mind:
+
+- **Sort, filter and tree.** Scala times the bare `Sort.doSort`,
+  `filterAllSafe` and `TreeBuilder` calls. Ours time the creation of a whole
+  `InMemoryViewport` (index build plus the first 50 row window), so they
+  overstate our cost slightly.
+- **equalsFilter.** `exchange` is an indexed column in the Scala table, so
+  Scala does an index lookup. vuu-table has no column indexes and does a full
+  scan.
+- **Join iterateRows.** Scala assembles join rows when they are read. Ours
+  are materialized, so iterating them is a key lookup; the cost moves to
+  updates.
+- **Updates and deletes.** Scala batches join propagation (the join provider
+  runs every 16384 rows). Ours propagate synchronously.
+- **Table iterateRows.** The JMH loop calls `keys.size()` on every iteration,
+  and that call walks every key, so the Scala result is O(n²) and mostly
+  overhead from the benchmark itself. By default the Scala side only runs it at
+  50,000 rows (`--scala-all-sizes` overrides this).
+- **addRows.** In the JMH benchmark the table persists across invocations,
+  so after the first invocation the adds are updates of existing keys. The
+  port does the same.
+
 ## Known limitations
 
 - A visual link is not refreshed when the parent row's link column value
