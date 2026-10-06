@@ -2,6 +2,7 @@ import {
   getPublishablePackage,
   PUBLISHABLE_PACKAGES,
   type PublishablePackageName,
+  PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
 
 type Options = {
@@ -14,7 +15,7 @@ const printHelp = () => {
 Builds every publishable package by default.
 
 Options:
-  --package <name>  Build only @heswell/user-admin or @heswell/module-admin.
+  --package <name>  Build only one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
   --help            Print this help message.`);
 };
 
@@ -47,7 +48,7 @@ const parseOptions = (): Options => {
       const selectedPackage = getPublishablePackage(value);
       if (!selectedPackage) {
         throw new Error(
-          `Unsupported package "${value}". Use @heswell/user-admin or @heswell/module-admin.`,
+          `Unsupported package "${value}". Use one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.`,
         );
       }
       options.packageName = selectedPackage.name;

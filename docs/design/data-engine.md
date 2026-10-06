@@ -151,6 +151,34 @@ equivalent to `TickingArrayDataSource` would:
 
 That work is the next phase. It is not part of this change.
 
+### Building and publishing
+
+Both packages are in `scripts/publishable-packages.ts`. Inside the workspace,
+their `main`/`types`/`exports` point at `src`, so the server, services and
+benchmarks use the TypeScript source directly. `npm run build:packages` runs
+rslib (ESM, `target: "web"`, declarations) and writes a publishable package to
+`dist/vuu-table` and `dist/vuu-viewport`. vuu-table is built first. The
+prepare step rewrites the manifest to point at the built files, drops
+`devDependencies`, and rewrites the relative `./x.ts` specifiers in the
+declarations to `./x.js`.
+
+| Package | Dependencies | Peer dependencies |
+| --- | --- | --- |
+| `@heswell/vuu-table` | none | `@vuu-ui/vuu-data-types`, `@vuu-ui/vuu-protocol-types` (types only) |
+| `@heswell/vuu-viewport` | `@heswell/vuu-table` | `@vuu-ui/vuu-filter-parser` (runtime), plus `vuu-data-types`, `vuu-filter-types`, `vuu-protocol-types` (types only) |
+
+The parser is a peer so a vuu-ui host does not bundle a second copy of it and
+lezer. The type packages are peers because the published declarations
+reference them.
+
+`npm run test:engine-packages` installs the built packages into a temporary
+consumer. It checks the published declarations under `node16` resolution and
+runs the viewport under plain Node ESM. CI runs it, after the build and an
+`npm pack --dry-run`. To publish, first `npm run bump:versions --
+--package=@heswell/vuu-table`, then `npm run pub --
+--package=@heswell/vuu-table [--tag alpha]`. Do the same for
+`@heswell/vuu-viewport`, after vuu-table.
+
 ## Benchmarks
 
 `packages/benchmarks` runs a fixed set of scenarios (view creation, sort,

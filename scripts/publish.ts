@@ -16,6 +16,7 @@ import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
   getPublishablePackage,
   type PublishablePackageName,
+  PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,7 +55,7 @@ const printHelp = () => {
 Builds and publishes ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default.
 
 Options:
-  --package <name>   Publish @heswell/user-admin or @heswell/module-admin.
+  --package <name>   Publish one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
   --dry-run           Validate the npm package without publishing it.
   --version-check     Show the version and current npm dist-tags.
@@ -153,7 +154,7 @@ const parseOptions = (): Options => {
       const selectedPackage = getPublishablePackage(value);
       if (!selectedPackage) {
         throw new Error(
-          `Unsupported package "${value}". Use @heswell/user-admin or @heswell/module-admin.`,
+          `Unsupported package "${value}". Use one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.`,
         );
       }
       options.packageName = selectedPackage.name;
