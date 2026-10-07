@@ -17,8 +17,8 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/service-utils": "1.0.0",
-    "@heswell/vuu-table": "3.0.0",
-    "@heswell/vuu-viewport": "3.1.0",
+    "@heswell/vuu-table": "1.0.0",
+    "@heswell/vuu-viewport": "1.1.1",
     "@vuu-ui/vuu-utils": "3.4.0",
     "pino": "9.6.0"
   },

@@ -10,7 +10,7 @@
     "bench:scala": "bun ./src/scala/run.ts"
   },
   "dependencies": {
-    "@heswell/vuu-table": "3.0.0",
-    "@heswell/vuu-viewport": "3.1.0"
+    "@heswell/vuu-table": "1.0.0",
+    "@heswell/vuu-viewport": "1.1.1"
   }
 }

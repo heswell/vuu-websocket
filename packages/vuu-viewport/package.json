@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-viewport",
-  "version": "3.1.0",
+  "version": "1.1.1",
   "description": "Runtime agnostic (browser or server) Vuu viewport analytics engine - windowing, sorting, filtering, grouping, selection and visual linking",
   "type": "module",
   "main": "src/index.ts",
@@ -23,7 +23,7 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/vuu-table": "3.0.0"
+    "@heswell/vuu-table": "1.0.0"
   },
   "peerDependencies": {
     "@vuu-ui/vuu-data-types": "^3.4.0",

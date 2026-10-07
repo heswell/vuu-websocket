@@ -18,7 +18,7 @@
   "dependencies": {
     "@heswell/module-admin": "1.1.0",
     "@heswell/vuu-server": "3.0.0",
-    "@heswell/vuu-table": "3.0.0",
+    "@heswell/vuu-table": "1.0.0",
     "pino": "9.6.0"
   }
 }

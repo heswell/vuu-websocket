@@ -18,6 +18,6 @@
   "dependencies": {
     "@heswell/user-admin": "1.0.2",
     "@heswell/vuu-server": "3.0.0",
-    "@heswell/vuu-table": "3.0.0"
+    "@heswell/vuu-table": "1.0.0"
   }
 }

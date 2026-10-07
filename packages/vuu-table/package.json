@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-table",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "description": "Runtime agnostic (browser or server) Vuu table store, including join tables",
   "type": "module",
   "main": "src/index.ts",
