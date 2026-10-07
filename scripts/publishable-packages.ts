@@ -18,7 +18,7 @@ export const PUBLISHABLE_PACKAGES = [
   },
   // Depends on all of the above.
   {
-    name: "@vuu-ui/vuu-data-engine-local",
+    name: "@heswell/vuu-data-engine-local",
     directory: "vuu-data-engine-local",
   },
 ] as const;

@@ -1,4 +1,4 @@
-# @vuu-ui/vuu-data-engine-local
+# @heswell/vuu-data-engine-local
 
 A browser-hosted Vuu data layer built on the runtime-agnostic data engine packages
 [`@heswell/vuu-table`](https://www.npmjs.com/package/@heswell/vuu-table) and
@@ -37,13 +37,13 @@ In the finos/vuu `vuu-ui` workspace:
 npm run showcase:engine   # equivalent to: VUU_DATA_ENGINE=local npm run showcase
 ```
 
-This aliases `@vuu-ui/vuu-data-test` to `@vuu-ui/vuu-data-engine-local` in the showcase
+This aliases `@vuu-ui/vuu-data-test` to `@heswell/vuu-data-engine-local` in the showcase
 rsbuild config. The examples themselves don't change.
 
 The showcase uses the published package. To publish it from vuu-websocket:
 
 ```sh
-npm run pub -- --package=@vuu-ui/vuu-data-engine-local --tag alpha
+npm run pub -- --package=@heswell/vuu-data-engine-local --tag alpha
 ```
 
 ## Performance
