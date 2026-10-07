@@ -5,6 +5,7 @@
 // leaving other test files in the same bun process with a plain runtime.
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { afterAll, beforeAll } from "bun:test";
+import { installBrowserGlobals } from "./browser-globals";
 
 const register = () => {
   if (!GlobalRegistrator.isRegistered) {
@@ -20,5 +21,7 @@ export const withHappyDom = () => {
     if (GlobalRegistrator.isRegistered) {
       await GlobalRegistrator.unregister();
     }
+    // Unregistering removes requestAnimationFrame etc. that other files expect.
+    installBrowserGlobals();
   });
 };

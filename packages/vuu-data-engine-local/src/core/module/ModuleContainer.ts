@@ -22,6 +22,10 @@ class ModuleContainer {
     this.#modules.set(module.name, module);
   }
 
+  unregister(name: string) {
+    return this.#modules.delete(name);
+  }
+
   has(name: string) {
     return this.#modules.has(name);
   }

@@ -1,7 +1,8 @@
 import type { DataSourceConfig, TableSchema } from "@vuu-ui/vuu-data-types";
-import { beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { buildDataColumnMapFromSchema, Table } from "../src/Table";
 import type { TickingArrayDataSource } from "../src/ModuleDataSource";
+import moduleContainer from "../src/core/module/ModuleContainer";
 import { VuuModule } from "../src/core/module/VuuModule";
 
 const schema: TableSchema = {
@@ -34,6 +35,12 @@ class EditingModule extends VuuModule<"items"> {
 }
 
 describe("VuuModule edit actions", () => {
+  // Its table is not in tableContainer, so leaving it registered breaks
+  // getTableList in other test files sharing the bun process.
+  afterAll(() => {
+    moduleContainer.unregister("EDIT_TEST");
+  });
+
   let module: EditingModule;
   let sourceTable: Table;
   let sessionDataSource: TickingArrayDataSource;
