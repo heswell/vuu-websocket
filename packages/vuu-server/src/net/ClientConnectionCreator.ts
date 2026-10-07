@@ -79,20 +79,25 @@ class DefaultMessageHandlerImpl implements MessageHandler {
   private formatDataOutbound(
     outbound: ViewPortUpdate[],
   ): ServerToClientTableRows {
-    const updates = outbound
-      .flatMap((vpu) =>
-        vpu.vpRequestId === vpu.vp.requestId
-          ? this.formatOneRowUpdate(vpu)
-          : undefined,
-      )
-      .filter((vpu) => vpu !== undefined);
+    const ts = performance.now();
+    const updates: RowUpdate[] = [];
+    for (let i = 0; i < outbound.length; i++) {
+      const vpu = outbound[i];
+      if (vpu.vpRequestId === vpu.vp.requestId) {
+        const update = this.formatOneRowUpdate(vpu, ts);
+        if (update !== undefined) updates.push(update);
+      }
+    }
 
     const updateId = RequestId.oneNew();
 
     return TableRowUpdates(updateId, true, Date.now(), updates);
   }
 
-  private formatOneRowUpdate(update: ViewPortUpdate): RowUpdate | undefined {
+  private formatOneRowUpdate(
+    update: ViewPortUpdate,
+    ts: number,
+  ): RowUpdate | undefined {
     if (isViewPortRowUpdate(update)) {
       //if viewport has changed while we're processing the queue
       if (!withinRange(update.index, update.vp.range)) {
@@ -106,7 +111,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         update.index,
         rowKey,
         RowUpdateType.Update,
-        performance.now(),
+        ts,
         sel,
         data,
       );
@@ -118,7 +123,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         update.index,
         update.key.key,
         RowUpdateType.SizeOnly,
-        performance.now(),
+        ts,
         0,
         EMPTY_ARRAY,
       );
