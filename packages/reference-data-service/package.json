@@ -10,7 +10,7 @@
   "type": "module",
   "dependencies": {
     "@heswell/service-utils": "1.0.0",
-    "@heswell/vuu-table": "1.0.0",
+    "@heswell/vuu-table": "1.0.1",
     "pino": "9.6.0"
   }
 }

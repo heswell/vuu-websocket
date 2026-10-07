@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-table",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Runtime agnostic (browser or server) Vuu table store, including join tables",
   "type": "module",
   "main": "src/index.ts",
@@ -23,8 +23,8 @@
   "author": "heswell",
   "license": "MIT",
   "peerDependencies": {
-    "@vuu-ui/vuu-data-types": "^3.4.0 || ^4.0.0-alpha.20",
-    "@vuu-ui/vuu-protocol-types": "^3.4.0 || ^4.0.0-alpha.20"
+    "@vuu-ui/vuu-data-types": "4.0.0-alpha.20",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
   },
   "devDependencies": {
     "@vuu-ui/vuu-data-types": "4.0.0-alpha.20",

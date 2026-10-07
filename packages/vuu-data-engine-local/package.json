@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-data-engine-local",
-  "version": "4.0.0-alpha.20",
+  "version": "1.0.0",
   "description": "In-browser Vuu server (VuuModule, tables, EngineDataSource) built on @heswell/vuu-table and @heswell/vuu-viewport",
   "main": "src/index.ts",
   "module": "src/index.ts",
@@ -25,8 +25,8 @@
   "dependencies": {
     "@heswell/module-admin": "1.1.0",
     "@heswell/user-admin": "1.0.2",
-    "@heswell/vuu-table": "1.0.0",
-    "@heswell/vuu-viewport": "1.1.1",
+    "@heswell/vuu-table": "1.0.1",
+    "@heswell/vuu-viewport": "1.1.2",
     "@vuu-ui/vuu-data-editing": "4.0.0-alpha.20",
     "@vuu-ui/vuu-data-local": "4.0.0-alpha.20",
     "@vuu-ui/vuu-filter-parser": "4.0.0-alpha.20",
