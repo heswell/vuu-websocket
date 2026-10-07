@@ -109,6 +109,13 @@ only to implement `DataEngine`/`ViewportEngine`.
   aggregate. Leaf rows in a grouped viewport use the same prefix. Their
   `rowKey`/`treeKey` is `parentTreeKey|tableKey`.
 - `sel` is materialized into each `ViewportRow`.
+- Rows are built by a `RowWriter` (`rowWriter` option, default
+  `viewportRowWriter` producing `ViewportRow`). A host can supply its own writer
+  to create rows in its output format: the engine calls
+  `create(header, valueCount)` with a reused `RowHeader` (rowIndex, rowKey, sel,
+  ts and tree columns), then writes projected values directly into
+  `values(row)` from `dataOffset`. `treeColumnsInData: false` omits the six
+  tree prefix columns for hosts that take them from the header.
 
 ## Server integration (`packages/vuu-server`)
 
@@ -120,6 +127,8 @@ only to implement `DataEngine`/`ViewportEngine`.
   - Batches are posted to the session's outbound queue as a SIZE update (when
     size changed) followed by ROW updates. The row data is materialized at
     flush time, so the send path no longer reads from the table.
+  - The viewport passes a `rowWriter` that creates the queued `ViewPortUpdate`
+    entries directly, so each changed row costs one entry plus its data array.
 - `CoreServerApiHandler` handles:
   - CREATE/CHANGE/REMOVE/ENABLE/DISABLE_VP and CHANGE_VP_RANGE.
   - SELECT_ROW, DESELECT_ROW, DESELECT_ALL and SELECT_ROW_RANGE.

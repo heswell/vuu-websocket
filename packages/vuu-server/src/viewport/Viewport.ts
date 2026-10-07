@@ -2,6 +2,7 @@ import type {
   VuuFilter,
   VuuGroupBy,
   VuuRange,
+  VuuRowDataItemType,
   VuuSort,
   VuuViewportChangeRequest,
 } from "@vuu-ui/vuu-protocol-types";
@@ -13,15 +14,10 @@ import {
   type ViewportBatch,
   type ViewportConfig,
   type ViewportEngine,
-  type ViewportRow,
 } from "@heswell/vuu-viewport";
 import { ViewPortDef } from "../api/ViewPortDef";
 import { Column } from "../api/TableDef";
-import {
-  DataTable,
-  isDataTable,
-  RowKeyUpdate,
-} from "../core/table/InMemDataTable";
+import { DataTable, isDataTable } from "../core/table/InMemDataTable";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { VuuUser } from "../core/auths/VuuUser";
 import { PublishQueue } from "../util/PublishQueue";
@@ -57,62 +53,56 @@ export type ViewportCreateConfig = Partial<ViewportConfig> & {
   range?: VuuRange;
 };
 
+/**
+ * An outbound update, queued for the client. ROW updates are created
+ * directly by the viewport engine (see the Viewport rowWriter), so this is
+ * the only allocation per changed row.
+ */
 export interface ViewPortUpdate {
-  index: number;
-  key: RowKeyUpdate;
   vpRequestId: string;
-  size: number;
-  table: Table | null; // null for SIZE update
-  ts: number;
   vp: Viewport;
+  table: Table | null; // null for SIZE update
+  index: number;
   vpUpdate: ViewPortUpdateType;
-  /** materialized row data, as computed by the viewport engine */
-  row?: ViewportRow;
+  /** viewport size, SIZE updates only. vpSize is read from vp at send time */
+  size: number;
+  /** "SIZE" for SIZE updates */
+  rowKey: string;
+  sel: 0 | 1;
+  /** projected row values, empty for SIZE updates */
+  data: VuuRowDataItemType[];
 }
 export interface ViewPortRowUpdate extends ViewPortUpdate {
-  row: ViewportRow;
+  vpUpdate: "ROW";
 }
 
 export const isViewPortRowUpdate = (
   vpu: ViewPortUpdate,
-): vpu is ViewPortRowUpdate => vpu.vpUpdate === "ROW" && vpu.row !== undefined;
+): vpu is ViewPortRowUpdate => vpu.vpUpdate === "ROW";
 
-export class ViewPortUpdateImpl implements ViewPortUpdate {
-  constructor(
-    public vpRequestId: string,
-    public vp: Viewport,
-    public table: Table | null, // rather than scala RowSource
-    public key: RowKeyUpdate,
-    public index: number,
-    public vpUpdate: ViewPortUpdateType,
-    public size: number,
-    public ts: number,
-    public row?: ViewportRow,
-  ) {}
-}
+const NO_DATA: VuuRowDataItemType[] = [];
 
 export const ViewPortUpdate = (
   vpRequestId: string,
   vp: Viewport,
   table: Table | null,
-  key: RowKeyUpdate,
   index: number,
   vpUpdate: ViewPortUpdateType,
   size: number,
-  ts: number,
-  row?: ViewportRow,
-): ViewPortUpdate =>
-  new ViewPortUpdateImpl(
-    vpRequestId,
-    vp,
-    table,
-    key,
-    index,
-    vpUpdate,
-    size,
-    ts,
-    row,
-  );
+  rowKey: string,
+  sel: 0 | 1 = 0,
+  data: VuuRowDataItemType[] = NO_DATA,
+): ViewPortUpdate => ({
+  vpRequestId,
+  vp,
+  table,
+  index,
+  vpUpdate,
+  size,
+  rowKey,
+  sel,
+  data,
+});
 
 export interface ViewPortVisualLink {
   childVp: Viewport;
@@ -258,7 +248,7 @@ const NO_SIZE = -1;
 export class Viewport extends EventEmitter<ViewportEvents> {
   #clientSessionId: ClientSessionId;
   #enabled: boolean = true;
-  #engine: ViewportEngine;
+  #engine: ViewportEngine<ViewPortUpdate>;
   #id: string;
   #outboundQ: PublishQueue<ViewPortUpdate>;
   #permissionFilter: PermissionFilter | undefined;
@@ -288,7 +278,8 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     this.#outboundQ = outboundQ;
     this.#viewPortDef = viewPortDef;
     this.#table = table;
-    this.#engine = dataEngine.createViewport(table as unknown as Table, {
+    const engineTable = table as unknown as Table;
+    this.#engine = dataEngine.createViewport(engineTable, {
       id,
       aggregations: config.aggregations,
       columns: this.expandColumns(config.columns),
@@ -297,6 +288,23 @@ export class Viewport extends EventEmitter<ViewportEvents> {
       sort: config.sort,
       range: config.range ?? range,
       onPendingChanges: () => markDirty(this),
+      rowWriter: {
+        dataOffset: 0,
+        treeColumnsInData: true,
+        create: ({ rowIndex, rowKey, sel }, valueCount) =>
+          ViewPortUpdate(
+            this.#requestId,
+            this,
+            engineTable,
+            rowIndex,
+            "ROW",
+            NO_SIZE,
+            rowKey,
+            sel,
+            new Array(valueCount),
+          ),
+        values: (update) => update.data,
+      },
     });
   }
 
@@ -494,7 +502,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     );
   }
 
-  private selectionChanged(batch: ViewportBatch) {
+  private selectionChanged(batch: ViewportBatch<ViewPortUpdate>) {
     this.post(batch);
     this.emit("row-selection");
     return { ...batch, selectedRowCount: this.selectedRowCount };
@@ -548,46 +556,25 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     this.removeAllListeners();
   }
 
-  private post(batch: ViewportBatch, forceSizeMessage = false) {
+  /** rows in the batch are ViewPortUpdates, created by the rowWriter */
+  private post(
+    batch: ViewportBatch<ViewPortUpdate>,
+    forceSizeMessage = false,
+  ) {
     if (!this.#enabled) {
       return batch;
     }
     const { rows, size, sizeChanged } = batch;
-    const time = Date.now();
-    const table = this.#table as unknown as Table;
     const outboundQ = this.#outboundQ;
-    const requestId = this.#requestId;
 
     if (sizeChanged || forceSizeMessage) {
       outboundQ.pushHighPriority(
-        ViewPortUpdate(
-          requestId,
-          this,
-          null,
-          RowKeyUpdate("SIZE", null),
-          NO_SIZE,
-          "SIZE",
-          size,
-          time,
-        ),
+        ViewPortUpdate(this.#requestId, this, null, NO_SIZE, "SIZE", size, "SIZE"),
       );
     }
 
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      outboundQ.pushHighPriority(
-        ViewPortUpdate(
-          requestId,
-          this,
-          table,
-          RowKeyUpdate(row.rowKey, table),
-          row.rowIndex,
-          "ROW",
-          size,
-          time,
-          row,
-        ),
-      );
+      outboundQ.pushHighPriority(rows[i]);
     }
     return batch;
   }

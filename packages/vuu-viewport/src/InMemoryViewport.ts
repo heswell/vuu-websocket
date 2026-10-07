@@ -17,14 +17,18 @@ import {
   type RowComparator,
   type SortSpec,
 } from "./sort.ts";
-import type {
-  LinkFilter,
-  RowPredicate,
-  ViewportBatch,
-  ViewportConfig,
-  ViewportEngine,
-  ViewportOptions,
-  ViewportRow,
+import {
+  viewportRowWriter,
+  type DataEngine,
+  type LinkFilter,
+  type RowHeader,
+  type RowPredicate,
+  type RowWriter,
+  type ViewportBatch,
+  type ViewportConfig,
+  type ViewportEngine,
+  type ViewportOptions,
+  type ViewportRow,
 } from "./types.ts";
 
 const EMPTY_SORT: VuuSort = { sortDefs: [] };
@@ -80,7 +84,9 @@ interface ColumnBinding {
  * Every flush compares the client window with what was previously sent, so
  * only genuinely changed rows are emitted.
  */
-export class InMemoryViewport implements ViewportEngine, TableListener {
+export class InMemoryViewport<R = ViewportRow>
+  implements ViewportEngine<R>, TableListener
+{
   readonly id: string;
   readonly table: RowSource;
 
@@ -133,6 +139,21 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   #sentSel: number[] = [];
   #sentSize = -1;
 
+  // output
+  #writer: RowWriter<R>;
+  #header: RowHeader = {
+    rowIndex: 0,
+    rowKey: "",
+    sel: 0,
+    ts: 0,
+    depth: 0,
+    isExpanded: false,
+    treeKey: "",
+    isLeaf: false,
+    label: "",
+    childCount: 0,
+  };
+
   constructor(
     table: RowSource,
     {
@@ -146,8 +167,11 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
       permissionFilter,
       baseFilterSpec = EMPTY_FILTER,
       onPendingChanges,
-    }: ViewportOptions,
+      rowWriter,
+    }: ViewportOptions<R>,
   ) {
+    this.#writer =
+      rowWriter ?? (viewportRowWriter as unknown as RowWriter<R>);
     this.id = id;
     this.table = table;
     this.#tsCol = table.columnMap.vuuUpdatedTimestamp ?? -1;
@@ -393,18 +417,18 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   // public api
   // ---------------------------------------------------------------------------
 
-  flush(): ViewportBatch {
+  flush(): ViewportBatch<R> {
     this.applyPending();
     return this.collect();
   }
 
-  getCurrentRange(): ViewportBatch {
+  getCurrentRange(): ViewportBatch<R> {
     this.applyPending();
     this.resetSnapshot();
     return this.collect(true);
   }
 
-  setRange(range: VuuRange): ViewportBatch {
+  setRange(range: VuuRange): ViewportBatch<R> {
     this.applyPending();
     const { from, to } = this.#range;
     if (range.from !== from || range.to !== to) {
@@ -427,7 +451,7 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return this.collect();
   }
 
-  setConfig(config: Partial<ViewportConfig>): ViewportBatch {
+  setConfig(config: Partial<ViewportConfig>): ViewportBatch<R> {
     this.applyPending();
     const current = this.#config;
     const next: ViewportConfig = { ...current };
@@ -1130,22 +1154,18 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
     return typeof v === "number" ? v : typeof v === "bigint" ? Number(v) : 0;
   }
 
-  private projectRow(row: VuuDataRow) {
+  /** write projected column values of row into out, starting at offset */
+  private projectInto(row: VuuDataRow, out: unknown[], offset: number) {
     const bindings = this.#bindings;
-    const data: (VuuRowDataItemType | null)[] = new Array(bindings.length);
     for (let i = 0; i < bindings.length; i++) {
       const col = bindings[i].col;
       if (col === -1) {
-        data[i] = null;
+        out[offset + i] = null;
       } else {
         const v: unknown = row[col];
-        data[i] =
-          typeof v === "bigint"
-            ? toProtocolValue(v)
-            : (v as VuuRowDataItemType);
+        out[offset + i] = typeof v === "bigint" ? toProtocolValue(v) : v;
       }
     }
-    return data as VuuRowDataItemType[];
   }
 
   private groupRowData(node: GroupNode, tree: GroupTree) {
@@ -1178,14 +1198,19 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
    * Compare client window with what has previously been sent, emitting rows
    * that have changed.
    */
-  private collect(forceSize = false): ViewportBatch {
+  private collect(forceSize = false): ViewportBatch<R> {
     const size = this.size;
     const sizeChanged = forceSize || size !== this.#sentSize;
     this.#sentSize = size;
 
     const { from, to } = this.#range;
     const end = Math.min(to, size);
-    const rows: ViewportRow[] = [];
+    const rows: R[] = [];
+    const writer = this.#writer;
+    const header = this.#header;
+    const dataOffset = writer.dataOffset;
+    const columnCount = this.#bindings.length;
+    const treeColumnCount = writer.treeColumnsInData ? TREE_COLUMN_COUNT : 0;
     const tableRows = this.table.rows;
     const keyIdx = this.table.indexOfKeyField;
     const selected = this.#selectAll ? this.#deselected : this.#selected;
@@ -1214,13 +1239,13 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
           sentKey[slot] = key;
           sentRef[slot] = row;
           sentSel[slot] = sel;
-          rows.push({
-            rowIndex: pos,
-            rowKey: key,
-            sel,
-            ts: this.rowTs(row),
-            data: this.projectRow(row),
-          });
+          header.rowIndex = pos;
+          header.rowKey = key;
+          header.sel = sel;
+          header.ts = this.rowTs(row);
+          const out = writer.create(header, columnCount);
+          this.projectInto(row, writer.values(out), dataOffset);
+          rows.push(out);
         }
       } else {
         const entry = tree.visible[pos];
@@ -1239,21 +1264,28 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             sentKey[slot] = key;
             sentRef[slot] = row;
             sentSel[slot] = sel;
-            rows.push({
-              rowIndex: pos,
-              rowKey: key,
-              sel,
-              ts: this.rowTs(row),
-              data: [
-                tree.leafDepth,
-                false,
-                key,
-                true,
-                rowKey,
-                0,
-                ...this.projectRow(row),
-              ],
-            });
+            header.rowIndex = pos;
+            header.rowKey = key;
+            header.sel = sel;
+            header.ts = this.rowTs(row);
+            header.depth = tree.leafDepth;
+            header.isExpanded = false;
+            header.treeKey = key;
+            header.isLeaf = true;
+            header.label = rowKey;
+            header.childCount = 0;
+            const out = writer.create(header, treeColumnCount + columnCount);
+            const values = writer.values(out);
+            if (treeColumnCount !== 0) {
+              values[dataOffset] = tree.leafDepth;
+              values[dataOffset + 1] = false;
+              values[dataOffset + 2] = key;
+              values[dataOffset + 3] = true;
+              values[dataOffset + 4] = rowKey;
+              values[dataOffset + 5] = 0;
+            }
+            this.projectInto(row, values, dataOffset + treeColumnCount);
+            rows.push(out);
           }
         } else {
           const key = entry.key;
@@ -1269,7 +1301,23 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
             sentKey[slot] = key;
             sentRef[slot] = data;
             sentSel[slot] = sel;
-            rows.push({ rowIndex: pos, rowKey: key, sel, ts: 0, data });
+            header.rowIndex = pos;
+            header.rowKey = key;
+            header.sel = sel;
+            header.ts = 0;
+            header.depth = data[0] as number;
+            header.isExpanded = data[1] as boolean;
+            header.treeKey = key;
+            header.isLeaf = false;
+            header.label = data[4];
+            header.childCount = data[5] as number;
+            const out = writer.create(header, treeColumnCount + columnCount);
+            const values = writer.values(out);
+            const skip = TREE_COLUMN_COUNT - treeColumnCount;
+            for (let i = skip; i < data.length; i++) {
+              values[dataOffset + i - skip] = data[i];
+            }
+            rows.push(out);
           }
         }
       }
@@ -1285,8 +1333,10 @@ export class InMemoryViewport implements ViewportEngine, TableListener {
   }
 }
 
-export const inMemoryDataEngine = {
+export const inMemoryDataEngine: DataEngine = {
   name: "in-memory",
-  createViewport: (table: RowSource, options: ViewportOptions) =>
-    new InMemoryViewport(table, options),
+  createViewport: <R = ViewportRow>(
+    table: RowSource,
+    options: ViewportOptions<R>,
+  ): ViewportEngine<R> => new InMemoryViewport<R>(table, options),
 };

@@ -17,7 +17,8 @@ export interface ViewportConfig {
   aggregations: VuuAggregation[];
 }
 
-export interface ViewportOptions extends Partial<ViewportConfig> {
+export interface ViewportOptions<R = ViewportRow>
+  extends Partial<ViewportConfig> {
   id: string;
   range?: VuuRange;
   permissionFilter?: RowPredicate;
@@ -33,6 +34,12 @@ export interface ViewportOptions extends Partial<ViewportConfig> {
    * timer, explicit tick).
    */
   onPendingChanges?: () => void;
+  /**
+   * Builds the rows returned in each ViewportBatch, letting a host create
+   * rows in its own output format without an intermediate ViewportRow.
+   * Defaults to viewportRowWriter.
+   */
+  rowWriter?: RowWriter<R>;
 }
 
 export interface ViewportRow {
@@ -53,13 +60,66 @@ export interface ViewportRow {
 }
 
 /**
+ * Row metadata passed to RowWriter.create. The engine reuses a single
+ * instance, so values must be copied out during the call, not retained.
+ */
+export interface RowHeader {
+  rowIndex: number;
+  rowKey: string;
+  sel: 0 | 1;
+  /** see ViewportRow.ts */
+  ts: number;
+  // tree columns, meaningful only for grouped viewports
+  depth: number;
+  isExpanded: boolean;
+  treeKey: string;
+  isLeaf: boolean;
+  label: VuuRowDataItemType;
+  childCount: number;
+}
+
+/**
+ * Creates output rows. For each changed row the engine calls create, then
+ * writes column values into values(row), starting at dataOffset. Values are
+ * already in protocol form (bigint converted).
+ */
+export interface RowWriter<R> {
+  /** index in values(row) at which the first value is written */
+  readonly dataOffset: number;
+  /**
+   * When true, values for grouped viewports are prefixed by the six tree
+   * columns [depth, isExpanded, treeKey, isLeaf, label, childCount], as in
+   * ViewportRow.data. When false only column values are written; tree
+   * columns are available from the header.
+   */
+  readonly treeColumnsInData: boolean;
+  /** valueCount: the number of values the engine will write */
+  create(header: Readonly<RowHeader>, valueCount: number): R;
+  values(row: R): unknown[];
+}
+
+/** The default RowWriter, produces ViewportRow */
+export const viewportRowWriter: RowWriter<ViewportRow> = {
+  dataOffset: 0,
+  treeColumnsInData: true,
+  create: ({ rowIndex, rowKey, sel, ts }, valueCount) => ({
+    rowIndex,
+    rowKey,
+    sel,
+    ts,
+    data: new Array(valueCount),
+  }),
+  values: (row) => row.data,
+};
+
+/**
  * Changes to be communicated to a client. `rows` only ever includes rows
  * within the current range that have changed since last sent.
  */
-export interface ViewportBatch {
+export interface ViewportBatch<R = ViewportRow> {
   size: number;
   sizeChanged: boolean;
-  rows: ViewportRow[];
+  rows: R[];
 }
 
 export interface LinkFilter {
@@ -71,7 +131,7 @@ export interface LinkFilter {
  * The analytics engine behind a single viewport. Implementations must be
  * runtime agnostic - no dependency on browser or server apis.
  */
-export interface ViewportEngine {
+export interface ViewportEngine<R = ViewportRow> {
   readonly id: string;
   readonly config: Readonly<ViewportConfig>;
   readonly range: VuuRange;
@@ -87,39 +147,39 @@ export interface ViewportEngine {
   readonly table: RowSource;
 
   /** Apply any pending table changes, return changes to send to client. */
-  flush(): ViewportBatch;
+  flush(): ViewportBatch<R>;
   /** Full contents of current range, irrespective of what was already sent. */
-  getCurrentRange(): ViewportBatch;
-  setRange(range: VuuRange): ViewportBatch;
-  setConfig(config: Partial<ViewportConfig>): ViewportBatch;
-  setPermissionFilter(predicate: RowPredicate | undefined): ViewportBatch;
-  setLinkFilter(linkFilter: LinkFilter | undefined): ViewportBatch;
+  getCurrentRange(): ViewportBatch<R>;
+  setRange(range: VuuRange): ViewportBatch<R>;
+  setConfig(config: Partial<ViewportConfig>): ViewportBatch<R>;
+  setPermissionFilter(predicate: RowPredicate | undefined): ViewportBatch<R>;
+  setLinkFilter(linkFilter: LinkFilter | undefined): ViewportBatch<R>;
   /**
    * Set the base filter. Composed (AND) with the permission, link and client
    * filters: permission, link, base, client. Undefined or "" clears it.
    */
-  setBaseFilter(filterSpec: VuuFilter | undefined): ViewportBatch;
+  setBaseFilter(filterSpec: VuuFilter | undefined): ViewportBatch<R>;
   readonly baseFilterSpec: VuuFilter;
 
-  openTreeNode(treeKey: string): ViewportBatch;
-  closeTreeNode(treeKey: string): ViewportBatch;
+  openTreeNode(treeKey: string): ViewportBatch<R>;
+  closeTreeNode(treeKey: string): ViewportBatch<R>;
 
-  selectRow(rowKey: string, preserveExistingSelection: boolean): ViewportBatch;
+  selectRow(rowKey: string, preserveExistingSelection: boolean): ViewportBatch<R>;
   deselectRow(
     rowKey: string,
     preserveExistingSelection: boolean,
-  ): ViewportBatch;
+  ): ViewportBatch<R>;
   selectRowRange(
     fromRowKey: string,
     toRowKey: string,
     preserveExistingSelection: boolean,
-  ): ViewportBatch;
+  ): ViewportBatch<R>;
   /**
    * Select every row, including rows that enter the viewport later, until
    * a selection change that does not preserve the existing selection.
    */
-  selectAll(): ViewportBatch;
-  deselectAll(): ViewportBatch;
+  selectAll(): ViewportBatch<R>;
+  deselectAll(): ViewportBatch<R>;
   /** distinct values of column across the (source table) rows of selected rows */
   getSelectedValues(column: string): Set<VuuRowDataItemType>;
   /** source table keys of selected rows (leaf rows of selected groups) */
@@ -144,5 +204,8 @@ export interface ViewportEngine {
  */
 export interface DataEngine {
   readonly name: string;
-  createViewport(table: RowSource, options: ViewportOptions): ViewportEngine;
+  createViewport<R = ViewportRow>(
+    table: RowSource,
+    options: ViewportOptions<R>,
+  ): ViewportEngine<R>;
 }

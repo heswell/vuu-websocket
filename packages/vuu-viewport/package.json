@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-viewport",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Runtime agnostic (browser or server) Vuu viewport analytics engine - windowing, sorting, filtering, grouping, selection and visual linking",
   "type": "module",
   "main": "src/index.ts",

@@ -51,10 +51,10 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
     }
     existing.vpRequestId = entry.vpRequestId;
     existing.table = entry.table;
-    existing.key = entry.key;
     existing.size = entry.size;
-    existing.ts = entry.ts;
-    existing.row = entry.row;
+    existing.rowKey = entry.rowKey;
+    existing.sel = entry.sel;
+    existing.data = entry.data;
     return true;
   }
 

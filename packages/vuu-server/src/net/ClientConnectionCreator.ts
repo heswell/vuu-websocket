@@ -113,7 +113,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
       ) {
         return undefined;
       }
-      const { data, rowKey, sel } = update.row;
+      const { data, rowKey, sel } = update;
       return RowUpdate(
         update.vpRequestId,
         update.vp.id,
@@ -131,7 +131,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         update.vp.id,
         vpSize,
         update.index,
-        update.key.key,
+        update.rowKey,
         RowUpdateType.SizeOnly,
         ts,
         0,

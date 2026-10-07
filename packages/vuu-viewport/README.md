@@ -25,6 +25,10 @@ const viewport = new InMemoryViewport(prices, {
 const { rows, size } = viewport.getCurrentRange();
 ```
 
+Rows are `ViewportRow` by default. Pass a `rowWriter` (see `RowWriter` in
+`types.ts`) to have the engine build rows directly in a host's own format,
+avoiding an intermediate copy.
+
 Peer dependencies: `@vuu-ui/vuu-filter-parser`, plus the type-only
 `@vuu-ui/vuu-data-types`, `@vuu-ui/vuu-filter-types` and
 `@vuu-ui/vuu-protocol-types`. See
