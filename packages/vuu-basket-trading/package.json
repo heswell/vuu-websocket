@@ -21,6 +21,6 @@
     "@heswell/vuu-table": "1.0.0"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.19"
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
   }
 }

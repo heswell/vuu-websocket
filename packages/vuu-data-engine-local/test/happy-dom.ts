@@ -1,10 +1,24 @@
-// React rendering needs a DOM; vitest supplied one via happy-dom. Register it
-// only for the tests that import this file, and remove it afterwards so other
-// test files in the same bun process keep a plain runtime.
+// React rendering and @vuu-ui/vuu-layout (loaded via @vuu-ui/vuu-data-test)
+// need a DOM; vitest supplied one via happy-dom. Bun evaluates this module once
+// per process, so registration at load covers imports, and each test file
+// calls withHappyDom() to keep the DOM for its tests and remove it afterwards,
+// leaving other test files in the same bun process with a plain runtime.
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
-import { afterAll } from "bun:test";
+import { afterAll, beforeAll } from "bun:test";
 
-if (!GlobalRegistrator.isRegistered) {
-  GlobalRegistrator.register();
-  afterAll(() => GlobalRegistrator.unregister());
-}
+const register = () => {
+  if (!GlobalRegistrator.isRegistered) {
+    GlobalRegistrator.register();
+  }
+};
+
+register();
+
+export const withHappyDom = () => {
+  beforeAll(register);
+  afterAll(async () => {
+    if (GlobalRegistrator.isRegistered) {
+      await GlobalRegistrator.unregister();
+    }
+  });
+};

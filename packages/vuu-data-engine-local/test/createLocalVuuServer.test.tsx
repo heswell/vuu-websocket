@@ -1,4 +1,4 @@
-import "./happy-dom";
+import { withHappyDom } from "./happy-dom";
 import { useData } from "@vuu-ui/core";
 import type { ServerAPI } from "@vuu-ui/vuu-data-types";
 import { act, useEffect } from "react";
@@ -12,6 +12,8 @@ import {
 // SIMUL creates tables that BASKET joins, so it must be imported first.
 import { simulModule } from "../src/simul/SimulModule";
 import { basketModule } from "../src/basket/BasketModule";
+
+withHappyDom();
 
 type TestServerAPI = Pick<ServerAPI, "getTableList" | "getTableSchema">;
 

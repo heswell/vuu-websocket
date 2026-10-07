@@ -1,3 +1,4 @@
+import { withHappyDom } from "./happy-dom";
 import "./browser-globals";
 /**
  * Checks that the legacy TickingArrayDataSource (@vuu-ui/vuu-data-test) and
@@ -18,6 +19,8 @@ import { buildDataColumnMapFromSchema, Table } from "../src/Table";
 
 const DATA = 10;
 const ROWS = 2_000;
+
+withHappyDom();
 
 const schema: TableSchema = {
   columns: [
