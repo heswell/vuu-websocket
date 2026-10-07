@@ -6,6 +6,10 @@ import {
   type ViewPortRowUpdate,
 } from "../src/viewport/Viewport";
 import { RowKeyUpdate } from "../src/core/table/InMemDataTable";
+import { DefaultMessageHandler } from "../src/net/ClientConnectionCreator";
+import type { Channel } from "../src/net/ws/Channel";
+import type { FlowController } from "../src/net/flowcontrol/FlowController";
+import { VuuUser } from "../src/core/auths/VuuUser";
 
 const vp = (id: string) => ({ id, requestId: "req-1" }) as unknown as Viewport;
 
@@ -108,5 +112,73 @@ describe("OutboundRowPublishQueue", () => {
     expect(queue.length).toBe(0);
     expect(queue.popUpTo(10)).toEqual([]);
     expect(() => queue.pop()).toThrow();
+  });
+});
+
+describe("DefaultMessageHandler outbound formatting", () => {
+  const sendAll = (queue: OutboundRowPublishQueue) => {
+    const sent: string[] = [];
+    const channel = { send: (msg: string) => sent.push(msg) } as unknown as Channel;
+    const flowController = {
+      process() {},
+      shouldSend: () => ({ type: "BATCHSIZE", size: 300 }),
+    } as unknown as FlowController;
+    const handler = DefaultMessageHandler(
+      channel,
+      queue,
+      VuuUser("test"),
+      { sessionId: "s1", channelId: "c1" } as never,
+      {} as never,
+      flowController,
+      {} as never,
+      {} as never,
+    );
+    handler.sendUpdates();
+    return sent.map((json) => JSON.parse(json).body.rows) as {
+      rowIndex: number;
+      updateType: string;
+      vpSize: number;
+    }[][];
+  };
+
+  test("every update carries the viewport's current size, even after in-place merging", () => {
+    const queue = new OutboundRowPublishQueue();
+    const viewport = {
+      id: "vp1",
+      requestId: "req-1",
+      size: 100,
+      range: { from: 0, to: 200 },
+    } as unknown as Viewport & { size: number };
+    // first flush: size 100, rows 5 and 7
+    queue.pushHighPriority(sizeUpdate(viewport, 100));
+    queue.pushHighPriority(rowUpdate(viewport, 5, 1));
+    queue.pushHighPriority(rowUpdate(viewport, 7, 1));
+    // second flush: size grows to 120, row 5 changes again (merged in place)
+    viewport.size = 120;
+    queue.pushHighPriority(sizeUpdate(viewport, 120));
+    queue.pushHighPriority(rowUpdate(viewport, 5, 2));
+
+    const [rows] = sendAll(queue);
+    expect(rows.map((r) => r.vpSize)).toEqual([120, 120, 120]);
+  });
+
+  test("row updates beyond the viewport's current size are dropped", () => {
+    const queue = new OutboundRowPublishQueue();
+    const viewport = {
+      id: "vp1",
+      requestId: "req-1",
+      size: 100,
+      range: { from: 0, to: 200 },
+    } as unknown as Viewport & { size: number };
+    queue.pushHighPriority(rowUpdate(viewport, 5, 1));
+    queue.pushHighPriority(rowUpdate(viewport, 50, 1));
+    viewport.size = 10;
+    queue.pushHighPriority(sizeUpdate(viewport, 10));
+
+    const [rows] = sendAll(queue);
+    expect(rows.map((r) => [r.updateType, r.rowIndex, r.vpSize])).toEqual([
+      ["U", 5, 10],
+      ["SIZE", -1, 10],
+    ]);
   });
 });

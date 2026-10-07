@@ -94,20 +94,30 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     return TableRowUpdates(updateId, true, Date.now(), updates);
   }
 
+  /**
+   * vpSize is taken from the viewport at send time, not from the queued entry.
+   * The queue merges updates in place, so queued sizes are not in
+   * chronological order; using the current size keeps every update in a
+   * message consistent and never regresses the client's size.
+   */
   private formatOneRowUpdate(
     update: ViewPortUpdate,
     ts: number,
   ): RowUpdate | undefined {
+    const vpSize = update.vp.size;
     if (isViewPortRowUpdate(update)) {
       //if viewport has changed while we're processing the queue
-      if (!withinRange(update.index, update.vp.range)) {
+      if (
+        update.index >= vpSize ||
+        !withinRange(update.index, update.vp.range)
+      ) {
         return undefined;
       }
       const { data, rowKey, sel } = update.row;
       return RowUpdate(
         update.vpRequestId,
         update.vp.id,
-        update.size,
+        vpSize,
         update.index,
         rowKey,
         RowUpdateType.Update,
@@ -119,7 +129,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
       return RowUpdate(
         update.vpRequestId,
         update.vp.id,
-        update.size,
+        vpSize,
         update.index,
         update.key.key,
         RowUpdateType.SizeOnly,
