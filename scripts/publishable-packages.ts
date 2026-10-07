@@ -16,6 +16,11 @@ export const PUBLISHABLE_PACKAGES = [
     name: "@heswell/vuu-viewport",
     directory: "vuu-viewport",
   },
+  // Depends on all of the above.
+  {
+    name: "@vuu-ui/vuu-data-engine-local",
+    directory: "vuu-data-engine-local",
+  },
 ] as const;
 
 export type PublishablePackageName = (typeof PUBLISHABLE_PACKAGES)[number]["name"];

@@ -40,6 +40,12 @@ npm run showcase:engine   # equivalent to: VUU_DATA_ENGINE=local npm run showcas
 This aliases `@vuu-ui/vuu-data-test` to `@vuu-ui/vuu-data-engine-local` in the showcase
 rsbuild config. The examples themselves don't change.
 
+The showcase uses the published package. To publish it from vuu-websocket:
+
+```sh
+npm run pub -- --package=@vuu-ui/vuu-data-engine-local --tag alpha
+```
+
 ## Performance
 
 `bench/datasource.bench.ts` compares the legacy `TickingArrayDataSource`
