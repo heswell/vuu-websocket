@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { OutboundRowPublishQueue } from "../src/util/PublishQueue";
-import {
-  ViewPortUpdate,
-  type Viewport,
-  type ViewPortRowUpdate,
-} from "../src/viewport/Viewport";
-import { RowKeyUpdate } from "../src/core/table/InMemDataTable";
+import { ViewPortUpdate, type Viewport } from "../src/viewport/Viewport";
 import { DefaultMessageHandler } from "../src/net/ClientConnectionCreator";
 import type { Channel } from "../src/net/ws/Channel";
 import type { FlowController } from "../src/net/flowcontrol/FlowController";
@@ -23,37 +18,22 @@ const rowUpdate = (
     requestId,
     viewport,
     null,
-    RowKeyUpdate(`key-${index}`, null),
     index,
     "ROW",
-    100,
+    -1,
+    `key-${index}`,
     0,
-    {
-      rowIndex: index,
-      rowKey: `key-${index}`,
-      sel: 0,
-      ts: 0,
-      data: [`key-${index}`, value],
-    },
+    [`key-${index}`, value],
   );
 
 const sizeUpdate = (viewport: Viewport, size: number) =>
-  ViewPortUpdate(
-    "req-1",
-    viewport,
-    null,
-    RowKeyUpdate("SIZE", null),
-    -1,
-    "SIZE",
-    size,
-    0,
-  );
+  ViewPortUpdate("req-1", viewport, null, -1, "SIZE", size, "SIZE");
 
 const values = (updates: ViewPortUpdate[]) =>
   updates.map((u) =>
     u.vpUpdate === "SIZE"
       ? `size:${u.size}`
-      : `${u.vp.id}:${u.index}:${(u as ViewPortRowUpdate).row.data[1]}`,
+      : `${u.vp.id}:${u.index}:${u.data[1]}`,
   );
 
 describe("OutboundRowPublishQueue", () => {

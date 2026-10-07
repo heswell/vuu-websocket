@@ -86,7 +86,7 @@ const setup = () => {
   const rowUpdates = () =>
     drain()
       .filter(isViewPortRowUpdate)
-      .map(({ index, row }) => [index, row.rowKey, row.sel, row.data]);
+      .map(({ index, rowKey, sel, data }) => [index, rowKey, sel, data]);
 
   return {
     createViewport,
@@ -106,7 +106,7 @@ describe("Viewport (server)", () => {
     const updates = drain();
     expect(updates[0].vpUpdate).toBe("SIZE");
     expect(updates[0].size).toBe(4);
-    expect(updates.filter(isViewPortRowUpdate).map((u) => u.row.data)).toEqual([
+    expect(updates.filter(isViewPortRowUpdate).map((u) => u.data)).toEqual([
       ["o1", 10],
       ["o2", 20],
       ["o3", 30],
@@ -327,7 +327,7 @@ describe("bigint values (server)", () => {
     const vp = createViewport(trades, ["id", "ts", "qty"], { sort: "ts" });
     const updates = drain();
     expect(() => JSON.stringify(updates)).not.toThrow();
-    expect(updates.filter(isViewPortRowUpdate).map((u) => u.row.data)).toEqual([
+    expect(updates.filter(isViewPortRowUpdate).map((u) => u.data)).toEqual([
       ["t2", 1_700_000_000_000, 5],
       ["t1", 1_700_000_000_001, (2n ** 60n).toString()],
     ]);
