@@ -13,20 +13,8 @@ export interface RowUpdate {
   vpVersion: string;
 }
 
-class RowUpdateImpl implements RowUpdate {
-  constructor(
-    public vpVersion: string,
-    public viewPortId: string,
-    public vpSize: number,
-    public rowIndex: number,
-    public rowKey: string,
-    public updateType: RowUpdateType,
-    public ts: number,
-    public sel: number,
-    public data: readonly VuuRowDataItemType[],
-  ) {}
-}
-
+// Plain object literal (rather than a class instance), JSON.stringify
+// serializes these considerably faster.
 export const RowUpdate = (
   vpVersion: string,
   viewPortId: string,
@@ -35,17 +23,16 @@ export const RowUpdate = (
   rowKey: string,
   updateType: RowUpdateType,
   ts: number,
-  selected: number,
+  sel: number,
   data: readonly VuuRowDataItemType[],
-): RowUpdate =>
-  new RowUpdateImpl(
-    vpVersion,
-    viewPortId,
-    vpSize,
-    rowIndex,
-    rowKey,
-    updateType,
-    ts,
-    selected,
-    data,
-  );
+): RowUpdate => ({
+  vpVersion,
+  viewPortId,
+  vpSize,
+  rowIndex,
+  rowKey,
+  updateType,
+  ts,
+  sel,
+  data,
+});
