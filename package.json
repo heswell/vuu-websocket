@@ -28,6 +28,7 @@
     "bench": "bun ./packages/benchmarks/src/run.ts",
     "bench:1m": "bun ./packages/benchmarks/src/run.ts --rows=1000000",
     "bench:scala": "bun ./packages/benchmarks/src/scala/run.ts",
+    "bench:data-engine-local": "npm run bench -w @vuu-ui/vuu-data-engine-local",
     "test": "bun test",
     "bump:versions": "bun ./scripts/bump-versions.ts",
     "pub": "bun ./scripts/publish.ts",
@@ -40,11 +41,11 @@
     "@microsoft/api-extractor": "7.59.1",
     "@rslib/core": "0.23.1",
     "@types/bun": "1.3.3",
-    "@vuu-ui/vuu-protocol-types": "3.4.0",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20",
     "typescript": "^5.5.3"
   },
   "dependencies": {
-    "@vuu-ui/vuu-utils": "3.4.0",
+    "@vuu-ui/vuu-utils": "4.0.0-alpha.20",
     "pure-uuid": "^1.8.1"
   }
 }
