@@ -12,7 +12,7 @@ export interface ModuleStore {
 }
 
 export class InMemoryModuleStore implements ModuleStore {
-  constructor(private modules: readonly ManagedModule[] = []) {}
+  constructor(private modules: readonly ManagedModule[] = []) { }
 
   load() {
     return cloneModules(this.modules);
@@ -48,7 +48,7 @@ export class YamlModuleStore implements ModuleStore {
   constructor(
     private readonly filePath: string,
     private readonly seedModules: () => readonly ManagedModule[],
-  ) {}
+  ) { }
 
   load() {
     if (!fs.existsSync(this.filePath)) {
@@ -74,7 +74,7 @@ export class YamlModuleStore implements ModuleStore {
       directory,
       `.${path.basename(this.filePath)}.${process.pid}.${Date.now()}.tmp`,
     );
-    const contents = YAML.stringify({ modules: cloneModules(modules) });
+    const contents = YAML.stringify({ modules: cloneModules(modules) }, null, 2);
     try {
       fs.writeFileSync(tempPath, contents, "utf8");
       fs.renameSync(tempPath, this.filePath);
