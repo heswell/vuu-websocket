@@ -65,7 +65,6 @@ function readModules(table: DataTable): DiscoveredModuleRecord[] {
       mfScope: stringValue(table, row, "mfScope"),
       mfUrl: stringValue(table, row, "mfUrl"),
       ...navIcon(table, row),
-      ...remoteConnection(table, row),
     };
   });
 }
@@ -75,21 +74,6 @@ function navIcon(table: DataTable, row: unknown[]) {
   const navIconUrl = row[columnIndex(table, "navIconUrl")];
   return typeof navIconUrl === "string" && navIconUrl
     ? { navIconUrl }
-    : {};
-}
-
-function remoteConnection(table: DataTable, row: unknown[]) {
-  const restUrl = stringValue(table, row, "vuuRestUrl");
-  const websocketUrl = stringValue(table, row, "vuuWebsocketUrl");
-  const connectionId = stringValue(table, row, "vuuConnectionId");
-  return connectionId
-    ? {
-        vuu: {
-          connectionId,
-          ...(restUrl ? { restUrl } : {}),
-          ...(websocketUrl ? { websocketUrl } : {}),
-        },
-      }
     : {};
 }
 

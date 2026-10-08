@@ -28,9 +28,6 @@ export type ModuleConfig = {
   mfUrl: string;
   /** Navigation icon as a data URL (SVG) or an http(s) URL. May be empty. */
   navIconUrl: string;
-  vuuConnectionId: string;
-  vuuWebsocketUrl: string;
-  vuuRestUrl: string;
   /**
    * Role a user must hold to be offered the module. Child modules may leave
    * this empty to inherit their parent's access role.
@@ -113,9 +110,6 @@ export const EMPTY_MODULE_CONFIG: ModuleConfig = {
   mfScope: "",
   mfUrl: "",
   navIconUrl: "",
-  vuuConnectionId: "",
-  vuuWebsocketUrl: "",
-  vuuRestUrl: "",
   accessRole: "",
 };
 
@@ -138,10 +132,6 @@ export const defaultAccessRole = (name: string) =>
 
 export const isChildModule = (module: Pick<ModuleConfig, "parentModuleId">) =>
   module.parentModuleId !== 0;
-
-export const hasVuuConnection = (
-  module: Pick<ModuleConfig, "vuuConnectionId">,
-) => module.vuuConnectionId !== "";
 
 /**
  * Access role that applies to a module: its own, or for a child module with
@@ -301,22 +291,6 @@ export const validateModuleConfig = (
     errors.navIconUrl = "Icon must be an image data URL or http(s) URL";
   }
 
-  if (
-    config.vuuConnectionId ||
-    config.vuuWebsocketUrl ||
-    config.vuuRestUrl
-  ) {
-    if (!config.vuuConnectionId) {
-      errors.vuuConnectionId = "Connection id is required";
-    }
-    if (!isUrl(config.vuuWebsocketUrl, ["ws:", "wss:"])) {
-      errors.vuuWebsocketUrl = "WebSocket URL must be a ws(s) URL";
-    }
-    if (!isUrl(config.vuuRestUrl, ["http:", "https:"])) {
-      errors.vuuRestUrl = "Auth URL must be an http(s) URL";
-    }
-  }
-
   if (config.accessRole) {
     if (!ACCESS_ROLE_PATTERN.test(config.accessRole)) {
       errors.accessRole =
@@ -357,9 +331,6 @@ export const toManagedModules = (
     mfScope: definition.mfScope,
     mfUrl: definition.mfUrl,
     navIconUrl: definition.navIconUrl ?? "",
-    vuuConnectionId: definition.vuu?.connectionId ?? "",
-    vuuWebsocketUrl: definition.vuu?.websocketUrl ?? "",
-    vuuRestUrl: definition.vuu?.restUrl ?? "",
     accessRole: rolesByName.get(definition.name) ?? "",
     id: definition.id,
     version: definition.version,
@@ -383,9 +354,6 @@ export const managedModuleColumnValues = (
   mfComponent: module.mfComponent,
   mfScope: module.mfScope,
   mfUrl: module.mfUrl,
-  vuuConnectionId: module.vuuConnectionId,
-  vuuWebsocketUrl: module.vuuWebsocketUrl,
-  vuuRestUrl: module.vuuRestUrl,
   navIconUrl: module.navIconUrl,
   vuuCreatedTimestamp: module.created,
   vuuUpdatedTimestamp: module.updated,

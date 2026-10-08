@@ -22,9 +22,6 @@ describe("module discovery contract", () => {
         "ModuleAdmin",
         "moduleAdmin",
         "http://localhost:5002",
-        "module-admin",
-        "wss://localhost:8091/websocket-portal",
-        "https://localhost:8443/api/authn",
         MODULE_NAV_ICONS.modules,
       ],
       expect.any(Array),
@@ -42,9 +39,6 @@ describe("module discovery contract", () => {
         "VuuTableBrowser",
         "vuuTableBrowser",
         "http://localhost:5004",
-        "",
-        "",
-        "",
         MODULE_NAV_ICONS.tables,
       ],
       [
@@ -60,9 +54,6 @@ describe("module discovery contract", () => {
         "VuuTableViewer",
         "vuuTableViewer",
         "http://localhost:5005",
-        "",
-        "",
-        "",
         "",
       ],
     ]);
@@ -118,7 +109,7 @@ const validConfig = {
 };
 
 describe("module administration contract", () => {
-  test("validates required fields, uniqueness, parent, location, connection and access rules", () => {
+  test("validates required fields, uniqueness, parent, location and access rules", () => {
     const existing = [{ ...validConfig, id: 1, version: 1, created: 1, updated: 1 }];
     expect(validateModuleConfig({ ...validConfig, name: "" }, [])).toMatchObject({ name: expect.any(String) });
     expect(validateModuleConfig({ ...validConfig, name: "bad name" }, [])).toMatchObject({ name: expect.any(String) });
@@ -126,7 +117,6 @@ describe("module administration contract", () => {
     expect(validateModuleConfig({ ...validConfig, name: "beta", mfScope: "alpha", path: "/beta" }, existing)).toMatchObject({ mfScope: expect.any(String) });
     expect(validateModuleConfig({ ...validConfig, name: "beta", mfScope: "beta", parentModuleId: 99 }, existing)).toMatchObject({ parentModuleId: expect.any(String) });
     expect(validateModuleConfig({ ...validConfig, location: "Tools/Alpha" }, [])).toMatchObject({ location: expect.any(String) });
-    expect(validateModuleConfig({ ...validConfig, vuuConnectionId: "x", vuuWebsocketUrl: "http://bad", vuuRestUrl: "ws://bad" }, [])).toMatchObject({ vuuWebsocketUrl: expect.any(String), vuuRestUrl: expect.any(String) });
     expect(validateModuleConfig({ ...validConfig, accessRole: "" }, [])).toMatchObject({ accessRole: expect.any(String) });
   });
 

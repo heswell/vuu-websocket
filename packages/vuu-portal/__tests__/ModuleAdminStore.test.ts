@@ -35,6 +35,20 @@ describe("YamlModuleStore", () => {
 
     expect(() => new YamlModuleStore(filePath, () => []).load()).toThrow("field 'id' must be a number");
   });
+
+  test("ignores retired VUU connection fields in existing files", () => {
+    fs.mkdirSync(root, { recursive: true });
+    const filePath = path.join(root, "modules.yaml");
+    const legacy = seeded(100).map((module) => ({
+      ...module,
+      vuuConnectionId: "legacy",
+      vuuWebsocketUrl: "wss://localhost:1/legacy",
+      vuuRestUrl: "https://localhost:1/legacy",
+    }));
+    fs.writeFileSync(filePath, Bun.YAML.stringify({ modules: legacy }), "utf8");
+
+    expect(new YamlModuleStore(filePath, () => []).load()).toEqual(seeded(100));
+  });
 });
 
 function seeded(timestamp: number) {

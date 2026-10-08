@@ -113,18 +113,21 @@ const managedModuleKeys = [
   "mfScope",
   "mfUrl",
   "navIconUrl",
-  "vuuConnectionId",
-  "vuuWebsocketUrl",
-  "vuuRestUrl",
   "accessRole",
 ] as const satisfies readonly (keyof ManagedModule)[];
+
+// Fields written by earlier versions; ignored on load and dropped on next save.
+const retiredModuleKeys = ["vuuConnectionId", "vuuWebsocketUrl", "vuuRestUrl"];
 
 function parseManagedModule(value: unknown, index: number): ManagedModule {
   if (!isRecord(value)) {
     throw new Error(`Modules file entry ${index} must be an object`);
   }
   for (const key of Object.keys(value)) {
-    if (!(managedModuleKeys as readonly string[]).includes(key)) {
+    if (
+      !(managedModuleKeys as readonly string[]).includes(key) &&
+      !retiredModuleKeys.includes(key)
+    ) {
       throw new Error(`Modules file entry ${index} contains unknown field '${key}'`);
     }
   }

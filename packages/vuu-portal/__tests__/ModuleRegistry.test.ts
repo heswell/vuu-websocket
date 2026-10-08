@@ -69,11 +69,6 @@ describe("portal module registry", () => {
         name: "basket-trading",
         mfUrl: "http://localhost:5006",
         navIconUrl: MODULE_NAV_ICONS.trading,
-        vuu: {
-          connectionId: "basket",
-          restUrl: "https://localhost:8445/api/authn",
-          websocketUrl: "wss://localhost:8093/websocket-basket-trading",
-        },
       }),
       {
         clientIdentifier: "vuu-module-admin",
@@ -90,11 +85,6 @@ describe("portal module registry", () => {
         mfScope: "moduleAdmin",
         mfUrl: "http://localhost:5002",
         navIconUrl: MODULE_NAV_ICONS.modules,
-        vuu: {
-          connectionId: "module-admin",
-          restUrl: "https://localhost:8443/api/authn",
-          websocketUrl: "wss://localhost:8091/websocket-portal",
-        },
       },
       {
         clientIdentifier: "vuu-user-admin",
@@ -111,11 +101,6 @@ describe("portal module registry", () => {
         mfScope: "userAdmin",
         mfUrl: "http://localhost:5003",
         navIconUrl: MODULE_NAV_ICONS.users,
-        vuu: {
-          connectionId: "user-admin",
-          restUrl: "https://localhost:8444/api/authn",
-          websocketUrl: "wss://localhost:8092/websocket-user-admin",
-        },
       },
       {
         clientIdentifier: "vuu-table-browser",

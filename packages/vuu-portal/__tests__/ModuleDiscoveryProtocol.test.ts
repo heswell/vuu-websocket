@@ -44,9 +44,6 @@ const moduleColumns = [
   "mfComponent",
   "mfScope",
   "mfUrl",
-  "vuuConnectionId",
-  "vuuWebsocketUrl",
-  "vuuRestUrl",
   "navIconUrl",
 ];
 

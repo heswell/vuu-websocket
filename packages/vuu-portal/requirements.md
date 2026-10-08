@@ -30,16 +30,10 @@ Structured config payloads are JSON strings matching
 `@heswell/module-admin/contracts`; mutations are version-checked where relevant
 and update the `modules` and `modulePermissions` tables plus `modules.yaml`.
 
-The built-in records route:
-
-- `moduleAdmin` to `connectionId: "module-admin"` through
-  `https://localhost:8443/api/authn/module-admin` and the portal WebSocket
-  `wss://localhost:8091/websocket-portal`;
-- `userAdmin` to the standalone user-admin server (`connectionId:
-  "user-admin"`, HTTPS `8444`, WebSocket
-  `wss://localhost:8092/websocket-user-admin`); and
-- basket trading to its independent server at
-  `wss://localhost:8093/websocket-basket-trading`.
+Module records do not carry VUU connection details (connection id, WebSocket
+or REST URLs); clients discover those through a separate mechanism. Legacy
+`vuuConnectionId`, `vuuWebsocketUrl` and `vuuRestUrl` fields in an existing
+`modules.yaml` are ignored on load and dropped on the next save.
 
 Keycloak mode uses `vuu-portal-server` to validate navigation tokens and
 `vuu-module-admin-server` for the fixed module-admin profile. Local permissive

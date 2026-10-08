@@ -34,7 +34,6 @@ describe("LoginSuccess", () => {
           mfComponent: "ModuleAdmin",
           mfScope: "ModuleAdmin",
           mfUrl: "http://localhost:5008",
-          vuu: { connectionId: "portal" },
         },
       ],
     };
@@ -74,7 +73,6 @@ describe("LoginSuccess", () => {
               mfComponent: "ModuleAdmin",
               mfScope: "ModuleAdmin",
               mfUrl: "http://localhost:5008",
-              vuu: { connectionId: "portal" },
             },
           ],
         },

@@ -14,9 +14,6 @@ export const modulesTable = TableDef({
     { name: "mfComponent", dataType: "string" },
     { name: "mfScope", dataType: "string" },
     { name: "mfUrl", dataType: "string" },
-    { name: "vuuConnectionId", dataType: "string" },
-    { name: "vuuWebsocketUrl", dataType: "string" },
-    { name: "vuuRestUrl", dataType: "string" },
     { name: "navIconUrl", dataType: "string" },
     ...VUU_DEFAULT_COLUMNS
   ],

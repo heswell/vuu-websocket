@@ -18,11 +18,6 @@ export type ModuleDefinition = {
   mfUrl: string;
   /** Navigation icon as a data URL (SVG). */
   navIconUrl?: string;
-  vuu?: {
-    connectionId: string;
-    websocketUrl: string;
-    restUrl: string;
-  };
 };
 
 export type ModuleRow = [
@@ -38,9 +33,6 @@ export type ModuleRow = [
   mfComponent: string,
   mfScope: string,
   mfUrl: string,
-  vuuConnectionId: string,
-  vuuWebsocketUrl: string,
-  vuuRestUrl: string,
   navIconUrl: string,
 ];
 
@@ -85,11 +77,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "moduleAdmin",
     mfUrl: "http://localhost:5002",
     navIconUrl: MODULE_NAV_ICONS.modules,
-    vuu: {
-      connectionId: "module-admin",
-      websocketUrl: "wss://localhost:8091/websocket-portal",
-      restUrl: "https://localhost:8443/api/authn",
-    },
   },
   {
     id: 2,
@@ -105,11 +92,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "userAdmin",
     mfUrl: "http://localhost:5003",
     navIconUrl: MODULE_NAV_ICONS.users,
-    vuu: {
-      connectionId: "user-admin",
-      websocketUrl: "wss://localhost:8092/websocket-user-admin",
-      restUrl: "https://localhost:8444/api/authn",
-    },
   },
   {
     id: 3,
@@ -125,11 +107,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "basketTrading",
     mfUrl: "http://localhost:5006",
     navIconUrl: MODULE_NAV_ICONS.trading,
-    vuu: {
-      connectionId: "basket",
-      websocketUrl: "wss://localhost:8093/websocket-basket-trading",
-      restUrl: "https://localhost:8445/api/authn",
-    },
   },
   {
     id: 4,
@@ -178,9 +155,6 @@ export const moduleDefinitionsToRows = (
     module.mfComponent,
     module.mfScope,
     module.mfUrl,
-    module.vuu?.connectionId ?? "",
-    module.vuu?.websocketUrl ?? "",
-    module.vuu?.restUrl ?? "",
     module.navIconUrl ?? "",
   ]);
 
