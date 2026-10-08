@@ -1,0 +1,75 @@
+# Default portal modules. Seeds modules.yaml on first startup only;
+# runtime edits (via the module admin service) are persisted to modules.yaml.
+# A child module (parentModuleId != 0) may leave accessRole empty to inherit
+# its parent's role.
+modules:
+  - id: 1
+    version: 1
+    parentModuleId: 0
+    name: "moduleAdmin"
+    title: "Manage remote modules"
+    description: "Create new remote module, update existing modules"
+    enabled: true
+    location: "/Modules/Manage Modules"
+    path: "/modules/admin"
+    mfComponent: "ModuleAdmin"
+    mfScope: "moduleAdmin"
+    mfUrl: "http://localhost:5002"
+    navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%2214%22%20y%3D%223%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%2214%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%2214%22%20y%3D%2214%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3C%2Fsvg%3E"
+    accessRole: "module-admin-access"
+  - id: 2
+    version: 1
+    parentModuleId: 0
+    name: "userAdmin"
+    title: "Manage users"
+    description: "Add, remove and update users"
+    enabled: true
+    location: "/Users/Manage Users"
+    path: "/users/admin"
+    mfComponent: "UserAdmin"
+    mfScope: "userAdmin"
+    mfUrl: "http://localhost:5003"
+    navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%229%22%20cy%3D%228%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M2%2021v-1a6%206%200%200%201%206-6h2a6%206%200%200%201%206%206v1%22%2F%3E%3Cpath%20d%3D%22M16%204a4%204%200%200%201%200%208%22%2F%3E%3Cpath%20d%3D%22M22%2021v-1a6%206%200%200%200-4-5.6%22%2F%3E%3C%2Fsvg%3E"
+    accessRole: "user-admin-access"
+  - id: 3
+    version: 1
+    parentModuleId: 0
+    name: "basket-trading"
+    title: "Basket trading"
+    description: "Basket Trading"
+    enabled: true
+    location: "/Trading/Baskets"
+    path: "/basket/trade"
+    mfComponent: "VuuBasketTradingFeature"
+    mfScope: "basketTrading"
+    mfUrl: "http://localhost:5006"
+    navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%203v18h18%22%2F%3E%3Cpath%20d%3D%22m7%2015%204-4%203%203%206-6%22%2F%3E%3C%2Fsvg%3E"
+    accessRole: "basket-trading-access"
+  - id: 4
+    version: 1
+    parentModuleId: 0
+    name: "vuu-table-browser"
+    title: "Browse tables"
+    description: "Discover and browse VUU tables"
+    enabled: true
+    location: "/Tools/Tables"
+    path: "/tools/tables"
+    mfComponent: "VuuTableBrowser"
+    mfScope: "vuuTableBrowser"
+    mfUrl: "http://localhost:5004"
+    navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%209h18%22%2F%3E%3Cpath%20d%3D%22M3%2015h18%22%2F%3E%3Cpath%20d%3D%22M9%203v18%22%2F%3E%3C%2Fsvg%3E"
+    accessRole: "vuu-table-browser-access"
+  - id: 5
+    version: 1
+    parentModuleId: 4
+    name: "vuu-table-viewer"
+    title: "View table"
+    description: "View a selected VUU table"
+    enabled: true
+    location: ""
+    path: ""
+    mfComponent: "VuuTableViewer"
+    mfScope: "vuuTableViewer"
+    mfUrl: "http://localhost:5005"
+    navIconUrl: ""
+    accessRole: "vuu-table-viewer-access"

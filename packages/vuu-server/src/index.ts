@@ -106,7 +106,6 @@ export type {
   LoginSuccessOptions,
   ModuleRecord,
   ModuleRegistry,
-  RemoteModuleConnection,
 } from "./net/LoginSuccess";
 export type { LoginSuccessProvider } from "./core/LoginSuccessProvider";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";

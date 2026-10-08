@@ -1,8 +1,0 @@
-# Seed-only map from portal module names to the Keycloak client role required to access them.
-# Used only to create modules.yaml on first startup; runtime edits are persisted there.
-moduleAccess:
-  moduleAdmin: module-admin-access
-  userAdmin: user-admin-access
-  basket-trading: basket-trading-access
-  vuu-table-browser: vuu-table-browser-access
-  vuu-table-viewer: vuu-table-viewer-access

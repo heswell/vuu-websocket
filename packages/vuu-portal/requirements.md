@@ -16,8 +16,8 @@
   `modulePermissions` tables. Module definitions are loaded from
   `vuu.portal.modulesFile` (default `modules.yaml`) and persisted after every
   successful module-admin mutation. If the file is missing, it is seeded from
-  the built-in catalog plus `module-access.yaml`; `module-access.yaml` is
-  seed-only after that.
+  `vuu.portal.defaultModulesFile` (default `default-modules.yaml`), which lists
+  each default module with its `accessRole`; that file is seed-only after that.
 - Registry selection includes only enabled, role-permitted modules and chooses
   the highest version, then highest id, for each module name. Child modules
   without their own permission row inherit their parent module role and are only
@@ -30,16 +30,10 @@ Structured config payloads are JSON strings matching
 `@heswell/module-admin/contracts`; mutations are version-checked where relevant
 and update the `modules` and `modulePermissions` tables plus `modules.yaml`.
 
-The built-in records route:
-
-- `moduleAdmin` to `connectionId: "module-admin"` through
-  `https://localhost:8443/api/authn/module-admin` and the portal WebSocket
-  `wss://localhost:8091/websocket-portal`;
-- `userAdmin` to the standalone user-admin server (`connectionId:
-  "user-admin"`, HTTPS `8444`, WebSocket
-  `wss://localhost:8092/websocket-user-admin`); and
-- basket trading to its independent server at
-  `wss://localhost:8093/websocket-basket-trading`.
+Module records do not carry VUU connection details (connection id, WebSocket
+or REST URLs); clients discover those through a separate mechanism. Legacy
+`vuuConnectionId`, `vuuWebsocketUrl` and `vuuRestUrl` fields in an existing
+`modules.yaml` are ignored on load and dropped on the next save.
 
 Keycloak mode uses `vuu-portal-server` to validate navigation tokens and
 `vuu-module-admin-server` for the fixed module-admin profile. Local permissive

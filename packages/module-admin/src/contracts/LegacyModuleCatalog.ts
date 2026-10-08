@@ -1,8 +1,19 @@
+/**
+ * Compatibility exports for published consumers (e.g. @vuu-ui/vuu-data-test)
+ * that still import the retired in-code module catalog.
+ *
+ * @deprecated Module seed data now lives in vuu-portal's default-modules.yaml.
+ * Remove once those consumers no longer import these symbols.
+ */
+import type { ManagedModule } from "./ModuleAdminContract";
+
+/** @deprecated */
 export type ModuleAccessRole = {
   moduleName: string;
   role: string;
 };
 
+/** @deprecated */
 export type ModuleDefinition = {
   id: number;
   parentModuleId: number;
@@ -16,45 +27,15 @@ export type ModuleDefinition = {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  /** Navigation icon as a data URL (SVG). */
   navIconUrl?: string;
-  vuu?: {
-    connectionId: string;
-    websocketUrl: string;
-    restUrl: string;
-  };
 };
-
-export type ModuleRow = [
-  id: number,
-  parentModuleId: number,
-  name: string,
-  title: string,
-  description: string,
-  version: number,
-  enabled: boolean,
-  location: string,
-  path: string,
-  mfComponent: string,
-  mfScope: string,
-  mfUrl: string,
-  vuuConnectionId: string,
-  vuuWebsocketUrl: string,
-  vuuRestUrl: string,
-  navIconUrl: string,
-];
-
-export type ModulePermissionRow = [
-  id: number,
-  moduleId: number,
-  role: string,
-];
 
 const svgIcon = (body: string) =>
   `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`,
   )}`;
 
+/** @deprecated */
 export const MODULE_NAV_ICONS = {
   modules: svgIcon(
     '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
@@ -70,6 +51,7 @@ export const MODULE_NAV_ICONS = {
   ),
 } as const;
 
+/** @deprecated */
 export const DEFAULT_MODULE_DEFINITIONS = [
   {
     id: 1,
@@ -85,11 +67,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "moduleAdmin",
     mfUrl: "http://localhost:5002",
     navIconUrl: MODULE_NAV_ICONS.modules,
-    vuu: {
-      connectionId: "module-admin",
-      websocketUrl: "wss://localhost:8091/websocket-portal",
-      restUrl: "https://localhost:8443/api/authn",
-    },
   },
   {
     id: 2,
@@ -105,11 +82,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "userAdmin",
     mfUrl: "http://localhost:5003",
     navIconUrl: MODULE_NAV_ICONS.users,
-    vuu: {
-      connectionId: "user-admin",
-      websocketUrl: "wss://localhost:8092/websocket-user-admin",
-      restUrl: "https://localhost:8444/api/authn",
-    },
   },
   {
     id: 3,
@@ -125,11 +97,6 @@ export const DEFAULT_MODULE_DEFINITIONS = [
     mfScope: "basketTrading",
     mfUrl: "http://localhost:5006",
     navIconUrl: MODULE_NAV_ICONS.trading,
-    vuu: {
-      connectionId: "basket",
-      websocketUrl: "wss://localhost:8093/websocket-basket-trading",
-      restUrl: "https://localhost:8445/api/authn",
-    },
   },
   {
     id: 4,
@@ -162,38 +129,38 @@ export const DEFAULT_MODULE_DEFINITIONS = [
   },
 ] as const satisfies readonly ModuleDefinition[];
 
-export const moduleDefinitionsToRows = (
-  modules: readonly ModuleDefinition[],
-): ModuleRow[] =>
-  modules.map((module) => [
-    module.id,
-    module.parentModuleId,
-    module.name,
-    module.title,
-    module.description,
-    module.version,
-    module.enabled,
-    module.location,
-    module.path,
-    module.mfComponent,
-    module.mfScope,
-    module.mfUrl,
-    module.vuu?.connectionId ?? "",
-    module.vuu?.websocketUrl ?? "",
-    module.vuu?.restUrl ?? "",
-    module.navIconUrl ?? "",
-  ]);
-
-export const modulePermissionsFor = (
-  modules: readonly ModuleDefinition[],
-  moduleAccessRoles: readonly ModuleAccessRole[],
-): ModulePermissionRow[] =>
-  moduleAccessRoles.map(({ moduleName, role }, index) => {
-    const module = modules.find(({ name }) => name === moduleName);
-    if (!module) {
+/** @deprecated */
+export const toManagedModules = (
+  definitions: readonly ModuleDefinition[],
+  accessRoles: readonly ModuleAccessRole[],
+  timestamp: number,
+): ManagedModule[] => {
+  for (const { moduleName } of accessRoles) {
+    if (!definitions.some(({ name }) => name === moduleName)) {
       throw new Error(
         `Module access configuration references unknown module '${moduleName}'`,
       );
     }
-    return [index + 1, module.id, role];
-  });
+  }
+  const rolesByName = new Map(
+    accessRoles.map(({ moduleName, role }) => [moduleName, role.trim()]),
+  );
+  return definitions.map((definition) => ({
+    parentModuleId: definition.parentModuleId,
+    name: definition.name,
+    title: definition.title,
+    description: definition.description,
+    enabled: definition.enabled,
+    location: definition.location,
+    path: definition.path,
+    mfComponent: definition.mfComponent,
+    mfScope: definition.mfScope,
+    mfUrl: definition.mfUrl,
+    navIconUrl: definition.navIconUrl ?? "",
+    accessRole: rolesByName.get(definition.name) ?? "",
+    id: definition.id,
+    version: definition.version,
+    created: timestamp,
+    updated: timestamp,
+  }));
+};

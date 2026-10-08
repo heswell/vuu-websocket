@@ -18,8 +18,9 @@ Other VUU servers omit `moduleRegistry`. The former authenticated
 `GET /module-registry` browser endpoint does not exist.
 
 Each record contains module-federation metadata and matches the UI's
-`VuuModuleDescriptor` (`@vuu-ui/vuu-protocol-types`). A remote that owns its
-own VUU target includes a VUU connection:
+`VuuModuleDescriptor` (`@vuu-ui/vuu-protocol-types`). Records carry no VUU
+connection details; clients discover a module's VUU connection through a
+separate mechanism:
 
 ```ts
 type ModuleRecord = {
@@ -38,11 +39,6 @@ type ModuleRecord = {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  vuu?: {
-    connectionId: string;
-    restUrl?: string;
-    websocketUrl?: string;
-  };
 };
 ```
 

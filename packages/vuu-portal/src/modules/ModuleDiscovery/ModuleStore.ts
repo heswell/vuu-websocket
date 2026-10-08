@@ -58,11 +58,9 @@ export class YamlModuleStore implements ModuleStore {
       return seeded;
     }
 
-    const parsed = YAML.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-    if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
-      throw new Error(`Modules file '${this.filePath}' must contain a 'modules' list`);
-    }
-    const modules = parsed.modules.map((value, index) => parseManagedModule(value, index));
+    const modules = readModulesFile(this.filePath).map((value, index) =>
+      parseManagedModule(value, index),
+    );
     assertValidManagedModules(modules, this.filePath);
     return modules;
   }
@@ -93,6 +91,30 @@ export function createModuleState(store: ModuleStore) {
   return new ModuleState(store, store.load());
 }
 
+/**
+ * Reads the default module catalog used to seed `modules.yaml`. Entries have
+ * the same fields as `modules.yaml`, except `created` and `updated`, which are
+ * set to `timestamp`.
+ */
+export function loadDefaultModules(filePath: string, timestamp: number) {
+  const modules = readModulesFile(filePath).map((value, index) =>
+    parseManagedModule(
+      isRecord(value) ? { ...value, created: timestamp, updated: timestamp } : value,
+      index,
+    ),
+  );
+  assertValidManagedModules(modules, filePath);
+  return modules;
+}
+
+function readModulesFile(filePath: string): unknown[] {
+  const parsed = YAML.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+  if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
+    throw new Error(`Modules file '${filePath}' must contain a 'modules' list`);
+  }
+  return parsed.modules;
+}
+
 function cloneModules(modules: readonly ManagedModule[]) {
   return modules.map((module) => ({ ...module }));
 }
@@ -113,18 +135,21 @@ const managedModuleKeys = [
   "mfScope",
   "mfUrl",
   "navIconUrl",
-  "vuuConnectionId",
-  "vuuWebsocketUrl",
-  "vuuRestUrl",
   "accessRole",
 ] as const satisfies readonly (keyof ManagedModule)[];
+
+// Fields written by earlier versions; ignored on load and dropped on next save.
+const retiredModuleKeys = ["vuuConnectionId", "vuuWebsocketUrl", "vuuRestUrl"];
 
 function parseManagedModule(value: unknown, index: number): ManagedModule {
   if (!isRecord(value)) {
     throw new Error(`Modules file entry ${index} must be an object`);
   }
   for (const key of Object.keys(value)) {
-    if (!(managedModuleKeys as readonly string[]).includes(key)) {
+    if (
+      !(managedModuleKeys as readonly string[]).includes(key) &&
+      !retiredModuleKeys.includes(key)
+    ) {
       throw new Error(`Modules file entry ${index} contains unknown field '${key}'`);
     }
   }

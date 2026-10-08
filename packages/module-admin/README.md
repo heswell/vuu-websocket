@@ -5,10 +5,10 @@ administration functionality.
 
 | Import | Use |
 | --- | --- |
-| `@heswell/module-admin` | Default module catalog and module permission helpers. |
-| `@heswell/module-admin/contracts` | Focused module-discovery contracts and row projections. |
+| `@heswell/module-admin` | Module-admin contract and helpers. |
+| `@heswell/module-admin/contracts` | The same contracts, as a focused entry point. |
 
-It exports the default module catalog used by the portal, discovery row helpers, and the module-admin RPC contract. The contract includes `ModuleConfig`, `ManagedModule`, `ModuleConfigChanges`, `MODULE_ADMIN_RPC`, `MODULE_ADMIN_RPC_CONTRACT`, parse/validate helpers, pure RPC operation helpers (`executeModuleAdminRpc` and per-RPC functions), access-role helpers, and projections for managed module and permission rows. Server table wiring and YAML persistence deliberately remain portal-specific.
+It exports the module-admin RPC contract. The default module catalog is not part of this package; the portal seeds it from `default-modules.yaml`. The contract includes `ModuleConfig`, `ManagedModule`, `ModuleConfigChanges`, `MODULE_ADMIN_RPC`, `MODULE_ADMIN_RPC_CONTRACT`, parse/validate helpers, pure RPC operation helpers (`executeModuleAdminRpc` and per-RPC functions), access-role helpers, and projections for managed module and permission rows. Server table wiring and YAML persistence deliberately remain portal-specific.
 
 ## Publishing
 

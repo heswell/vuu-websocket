@@ -1,9 +1,3 @@
-export interface RemoteModuleConnection {
-  connectionId: string;
-  restUrl?: string;
-  websocketUrl?: string;
-}
-
 /**
  * A portal module as sent in LOGIN_SUCCESS. Mirrors the UI's
  * `VuuModuleDescriptor` (`@vuu-ui/vuu-protocol-types`).
@@ -29,7 +23,6 @@ export interface ModuleRecord {
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
-  vuu?: RemoteModuleConnection;
 }
 
 export interface ModuleRegistry {

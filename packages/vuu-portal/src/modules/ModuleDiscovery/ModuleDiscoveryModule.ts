@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import { YAML } from "bun";
 import {
   Column,
   ModuleFactory,
@@ -7,11 +5,8 @@ import {
 } from "@heswell/vuu-server";
 import type { Config, TableContainer } from "@heswell/vuu-server";
 import {
-  DEFAULT_MODULE_DEFINITIONS,
   managedModuleColumnValues,
   managedModulePermissionValues,
-  toManagedModules,
-  type ModuleAccessRole,
 } from "@heswell/module-admin";
 import {
   modulePermissionsTable,
@@ -19,56 +14,31 @@ import {
 } from "./ModuleDiscoveryTableDefs";
 import { ModuleDiscoveryProvider } from "./ModuleDiscoveryProvider";
 import { ModuleDiscoveryService } from "./ModuleDiscoveryService";
-import { ModuleState, YamlModuleStore, createModuleState } from "./ModuleStore";
+import {
+  ModuleState,
+  YamlModuleStore,
+  createModuleState,
+  loadDefaultModules,
+} from "./ModuleStore";
 import { DEFAULT_MODULE_ADMIN_ROLE } from "./ModuleAdminService";
 
-export type { ModuleAccessRole } from "@heswell/module-admin";
 export {
   InMemoryModuleStore,
   ModuleState,
   YamlModuleStore,
   createModuleState,
+  loadDefaultModules,
 } from "./ModuleStore";
-
-export type ModuleAccessConfig = {
-  moduleAccess?: unknown;
-};
-
-export function loadModuleAccessRoles(
-  config: Pick<Config, "getPath">,
-): ModuleAccessRole[] {
-  const filePath = config.getPath(
-    "vuu.portal.moduleAccessFile",
-    "module-access.yaml",
-  );
-  const source = fs.readFileSync(filePath, "utf8");
-  const parsed = YAML.parse(source) as ModuleAccessConfig;
-
-  if (!isRecord(parsed) || !isRecord(parsed.moduleAccess)) {
-    throw new Error(
-      `Module access file '${filePath}' must contain a 'moduleAccess' object`,
-    );
-  }
-
-  return Object.entries(parsed.moduleAccess).map(([moduleName, role]) => {
-    if (typeof role !== "string" || role.trim() === "") {
-      throw new Error(
-        `Module access file '${filePath}' must map '${moduleName}' to a non-empty role`,
-      );
-    }
-    return { moduleName, role: role.trim() };
-  });
-}
 
 export function loadModuleState(config: Pick<Config, "getPath">) {
   const filePath = config.getPath("vuu.portal.modulesFile", "modules.yaml");
+  const defaultsPath = config.getPath(
+    "vuu.portal.defaultModulesFile",
+    "default-modules.yaml",
+  );
   return createModuleState(
     new YamlModuleStore(filePath, () =>
-      toManagedModules(
-        DEFAULT_MODULE_DEFINITIONS,
-        loadModuleAccessRoles(config),
-        Date.now(),
-      ),
+      loadDefaultModules(defaultsPath, Date.now()),
     ),
   );
 }
@@ -133,8 +103,4 @@ function valuesToRow(
   values: Record<string, string | number | boolean>,
 ) {
   return table.columns.map(({ name }) => values[name] ?? "");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
