@@ -19,16 +19,8 @@ import {
   createModuleRegistry,
   moduleClientIdentifier,
 } from "../src/ModuleRegistry";
-import { DEFAULT_MODULE_DEFINITIONS, MODULE_NAV_ICONS, toManagedModules } from "@heswell/module-admin";
 import { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
-
-const moduleAccessRoles = [
-  { moduleName: "moduleAdmin", role: "module-admin-access" },
-  { moduleName: "userAdmin", role: "user-admin-access" },
-  { moduleName: "basket-trading", role: "basket-trading-access" },
-  { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
-  { moduleName: "vuu-table-viewer", role: "vuu-table-viewer-access" },
-];
+import { defaultModules, navIconUrl } from "./defaultModules";
 
 describe("portal module registry", () => {
   let lifecycle: LifecycleContainer;
@@ -40,7 +32,7 @@ describe("portal module registry", () => {
       VuuWebSocketOptions().withWsPort(0),
       {},
       LoginTokenService(),
-    ).withModule(ModuleDiscoveryModule(moduleState(moduleAccessRoles)));
+    ).withModule(ModuleDiscoveryModule(moduleState()));
     vuuServer = new VuuServer(config, lifecycle);
     await lifecycle.start();
   });
@@ -49,7 +41,7 @@ describe("portal module registry", () => {
     await lifecycle.stop();
   });
 
-  test("serializes authorized remotes with their target server connections", () => {
+  test("serializes authorized modules", () => {
     const registry = createModuleRegistry(
       vuuServer.tableContainer,
       VuuUserWithAuthorizations("admin", [
@@ -68,7 +60,7 @@ describe("portal module registry", () => {
         accessRole: "basket-trading-access",
         name: "basket-trading",
         mfUrl: "http://localhost:5006",
-        navIconUrl: MODULE_NAV_ICONS.trading,
+        navIconUrl: navIconUrl("basket-trading"),
       }),
       {
         clientIdentifier: "vuu-module-admin",
@@ -84,7 +76,7 @@ describe("portal module registry", () => {
         mfComponent: "ModuleAdmin",
         mfScope: "moduleAdmin",
         mfUrl: "http://localhost:5002",
-        navIconUrl: MODULE_NAV_ICONS.modules,
+        navIconUrl: navIconUrl("moduleAdmin"),
       },
       {
         clientIdentifier: "vuu-user-admin",
@@ -100,7 +92,7 @@ describe("portal module registry", () => {
         mfComponent: "UserAdmin",
         mfScope: "userAdmin",
         mfUrl: "http://localhost:5003",
-        navIconUrl: MODULE_NAV_ICONS.users,
+        navIconUrl: navIconUrl("userAdmin"),
       },
       {
         clientIdentifier: "vuu-table-browser",
@@ -116,7 +108,7 @@ describe("portal module registry", () => {
         mfComponent: "VuuTableBrowser",
         mfScope: "vuuTableBrowser",
         mfUrl: "http://localhost:5004",
-        navIconUrl: MODULE_NAV_ICONS.tables,
+        navIconUrl: navIconUrl("vuu-table-browser"),
       },
       {
         clientIdentifier: "vuu-table-viewer",
@@ -195,9 +187,6 @@ describe("portal module registry", () => {
       "ModuleAdmin",
       "ModuleAdmin",
       "http://localhost:5011",
-      "module-admin",
-      "wss://localhost:8091/websocket-portal",
-      "https://localhost:8443/api/authn",
     ]);
     modules.insert([
       7,
@@ -212,9 +201,6 @@ describe("portal module registry", () => {
       "ModuleAdmin",
       "ModuleAdmin",
       "http://localhost:5012",
-      "portal",
-      "",
-      "",
     ]);
     permissions.insert([7, 6, "module-admin-access"]);
     permissions.insert([8, 7, "module-admin-access"]);
@@ -259,7 +245,7 @@ describe("portal module registry", () => {
 });
 
 
-function moduleState(roles: typeof moduleAccessRoles) {
-  const modules = toManagedModules(DEFAULT_MODULE_DEFINITIONS, roles, Date.now());
+function moduleState() {
+  const modules = defaultModules();
   return new ModuleState(new InMemoryModuleStore(modules), modules);
 }

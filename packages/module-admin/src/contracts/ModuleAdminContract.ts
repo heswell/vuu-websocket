@@ -1,8 +1,3 @@
-import type {
-  ModuleAccessRole,
-  ModuleDefinition,
-} from "./ModuleDiscoveryContract";
-
 /**
  * Module administration contract shared by the VUU portal server, the
  * module-admin UI and local (in-browser) test data services.
@@ -301,42 +296,6 @@ export const validateModuleConfig = (
   }
 
   return errors;
-};
-
-
-export const toManagedModules = (
-  definitions: readonly ModuleDefinition[],
-  accessRoles: readonly ModuleAccessRole[],
-  timestamp: number,
-): ManagedModule[] => {
-  for (const { moduleName } of accessRoles) {
-    if (!definitions.some(({ name }) => name === moduleName)) {
-      throw new Error(
-        `Module access configuration references unknown module '${moduleName}'`,
-      );
-    }
-  }
-  const rolesByName = new Map(
-    accessRoles.map(({ moduleName, role }) => [moduleName, role.trim()]),
-  );
-  return definitions.map((definition) => ({
-    parentModuleId: definition.parentModuleId,
-    name: definition.name,
-    title: definition.title,
-    description: definition.description,
-    enabled: definition.enabled,
-    location: definition.location,
-    path: definition.path,
-    mfComponent: definition.mfComponent,
-    mfScope: definition.mfScope,
-    mfUrl: definition.mfUrl,
-    navIconUrl: definition.navIconUrl ?? "",
-    accessRole: rolesByName.get(definition.name) ?? "",
-    id: definition.id,
-    version: definition.version,
-    created: timestamp,
-    updated: timestamp,
-  }));
 };
 
 export const managedModuleColumnValues = (

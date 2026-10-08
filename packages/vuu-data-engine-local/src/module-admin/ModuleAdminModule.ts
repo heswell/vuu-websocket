@@ -1,11 +1,7 @@
 import {
-  DEFAULT_MODULE_DEFINITIONS,
   MODULE_ADMIN_RPC,
-  MODULE_NAV_ICONS,
   executeModuleAdminRpc,
-  toManagedModules,
   type ManagedModule,
-  type ModuleAccessRole,
   type ModuleAdminRpcName,
 } from "@heswell/module-admin/contracts";
 import type { TableSchema } from "@vuu-ui/vuu-data-types";
@@ -44,45 +40,139 @@ const createTables = (): ModuleAdminTables => ({
 
 const INITIAL_TIMESTAMP = 1_710_000_000_000;
 
-/** The child module `vuu-table-viewer` has no role and inherits its parent's. */
-const INITIAL_ACCESS_ROLES: readonly ModuleAccessRole[] = [
-  { moduleName: "moduleAdmin", role: "module-admin-access" },
-  { moduleName: "userAdmin", role: "user-admin-access" },
-  { moduleName: "basket-trading", role: "basket-trading-access" },
-  { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
-];
+const svgIcon = (body: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`,
+  )}`;
 
-/** Local-only examples: a disabled module without an access role. */
-const EXAMPLE_MODULES: readonly ManagedModule[] = [
-  {
+const NAV_ICONS = {
+  modules: svgIcon(
+    '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  ),
+  users: svgIcon(
+    '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1"/><path d="M16 4a4 4 0 0 1 0 8"/><path d="M22 21v-1a6 6 0 0 0-4-5.6"/>',
+  ),
+  trading: svgIcon('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/>'),
+  tables: svgIcon(
+    '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/>',
+  ),
+} as const;
+
+const localModule = (
+  module: Omit<ManagedModule, "created" | "updated">,
+): ManagedModule => ({
+  ...module,
+  created: INITIAL_TIMESTAMP,
+  updated: INITIAL_TIMESTAMP,
+});
+
+/**
+ * Local seed modules, mirroring the portal's `default-modules.yaml`. The child
+ * module `vuu-table-viewer` has no role and inherits its parent's. The
+ * disabled `order-blotter` module without an access role is a local-only
+ * example.
+ */
+const INITIAL_MODULES: readonly ManagedModule[] = [
+  localModule({
+    id: 1,
+    version: 1,
+    parentModuleId: 0,
+    name: "moduleAdmin",
+    title: "Manage remote modules",
+    description: "Create new remote module, update existing modules",
+    enabled: true,
+    location: "/Modules/Manage Modules",
+    path: "/modules/admin",
+    mfComponent: "ModuleAdmin",
+    mfScope: "moduleAdmin",
+    mfUrl: "http://localhost:5002",
+    navIconUrl: NAV_ICONS.modules,
+    accessRole: "module-admin-access",
+  }),
+  localModule({
+    id: 2,
+    version: 1,
+    parentModuleId: 0,
+    name: "userAdmin",
+    title: "Manage users",
+    description: "Add, remove and update users",
+    enabled: true,
+    location: "/Users/Manage Users",
+    path: "/users/admin",
+    mfComponent: "UserAdmin",
+    mfScope: "userAdmin",
+    mfUrl: "http://localhost:5003",
+    navIconUrl: NAV_ICONS.users,
+    accessRole: "user-admin-access",
+  }),
+  localModule({
+    id: 3,
+    version: 1,
+    parentModuleId: 0,
+    name: "basket-trading",
+    title: "Basket trading",
+    description: "Basket Trading",
+    enabled: true,
+    location: "/Trading/Baskets",
+    path: "/basket/trade",
+    mfComponent: "VuuBasketTradingFeature",
+    mfScope: "basketTrading",
+    mfUrl: "http://localhost:5006",
+    navIconUrl: NAV_ICONS.trading,
+    accessRole: "basket-trading-access",
+  }),
+  localModule({
+    id: 4,
+    version: 1,
+    parentModuleId: 0,
+    name: "vuu-table-browser",
+    title: "Browse tables",
+    description: "Discover and browse VUU tables",
+    enabled: true,
+    location: "/Tools/Tables",
+    path: "/tools/tables",
+    mfComponent: "VuuTableBrowser",
+    mfScope: "vuuTableBrowser",
+    mfUrl: "http://localhost:5004",
+    navIconUrl: NAV_ICONS.tables,
+    accessRole: "vuu-table-browser-access",
+  }),
+  localModule({
+    id: 5,
+    version: 1,
+    parentModuleId: 4,
+    name: "vuu-table-viewer",
+    title: "View table",
+    description: "View a selected VUU table",
+    enabled: true,
+    location: "",
+    path: "",
+    mfComponent: "VuuTableViewer",
+    mfScope: "vuuTableViewer",
+    mfUrl: "http://localhost:5005",
+    navIconUrl: "",
+    accessRole: "",
+  }),
+  localModule({
     id: 6,
+    version: 3,
     parentModuleId: 0,
     name: "order-blotter",
     title: "Order blotter",
     description: "Monitor parent and child orders across all desks.",
-    version: 3,
     enabled: false,
     location: "/Trading/Orders",
     path: "/trading/orders",
     mfComponent: "OrderBlotter",
     mfScope: "orderBlotter",
     mfUrl: "http://localhost:5009",
-    navIconUrl: MODULE_NAV_ICONS.tables,
+    navIconUrl: NAV_ICONS.tables,
     accessRole: "",
-    created: INITIAL_TIMESTAMP,
-    updated: INITIAL_TIMESTAMP,
-  },
+  }),
 ];
 
 export const MODULE_ADMIN_INITIAL_SNAPSHOT: ModuleAdminSnapshot = {
-  modules: [
-    ...toManagedModules(
-      DEFAULT_MODULE_DEFINITIONS,
-      INITIAL_ACCESS_ROLES,
-      INITIAL_TIMESTAMP,
-    ),
-    ...EXAMPLE_MODULES,
-  ],
+  modules: INITIAL_MODULES,
 };
 
 /**

@@ -22,11 +22,8 @@ const {
   VuuUserWithAuthorizations,
   VuuWebSocketOptions,
 } = await import("@heswell/vuu-server");
-const {
-  DEFAULT_MODULE_DEFINITIONS,
-  moduleDefinitionsToRows,
-  toManagedModules,
-} = await import("@heswell/module-admin");
+const { managedModuleColumnValues } = await import("@heswell/module-admin");
+const { defaultModules } = await import("./defaultModules");
 const { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } = await import(
   "../src/modules/ModuleDiscovery/ModuleDiscoveryModule"
 );
@@ -60,6 +57,7 @@ describe("module discovery protocol", () => {
 
   test("projects table rows to the CREATE_VP column contract", async () => {
     lifecycle = new LifecycleContainer();
+    const modules = defaultModules();
     const loginTokenService = LoginTokenService();
     const token = loginTokenService.getToken(
       VuuUserWithAuthorizations("module-admin", ["module-admin-access"]),
@@ -69,7 +67,7 @@ describe("module discovery protocol", () => {
         VuuWebSocketOptions().withWsPort(0),
         {},
         loginTokenService,
-      ).withModule(ModuleDiscoveryModule(new ModuleState(new InMemoryModuleStore(toManagedModules(DEFAULT_MODULE_DEFINITIONS, [], Date.now())), toManagedModules(DEFAULT_MODULE_DEFINITIONS, [], Date.now())))),
+      ).withModule(ModuleDiscoveryModule(new ModuleState(new InMemoryModuleStore(modules), modules))),
       lifecycle,
     );
     await lifecycle.start();
@@ -112,7 +110,8 @@ describe("module discovery protocol", () => {
     );
 
     expect(createVpSuccess.columns).toEqual(moduleColumns);
-    expect(row?.data).toEqual(moduleDefinitionsToRows(DEFAULT_MODULE_DEFINITIONS)[0]);
+    const firstModule = managedModuleColumnValues(modules[0]);
+    expect(row?.data).toEqual(moduleColumns.map((column) => firstModule[column]));
     expect(row?.data).toHaveLength(createVpSuccess.columns.length);
 
     const rpcResponse = waitForMessage<VuuRpcServiceResponse>(

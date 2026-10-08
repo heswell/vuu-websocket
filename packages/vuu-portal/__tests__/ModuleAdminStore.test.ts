@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_MODULE_DEFINITIONS, toManagedModules } from "@heswell/module-admin";
 import { YamlModuleStore } from "../src/modules/ModuleDiscovery/ModuleStore";
+import { defaultModules } from "./defaultModules";
 
 const root = path.join(import.meta.dir, ".test-output", "module-store");
 
@@ -52,15 +52,5 @@ describe("YamlModuleStore", () => {
 });
 
 function seeded(timestamp: number) {
-  return toManagedModules(
-    DEFAULT_MODULE_DEFINITIONS,
-    [
-      { moduleName: "moduleAdmin", role: "module-admin-access" },
-      { moduleName: "userAdmin", role: "user-admin-access" },
-      { moduleName: "basket-trading", role: "basket-trading-access" },
-      { moduleName: "vuu-table-browser", role: "vuu-table-browser-access" },
-      { moduleName: "vuu-table-viewer", role: "vuu-table-viewer-access" },
-    ],
-    timestamp,
-  );
+  return defaultModules(timestamp);
 }

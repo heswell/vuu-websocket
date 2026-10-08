@@ -16,8 +16,8 @@
   `modulePermissions` tables. Module definitions are loaded from
   `vuu.portal.modulesFile` (default `modules.yaml`) and persisted after every
   successful module-admin mutation. If the file is missing, it is seeded from
-  the built-in catalog plus `module-access.yaml`; `module-access.yaml` is
-  seed-only after that.
+  `vuu.portal.defaultModulesFile` (default `default-modules.yaml`), which lists
+  each default module with its `accessRole`; that file is seed-only after that.
 - Registry selection includes only enabled, role-permitted modules and chooses
   the highest version, then highest id, for each module name. Child modules
   without their own permission row inherit their parent module role and are only

@@ -15,9 +15,5 @@ export {
 } from "./snapshot-projection";
 export type {
   ManagedModule,
-  ModuleAccessRole,
   ModuleConfig,
-  ModuleDefinition,
-  ModulePermissionRow,
-  ModuleRow,
 } from "@heswell/module-admin/contracts";

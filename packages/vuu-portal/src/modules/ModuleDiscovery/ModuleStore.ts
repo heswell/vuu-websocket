@@ -58,11 +58,9 @@ export class YamlModuleStore implements ModuleStore {
       return seeded;
     }
 
-    const parsed = YAML.parse(fs.readFileSync(this.filePath, "utf8")) as unknown;
-    if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
-      throw new Error(`Modules file '${this.filePath}' must contain a 'modules' list`);
-    }
-    const modules = parsed.modules.map((value, index) => parseManagedModule(value, index));
+    const modules = readModulesFile(this.filePath).map((value, index) =>
+      parseManagedModule(value, index),
+    );
     assertValidManagedModules(modules, this.filePath);
     return modules;
   }
@@ -91,6 +89,30 @@ export class YamlModuleStore implements ModuleStore {
 
 export function createModuleState(store: ModuleStore) {
   return new ModuleState(store, store.load());
+}
+
+/**
+ * Reads the default module catalog used to seed `modules.yaml`. Entries have
+ * the same fields as `modules.yaml`, except `created` and `updated`, which are
+ * set to `timestamp`.
+ */
+export function loadDefaultModules(filePath: string, timestamp: number) {
+  const modules = readModulesFile(filePath).map((value, index) =>
+    parseManagedModule(
+      isRecord(value) ? { ...value, created: timestamp, updated: timestamp } : value,
+      index,
+    ),
+  );
+  assertValidManagedModules(modules, filePath);
+  return modules;
+}
+
+function readModulesFile(filePath: string): unknown[] {
+  const parsed = YAML.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+  if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
+    throw new Error(`Modules file '${filePath}' must contain a 'modules' list`);
+  }
+  return parsed.modules;
 }
 
 function cloneModules(modules: readonly ManagedModule[]) {
