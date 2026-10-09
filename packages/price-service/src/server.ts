@@ -1,66 +1,65 @@
 import {
-  WebSocketConnectionHandler,
-  WebsocketData,
+  DataService,
+  RemoteTableSubscription,
+  TablePublisher,
 } from "@heswell/service-utils";
-import { uuid } from "@vuu-ui/vuu-utils";
-import logger from "./logger";
-import { startGeneratingUpdates, stopGeneratingUpdates } from "./price-factory";
-import priceStore from "./PriceStore";
+import { Table } from "@heswell/vuu-table";
 import { loadConfig } from "./config";
+import { PriceGenerator } from "./PriceGenerator";
+import { instrumentsSchema, pricesSchema } from "./tableSchemas";
 
-export async function start() {
-  console.log(`[PRICES:service:server] start`);
-  const websocketServer = Bun.serve<WebsocketData>({
-    // certFile: "./certs/myCA.pem",
-    // keyFile: "./certs/myCA.key",
-    // passphrase: "1234",
+export interface PriceServiceOptions {
+  log?: (message: string) => void;
+  port?: number;
+  refDataUrl?: string;
+  updatesPerSecond?: number;
+}
 
-    port: loadConfig().getNumber("service.port"),
+/**
+ * Publishes the prices resource, one price per instrument.
+ *
+ * Instruments are sourced from the reference data service. This service
+ * starts regardless of whether that is available. Subscribers receive their
+ * snapshot once instruments have been loaded. If reference data restarts,
+ * instruments (and so prices) are reconciled when it comes back.
+ */
+export function start(options: PriceServiceOptions = {}) {
+  const config = loadConfig();
+  const log = options.log ?? console.log;
+  const port = options.port ?? config.getNumber("service.port");
+  const refDataUrl =
+    options.refDataUrl ?? config.getString("services.refdata.url");
+  const updatesPerSecond =
+    options.updatesPerSecond ??
+    config.getNumber("prices.updatesPerSecond", 10_000);
 
-    fetch(req, server) {
-      const sessionId = uuid();
-      logger.info({ sessionId }, "create session");
-      const url = new URL(req.url);
-      const success = server.upgrade(req, { data: { sessionId } });
-      if (success) {
-        // Bun automatically returns a 101 Switching Protocols
-        // if the upgrade succeeds
-        return undefined;
-      }
+  const instruments = new Table({ schema: instrumentsSchema });
+  const prices = new Table({ schema: pricesSchema });
 
-      switch (url.pathname) {
-        case "/admin/start": {
-          const responseInit: ResponseInit = {
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-            },
-          };
-
-          const updatesPerSecond = parseInt(
-            url.searchParams.get("updatesPerSecond") ?? "1"
-          );
-
-          startGeneratingUpdates({ updatesPerSecond });
-          return new Response("ok", responseInit);
-        }
-        case "/admin/stop":
-          const responseInit: ResponseInit = {
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-            },
-          };
-          stopGeneratingUpdates();
-          return new Response("ok", responseInit);
-        default:
-          console.log(`unknown url path ${url.pathname}`);
-          // handle HTTP request normally
-          return new Response("Hello world!");
-      }
-    },
-    websocket: new WebSocketConnectionHandler(priceStore, "PRICES:service"),
+  const publisher = new TablePublisher({ table: prices, ready: false });
+  const generator = new PriceGenerator({ instruments, prices });
+  const refData = new RemoteTableSubscription({
+    columns: ["ric"],
+    log,
+    name: "PRICES:service",
+    resource: "instruments",
+    table: instruments,
+    url: refDataUrl,
   });
 
-  console.log(
-    `[PRICES:service:server] websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
-  );
+  const service = new DataService({ name: "PRICES:service", port, log })
+    .addPublisher(publisher)
+    .addGenerator(generator)
+    .addDependency(refData)
+    .start();
+
+  refData.firstSnapshot.then(() => {
+    log(`[PRICES:service] ${prices.rowCount} prices created`);
+    publisher.setReady();
+    if (updatesPerSecond > 0) {
+      generator.start(updatesPerSecond);
+    }
+  }, () => undefined);
+
+  return { generator, instruments, prices, refData, service };
 }

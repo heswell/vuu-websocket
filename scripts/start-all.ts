@@ -1,28 +1,29 @@
-import { Subprocess } from "bun";
+import type { Subprocess } from "bun";
 
-let procRefData: Subprocess | null = null;
-let procVuuServer: Subprocess | null = null;
+// Services reconnect to their dependencies, so they can be started in any
+// order, no need to wait for one to be ready before starting the next.
+const scripts = {
+  "ref data": "./scripts/start-refdata.ts",
+  prices: "./scripts/start-prices.ts",
+  // orders module is not currently enabled in the demo server
+  // orders: "./scripts/start-orders.ts",
+  "demo vuu server": "./scripts/start-demo.ts",
+};
 
-procRefData = Bun.spawn(["bun", "./scripts/start-refdata.ts"], {
-  stdout: "inherit",
-});
-// procRefData = Bun.spawn(["bun", "./scripts/start-orders.ts"], {
-//   stdout: "inherit",
-// });
+const processes: Subprocess[] = [];
 
-setTimeout(() => {
-  // TODO fix vuu server so that wait for ref data is not required
-  console.log(`spawn a process for the Vuu Server`);
-  procVuuServer = Bun.spawn(["bun", "./scripts/start-demo.ts"], {
+for (const [name, script] of Object.entries(scripts)) {
+  const proc = Bun.spawn(["bun", script], {
     stdout: "inherit",
+    stderr: "inherit",
   });
-  console.log(`PID (demo vuu server) ${procVuuServer.pid}`);
-}, 1000);
-
-console.log(`PID (ref data) ${procRefData?.pid}`);
+  processes.push(proc);
+  console.log(`PID (${name}) ${proc.pid}`);
+}
 
 process.on("SIGINT", () => {
-  procVuuServer?.kill();
-  procRefData?.kill();
+  for (const proc of processes) {
+    proc.kill();
+  }
   process.exit();
 });

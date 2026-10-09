@@ -1,66 +1,70 @@
 import {
-  WebSocketConnectionHandler,
-  WebsocketData,
+  DataService,
+  RemoteTableSubscription,
+  TablePublisher,
 } from "@heswell/service-utils";
-import { uuid } from "@vuu-ui/vuu-utils";
-import logger from "./logger";
-import { startNewOrderCreation, stopNewOrderCreation } from "./order-factory";
-import orderStore from "./OrderStore";
+import { Table } from "@heswell/vuu-table";
 import { loadConfig } from "./config";
+import { OrderGenerator } from "./OrderGenerator";
+import { instrumentsSchema, parentOrdersSchema } from "./tableSchemas";
 
-export async function start() {
-  console.log(`[ORDERS:service:server] start`);
-  const websocketServer = Bun.serve<WebsocketData>({
-    // certFile: "./certs/myCA.pem",
-    // keyFile: "./certs/myCA.key",
-    // passphrase: "1234",
+export interface OrdersServiceOptions {
+  initialOrderCount?: number;
+  log?: (message: string) => void;
+  newOrdersPerSecond?: number;
+  port?: number;
+  refDataUrl?: string;
+}
 
-    port: loadConfig().getNumber("service.port"),
+/**
+ * Publishes the parentOrders resource.
+ *
+ * Orders reference instruments sourced from the reference data service.
+ * This service starts regardless of whether that is available, initial
+ * orders are created, and subscribers receive their snapshot, once
+ * instruments have been loaded.
+ */
+export function start(options: OrdersServiceOptions = {}) {
+  const config = loadConfig();
+  const log = options.log ?? console.log;
+  const port = options.port ?? config.getNumber("service.port");
+  const refDataUrl =
+    options.refDataUrl ?? config.getString("services.refdata.url");
+  const initialOrderCount =
+    options.initialOrderCount ??
+    config.getNumber("orders.initialCount", 10_000);
+  const newOrdersPerSecond =
+    options.newOrdersPerSecond ??
+    config.getNumber("orders.newOrdersPerSecond", 0);
 
-    fetch(req, server) {
-      const sessionId = uuid();
-      logger.info({ sessionId }, "create session");
-      const url = new URL(req.url);
-      const success = server.upgrade(req, { data: { sessionId } });
-      if (success) {
-        // Bun automatically returns a 101 Switching Protocols
-        // if the upgrade succeeds
-        return undefined;
-      }
+  const instruments = new Table({ schema: instrumentsSchema });
+  const orders = new Table({ schema: parentOrdersSchema });
 
-      switch (url.pathname) {
-        case "/admin/start": {
-          const responseInit: ResponseInit = {
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-            },
-          };
-
-          const newOrdersPerSecond = parseInt(
-            url.searchParams.get("newOrdersPerSecond") ?? "1"
-          );
-
-          startNewOrderCreation({ newOrdersPerSecond });
-          return new Response("ok", responseInit);
-        }
-        case "/admin/stop":
-          const responseInit: ResponseInit = {
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-            },
-          };
-          stopNewOrderCreation();
-          return new Response("ok", responseInit);
-        default:
-          console.log(`unknown url path ${url.pathname}`);
-          // handle HTTP request normally
-          return new Response("Hello world!");
-      }
-    },
-    websocket: new WebSocketConnectionHandler(orderStore, "ORDERS:service"),
+  const publisher = new TablePublisher({ table: orders, ready: false });
+  const generator = new OrderGenerator({ instruments, orders });
+  const refData = new RemoteTableSubscription({
+    columns: ["currency", "ric"],
+    log,
+    name: "ORDERS:service",
+    resource: "instruments",
+    table: instruments,
+    url: refDataUrl,
   });
 
-  console.log(
-    `[ORDERS:service:server] websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
-  );
+  const service = new DataService({ name: "ORDERS:service", port, log })
+    .addPublisher(publisher)
+    .addGenerator(generator)
+    .addDependency(refData)
+    .start();
+
+  refData.firstSnapshot.then(() => {
+    const { count, ms } = generator.createInitialOrders(initialOrderCount);
+    log(`[ORDERS:service] created ${count} orders in ${ms}ms`);
+    publisher.setReady();
+    if (newOrdersPerSecond > 0) {
+      generator.start(newOrdersPerSecond);
+    }
+  }, () => undefined);
+
+  return { generator, instruments, orders, refData, service };
 }
