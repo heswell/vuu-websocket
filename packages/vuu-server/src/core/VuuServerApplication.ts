@@ -3,6 +3,11 @@ import { AuthenticationProviders } from "../net/auth/AuthProvider";
 import { createAuthHttpHandler } from "../net/auth/AuthHttpHandler";
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { composeHttpHandlers } from "../net/http/composeHttpHandlers";
+import {
+  AdminRoute,
+  createAdminHttpHandler,
+} from "../net/http/admin/AdminHttpHandler";
+import { createNotificationAdminRoutes } from "../net/http/admin/NotificationAdminRoutes";
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
 import { ViewServerModule } from "./module/VsModule";
 import { VuuServer } from "./VuuServer";
@@ -16,6 +21,9 @@ import {
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
 
 const ConfigKeys = {
+  adminEnabled: "vuu.admin.enabled",
+  adminNotificationDurationMs: "vuu.admin.notifications.defaultDurationMs",
+  adminPath: "vuu.admin.path",
   authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   authPath: "vuu.auth.path",
   certPath: "vuu.certPath",
@@ -45,6 +53,11 @@ export type VuuServerApplicationOptions = {
   additionalHttpHandlers?: (
     context: VuuServerApplicationContext,
   ) => HttpRequestHandler[];
+  /**
+   * Additional routes for the (unauthenticated, development only) admin api.
+   * Only installed when vuu.admin.enabled=true.
+   */
+  additionalAdminRoutes?: (context: VuuServerApplicationContext) => AdminRoute[];
 };
 
 export type VuuServerApplication = VuuServerApplicationContext & {
@@ -55,6 +68,7 @@ export type VuuServerApplication = VuuServerApplicationContext & {
 };
 
 export function createVuuServerApplication({
+  additionalAdminRoutes,
   additionalAuthProfiles,
   additionalHttpHandlers,
   authProviders,
@@ -94,6 +108,7 @@ export function createVuuServerApplication({
   );
   const handlers = [
     authHandler,
+    ...createAdminHttpHandlers(context, additionalAdminRoutes),
     ...(additionalHttpHandlers?.(context) ?? []),
   ];
   const httpServerOptions: HttpServerOptions = {
@@ -129,6 +144,30 @@ export function createVuuServerApplication({
     },
     webSocketOptions,
   };
+}
+
+function createAdminHttpHandlers(
+  context: VuuServerApplicationContext,
+  additionalAdminRoutes: VuuServerApplicationOptions["additionalAdminRoutes"],
+): HttpRequestHandler[] {
+  const { config, getServer } = context;
+  if (!config.getBoolean(ConfigKeys.adminEnabled, false)) {
+    return [];
+  }
+  const path = config.getString(ConfigKeys.adminPath, "/api/admin");
+  console.warn(
+    `[VUU] UNAUTHENTICATED admin REST api enabled at ${path} (${ConfigKeys.adminEnabled}=true). Do not enable in production.`,
+  );
+  const routes = [
+    ...createNotificationAdminRoutes(() => getServer().tableContainer, {
+      defaultDurationMs: config.getNumber(
+        ConfigKeys.adminNotificationDurationMs,
+        10_000,
+      ),
+    }),
+    ...(additionalAdminRoutes?.(context) ?? []),
+  ];
+  return [createAdminHttpHandler(routes, { path })];
 }
 
 export function createConfiguredWebSocketOptions(
