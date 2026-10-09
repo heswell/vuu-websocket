@@ -1,0 +1,204 @@
+{
+  "meta": {
+    "bun": "1.3.14",
+    "cpu": "Apple M2",
+    "date": "2026-10-09T02:45:50.550Z",
+    "git": "17a55de",
+    "iterations": 5,
+    "platform": "darwin-arm64"
+  },
+  "metrics": {
+    "refdata.load.time": {
+      "better": "lower",
+      "description": "load 228488 instruments from ndjson",
+      "kind": "time",
+      "name": "refdata.load.time",
+      "unit": "ms",
+      "value": 236.6
+    },
+    "refdata.snapshot.time": {
+      "better": "lower",
+      "description": "time to receive the instruments snapshot",
+      "kind": "time",
+      "name": "refdata.snapshot.time",
+      "unit": "ms",
+      "value": 143.2
+    },
+    "refdata.snapshot.messages": {
+      "better": "lower",
+      "description": "websocket messages for the instruments snapshot",
+      "kind": "count",
+      "name": "refdata.snapshot.messages",
+      "unit": "msgs",
+      "value": 230
+    },
+    "refdata.snapshot.bytesPerRow": {
+      "better": "lower",
+      "description": "instruments snapshot bytes per row",
+      "kind": "size",
+      "name": "refdata.snapshot.bytesPerRow",
+      "unit": "B",
+      "value": 98
+    },
+    "prices.startToSnapshot.time": {
+      "better": "lower",
+      "description": "price service start to subscriber holding the full prices snapshot",
+      "kind": "time",
+      "name": "prices.startToSnapshot.time",
+      "unit": "ms",
+      "value": 333.7
+    },
+    "prices.snapshot.bytesPerRow": {
+      "better": "lower",
+      "description": "prices snapshot bytes per row",
+      "kind": "size",
+      "name": "prices.snapshot.bytesPerRow",
+      "unit": "B",
+      "value": 69.7
+    },
+    "prices.generate.time": {
+      "better": "lower",
+      "description": "generate 100000 price updates",
+      "kind": "time",
+      "name": "prices.generate.time",
+      "unit": "ms",
+      "value": 32.1
+    },
+    "prices.flush.time": {
+      "better": "lower",
+      "description": "flush after 100000 price updates",
+      "kind": "time",
+      "name": "prices.flush.time",
+      "unit": "ms",
+      "value": 31.8
+    },
+    "prices.updates.bytesPerRow": {
+      "better": "lower",
+      "description": "live price update bytes per row",
+      "kind": "size",
+      "name": "prices.updates.bytesPerRow",
+      "unit": "B",
+      "value": 69.9
+    },
+    "orders.startToSnapshot.time": {
+      "better": "lower",
+      "description": "orders service start to subscriber holding 10000 orders",
+      "kind": "time",
+      "name": "orders.startToSnapshot.time",
+      "unit": "ms",
+      "value": 137.1
+    },
+    "orders.snapshot.bytesPerRow": {
+      "better": "lower",
+      "description": "orders snapshot bytes per row",
+      "kind": "size",
+      "name": "orders.snapshot.bytesPerRow",
+      "unit": "B",
+      "value": 173.4
+    },
+    "orders.create.time": {
+      "better": "lower",
+      "description": "create 10000 orders",
+      "kind": "time",
+      "name": "orders.create.time",
+      "unit": "ms",
+      "value": 6.9
+    },
+    "publisher.snapshot.time": {
+      "better": "lower",
+      "description": "time to receive a 200000 row snapshot",
+      "kind": "time",
+      "name": "publisher.snapshot.time",
+      "unit": "ms",
+      "value": 96.6
+    },
+    "publisher.snapshot.messages": {
+      "better": "lower",
+      "description": "websocket messages for the snapshot",
+      "kind": "count",
+      "name": "publisher.snapshot.messages",
+      "unit": "msgs",
+      "value": 201
+    },
+    "publisher.snapshot.bytesPerRow": {
+      "better": "lower",
+      "description": "snapshot bytes per row",
+      "kind": "size",
+      "name": "publisher.snapshot.bytesPerRow",
+      "unit": "B",
+      "value": 64.4
+    },
+    "subscription.replicate.time": {
+      "better": "lower",
+      "description": "time to replicate 200000 rows into a local table",
+      "kind": "time",
+      "name": "subscription.replicate.time",
+      "unit": "ms",
+      "value": 137.5
+    },
+    "publisher.ingest.timePer100k": {
+      "better": "lower",
+      "description": "table mutation cost with a live subscriber",
+      "kind": "time",
+      "name": "publisher.ingest.timePer100k",
+      "unit": "ms",
+      "value": 13.9
+    },
+    "publisher.flush.time": {
+      "better": "lower",
+      "description": "flush (serialize + send) after 200000 updates",
+      "kind": "time",
+      "name": "publisher.flush.time",
+      "unit": "ms",
+      "value": 3.6
+    },
+    "publisher.updates.rowsSent": {
+      "better": "lower",
+      "description": "rows sent for 200000 updates to 20000 rows",
+      "kind": "count",
+      "name": "publisher.updates.rowsSent",
+      "unit": "rows",
+      "value": 20000
+    },
+    "publisher.updates.bytesPerRow": {
+      "better": "lower",
+      "description": "live update bytes per row",
+      "kind": "size",
+      "name": "publisher.updates.bytesPerRow",
+      "unit": "B",
+      "value": 73.6
+    },
+    "publisher.fanout.flushTime": {
+      "better": "lower",
+      "description": "flush 20000 updated rows to 50 subscribers",
+      "kind": "time",
+      "name": "publisher.fanout.flushTime",
+      "unit": "ms",
+      "value": 3.3
+    },
+    "publisher.fanout.serializations": {
+      "better": "lower",
+      "description": "distinct messages serialized for the fan out",
+      "kind": "count",
+      "name": "publisher.fanout.serializations",
+      "unit": "msgs",
+      "value": 4
+    },
+    "publisher.idle.ingestTimePer100k": {
+      "better": "lower",
+      "description": "table mutation cost with no subscribers",
+      "kind": "time",
+      "name": "publisher.idle.ingestTimePer100k",
+      "unit": "ms",
+      "value": 9.6
+    },
+    "publisher.idle.backlogRows": {
+      "better": "lower",
+      "description": "update rows replayed to a late subscriber",
+      "kind": "count",
+      "name": "publisher.idle.backlogRows",
+      "unit": "rows",
+      "value": 0
+    }
+  }
+}

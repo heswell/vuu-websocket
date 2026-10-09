@@ -109,6 +109,35 @@ What changed:
 - **Shared rate generation.** `RateGenerator` replaces duplicated per-service
   timer code, and the generators mutate the `Table` directly.
 
+## Performance tests
+
+`perf/*.perf.test.ts` measure the framework (synthetic, deterministic data)
+and the real services (the 228k instruments data set). They run as part of
+`bun test`, failing if a metric regresses against `perf/baseline.json`:
+
+| Metric kind | Examples                                 | Tolerance                                   |
+| ----------- | ---------------------------------------- | ------------------------------------------- |
+| `time`      | snapshot time, flush time, startup time  | `PERF_TOLERANCE` x baseline + 25ms (default 3, 5 on CI) |
+| `count`     | snapshot messages, rows sent, serializations | 10%                                     |
+| `size`      | bytes per row                            | 10%                                         |
+
+Timings are machine dependent, the baseline records the machine it came
+from. Counts and sizes are the reliable regression signal.
+
+`npm run perf` (`scripts/perf.ts`) runs the suite with 5 iterations per
+timing (median) and prints a comparison table:
+
+```sh
+npm run perf                                # compare with perf/baseline.json
+npm run perf -- --save /tmp/before.json     # save a run, e.g. on main
+npm run perf -- --compare /tmp/before.json  # compare a branch with it
+npm run perf -- --update-baseline           # accept current results
+npm run perf -- --filter publisher          # run a subset
+```
+
+To add a metric, call the `record` function returned by `createRecorder()`
+(`perf/harness.ts`) in a perf test, then update the baseline.
+
 ## Creating a new data publisher
 
 A service is a table, a publisher and (optionally) a generator and

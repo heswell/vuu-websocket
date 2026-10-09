@@ -9,6 +9,7 @@
   "scripts": {
     "build:packages": "bun ./scripts/build-packages.ts",
     "test:engine-packages": "bun ./scripts/smoke-test-engine-packages.ts",
+    "perf": "bun ./scripts/perf.ts",
     "keycloak:realm": "bun ./scripts/keycloak-realm-client.ts",
     "keycloak:users": "bun ./scripts/keycloak-users.ts",
     "keycloak:bootstrap": "npm run keycloak:realm && npm run keycloak:users",
