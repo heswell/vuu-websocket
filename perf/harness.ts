@@ -140,3 +140,104 @@ export class WireClient {
     this.#ws.close();
   }
 }
+
+/** Writes with backpressure handling, Bun socket.write may be partial. */
+class Pipe {
+  #queue: Uint8Array[] = [];
+  constructor(readonly socket: { write(data: Uint8Array): number; end(): void }) {}
+  write(chunk: Uint8Array) {
+    this.#queue.push(chunk);
+    this.drain();
+  }
+  drain() {
+    while (this.#queue.length) {
+      const chunk = this.#queue[0];
+      const written = this.socket.write(chunk);
+      if (written < chunk.length) {
+        this.#queue[0] = chunk.subarray(Math.max(0, written));
+        return;
+      }
+      this.#queue.shift();
+    }
+  }
+}
+
+interface TapConnection {
+  pending: Uint8Array[];
+  toClient: Pipe;
+  toServer?: Pipe;
+}
+
+/**
+ * TCP proxy in front of a service that counts the bytes actually sent
+ * server to client, i.e. after websocket framing and compression.
+ * WireClient only sees decompressed message text.
+ */
+export class WireTap {
+  /** server to client bytes, including the HTTP upgrade response */
+  bytes = 0;
+  /** the upgrade response accepted permessage-deflate */
+  deflate = false;
+  readonly url: string;
+  #server: Bun.TCPSocketListener<TapConnection>;
+
+  constructor(targetPort: number) {
+    const tap = this;
+    this.#server = Bun.listen<TapConnection>({
+      hostname: "127.0.0.1",
+      port: 0,
+      socket: {
+        open(client) {
+          client.data = { pending: [], toClient: new Pipe(client) };
+          Bun.connect({
+            hostname: "127.0.0.1",
+            port: targetPort,
+            socket: {
+              open(server) {
+                client.data.toServer = new Pipe(server);
+                client.data.pending.forEach((chunk) =>
+                  client.data.toServer!.write(chunk),
+                );
+                client.data.pending = [];
+              },
+              data(_server, chunk) {
+                if (tap.bytes === 0) {
+                  tap.deflate = Buffer.from(chunk)
+                    .toString("latin1")
+                    .includes("permessage-deflate");
+                }
+                tap.bytes += chunk.length;
+                client.data.toClient.write(new Uint8Array(chunk));
+              },
+              drain() {
+                client.data.toServer?.drain();
+              },
+              close() {
+                client.end();
+              },
+            },
+          });
+        },
+        data(client, chunk) {
+          const copy = new Uint8Array(chunk);
+          if (client.data.toServer) {
+            client.data.toServer.write(copy);
+          } else {
+            client.data.pending.push(copy);
+          }
+        },
+        drain(client) {
+          client.data.toClient.drain();
+        },
+        close(client) {
+          client.data.toServer?.socket.end();
+        },
+      },
+    });
+    this.url = `ws://127.0.0.1:${this.#server.port}`;
+  }
+
+  stop() {
+    this.#server.stop(true);
+  }
+}

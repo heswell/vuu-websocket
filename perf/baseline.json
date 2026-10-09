@@ -199,6 +199,46 @@
       "name": "publisher.idle.backlogRows",
       "unit": "rows",
       "value": 0
+    },
+    "compressed.refdata.snapshot.time": {
+      "better": "lower",
+      "description": "time to receive the compressed instruments snapshot",
+      "kind": "time",
+      "name": "compressed.refdata.snapshot.time",
+      "unit": "ms",
+      "value": 366.7
+    },
+    "compressed.refdata.snapshot.wireBytesPerRow": {
+      "better": "lower",
+      "description": "compressed instruments snapshot wire bytes per row",
+      "kind": "size",
+      "name": "compressed.refdata.snapshot.wireBytesPerRow",
+      "unit": "B",
+      "value": 14.1
+    },
+    "compressed.prices.snapshot.wireBytesPerRow": {
+      "better": "lower",
+      "description": "compressed prices snapshot wire bytes per row",
+      "kind": "size",
+      "name": "compressed.prices.snapshot.wireBytesPerRow",
+      "unit": "B",
+      "value": 18.7
+    },
+    "compressed.prices.flush.time": {
+      "better": "lower",
+      "description": "flush 10000 price updates with compression",
+      "kind": "time",
+      "name": "compressed.prices.flush.time",
+      "unit": "ms",
+      "value": 21.9
+    },
+    "compressed.prices.updates.wireBytesPerRow": {
+      "better": "lower",
+      "description": "compressed live price update wire bytes per row",
+      "kind": "size",
+      "name": "compressed.prices.updates.wireBytesPerRow",
+      "unit": "B",
+      "value": 20.7
     }
   }
 }

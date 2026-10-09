@@ -15,12 +15,14 @@ const schema: TableSchema = {
 
 class FakeSocket implements SubscriberSocket {
   bufferedAmount = 0;
+  compressFlags: (boolean | undefined)[] = [];
   messages: any[] = [];
   serializations = new Set<string>();
   getBufferedAmount() {
     return this.bufferedAmount;
   }
-  send(data: string) {
+  send(data: string, compress?: boolean) {
+    this.compressFlags.push(compress);
     this.serializations.add(data);
     this.messages.push(JSON.parse(data));
     return data.length;
@@ -279,5 +281,20 @@ describe("TablePublisher", () => {
     expect(table.listenerCount).toBe(before + 1);
     publisher.dispose();
     expect(table.listenerCount).toBe(before);
+  });
+
+  test("compress option is passed on every send", () => {
+    const table = createTable();
+    const publisher = new TablePublisher({ table });
+    const plain = new FakeSocket();
+    const compressed = new FakeSocket();
+    publisher.subscribe(plain);
+    publisher.subscribe(compressed, { compress: true });
+    table.upsert(["id-1", 1, 1]);
+    publisher.flush();
+    expect(plain.compressFlags.length).toBeGreaterThan(1);
+    expect(plain.compressFlags.every((flag) => flag === false)).toBe(true);
+    expect(compressed.compressFlags.length).toBe(plain.compressFlags.length);
+    expect(compressed.compressFlags.every((flag) => flag === true)).toBe(true);
   });
 });
