@@ -3,6 +3,7 @@ import {
   createConfiguredAuthProviders,
   createVuuServerApplication,
 } from "@heswell/vuu-server";
+import { RefDataModule } from "@heswell/vuu-module-refdata";
 import { PricesModule } from "./modules/prices";
 import { SimulationModule } from "./modules/simul";
 import { SimulatedNotificationsModule } from "./modules/notifications";
@@ -21,6 +22,7 @@ export default async function main() {
     defaultWebSocketPort: 8091,
     modules: [
       PricesModule(),
+      RefDataModule(),
       SimulationModule(),
       SimulatedNotificationsModule(),
     ],
