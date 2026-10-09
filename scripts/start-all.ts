@@ -4,6 +4,7 @@ import type { Subprocess } from "bun";
 // order, no need to wait for one to be ready before starting the next.
 const scripts = {
   "ref data": "./scripts/start-refdata.ts",
+  equities: "./scripts/start-equities.ts",
   prices: "./scripts/start-prices.ts",
   // orders module is not currently enabled in the demo server
   // orders: "./scripts/start-orders.ts",

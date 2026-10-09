@@ -7,6 +7,7 @@ The demo Vuu server (`vuu-demo`) consumes data from standalone data services:
 | `reference-data-service` | `instruments`  | 8081         | –            |
 | `price-service`          | `prices`       | 8082         | `instruments` |
 | `orders-service`         | `parentOrders` | 8083         | `instruments` |
+| `equity-refdata-service` | `equities`     | 8084         | –            |
 
 All of them are built on the publisher framework in
 `packages/service-utils/src/publisher`.
@@ -18,7 +19,12 @@ flowchart LR
   RD -- instruments --> VD[vuu-demo]
   PS -- prices --> VD
   OS -- parentOrders --> VD
+  EQ[equity-refdata-service] -- equities --> RM[vuu-module-refdata]
+  RM --> VD
 ```
+
+`reference-data-service` generates fake instruments. `equity-refdata-service`
+publishes real EU listed equities, see [Equity reference data](#equity-reference-data).
 
 ## Building blocks
 
@@ -199,7 +205,7 @@ export function start() {
     url: "ws://localhost:8081",
   });
 
-  new DataService({ name: "TRADES:service", port: 8084 })
+  new DataService({ name: "TRADES:service", port: 8085 })
     .addPublisher(publisher)
     .addGenerator(generator)
     .addDependency(refData)
@@ -227,6 +233,71 @@ export class TradesProvider extends RemoteProvider {
 }
 ```
 
+To make the table reusable across applications, package it as a module, see
+[Reusable modules](#reusable-modules).
+
+## Equity reference data
+
+`packages/equity-refdata-service` publishes about 18k EU shares and
+depositary receipts (resource `equities`, table `REFDATA.equities`, key
+`ric`), loaded from the committed `data/equities.ndjson` snapshot.
+
+| Column             | Source                                                      |
+| ------------------ | ----------------------------------------------------------- |
+| `ric`              | OpenFIGI ticker + conventional exchange suffix (not LSEG)   |
+| `bbg`              | OpenFIGI ticker + exchange code, e.g. `ASML NA`             |
+| `isin`, `description`, `currency` | ESMA FIRDS                                   |
+| `exchange`, `venueName` | Most relevant venue (FIRDS/FITRS), operating MIC and ISO 10383 name |
+| `assetClass`       | CFI code (FIRDS) / FITRS classification                     |
+| `issuerName`, `issuerCountry`, `parentName` | GLEIF (issuer LEI from FIRDS)      |
+| `liquid`, `avgDailyTurnover` (EUR), `avgDailyTrades` | ESMA FITRS             |
+| `tickSizeBand`     | MiFID II RTS 11 liquidity band (1–6) from FITRS trade counts |
+| `lotSize`          | Always 1, not published by FIRDS                            |
+
+Regenerate the snapshot with:
+
+```sh
+npm run fetch-data -w @heswell/equity-refdata-service
+```
+
+The script downloads the latest ESMA FITRS and FIRDS full files, the ISO
+10383 MIC list and the GLEIF relationship golden copy into `.cache/`, then
+maps ISINs to tickers with OpenFIGI. Without an API key OpenFIGI allows 25
+requests a minute, so a first run takes over an hour; set
+`OPENFIGI_API_KEY` to speed it up. Responses are cached, `--cached-only`
+rebuilds the snapshot from the cache without calling OpenFIGI. Sources and
+their terms are listed in `data/SOURCES.md`.
+
+Future additions: UK equities (FCA FIRDS, same format) and other FIRDS
+instrument types (bonds, ETFs, derivatives).
+
+## Reusable modules
+
+A Vuu server module can live in its own package, so applications assemble
+the modules they need:
+
+```ts
+import { RefDataModule } from "@heswell/vuu-module-refdata";
+
+createVuuServerApplication({
+  modules: [RefDataModule(), PricesModule(), SimulationModule()],
+  ...
+});
+```
+
+`@heswell/vuu-module-refdata` is the first. Conventions:
+
+- The module is a factory function taking options (service URLs,
+  namespace) with config fallbacks (`services.equities.url`), so it carries
+  no application specific state.
+- `@heswell/vuu-server` and `@heswell/vuu-table` are peer dependencies, the
+  application owns the server instance.
+- The table definition is derived from the schema exported by the data
+  service (`@heswell/equity-refdata-service/schema`), so the column
+  contract has a single source.
+- Tables are populated by a `RemoteProvider`, the module works whether its
+  services start before or after the Vuu server.
+
 ## Operations
 
 HTTP routes on every `DataService` port:
@@ -244,6 +315,8 @@ Config keys (`application.conf`):
 | `service.port`              | all        | required               |
 | `services.refdata.url`      | prices, orders, demo | required     |
 | `instruments.dataPath`      | refdata    | `data/instruments.ndjson` |
+| `services.equities.url`     | demo (RefDataModule) | required unless `equitiesUrl` passed |
+| `equities.dataPath`         | equities   | `data/equities.ndjson` |
 | `prices.updatesPerSecond`   | prices     | 10000                  |
 | `orders.initialCount`       | orders     | 10000                  |
 | `orders.newOrdersPerSecond` | orders     | 0                      |

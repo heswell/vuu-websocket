@@ -1,0 +1,3 @@
+{"assetClass":"Share","avgDailyTrades":80136,"avgDailyTurnover":1240000000,"bbg":"ASML NA","currency":"EUR","description":"ASML HOLDING NV","exchange":"XAMS","isin":"NL0010273215","issuerCountry":"NL","issuerName":"ASML Holding N.V.","liquid":true,"lotSize":1,"parentName":null,"ric":"ASML.AS","tickSizeBand":6,"venueName":"EURONEXT AMSTERDAM"}
+not json
+{"assetClass":"Share","avgDailyTrades":41000,"avgDailyTurnover":520000000,"bbg":"SAP GY","currency":"EUR","description":"SAP SE","exchange":"XETR","isin":"DE0007164600","issuerCountry":"DE","issuerName":"SAP SE","liquid":true,"lotSize":1,"parentName":null,"ric":"SAP.DE","tickSizeBand":6,"venueName":"XETRA"}
