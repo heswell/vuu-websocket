@@ -15,6 +15,11 @@ export interface ServiceDependency {
 }
 
 export interface DataServiceOptions {
+  /**
+   * Negotiate permessage-deflate with clients that support it. Defaults to
+   * env DATA_SERVICE_COMPRESSION=1.
+   */
+  compression?: boolean;
   /** How often pending updates are published, default 100ms */
   flushInterval?: number;
   /** Interval between heartbeats, 0 disables, default 30s */
@@ -67,6 +72,7 @@ export class DataService {
   #heartbeatTimer: Timer | undefined;
   #hostname: string | undefined;
   #log: (message: string) => void;
+  #compression: boolean;
   #maxBufferedBytes: number;
   #nextSessionId = 1;
   #port: number;
@@ -76,6 +82,7 @@ export class DataService {
   #sockets = new Set<Socket>();
 
   constructor({
+    compression = process.env.DATA_SERVICE_COMPRESSION === "1",
     flushInterval = 100,
     heartbeatInterval = 30_000,
     hostname,
@@ -86,6 +93,7 @@ export class DataService {
     routes = {},
   }: DataServiceOptions) {
     this.name = name;
+    this.#compression = compression;
     this.#flushInterval = flushInterval;
     this.#heartbeatInterval = heartbeatInterval;
     this.#hostname = hostname;
@@ -167,6 +175,7 @@ export class DataService {
       websocket: {
         backpressureLimit: this.#maxBufferedBytes,
         closeOnBackpressureLimit: true,
+        perMessageDeflate: this.#compression,
         open: (ws) => {
           this.#sockets.add(ws);
         },
@@ -273,6 +282,7 @@ export class DataService {
         ws.data.subscriptions.add(publisher);
         publisher.subscribe(ws, {
           columns: message.columns,
+          compress: this.#compression,
           mode: message.type === "snapshot" ? "snapshot" : "subscribe",
         });
       } catch (err) {

@@ -9,7 +9,7 @@ import type { SubscriptionMode } from "./protocol";
  */
 export interface SubscriberSocket {
   getBufferedAmount(): number;
-  send(data: string): number;
+  send(data: string, compress?: boolean): number;
 }
 
 export interface TablePublisherOptions {
@@ -30,6 +30,8 @@ export interface TablePublisherOptions {
 
 export interface SubscribeOptions {
   columns?: string[];
+  /** compress messages, requires permessage-deflate to have been negotiated */
+  compress?: boolean;
   mode?: SubscriptionMode;
 }
 
@@ -87,11 +89,16 @@ class Subscriber {
     readonly socket: SubscriberSocket,
     readonly group: ProjectionGroup,
     readonly mode: SubscriptionMode,
+    readonly compress: boolean,
   ) {}
+
+  send(message: string) {
+    this.socket.send(message, this.compress);
+  }
 
   deliver(message: string) {
     if (this.state === "live") {
-      this.socket.send(message);
+      this.send(message);
     } else if (this.state === "snapshot") {
       this.pending.push(message);
     }
@@ -184,11 +191,11 @@ export class TablePublisher {
    */
   subscribe(
     socket: SubscriberSocket,
-    { columns, mode = "subscribe" }: SubscribeOptions = {},
+    { columns, compress = false, mode = "subscribe" }: SubscribeOptions = {},
   ) {
     this.unsubscribe(socket);
     const group = this.#getGroup(columns);
-    const subscriber = new Subscriber(socket, group, mode);
+    const subscriber = new Subscriber(socket, group, mode, compress);
     this.#subscribers.set(socket, subscriber);
     group.subscribers.add(subscriber);
     if (this.#ready) {
@@ -389,7 +396,7 @@ export class TablePublisher {
       const start = subscriber.snapshotIndex;
       const end = Math.min(start + batchSize, count);
       subscriber.snapshotIndex = end;
-      socket.send(
+      subscriber.send(
         JSON.stringify({
           type: "snapshot-batch",
           resource,
@@ -405,7 +412,9 @@ export class TablePublisher {
       }
     }
 
-    socket.send(JSON.stringify({ type: "snapshot-count", resource, count }));
+    subscriber.send(
+      JSON.stringify({ type: "snapshot-count", resource, count }),
+    );
     subscriber.snapshotRows = undefined;
 
     if (subscriber.mode === "snapshot") {
@@ -415,7 +424,7 @@ export class TablePublisher {
       const { pending } = subscriber;
       subscriber.pending = [];
       for (const message of pending) {
-        socket.send(message);
+        subscriber.send(message);
       }
     }
   }

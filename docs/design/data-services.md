@@ -109,10 +109,31 @@ What changed:
 - **Shared rate generation.** `RateGenerator` replaces duplicated per-service
   timer code, and the generators mutate the `Table` directly.
 
+### Compression
+
+`DataService` can negotiate websocket permessage-deflate with clients that
+support it, via the `compression` option or env `DATA_SERVICE_COMPRESSION=1`.
+It is off by default. Measured on the wire (`perf/compression.perf.test.ts`):
+
+| Metric                           | Off              | On               |
+| -------------------------------- | ---------------- | ---------------- |
+| Instruments snapshot             | 98 B/row, 0.14s  | 14 B/row, 0.37s  |
+| Prices snapshot                  | 70 B/row         | 19 B/row         |
+| Live price updates               | 70 B/row         | 21 B/row         |
+| Flush 10k price updates (server) | ~7ms             | ~25ms            |
+
+Compression cuts bandwidth 3-7x, but costs 2.5-3x in snapshot latency and
+about 4x the server CPU per flush. Bun compresses each send per
+socket, so the cost scales with the number of subscribers and is not shared
+across a projection group. Turn it on for consumers on slow or metered
+links, not on localhost or a fast LAN.
+
 ## Performance tests
 
 `perf/*.perf.test.ts` measure the framework (synthetic, deterministic data)
-and the real services (the 228k instruments data set). They run as part of
+and the real services (the 228k instruments data set), with and without
+compression. Compressed sizes are measured on the wire by `WireTap`, a
+byte-counting TCP proxy; `WireClient` sees only decompressed text. They run as part of
 `bun test`, failing if a metric regresses against `perf/baseline.json`:
 
 | Metric kind | Examples                                 | Tolerance                                   |
@@ -226,5 +247,7 @@ Config keys (`application.conf`):
 | `prices.updatesPerSecond`   | prices     | 10000                  |
 | `orders.initialCount`       | orders     | 10000                  |
 | `orders.newOrdersPerSecond` | orders     | 0                      |
+
+Env `DATA_SERVICE_COMPRESSION=1` enables websocket compression on all services.
 
 `scripts/start-all.ts` starts the services and the demo server concurrently.
