@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import {
   BASELINE_PATH,
   createMeta,
+  isNoise,
   isRegression,
   loadResults,
   type PerfResults,
@@ -21,7 +22,8 @@ Options:
   --filter <text>   only run perf test files whose path contains text
 
 Exits 1 if any metric regressed beyond tolerance (PERF_TOLERANCE for timings,
-default 3x, 10% for counts and sizes).`;
+default 3x, 10% for counts and sizes). Status ≈ marks changes within noise
+(10% or 1ms for timings, 1% for counts and sizes).`;
 
 const { values: args } = parseArgs({
   options: {
@@ -107,9 +109,11 @@ const rows = Object.values(current.metrics).map((metric) => {
         ? "REGRESSED"
         : metric.value === ref
           ? "="
-          : improved
-            ? "better"
-            : "worse (within tolerance)";
+          : isNoise(metric, ref)
+            ? "≈"
+            : improved
+              ? "better"
+              : "worse (within tolerance)";
   return {
     metric: metric.name,
     unit: metric.unit,

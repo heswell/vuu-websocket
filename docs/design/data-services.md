@@ -125,7 +125,8 @@ Timings are machine dependent, the baseline records the machine it came
 from. Counts and sizes are the reliable regression signal.
 
 `npm run perf` (`scripts/perf.ts`) runs the suite with 5 iterations per
-timing (median) and prints a comparison table:
+timing (median) and prints a comparison table. Changes within run to run
+noise (10% or 1ms for timings, 1% for counts and sizes) are shown as `≈`:
 
 ```sh
 npm run perf                                # compare with perf/baseline.json

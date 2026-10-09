@@ -54,6 +54,18 @@ export const isRegression = (metric: Metric, reference: number) =>
     ? metric.value > limitFor(metric, reference)
     : metric.value < limitFor(metric, reference);
 
+/**
+ * Changes smaller than this are run to run variation, not worth flagging.
+ * Timings: within 10% or 1ms. Counts and sizes: within 1%.
+ */
+export const isNoise = (metric: Metric, reference: number) => {
+  const delta = Math.abs(metric.value - reference);
+  if (metric.kind === "time") {
+    return delta < 1 || delta <= reference * 0.1;
+  }
+  return delta <= Math.abs(reference) * 0.01;
+};
+
 export const loadResults = (
   filePath = BASELINE_PATH,
 ): PerfResults | undefined =>
