@@ -3,7 +3,7 @@ import type {
   VuuDataRow,
   VuuRowDataItemType,
 } from "@vuu-ui/vuu-protocol-types";
-import { ResourceMessage } from "./StoreDataStreamSource";
+import type { HeartbeatMessage, ResourceMessage } from "./publisher/protocol";
 
 export interface ResourceRequest {
   columns?: string[];
@@ -60,7 +60,7 @@ export interface RemoteResourceSocket {
 
 export type RemoteResourceSocketFactory = (url: string) => RemoteResourceSocket;
 
-const defaultSocketFactory: RemoteResourceSocketFactory = (url) => {
+export const defaultSocketFactory: RemoteResourceSocketFactory = (url) => {
   const socket = new WebSocket(url);
   const listen = <K extends keyof WebSocketEventMap>(
     type: K,
@@ -174,9 +174,13 @@ export const loadTableFromRemoteResource = async ({
           return;
         }
         try {
-          const message = JSON.parse(evt.data as string) as ResourceMessage;
+          const message = JSON.parse(evt.data as string) as
+            | ResourceMessage
+            | HeartbeatMessage;
 
-          if (message.type === "snapshot-count") {
+          if (message.type === "HB") {
+            socket?.send(JSON.stringify({ type: "HB", ts: message.ts }));
+          } else if (message.type === "snapshot-count") {
             console.log(
               `[service-utils:loadTableFromRemoteResource] final snapshot ${message.count} ${resource} rows received`,
             );
@@ -191,8 +195,14 @@ export const loadTableFromRemoteResource = async ({
             }
           } else if (message.type === "insert") {
             table.insert(toTableRow ? toTableRow(message.row) : message.row);
-          } else if (message.type === "inserts") {
-            console.log(`inserts received`);
+          } else if (message.type === "updates") {
+            for (const row of message.rows) {
+              table.upsert(toTableRow ? toTableRow(row) : row);
+            }
+          } else if (message.type === "deletes") {
+            for (const key of message.keys) {
+              table.delete(key);
+            }
           } else {
             fail(
               new Error(

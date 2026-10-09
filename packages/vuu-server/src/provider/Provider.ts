@@ -1,8 +1,12 @@
 import { Table } from "@heswell/vuu-table";
 import { VuuDataRowDto, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import { type TableContainer } from "../core/table/TableContainer";
-import { loadTableFromRemoteResource } from "@heswell/service-utils";
-import { RemoteResourceMessageType } from "@heswell/service-utils/src/resource-loader";
+import {
+  RemoteTableSubscription,
+  type RemoteResourceMessageType,
+  type RemoteTableSubscriptionOptions,
+  type SubscriptionMode,
+} from "@heswell/service-utils";
 import {
   DefaultLifecycleEnabled,
   LifecycleEnabled,
@@ -123,62 +127,110 @@ export class NullProvider extends Provider {
   async load() {}
 }
 
-export type RemoteResourceLoad = typeof loadTableFromRemoteResource;
+export type RemoteSubscriptionFactory = (
+  options: RemoteTableSubscriptionOptions,
+) => RemoteTableSubscription;
 
+const defaultSubscriptionFactory: RemoteSubscriptionFactory = (options) =>
+  new RemoteTableSubscription(options);
+
+export interface RemoteServiceDetails {
+  /**
+   * columns defaults to the columns of the table. Rows are mapped to the
+   * table's column order by name, so the order requested here is irrelevant.
+   */
+  columns?: string[];
+  /** subscribe (default) = snapshot then live updates, snapshot = snapshot only */
+  mode?: SubscriptionMode;
+  /** @deprecated use mode, a value of ["snapshot"] maps to mode "snapshot" */
+  remoteResourceMessageType?: RemoteResourceMessageType[];
+  resource: string;
+  url: string;
+  /**
+   * By default load resolves immediately, the table is populated when the
+   * remote service becomes available. Set true to have startup wait until
+   * the initial snapshot has been received.
+   */
+  waitForInitialSnapshot?: boolean;
+}
+
+const resolveMode = ({
+  mode,
+  remoteResourceMessageType,
+}: RemoteServiceDetails): SubscriptionMode => {
+  if (mode) {
+    return mode;
+  }
+  if (
+    remoteResourceMessageType?.length === 1 &&
+    remoteResourceMessageType[0] === "snapshot"
+  ) {
+    return "snapshot";
+  }
+  return "subscribe";
+};
+
+/**
+ * Populates a table from a resource published by a remote data service.
+ * The remote service need not be available when the Vuu server starts,
+ * connection is retried until it is. Live updates are applied and the
+ * table is reconciled against a fresh snapshot after any reconnection.
+ */
 export abstract class RemoteProvider extends Provider {
   #loadPromise: Promise<void> | undefined;
-  readonly #abortController = new AbortController();
+  #subscription: RemoteTableSubscription | undefined;
 
   constructor(
     table: Table,
-    private readonly resourceLoader: RemoteResourceLoad = loadTableFromRemoteResource,
+    private readonly subscriptionFactory: RemoteSubscriptionFactory = defaultSubscriptionFactory,
   ) {
     super(table);
   }
 
+  get subscription() {
+    return this.#subscription;
+  }
+
+  /**
+   * True once the initial snapshot has been received.
+   */
+  get loaded() {
+    return this.#subscription?.hasSnapshot ?? false;
+  }
+
+  set loaded(_: boolean) {
+    // derived from subscription state
+  }
+
   load(_: TableContainer) {
     if (this.#loadPromise === undefined) {
-      this.#loadPromise = this.loadRemoteResource();
+      const details = this.remoteServiceDetails();
+      const { columns, resource, url, waitForInitialSnapshot = false } =
+        details;
+      const subscription = this.subscriptionFactory({
+        columns,
+        mode: resolveMode(details),
+        name: `RemoteProvider:${this.table.name}`,
+        resource,
+        table: this.table,
+        url,
+      });
+      this.#subscription = subscription;
+      subscription.start();
+      this.#loadPromise = waitForInitialSnapshot
+        ? subscription.firstSnapshot.then(() => undefined)
+        : Promise.resolve();
     }
     return this.#loadPromise;
   }
 
-  private async loadRemoteResource() {
-    const { columns, remoteResourceMessageType, resource, url } =
-      this.remoteServiceDetails();
-    const start = performance.now();
-    const count = await this.resourceLoader({
-      columns,
-      resource,
-      remoteResourceMessageType,
-      url,
-      table: this.table,
-      signal: this.#abortController.signal,
-    });
-    const end = performance.now();
-    console.log(
-      `[RemoteProvider] initial snapshot loaded, ${count} ${resource} inserted [${
-        end - start
-      }ms]`,
-    );
-  }
-
   requestStop() {
-    this.#abortController.abort();
+    this.#subscription?.stop();
   }
 
   doStop() {
     this.requestStop();
   }
 
-  /**
-   * columns defaults to the columns of the table. Rows are mapped to the
-   * table's column order by name, so the order requested here is irrelevant.
-   */
-  abstract remoteServiceDetails(): {
-    columns?: string[];
-    remoteResourceMessageType?: RemoteResourceMessageType[];
-    resource: string;
-    url: string;
-  };
+  abstract remoteServiceDetails(): RemoteServiceDetails;
 }

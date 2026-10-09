@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Table } from "@heswell/vuu-table";
-import { loadTableFromRemoteResource } from "../../service-utils/src/resource-loader";
+import { RemoteTableSubscription } from "../../service-utils/src/publisher";
+import { TestRemoteResourceSocket } from "../../service-utils/__tests__/TestRemoteResourceSocket";
 import { TableDef } from "../src/api/TableDef";
 import { VuuServer } from "../src/core/VuuServer";
 import {
@@ -13,8 +14,8 @@ import { LoginTokenService } from "../src/net/auth/LoginTokenService";
 import {
   NullProvider,
   Provider,
-  RemoteResourceLoad,
   RemoteProvider,
+  type RemoteServiceDetails,
 } from "../src/provider/Provider";
 import { LifecycleContainer } from "../src/toolbox/thread/LifecycleContainer";
 
@@ -125,50 +126,56 @@ describe("VuuServer lifecycle", () => {
     expect(first).not.toBe(second);
   });
 
-  test("reuses a RemoteProvider load promise and aborts its resource on shutdown", async () => {
-    const resourceLoad = Promise.withResolvers<number>();
-    let resourceSignal: AbortSignal | undefined;
+  test("RemoteProvider does not block startup while its remote service is unavailable", async () => {
+    const sockets: TestRemoteResourceSocket[] = [];
     let provider: TestRemoteProvider | undefined;
     const lifecycle = new LifecycleContainer();
-    const module = ModuleFactory.withNameSpace("REMOTE_PROVIDER_RESOURCE")
+    const module = ModuleFactory.withNameSpace("REMOTE_PROVIDER_RESILIENT")
       .addTable(tableDef("remote"), (table) => {
-        provider = new TestRemoteProvider(table, ({ signal }) => {
-          resourceSignal = signal;
-          return resourceLoad.promise;
-        });
+        provider = new TestRemoteProvider(table, sockets);
         return provider;
       })
       .asModule();
     const server = new VuuServer(serverConfig(module), lifecycle);
 
-    const startup = lifecycle.start();
-    await Bun.sleep(1);
+    await lifecycle.start();
+    expect(provider?.loaded).toBe(false);
     const firstLoad = provider?.load(server.tableContainer);
-    const secondLoad = provider?.load(server.tableContainer);
-    expect(firstLoad).toBe(secondLoad);
+    expect(firstLoad).toBe(provider?.load(server.tableContainer));
+    expect(sockets.length).toBe(1);
 
-    resourceLoad.resolve(1);
-    await startup;
-    expect(resourceSignal?.aborted).toBe(false);
+    // remote service unavailable, then comes online
+    sockets[0].emitClose();
+    await waitFor(() => sockets.length === 2);
+    sockets[1].emitOpen();
+    expect(JSON.parse(sockets[1].sent[0])).toEqual({
+      type: "subscribe",
+      resource: "remote",
+      columns: ["id"],
+    });
+    sockets[1].emitMessage({
+      type: "snapshot-batch",
+      isLast: true,
+      rows: [["a"], ["b"]],
+    });
+    sockets[1].emitMessage({ type: "snapshot-count", count: 2 });
+    expect(provider?.loaded).toBe(true);
+    sockets[1].emitMessage({ type: "updates", rows: [["c"]] });
+    expect(provider?.table.rowCount).toBe(3);
+
     await lifecycle.destroy();
-    expect(resourceSignal?.aborted).toBe(true);
+    expect(provider?.subscription?.status).toBe("stopped");
+    expect(sockets[1].closeCount).toBe(1);
   });
 
-  test("cancels a remote provider that is still loading during shutdown", async () => {
-    let resourceSignal: AbortSignal | undefined;
+  test("RemoteProvider can wait for initial snapshot, cancelled on shutdown", async () => {
+    const sockets: TestRemoteResourceSocket[] = [];
     let provider: TestRemoteProvider | undefined;
     const lifecycle = new LifecycleContainer();
     const module = ModuleFactory.withNameSpace("REMOTE_PROVIDER_CANCELLATION")
       .addTable(tableDef("remote-cancellation"), (table) => {
-        provider = new TestRemoteProvider(table, ({ signal }) => {
-          resourceSignal = signal;
-          return new Promise<number>((_, reject) => {
-            signal?.addEventListener(
-              "abort",
-              () => reject(new Error("resource aborted")),
-              { once: true },
-            );
-          });
+        provider = new TestRemoteProvider(table, sockets, {
+          waitForInitialSnapshot: true,
         });
         return provider;
       })
@@ -177,10 +184,6 @@ describe("VuuServer lifecycle", () => {
 
     const startup = lifecycle.start();
     await Bun.sleep(1);
-    const firstLoad = provider?.load(server.tableContainer);
-    const secondLoad = provider?.load(server.tableContainer);
-    expect(firstLoad).toBe(secondLoad);
-
     const shutdown = lifecycle.destroy();
     const [startupResult, shutdownResult] = await Promise.allSettled([
       startup,
@@ -188,21 +191,38 @@ describe("VuuServer lifecycle", () => {
     ]);
     expect(startupResult.status).toBe("rejected");
     expect(shutdownResult.status).toBe("fulfilled");
-    expect(resourceSignal?.aborted).toBe(true);
+    expect(provider?.subscription?.status).toBe("stopped");
     expect(server.webSocketPort).toBeUndefined();
+  });
 
-    const preAborted = new AbortController();
-    preAborted.abort();
-    await expect(
-      loadTableFromRemoteResource({
-        resource: "remote-cancellation",
-        signal: preAborted.signal,
-        table: server.tableContainer.getTable("remote-cancellation"),
-        url: "ws://unused",
-      }),
-    ).rejects.toThrow("aborted remote-cancellation");
+  test("RemoteProvider maps legacy snapshot-only message type to snapshot mode", async () => {
+    const sockets: TestRemoteResourceSocket[] = [];
+    const table = new Table({
+      schema: {
+        columns: [{ name: "id", serverDataType: "string" }],
+        key: "id",
+        table: { module: "TEST", table: "remote" },
+      },
+    });
+    const provider = new TestRemoteProvider(table, sockets, {
+      remoteResourceMessageType: ["snapshot"],
+    });
+    provider.load({} as never);
+    sockets[0].emitOpen();
+    expect(JSON.parse(sockets[0].sent[0]).type).toBe("snapshot");
+    provider.doStop();
   });
 });
+
+const waitFor = async (predicate: () => boolean, timeout = 2000) => {
+  const start = performance.now();
+  while (!predicate()) {
+    if (performance.now() - start > timeout) {
+      throw Error("timed out waiting for condition");
+    }
+    await Bun.sleep(5);
+  }
+};
 
 class RecordingProvider extends Provider {
   loadCount = 0;
@@ -228,8 +248,25 @@ class RecordingProvider extends Provider {
 }
 
 class TestRemoteProvider extends RemoteProvider {
-  constructor(table: Table, loader: RemoteResourceLoad) {
-    super(table, loader);
+  constructor(
+    table: Table,
+    sockets: TestRemoteResourceSocket[],
+    private readonly details: Partial<RemoteServiceDetails> = {},
+  ) {
+    super(
+      table,
+      (options) =>
+        new RemoteTableSubscription({
+          ...options,
+          log: () => undefined,
+          reconnect: { initialDelay: 5, maxDelay: 20 },
+          socketFactory: () => {
+            const socket = new TestRemoteResourceSocket();
+            sockets.push(socket);
+            return socket;
+          },
+        }),
+    );
   }
 
   remoteServiceDetails() {
@@ -237,6 +274,7 @@ class TestRemoteProvider extends RemoteProvider {
       columns: ["id"],
       resource: "remote",
       url: "ws://unused",
+      ...this.details,
     };
   }
 }

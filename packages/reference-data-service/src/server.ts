@@ -1,47 +1,47 @@
-import { uuid } from "@vuu-ui/vuu-utils";
-import { WebSocketConnectionHandler } from "./WebSocketConnectionHandler";
-import "./InstrumentStore";
-import logger from "./logger";
-import { parseArgs, type ParseArgsOptionsConfig } from "@heswell/service-utils";
-import path from "path";
+import path from "node:path";
+import { DataService, TablePublisher } from "@heswell/service-utils";
+import { Table } from "@heswell/vuu-table";
 import { loadConfig } from "./config";
+import { loadInstruments } from "./instrument-loader";
+import { instrumentsSchema } from "./tableSchemas";
 
-export interface WebsocketData {
-  sessionId: string;
+export interface ReferenceDataServiceOptions {
+  dataPath?: string;
+  log?: (message: string) => void;
+  port?: number;
 }
 
-export async function start() {
-  const runtimeOptions = (await Bun.file(
-    path.join(import.meta.path, "../config.json")
-  ).json()) as ParseArgsOptionsConfig;
+const DEFAULT_DATA_PATH = path.resolve(
+  import.meta.dir,
+  "../data/instruments.ndjson",
+);
 
-  const values = parseArgs(runtimeOptions);
-  console.log(JSON.stringify(values));
+/**
+ * Publishes the instruments resource. The service accepts connections
+ * immediately, subscribers receive their snapshot once loading completes.
+ */
+export function start(options: ReferenceDataServiceOptions = {}) {
+  const config = loadConfig();
+  const log = options.log ?? console.log;
+  const port = options.port ?? config.getNumber("service.port");
+  const dataPath =
+    options.dataPath ??
+    (config.has("instruments.dataPath")
+      ? config.getPath("instruments.dataPath")
+      : DEFAULT_DATA_PATH);
 
-  const websocketServer = Bun.serve<WebsocketData>({
-    // certFile: "./certs/myCA.pem",
-    // keyFile: "./certs/myCA.key",
-    // passphrase: "1234",
+  const instruments = new Table({ schema: instrumentsSchema });
+  const publisher = new TablePublisher({ table: instruments, ready: false });
+  const service = new DataService({ name: "REFDATA:service", port, log })
+    .addPublisher(publisher)
+    .start();
 
-    port: loadConfig().getNumber("service.port"),
-
-    fetch(req, server) {
-      const sessionId = uuid();
-      logger.info({ sessionId }, "create session");
-      const success = server.upgrade(req, { data: { sessionId } });
-      if (success) {
-        // Bun automatically returns a 101 Switching Protocols
-        // if the upgrade succeeds
-        return undefined;
-      }
-
-      // handle HTTP request normally
-      return new Response("Hello world!");
-    },
-    websocket: new WebSocketConnectionHandler(),
+  const loaded = loadInstruments(instruments, dataPath, (message) =>
+    log(`[REFDATA:service] ${message}`),
+  ).then((count) => {
+    publisher.setReady();
+    return count;
   });
 
-  console.log(
-    `[ReferenceDataService] websocket listening on ${websocketServer.hostname}:${websocketServer.port}`
-  );
+  return { instruments, loaded, service };
 }

@@ -7,12 +7,14 @@ export {
   isSessionDataTable,
 } from "./core/table/InMemSessionDataTable";
 export { ProviderContainer } from "./provider/ProviderContainer";
-export { NullProvider, Provider, RemoteProvider } from "./provider/Provider";
-export type {
-  IProvider,
-  ProviderFactory,
-  RemoteResourceLoad,
+export {
+  NullProvider,
+  Provider,
+  RemoteProvider,
+  type RemoteServiceDetails,
+  type RemoteSubscriptionFactory,
 } from "./provider/Provider";
+export type { IProvider, ProviderFactory } from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
 export type { RpcParams } from "./net/rpc/Rpc";
