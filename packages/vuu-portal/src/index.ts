@@ -2,7 +2,12 @@ export {
   createModuleRegistry,
   moduleClientIdentifier,
 } from "./ModuleRegistry";
-export { ModuleDiscoveryModule } from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
+export {
+  loadModuleAdminRole,
+  loadModuleState,
+  ModuleDiscoveryModule,
+  ModuleState,
+} from "./modules/ModuleDiscovery/ModuleDiscoveryModule";
 export {
   createPortalApplication,
   PORTAL_DEFAULT_HTTPS_PORT,
