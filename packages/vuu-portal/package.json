@@ -34,7 +34,8 @@
   },
   "scripts": {
     "build": "etsc",
-    "build:vuu": "node ../../scripts/build.mjs"
+    "build:vuu": "node ../../scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "author": "heswell",
   "license": "MIT",

@@ -10,7 +10,8 @@
   "scripts": {
     "build": "etsc",
     "build:vuu": "node ../../scripts/build.mjs",
-    "bench:outbound": "bun ./bench/outbound.bench.ts"
+    "bench:outbound": "bun ./bench/outbound.bench.ts",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "types": "src/index.ts",
   "author": "heswell",

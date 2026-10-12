@@ -6,7 +6,8 @@
   "scripts": {
     "order-client": "bun ./src/mock-client/mock-refdata-client.ts",
     "order-service": "bun ./src/orders-server/server.ts",
-    "test": "bun --watch ./test.ts"
+    "test": "bun --watch ./test.ts",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "author": "heswell",
   "type": "module",
