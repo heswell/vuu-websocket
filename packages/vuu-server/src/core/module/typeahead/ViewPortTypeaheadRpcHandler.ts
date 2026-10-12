@@ -20,9 +20,32 @@ const MAX_SUGGESTIONS = 10;
  * otherwise from the whole table.
  */
 export class ViewPortTypeaheadRpcHandler {
+  static #instances = new WeakMap<
+    TableContainer,
+    ViewPortTypeaheadRpcHandler
+  >();
+
+  /**
+   * One stateless typeahead handler per TableContainer, shared by every
+   * DefaultRpcHandler, so creating a handler per viewport does no repeated
+   * typeahead setup.
+   */
+  static forTableContainer(tableContainer: TableContainer) {
+    let instance = ViewPortTypeaheadRpcHandler.#instances.get(tableContainer);
+    if (instance === undefined) {
+      instance = new ViewPortTypeaheadRpcHandler(tableContainer);
+      ViewPortTypeaheadRpcHandler.#instances.set(tableContainer, instance);
+    }
+    return instance;
+  }
+
   #tableContainer: TableContainer;
-  constructor(rpcRegistry: DefaultRpcHandler, tableContainer: TableContainer) {
+  constructor(tableContainer: TableContainer) {
     this.#tableContainer = tableContainer;
+  }
+
+  /** Idempotent: registering on the same registry twice is a no-op. */
+  registerWith(rpcRegistry: DefaultRpcHandler) {
     rpcRegistry.registerRpc(
       RpcNames.UniqueFieldValuesRpc,
       this.processGetUniqueFieldValuesRequest,

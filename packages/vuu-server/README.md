@@ -72,6 +72,8 @@ VuuServer makes use of a number of global singletons
        - serviceFactory
      - addJoinTable
        - JoinTableFactory
+       - serviceFactory (optional, registered under the realised join
+         table's name)
 
 2. VuuServer constructor
 
@@ -95,3 +97,42 @@ VuuServer makes use of a number of global singletons
    - viewport updates are queued per session and flushed to the client
 
 Mocking the VuuServer: provide a mock provider in the module config.
+
+## ServiceFactory lifecycle
+
+A `ServiceFactory` (the optional last argument to `addTable`,
+`addSessionTable` and `addJoinTable`) returns a `ViewPortDef`: the columns
+plus the `RpcHandler` that serves RPC calls and menus for a viewport.
+
+- **When it is called:** once per viewport, on `CREATE_VP`. It is not called
+  for `GET_TABLE_META`; table metadata comes from the table's `TableDef`
+  columns, so `ViewPortDef.columns` should describe the table's columns.
+- **What is per viewport:** the returned `ViewPortDef` and its `RpcHandler`
+  belong to the viewport they were created for, so a handler may hold
+  per-viewport state. A factory may also return a shared, stateless handler.
+- **What must be idempotent:** the factory runs once per viewport for the
+  life of the server. Work with global side effects (subscriptions, timers,
+  shared registrations) must be idempotent or done outside the factory.
+  `DefaultRpcHandler` shares one typeahead handler per `TableContainer`, and
+  `registerRpc` ignores a repeat registration of the same function under the
+  same name.
+
+Join tables take a `ServiceFactory` too:
+
+```ts
+ModuleFactory.withNameSpace("EXCHANGE")
+  .addJoinTable(
+    (tableDefs) =>
+      JoinTableDef({
+        name: "instrumentPrices",
+        // ...
+        permissionFunction: (viewport, tableContainer) => /* ... */,
+      }),
+    (table, _provider, _providerContainer, tableContainer) =>
+      ViewPortDef(table.tableDef.columns, new MyRpcHandler(tableContainer)),
+  )
+  .asModule();
+```
+
+`JoinTableDef` passes all remaining `TableDefConfig` fields, including
+`permissionFunction`, to the underlying `TableDef`.

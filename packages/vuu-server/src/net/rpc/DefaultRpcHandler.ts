@@ -9,11 +9,21 @@ export class DefaultRpcHandler extends RpcHandler {
 
   constructor(protected tableContainer: TableContainer) {
     super();
-    new ViewPortTypeaheadRpcHandler(this, tableContainer);
+    ViewPortTypeaheadRpcHandler.forTableContainer(tableContainer).registerWith(
+      this,
+    );
   }
 
+  /**
+   * Registers an RPC function. Re-registering the same function under the
+   * same name is a no-op; registering a different function under an
+   * existing name throws.
+   */
   registerRpc(functionName: string, handlerFunc: RpcFunction) {
-    if (this.#rpcHandlerMap.has(functionName)) {
+    const existing = this.#rpcHandlerMap.get(functionName);
+    if (existing === handlerFunc) {
+      return;
+    } else if (existing) {
       throw Error(`[DefaultRpcHandler] ${functionName} already registered`);
     }
     this.#rpcHandlerMap.set(functionName, handlerFunc);

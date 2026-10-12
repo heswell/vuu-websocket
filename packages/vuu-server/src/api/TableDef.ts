@@ -244,18 +244,18 @@ class JoinTableDefImpl extends TableDefImpl implements JoinTableDef {
   name: string;
   constructor({
     baseTable,
-    joinFields,
     joins,
     joinColumns,
     name,
-    links,
+    ...tableDefConfig
   }: JoinTableDefConfig) {
+    // Pass every remaining TableDefConfig field (joinFields, links,
+    // permissionFunction, ...) through to the base TableDef.
     super({
+      ...tableDefConfig,
       columns: joinColumns,
-      joinFields,
       keyField: baseTable.keyField,
       name,
-      links,
     });
     this.baseTable = baseTable;
     this.joinColumns = joinColumns;
