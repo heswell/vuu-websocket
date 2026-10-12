@@ -16,6 +16,7 @@ import { ServiceFactory } from "../core/module/ModuleFactory";
 import { TableContainer } from "../core/table/TableContainer";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewPortDef } from "../api/ViewPortDef";
+import type { Column } from "../api/TableDef";
 import { RpcParams } from "../net/rpc/Rpc";
 import { DataTable, isDataTable } from "../core/table/InMemDataTable";
 import { SelectionViewPortMenuItem } from "./ViewPortMenu";
@@ -58,7 +59,11 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     this.#viewPortDefinitions.set(tableName, viewPortDefFunc);
   }
 
-  // Note: feels wrong that this gets calles on GET_TABLE_META request
+  /**
+   * Creates a new ViewPortDef for a viewport on `table`, invoking the table's
+   * ServiceFactory if one is registered. Called once per viewport (CREATE_VP);
+   * see {@link ServiceFactory} for the lifecycle contract.
+   */
   getViewPortDefinition(table: DataTable) {
     const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
     if (viewPortDefFunc) {
@@ -77,6 +82,14 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       );
       return ViewPortDef.default(table.tableDef.columns);
     }
+  }
+
+  /**
+   * Columns reported in table metadata (GET_TABLE_META). Derived from the
+   * TableDef so no ServiceFactory / RpcHandler is instantiated.
+   */
+  getTableMetaColumns(table: DataTable): Column[] {
+    return table.tableDef.columns;
   }
 
   private getViewPortDefinitionCreator(table: DataTable) {

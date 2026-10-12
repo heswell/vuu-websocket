@@ -17,6 +17,21 @@ import { DataTable } from "../table/InMemDataTable";
 
 export type TableDefTuple = [TableDef, ProviderFactory];
 
+/**
+ * Creates the {@link ViewPortDef} (columns + RPC/menu service) for a table.
+ *
+ * Lifecycle contract:
+ * - Invoked once per viewport, when the viewport is created (CREATE_VP).
+ *   The returned `ViewPortDef` (and its `RpcHandler`) belongs to that
+ *   viewport, so handlers may keep per-viewport state.
+ * - Never invoked for table metadata (GET_TABLE_META); metadata is derived
+ *   from the table's `TableDef` columns, so `ViewPortDef.columns` should
+ *   describe the table's columns.
+ * - May be invoked many times over the server's life: anything with global
+ *   side effects (subscriptions, timers, shared registrations) must be
+ *   idempotent, or hoisted out of the factory. A factory may return a shared,
+ *   stateless handler if it prefers.
+ */
 export type ServiceFactory = (
   table: DataTable,
   provider: IProvider | undefined,
@@ -85,6 +100,7 @@ function ModuleFactoryNode(
   rpcHandlers: RpcHandlerFunc[],
   viewPortDefs: Map<string, ServiceFactory>,
   moduleName: string,
+  joinServiceFactories: Map<TableJoinFactory, ServiceFactory>,
 ) {
   return {
     addTable: (
@@ -100,15 +116,29 @@ function ModuleFactoryNode(
         rpcHandlers,
         viewPortDefs,
         moduleName,
+        joinServiceFactories,
       );
     },
-    addJoinTable: (func: TableJoinFactory) =>
-      ModuleFactoryNode(
+    /**
+     * The join table's name is only known once `asModule()` realises the
+     * join, so an optional `serviceFactory` is registered under the realised
+     * join table's name at that point.
+     */
+    addJoinTable: (
+      func: TableJoinFactory,
+      serviceFactory?: ServiceFactory,
+    ) => {
+      if (serviceFactory) {
+        joinServiceFactories.set(func, serviceFactory);
+      }
+      return ModuleFactoryNode(
         tableDefs.addJoin(func),
         rpcHandlers,
         viewPortDefs,
         moduleName,
-      ),
+        joinServiceFactories,
+      );
+    },
     addSessionTable: (
       tableDef: TableDef,
       providerFactory: ProviderFactory = (table) => new NullProvider(table),
@@ -122,6 +152,7 @@ function ModuleFactoryNode(
         rpcHandlers,
         viewPortDefs,
         moduleName,
+        joinServiceFactories,
       );
     },
 
@@ -131,6 +162,7 @@ function ModuleFactoryNode(
         rpcHandlers.concat(rpcFunc),
         viewPortDefs,
         moduleName,
+        joinServiceFactories,
       ),
 
     asModule(): ViewServerModule {
@@ -145,6 +177,10 @@ function ModuleFactoryNode(
       tableDefs.joinDefFuncs.forEach((toJTFunc) => {
         const realizedJoinTable = toJTFunc(tableDefContainer);
         mutableTableDefs = mutableTableDefs.addRealized(realizedJoinTable);
+        const serviceFactory = joinServiceFactories.get(toJTFunc);
+        if (serviceFactory) {
+          viewPortDefs.set(realizedJoinTable.name, serviceFactory);
+        }
       });
 
       console.log(`[ModuleFactory] as Module`, {
@@ -177,5 +213,5 @@ function ModuleFactoryNode(
 
 export const ModuleFactory = {
   withNameSpace: (name: string) =>
-    ModuleFactoryNode(TableDefs([], [], []), [], new Map(), name),
+    ModuleFactoryNode(TableDefs([], [], []), [], new Map(), name, new Map()),
 };

@@ -161,9 +161,9 @@ export class CoreServerApiHandler implements ServerApi {
   ) {
     const table = this.tableContainer.getTable<DataTable>(msg.table.table);
     if (table) {
-      const viewPortDef = this.viewPortContainer.getViewPortDefinition(table);
-      const columns = viewPortDef.columns.map((col) => col.name);
-      const dataTypes = viewPortDef.columns.map((col) => col.dataType);
+      const metaColumns = this.viewPortContainer.getTableMetaColumns(table);
+      const columns = metaColumns.map((col) => col.name);
+      const dataTypes = metaColumns.map((col) => col.dataType);
       const { key, table: vuuTable } = table.schema;
       const tableMetaResponseBody = GetTableMetaResponse(
         vuuTable,
