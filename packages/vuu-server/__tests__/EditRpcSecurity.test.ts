@@ -462,6 +462,37 @@ describe("session ownership", () => {
     ).toThrow(`[ViewportContainer] viewport not found ${sessionVp.id}`);
   });
 
+  test("selection, tree, link and remove requests are refused for another session's viewport", () => {
+    const { createViewport, orders, viewportContainer } = setup();
+    const vp = createViewport(orders);
+    const other = createViewport(orders, "alice", SESSION_2);
+    vp.selectRow("o1", false);
+    const notFound = `[ViewportContainer] viewport not found ${vp.id}`;
+    for (const request of [
+      () => viewportContainer.selectAll(vp.id, SESSION_2),
+      () => viewportContainer.deselectAll(vp.id, SESSION_2),
+      () =>
+        viewportContainer.selectRowRange(vp.id, "o1", "o3", false, SESSION_2),
+      () => viewportContainer.openTreeNode(vp.id, "$root", SESSION_2),
+      () => viewportContainer.closeTreeNode(vp.id, "$root", SESSION_2),
+      () =>
+        viewportContainer.linkViewPorts(other.id, vp.id, "id", "id", SESSION_2),
+      () => viewportContainer.unlinkViewPorts(vp.id, SESSION_2),
+      () => viewportContainer.getViewPortVisualLinks(vp.id, SESSION_2),
+      () => viewportContainer.getViewportForSession(vp.id, SESSION_2),
+      () => viewportContainer.removeViewport(vp.id, SESSION_2),
+    ]) {
+      expect(request).toThrow(notFound);
+    }
+    expect([...vp.selectedKeys]).toEqual(["o1"]);
+    expect(other.visualLink).toBeUndefined();
+    expect(viewportContainer.getViewportById(vp.id)).toBe(vp);
+    // the owner can still use its own viewport
+    expect(viewportContainer.selectAll(vp.id, SESSION_1)).toBe(2);
+    viewportContainer.removeViewport(vp.id, SESSION_1);
+    expect(() => viewportContainer.getViewportById(vp.id)).toThrow(notFound);
+  });
+
   test("edit RPCs refuse a session table owned by another session", () => {
     const { beginSession, call, createViewport, ctxFor, orders } = setup();
     const { sessionTable, sessionVp } = beginSession(createViewport(orders));

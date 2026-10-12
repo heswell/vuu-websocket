@@ -294,10 +294,12 @@ and applied to the source table when the session is saved.
 - **Session tables only.** Every edit RPC targets a session table. `editCell`
   on a viewport over a source table returns `ERROR_RESULT`, unless the
   handler opts in with `canEditSource`.
-- **Session tables are private.** Only the client session that created a
-  session table can open a viewport on it or call edit RPCs against it.
-  Viewport RPCs, row selection, range changes and enable/disable are refused
-  for a viewport owned by another session.
+- **Session tables and viewports are private.** Only the client session
+  that created a session table can open a viewport on it or call edit RPCs
+  against it. Requests naming a viewport owned by another session are
+  refused as if the viewport did not exist. This covers RPCs, menus,
+  selection, range, change, remove, enable/disable, tree open/close and
+  visual links.
 - **Validated columns and values.** `editCell` refuses:
   - unknown columns;
   - the key column;

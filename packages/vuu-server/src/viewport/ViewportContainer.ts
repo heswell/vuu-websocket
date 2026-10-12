@@ -40,6 +40,8 @@ import { getLogger } from "@heswell/service-utils";
 
 const log = getLogger("vuu.viewport");
 
+type SessionRef = Pick<ClientSessionId, "sessionId">;
+
 export type ViewportCreationEvent = {
   id: string;
   table: VuuTable;
@@ -215,7 +217,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
    */
   getViewportForSession(
     viewportId: string,
-    clientSessionId: Pick<ClientSessionId, "sessionId">,
+    clientSessionId: SessionRef,
   ) {
     const viewport = this.#viewports.get(viewportId);
     if (viewport && viewport.sessionId === clientSessionId.sessionId) {
@@ -225,8 +227,18 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  removeViewport(viewportId: string) {
-    const viewport = this.getViewportById(viewportId);
+  /**
+   * Viewport lookup for client requests. When clientSessionId is supplied the
+   * viewport must belong to that session.
+   */
+  #lookup(viewportId: string, clientSessionId?: SessionRef) {
+    return clientSessionId
+      ? this.getViewportForSession(viewportId, clientSessionId)
+      : this.getViewportById(viewportId);
+  }
+
+  removeViewport(viewportId: string, clientSessionId?: SessionRef) {
+    const viewport = this.#lookup(viewportId, clientSessionId);
     // remove any visual links for which this viewport is the parent
     for (const vp of this.#viewports.values()) {
       if (vp.visualLink?.parentVp === viewport) {
@@ -404,14 +416,14 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     return selectedRowCount;
   }
 
-  selectAll(viewPortId: string) {
-    const viewport = this.getViewportById(viewPortId);
+  selectAll(viewPortId: string, clientSessionId?: SessionRef) {
+    const viewport = this.#lookup(viewPortId, clientSessionId);
     const { selectedRowCount } = viewport.selectAll();
     return selectedRowCount;
   }
 
-  deselectAll(viewPortId: string) {
-    const viewport = this.getViewportById(viewPortId);
+  deselectAll(viewPortId: string, clientSessionId?: SessionRef) {
+    const viewport = this.#lookup(viewPortId, clientSessionId);
     const { selectedRowCount } = viewport.deselectAll();
     return selectedRowCount;
   }
@@ -421,8 +433,9 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     fromRowKey: string,
     toRowKey: string,
     preserveExistingSelection: boolean,
+    clientSessionId?: SessionRef,
   ) {
-    const viewport = this.getViewportById(viewPortId);
+    const viewport = this.#lookup(viewPortId, clientSessionId);
     const { selectedRowCount } = viewport.selectRowRange(
       fromRowKey,
       toRowKey,
@@ -436,10 +449,11 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     parentVpId: string,
     childColumnName: string,
     parentColumnName: string,
+    clientSessionId?: SessionRef,
   ) {
     log.debug(`link viewports ${childVpId} -> ${parentVpId}`);
-    const child = this.getViewportById(childVpId);
-    const parent = this.getViewportById(parentVpId);
+    const child = this.#lookup(childVpId, clientSessionId);
+    const parent = this.#lookup(parentVpId, clientSessionId);
     const childColumn = child.dataTable.columnForName(childColumnName);
     const parentColumn = parent.dataTable.columnForName(parentColumnName);
     child.setVisualLink(
@@ -447,21 +461,29 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     );
   }
 
-  openTreeNode(viewPortId: string, treeKey: string) {
-    this.getViewportById(viewPortId).openTreeNode(treeKey);
+  openTreeNode(
+    viewPortId: string,
+    treeKey: string,
+    clientSessionId?: SessionRef,
+  ) {
+    this.#lookup(viewPortId, clientSessionId).openTreeNode(treeKey);
   }
 
-  closeTreeNode(viewPortId: string, treeKey: string) {
-    this.getViewportById(viewPortId).closeTreeNode(treeKey);
+  closeTreeNode(
+    viewPortId: string,
+    treeKey: string,
+    clientSessionId?: SessionRef,
+  ) {
+    this.#lookup(viewPortId, clientSessionId).closeTreeNode(treeKey);
   }
 
-  unlinkViewPorts(childVpId: string) {
-    const viewPort = this.getViewportById(childVpId);
+  unlinkViewPorts(childVpId: string, clientSessionId?: SessionRef) {
+    const viewPort = this.#lookup(childVpId, clientSessionId);
     viewPort.removeVisualLink();
   }
 
-  getViewPortVisualLinks(viewportId: string) {
-    const viewport = this.getViewportById(viewportId);
+  getViewPortVisualLinks(viewportId: string, clientSessionId?: SessionRef) {
+    const viewport = this.#lookup(viewportId, clientSessionId);
     const { tableDef } = getViewPortDataTable(viewport);
     const visualLinks = tableDef.links;
 
