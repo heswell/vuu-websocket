@@ -1,22 +1,34 @@
-import pino from "pino";
-import path from "path";
+import path from "node:path";
+import pino, { type Logger } from "pino";
 
-const pathToLogs = path.join(__dirname, "../../../logs");
+let instance: Logger | undefined;
 
-const fileTransport = pino.transport({
-  target: "pino/file",
-  options: { destination: `${pathToLogs}/vuu-server.log` },
-});
-
-export default pino(
-  {
-    level: "info",
-    formatters: {
-      bindings: (bindings) => ({}),
-      level: (label) => {
-        return { level: label.toUpperCase() };
+// Created on first use so that importing @heswell/vuu-server does not start a
+// pino transport worker or touch the file system.
+const getLogger = (): Logger => {
+  if (!instance) {
+    const destination =
+      process.env.VUU_SERVER_LOG_FILE ??
+      path.join(process.cwd(), "logs", "vuu-server.log");
+    instance = pino(
+      {
+        level: "info",
+        formatters: {
+          bindings: () => ({}),
+          level: (label) => ({ level: label.toUpperCase() }),
+        },
       },
-    },
-  },
-  fileTransport
-);
+      pino.transport({
+        target: "pino/file",
+        options: { destination, mkdir: true },
+      }),
+    );
+  }
+  return instance;
+};
+
+const logger = {
+  info: (message: string) => getLogger().info(message),
+};
+
+export default logger;

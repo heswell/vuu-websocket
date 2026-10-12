@@ -1,5 +1,5 @@
 import { ServerMessagingConfig } from "./server-types";
-import { ServerWebSocket } from "bun";
+import type { ServerWebSocket } from "bun";
 import {
   clearSession,
   createSession,

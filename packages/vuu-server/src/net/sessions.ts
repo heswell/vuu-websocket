@@ -4,7 +4,7 @@ import type {
   VuuLoginSuccessResponse,
   VuuServerMessage,
 } from "@vuu-ui/vuu-protocol-types";
-import { ServerWebSocket } from "bun";
+import type { ServerWebSocket } from "bun";
 import logger from "../logger.ts";
 import { MessageQueue } from "../messageQueue.ts";
 import type { WebsocketData } from "../server.ts";
