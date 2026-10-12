@@ -5,6 +5,12 @@ hosts the `MODULE_DISCOVERY` module and returns each user's module registry in
 the login response. Requires the [Bun](https://bun.sh) runtime to run the
 server. The library exports can be imported under Node.js too.
 
+```sh
+npm install @heswell/vuu-portal
+# TypeScript consumers: the vuu-server declarations reference Bun types
+npm install -D @types/bun
+```
+
 ## Entry points
 
 | Import / command | Purpose |
