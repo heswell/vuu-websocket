@@ -15,6 +15,9 @@ import type {
   VuuLoginSuccessResponse,
   VuuMenu,
   VuuMenuItem,
+  VuuRpcMenuAction,
+  VuuRpcMenuError,
+  VuuRpcMenuSuccess,
   VuuRpcServiceResponse,
   VuuTable,
   VuuTableListResponse,
@@ -256,5 +259,27 @@ export const SelectRowRangeSuccess = (
 ): VuuSelectRowRangeSuccess => ({
   selectedRowCount,
   type: "SELECT_ROW_RANGE_SUCCESS",
+  vpId,
+});
+
+export const ViewPortMenuRpcResponse = (
+  vpId: string,
+  rpcName: string,
+  action: VuuRpcMenuAction,
+): VuuRpcMenuSuccess => ({
+  action,
+  rpcName,
+  type: "VIEW_PORT_MENU_RESP",
+  vpId,
+});
+
+export const ViewPortMenuRpcReject = (
+  vpId: string,
+  rpcName: string,
+  error: string,
+): VuuRpcMenuError => ({
+  error,
+  rpcName,
+  type: "VIEW_PORT_MENU_REJ",
   vpId,
 });

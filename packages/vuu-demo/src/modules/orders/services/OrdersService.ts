@@ -2,6 +2,7 @@ import { Table } from "@heswell/vuu-table";
 import {
   DefaultRpcHandler,
   isDataTable,
+  type MenuRpcSession,
   NoAction,
   OpenDialogViewPortAction,
   ProviderContainer,
@@ -27,17 +28,20 @@ export class OrdersService extends DefaultRpcHandler {
     console.log(`rpc message received`);
   }
 
-  private cancelOrders = (selection: ViewPortSelection, sessionId: string) => {
+  private cancelOrders = (
+    selection: ViewPortSelection,
+    _sessionId: string,
+    session: MenuRpcSession,
+  ) => {
     const baseTable = this.#tableContainer.getTable("parentOrders");
 
     if (isDataTable(baseTable)) {
       const sessionTable = this.#tableContainer.createSimpleSessionTable(
         baseTable,
-        sessionId
+        session
       );
 
-      const { rowKeyIndex } = selection;
-      rowKeyIndex.forEach((_, key) => {
+      selection.rowKeys.forEach((key) => {
         const row = baseTable.getRowAtKey(key);
         console.log(`add row ${row.join(",")}`);
         sessionTable.processUpdate(key, row.slice());
