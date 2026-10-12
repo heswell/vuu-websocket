@@ -1,16 +1,14 @@
 import { Table } from "@heswell/vuu-table";
 import {
+  type DataTable,
   DefaultRpcHandler,
   EditSessionRpcHandler,
   NoAction,
   ProviderContainer,
-  TableContainer,
-} from "@heswell/vuu-server";
-import { DataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
-import {
   SelectionViewPortMenuItem,
+  TableContainer,
   ViewPortMenu,
-} from "@heswell/vuu-server/src/viewport/ViewPortMenu";
+} from "@heswell/vuu-server";
 import { VuuMenu, VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
 export class InstrumentService extends EditSessionRpcHandler {

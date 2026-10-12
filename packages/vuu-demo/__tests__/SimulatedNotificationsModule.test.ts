@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { VuuUser } from "@heswell/vuu-server";
-import { InMemDataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
-import { TableContainer } from "@heswell/vuu-server/src/core/table/TableContainer";
-import { JoinTableProvider } from "@heswell/vuu-server/src/provider/JoinTableProvider";
-import { ProviderContainer } from "@heswell/vuu-server/src/provider/ProviderContainer";
-import { ViewportContainer } from "@heswell/vuu-server/src/viewport/ViewportContainer";
-import { OutboundRowPublishQueue } from "@heswell/vuu-server/src/util/PublishQueue";
-import { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
-import { RequestContext } from "@heswell/vuu-server/src/net/RequestProcessor";
+import {
+  InMemDataTable,
+  JoinTableProvider,
+  OutboundRowPublishQueue,
+  ProviderContainer,
+  RequestContext,
+  RpcParams,
+  TableContainer,
+  ViewportContainer,
+  VuuUser,
+} from "@heswell/vuu-server";
 import { SimulatedNotificationsModule } from "../src/modules/notifications";
 import { formatMessage } from "../src/modules/notifications/providers/SimulatedNotificationsProvider";
 

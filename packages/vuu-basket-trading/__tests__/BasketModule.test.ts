@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
+  type DataTable,
   LifecycleContainer,
   LoginTokenService,
+  type RpcParams,
   VuuServer,
   VuuServerConfig,
   VuuWebSocketOptions,
-  type DataTable,
 } from "@heswell/vuu-server";
-import type { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
 import type { RpcResult } from "@vuu-ui/vuu-protocol-types";
 import { BasketModule } from "../src/modules/basket/BasketModule";
 

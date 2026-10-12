@@ -1,11 +1,11 @@
-import { ModuleContainer } from "@heswell/vuu-server/src/core/module/ModuleContainer";
-import { InstrumentProvider } from "./providers/InstrumentProvider";
 import {
   Link,
+  ModuleContainer,
   ModuleFactory,
   TableDef,
   VisualLinks,
 } from "@heswell/vuu-server";
+import { InstrumentProvider } from "./providers/InstrumentProvider";
 import { LinkParentProvider } from "./providers/LinkParentProvider";
 import { LinkChildProvider } from "./providers/LinkChildProvider";
 

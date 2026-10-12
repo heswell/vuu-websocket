@@ -1,7 +1,12 @@
 export { ViewServerModule as Module } from "./core/module/VsModule";
 export { type Column, Columns } from "./core/table/Column";
-export type { TableContainer } from "./core/table/TableContainer";
-export type { DataTable } from "./core/table/InMemDataTable";
+export { TableContainer } from "./core/table/TableContainer";
+export {
+  type DataTable,
+  InMemDataTable,
+  isDataTable,
+} from "./core/table/InMemDataTable";
+export { ModuleContainer } from "./core/module/ModuleContainer";
 export {
   InMemSessionDataTable,
   isSessionDataTable,
@@ -17,7 +22,8 @@ export {
 export type { IProvider, ProviderFactory } from "./provider/Provider";
 export { RpcHandler } from "./net/rpc/RpcHandler";
 export { RpcNames } from "./util/RpcNames";
-export type { RpcParams } from "./net/rpc/Rpc";
+export { RpcParams, type RpcFunction } from "./net/rpc/Rpc";
+export { RequestContext } from "./net/RequestProcessor";
 export { RpcErrorResult, RpcSuccessResult } from "./net/rpc/RpcResult";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
 export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
@@ -46,8 +52,25 @@ export * from "./api/ViewPortDef";
 export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
 export * from "./core/VuuServerApplication";
-export { NoAction } from "./viewport/ViewPortAction";
-export { Viewport } from "./viewport/Viewport";
+export {
+  NoAction,
+  OpenDialogViewPortAction,
+  type ViewPortAction,
+} from "./viewport/ViewPortAction";
+export {
+  CellViewPortMenuItem,
+  EmptyViewPortMenu,
+  RowViewPortMenuItem,
+  type SelectionMenuFunc,
+  SelectionViewPortMenuItem,
+  TableViewPortMenuItem,
+  ViewPortMenu,
+  ViewPortMenuFolder,
+  ViewPortMenuItem,
+} from "./viewport/ViewPortMenu";
+export { Viewport, ViewPortSelection } from "./viewport/Viewport";
+export { ViewportContainer } from "./viewport/ViewportContainer";
+export { OutboundRowPublishQueue } from "./util/PublishQueue";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
 export type { ServiceFactory } from "./core/module/ModuleFactory";

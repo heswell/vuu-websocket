@@ -16,6 +16,13 @@
       "import": "./src/main.ts"
     }
   },
+  "typesVersions": {
+    "*": {
+      "main": [
+        "./src/main.ts"
+      ]
+    }
+  },
   "bin": {
     "vuu-portal": "./src/bin.ts"
   },
