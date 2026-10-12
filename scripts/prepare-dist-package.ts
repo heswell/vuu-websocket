@@ -121,7 +121,8 @@ export const prepareDistPackage = ({
     ...(bin
       ? {
           bin: Object.fromEntries(
-            Object.entries(bin).map(([command, name]) => [command, js(name)]),
+            // npm 11 publish strips bin paths written as "./x.js".
+            Object.entries(bin).map(([command, name]) => [command, `${name}.js`]),
           ),
         }
       : {}),
