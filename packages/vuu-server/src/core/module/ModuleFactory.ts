@@ -19,7 +19,7 @@ export type TableDefTuple = [TableDef, ProviderFactory];
 
 export type ServiceFactory = (
   table: DataTable,
-  provider: Provider,
+  provider: IProvider | undefined,
   providerContainer: ProviderContainer,
   tableContainer: TableContainer,
 ) => ViewPortDef;

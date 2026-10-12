@@ -1,7 +1,9 @@
 import { Table } from "@heswell/vuu-table";
-import { RpcNamedParams, VuuMenu } from "@vuu-ui/vuu-protocol-types";
+import { VuuMenu } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "./provider/ProviderContainer";
 import { ViewPortDef } from "./api/ViewPortDef";
+
+export type RpcNamedParams = Record<string, unknown>;
 
 export interface ServiceMessage {
   name: string;

@@ -86,7 +86,6 @@ export {
   type PermissionFunction,
   type RowData,
 } from "./core/filter/PermissionFilter";
-export { websocketConnectionHandler } from "./websocket-connection-handler-DEPRECATED";
 export * from "./toolbox/thread/LifecycleContainer";
 export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";
 export { ConfigFactory } from "./util/ConfigFactory";

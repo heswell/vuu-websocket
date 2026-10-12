@@ -1,4 +1,4 @@
-import { VuuClientMessage, VuuServerMessage } from "@vuu-ui/vuu-protocol-types";
+import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ModuleContainer } from "../core/module/ModuleContainer";
 import { VuuUser } from "../core/auths/VuuUser";
 import {
@@ -12,7 +12,11 @@ import { ServerApi } from "./ServerApi";
 import { Channel } from "./ws/Channel";
 import { SessionId } from "../client/messages/ClientMessage";
 import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
-import { JsonViewServerMessage, LoginSuccess } from "./Messages";
+import {
+  JsonViewServerMessage,
+  LoginSuccess,
+  type ViewServerMessage,
+} from "./Messages";
 import { ViewPortUpdate } from "../viewport/Viewport";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { LoginSuccessOptions } from "./LoginSuccess";
@@ -83,7 +87,7 @@ export class RequestProcessor {
     clientSessionContainer: ClientSessionContainer,
     channel: Channel,
     vuUServerId: string,
-  ): VuuServerMessage | void {
+  ): ViewServerMessage | void {
     console.log(
       `[RequestProcessor] createSession ${requestId} for user ${user.name}`,
     );

@@ -40,7 +40,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       return { type: "SUCCESS_RESULT", data: undefined };
     }
 
-    const prepared = this.prepareSessionSave(sessionTable, force);
+    const prepared = this.prepareSessionSave(sessionTable, force === true);
     if ("type" in prepared) return prepared;
 
     this.applySessionSave(sessionTable, prepared);

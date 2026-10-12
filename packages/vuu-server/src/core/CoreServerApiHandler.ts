@@ -1,13 +1,13 @@
 import {
+  VuuMenu,
+  VuuMenuItem,
   ClientToServerCloseTreeNode,
-  ClientToServerMenuSelectRPC,
   ClientToServerOpenTreeNode,
   DeselectAllRequest,
   DeselectRowRequest,
   SelectAllRequest,
   SelectRowRangeRequest,
   SelectRowRequest,
-  ServerMessageBody,
   ViewportRpcContext,
   VuuClientMessage,
   VuuCreateVisualLink,
@@ -45,21 +45,25 @@ import {
   SelectRowRangeSuccess,
   SelectRowSuccess,
   VsMsg,
+  type ViewServerMessageBody,
 } from "../net/Messages";
 import { RequestContext } from "../net/RequestProcessor";
 import { RpcErrorResult } from "../net/rpc/RpcResult";
 import { ServerApi } from "../net/ServerApi";
 import { ProviderContainer } from "../provider/ProviderContainer";
-import { ISession } from "../server-types";
 import { ViewPortRange } from "../viewport/Viewport";
 import { ViewportContainer } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { DataTable } from "./table/InMemDataTable";
 
-const vsMsg = (body: ServerMessageBody, ctx: RequestContext) =>
+const vsMsg = (body: ViewServerMessageBody, ctx: RequestContext) =>
   JsonViewServerMessage(ctx.requestId, ctx.session.sessionId, body);
 
-const errorMsg = (s: String, ctx: RequestContext) =>
+// The menus response must have a root folder; a lone item gets wrapped.
+const asRootMenu = (menu: VuuMenu | VuuMenuItem): VuuMenu =>
+  "menus" in menu ? menu : { name: "ROOT", menus: [menu] };
+
+const errorMsg = (s: string, ctx: RequestContext) =>
   VsMsg(ctx.requestId, ctx.session.sessionId, ErrorResponse(s));
 
 const createErrorRpcResponse = (
@@ -186,7 +190,7 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     const tableName = msg.table.table;
-    const table = this.tableContainer.getTable(tableName);
+    const table = this.tableContainer.getTable<DataTable>(tableName);
     // if (table.getTableDef.visibility !== Public)
     if (msg.columns.length === 1 && msg.columns[0] === "*") {
       console.log("all columns");
@@ -258,7 +262,7 @@ export class CoreServerApiHandler implements ServerApi {
   ) {
     const viewPort = this.viewPortContainer.getViewportById(vpId);
     const menu = viewPort.viewPortDef.service.menuItems.asJson;
-    return vsMsg(GetViewPortMenusResponse(vpId, menu), ctx);
+    return vsMsg(GetViewPortMenusResponse(vpId, asRootMenu(menu)), ctx);
   }
 
   private processViewPortRange(
@@ -319,7 +323,11 @@ export class CoreServerApiHandler implements ServerApi {
         return vsMsg(RpcResponseNew(msg.rpcName, rpcResult, {}), ctx);
       } else {
         return vsMsg(
-          createErrorRpcResponse(msg, rpcResult.errorMessage, rpcResult.data),
+          createErrorRpcResponse(
+            msg,
+            rpcResult.errorMessage,
+            "data" in rpcResult ? rpcResult.data : undefined,
+          ),
           ctx,
         );
       }
@@ -528,25 +536,6 @@ export class CoreServerApiHandler implements ServerApi {
     } catch (e) {
       return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
     }
-  }
-
-  private processViewPortMenuSelectionRpcCall(
-    requestId: string,
-    { vpId, rpcName }: ClientToServerMenuSelectRPC,
-    session: ISession,
-  ) {
-    const action = this.viewPortContainer.callRpcSelection(
-      vpId,
-      rpcName,
-      session.id,
-    );
-
-    session.enqueue(requestId, {
-      action,
-      rpcName,
-      type: "VIEW_PORT_MENU_RESP",
-      vpId,
-    });
   }
 
   disconnect(session: ClientSessionId) {

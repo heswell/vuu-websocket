@@ -4,7 +4,6 @@ import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
-import { ProxySessionDataTable } from "./ProxySessionDataTable";
 import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
 
 export class TableContainer {

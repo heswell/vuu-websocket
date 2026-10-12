@@ -46,11 +46,6 @@ export class ModuleContainer {
     throw Error(`[ModuleFactory] module ${name} not found`);
   }
 
-  createSessionTableFromSelectedRows(viewport: Viewport) {
-    const module = this.get(viewport.table.schema.table.module);
-    return module.createSessionTableFromSelectedRows(viewport);
-  }
-
   getLinks({ module, table }: VuuTable) {
     return this.get(module).getLinks(table);
   }
