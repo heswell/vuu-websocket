@@ -42,6 +42,16 @@ export class VuuServer extends DefaultLifecycleEnabled {
     return this.#webSocketServer.port;
   }
 
+  /** Port the REST server is listening on, once started. */
+  get restPort() {
+    return this.#restServer?.port;
+  }
+
+  /** Base URL (http or https) of the REST server, once started. */
+  get restUrl() {
+    return this.#restServer?.url;
+  }
+
   constructor(
     { loginSuccessProvider, loginTokenService, modules, ...config }: VuuServerConfig,
     private readonly lifecycle: LifecycleContainer,

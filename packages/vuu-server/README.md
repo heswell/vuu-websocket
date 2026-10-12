@@ -55,6 +55,35 @@ overrides and path resolution.
 `/websocket-portal`. The default is `/websocket`. Paths with a trailing
 slash, query, fragment, or full URL are rejected during application setup.
 
+## TLS and local plain-HTTP mode
+
+`vuu.ssl=true` (with `vuu.certPath` and `vuu.keyPath`) serves the websocket
+as `wss://` and the REST server (`/api/authn`, the admin api and any
+`additionalHttpHandlers`) as `https://` on `vuu.https.port`.
+
+For local development and tests, TLS can be switched off, but only with
+permissive auth:
+
+```hocon
+vuu.ssl=false
+vuu.auth.mode="permissive"
+vuu.auth.permissive.users=""   # optional username:password list
+vuu.https.port=8443            # REST port; serves plain http when vuu.ssl=false
+vuu.websocket.port=8091
+```
+
+The websocket is then `ws://` and REST is `http://` on the same
+`vuu.https.port` (there is no separate `vuu.http.port` key). Routes, CORS
+and token responses (JSON body plus `vuu-auth-token` header) are unchanged,
+and a warning is logged at startup. With `vuu.ssl=false` and any other auth
+mode (e.g. `keycloak`) the server refuses to start with
+`PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH`. The effective auth mode is
+`vuu.auth.mode`, else `VUU_AUTH_MODE`, else `keycloak`
+(`getConfiguredAuthMode(config)`).
+
+Use port `0` for ephemeral ports; `server.webSocketPort`, `server.restPort`
+and `server.restUrl` report the bound values once started.
+
 ## How it fits together
 
 VuuServer makes use of a number of global singletons

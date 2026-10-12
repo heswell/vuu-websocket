@@ -8,6 +8,15 @@ export type HttpRequestHandler = (
 ) => Promise<Response | undefined> | Response | undefined;
 
 export type HttpServerOptions = {
+  /**
+   * The effective `vuu.auth.mode`. When SSL is disabled the REST server only
+   * starts (over plain HTTP) if this is "permissive".
+   */
+  authMode?: string;
+  /**
+   * REST server port (`vuu.https.port`). Used for plain HTTP too when SSL is
+   * disabled. Use 0 for an ephemeral port.
+   */
   httpsPort?: number;
   requestHandler?: HttpRequestHandler;
 };

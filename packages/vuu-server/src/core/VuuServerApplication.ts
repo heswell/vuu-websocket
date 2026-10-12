@@ -1,6 +1,7 @@
 import { Config } from "../util/ConfigFactory";
 import { AuthenticationProviders } from "../net/auth/AuthProvider";
 import { createAuthHttpHandler } from "../net/auth/AuthHttpHandler";
+import { getConfiguredAuthMode } from "../net/auth/ConfiguredAuthProviders";
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { composeHttpHandlers } from "../net/http/composeHttpHandlers";
 import {
@@ -112,6 +113,7 @@ export function createVuuServerApplication({
     ...(additionalHttpHandlers?.(context) ?? []),
   ];
   const httpServerOptions: HttpServerOptions = {
+    authMode: getConfiguredAuthMode(config),
     httpsPort: config.getNumber(ConfigKeys.httpsPort, defaultHttpsPort),
     requestHandler:
       handlers.length === 1 ? handlers[0] : composeHttpHandlers(...handlers),

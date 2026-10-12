@@ -51,7 +51,7 @@ export class WebSocketServer {
     });
 
     console.log(
-      `[VUU] WebSocket listening on ${this.#server.hostname}:${this.#server.port}${uri}`,
+      `[VUU] WebSocket listening on ${sslEnabled(sslOptions) ? "wss" : "ws"}://${this.#server.hostname}:${this.#server.port}${uri}`,
     );
   }
 
