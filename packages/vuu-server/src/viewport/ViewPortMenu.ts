@@ -1,6 +1,14 @@
-import { VuuMenu, VuuMenuItem } from "@vuu-ui/vuu-protocol-types";
-import { ViewPortSelection } from "./Viewport";
-import { ViewPortAction } from "./ViewPortAction";
+import type {
+  VuuDataRowDto,
+  VuuMenu,
+  VuuMenuContext,
+  VuuMenuItem,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
+import type { VuuUser } from "../core/auths/VuuUser";
+import type { ClientSessionId } from "../net/ClientConnectionCreator";
+import type { Viewport, ViewPortSelection } from "./Viewport";
+import type { ViewPortAction } from "./ViewPortAction";
 
 export interface ViewPortMenu {
   asJson: VuuMenu | VuuMenuItem;
@@ -41,79 +49,128 @@ export function ViewPortMenu(
   }
 }
 
+/**
+ * The session a menu RPC was invoked in. It is a `ClientSessionId`, so it can
+ * be passed wherever one is expected (e.g. `createSimpleSessionTable`), and
+ * also carries the user, for permission checks, and the viewport.
+ */
+export interface MenuRpcSession extends ClientSessionId {
+  requestId: string;
+  user: VuuUser;
+  viewport: Viewport;
+}
+
+export type MenuRpcResult = ViewPortAction | Promise<ViewPortAction>;
+
 export abstract class ViewPortMenuItem implements ViewPortMenu {
   constructor(
     public name: string,
     public filter: string,
-    public rpcName: string
+    public rpcName: string,
   ) {}
-  abstract asJson: VuuMenuItem;
+  abstract readonly context: VuuMenuContext;
+  get asJson(): VuuMenuItem {
+    return {
+      context: this.context,
+      filter: this.filter,
+      name: this.name,
+      rpcName: this.rpcName,
+    };
+  }
 }
 
+/**
+ * Handler for a `selected-rows` menu item. `selection` is the viewport's
+ * current server-side selection. `sessionId` is kept for backward
+ * compatibility; `session` carries the full session context.
+ */
 export type SelectionMenuFunc = (
   selection: ViewPortSelection,
-  sessionId: string
-) => ViewPortAction;
+  sessionId: string,
+  session: MenuRpcSession,
+) => MenuRpcResult;
+
+/** Handler for a `grid` (table) menu item. */
+export type TableMenuFunc = (session: MenuRpcSession) => MenuRpcResult;
+
+/**
+ * Handler for a `row` menu item. `row` is the row as sent by the client
+ * (Scala Vuu parity); re-read it from the table if it must be authoritative.
+ */
+export type RowMenuFunc = (
+  rowKey: string,
+  row: VuuDataRowDto,
+  session: MenuRpcSession,
+) => MenuRpcResult;
+
+/** Handler for a `cell` menu item. `value` is as sent by the client. */
+export type CellMenuFunc = (
+  rowKey: string,
+  field: string,
+  value: VuuRowDataItemType,
+  session: MenuRpcSession,
+) => MenuRpcResult;
 
 export class SelectionViewPortMenuItem extends ViewPortMenuItem {
-  public func: SelectionMenuFunc;
+  readonly context = "selected-rows";
   constructor(
     name: string,
     filter: string,
-    func: SelectionMenuFunc,
-    rpcName: string
+    public func: SelectionMenuFunc,
+    rpcName: string,
   ) {
     super(name, filter, rpcName);
-    this.func = func;
-  }
-  get asJson(): VuuMenuItem {
-    return {
-      context: "selected-rows",
-      filter: this.filter,
-      name: this.name,
-      rpcName: this.rpcName,
-    };
-  }
-}
-
-export class CellViewPortMenuItem extends ViewPortMenuItem {
-  constructor(name: string, filter: string, rpcName: string) {
-    super(name, filter, rpcName);
-  }
-  get asJson(): VuuMenuItem {
-    return {
-      context: "cell",
-      filter: this.filter,
-      name: this.name,
-      rpcName: this.rpcName,
-    };
   }
 }
 
 export class TableViewPortMenuItem extends ViewPortMenuItem {
-  constructor(name: string, filter: string, rpcName: string) {
+  readonly context = "grid";
+  constructor(
+    name: string,
+    filter: string,
+    public func: TableMenuFunc,
+    rpcName: string,
+  ) {
     super(name, filter, rpcName);
-  }
-  get asJson(): VuuMenuItem {
-    return {
-      context: "grid",
-      filter: this.filter,
-      name: this.name,
-      rpcName: this.rpcName,
-    };
   }
 }
 
 export class RowViewPortMenuItem extends ViewPortMenuItem {
-  constructor(name: string, filter: string, rpcName: string) {
+  readonly context = "row";
+  constructor(
+    name: string,
+    filter: string,
+    public func: RowMenuFunc,
+    rpcName: string,
+  ) {
     super(name, filter, rpcName);
   }
-  get asJson(): VuuMenuItem {
-    return {
-      context: "row",
-      filter: this.filter,
-      name: this.name,
-      rpcName: this.rpcName,
-    };
+}
+
+/**
+ * A `cell` menu item. `field` restricts the item to one column; the default
+ * `"*"` shows it on every column.
+ */
+export class CellViewPortMenuItem extends ViewPortMenuItem {
+  readonly context = "cell";
+  constructor(
+    name: string,
+    filter: string,
+    public func: CellMenuFunc,
+    rpcName: string,
+    public field = "*",
+  ) {
+    super(name, filter, rpcName);
+  }
+  get asJson(): VuuMenuItem & { field: string } {
+    return { ...super.asJson, field: this.field };
   }
 }
+
+/** The client message type that invokes a menu item of each context. */
+export const MenuRpcTypeForContext = {
+  "selected-rows": "VIEW_PORT_MENUS_SELECT_RPC",
+  grid: "VIEW_PORT_MENU_TABLE_RPC",
+  row: "VIEW_PORT_MENU_ROW_RPC",
+  cell: "VIEW_PORT_MENU_CELL_RPC",
+} as const satisfies Record<VuuMenuContext, string>;

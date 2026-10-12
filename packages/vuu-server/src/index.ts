@@ -15,6 +15,10 @@ export type {
   ViewServerMessage,
   ViewServerMessageBody,
 } from "./net/Messages";
+export {
+  ViewPortMenuRpcReject,
+  ViewPortMenuRpcResponse,
+} from "./net/Messages";
 export { ClientSessionId } from "./net/ClientConnectionCreator";
 export type { RpcHandlerFunc } from "./net/rpc/RpcHandler";
 export type { RpcResultErrorWithData } from "./net/rpc/RpcResult";
@@ -88,16 +92,26 @@ export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
 export * from "./core/VuuServerApplication";
 export {
+  CloseDialog,
+  CloseDialogViewPortAction,
   NoAction,
+  OpenDialog,
   OpenDialogViewPortAction,
+  ShowNotification,
   type ViewPortAction,
 } from "./viewport/ViewPortAction";
 export {
+  type CellMenuFunc,
   CellViewPortMenuItem,
   EmptyViewPortMenu,
+  MenuRpcTypeForContext,
+  type MenuRpcResult,
+  type MenuRpcSession,
+  type RowMenuFunc,
   RowViewPortMenuItem,
   type SelectionMenuFunc,
   SelectionViewPortMenuItem,
+  type TableMenuFunc,
   TableViewPortMenuItem,
   ViewPortMenu,
   ViewPortMenuFolder,
@@ -116,6 +130,7 @@ export {
   type ViewPortUpdateType,
 } from "./viewport/Viewport";
 export {
+  MenuRpcDispatchError,
   ViewportContainer,
   type ViewportCreationEvent,
   type ViewportEvents as ViewportContainerEvents,

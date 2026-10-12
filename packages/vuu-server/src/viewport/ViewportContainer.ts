@@ -2,6 +2,8 @@ import type {
   RpcResult,
   VuuLinkDescriptor,
   VuuTable,
+  VuuRowDataItemType,
+  VuuRpcMenuRequest,
   VuuViewportCreateRequest,
 } from "@vuu-ui/vuu-protocol-types";
 import { EventEmitter, uuid } from "@vuu-ui/vuu-utils";
@@ -19,7 +21,15 @@ import { ViewPortDef } from "../api/ViewPortDef";
 import type { Column } from "../api/TableDef";
 import { RpcParams } from "../net/rpc/Rpc";
 import { DataTable, isDataTable } from "../core/table/InMemDataTable";
-import { SelectionViewPortMenuItem } from "./ViewPortMenu";
+import {
+  CellViewPortMenuItem,
+  MenuRpcTypeForContext,
+  RowViewPortMenuItem,
+  SelectionViewPortMenuItem,
+  TableViewPortMenuItem,
+  type MenuRpcSession,
+} from "./ViewPortMenu";
+import type { ViewPortAction } from "./ViewPortAction";
 import { RequestContext } from "../net/RequestProcessor";
 import { VuuUser } from "../core/auths/VuuUser";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
@@ -40,6 +50,14 @@ export type ViewportEvents = {
   "viewport-created": (e: ViewportCreationEvent) => void;
   "viewport-removed": (e: ViewportRemovedEvent) => void;
 };
+
+/**
+ * A menu RPC could not be dispatched (unknown viewport or rpcName, or a
+ * context mismatch). Its message is safe to return to the client.
+ */
+export class MenuRpcDispatchError extends Error {
+  name = "MenuRpcDispatchError";
+}
 
 export class ViewportContainer extends EventEmitter<ViewportEvents> {
   constructor(
@@ -245,20 +263,74 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }
   }
 
-  callRpcSelection(vpId: string, rpcName: string, sessionId: string) {
-    const viewport = this.getViewportById(vpId);
-    const { menuMap } = viewport.viewPortDef.service;
-    const menuItem = menuMap.get(rpcName);
-    if (menuItem instanceof SelectionViewPortMenuItem) {
-      return menuItem.func(
-        ViewPortSelection(viewport.selectedKeys, viewport),
-        sessionId,
-      );
-    } else {
-      throw Error(
-        `[ViewportContainer] callRpcSelection, no selection menuItem found for ${rpcName}`,
+  /**
+   * Invokes the handler of the menu item `rpcName` on viewport `vpId`, as
+   * requested by one of the four menu RPC messages. Throws a
+   * {@link MenuRpcDispatchError} if the viewport does not exist or belongs to
+   * another session, if the viewport's RpcHandler has no menu item
+   * `rpcName`, or if the item's context does not match the message type.
+   * Errors thrown by the handler itself propagate unchanged.
+   */
+  async callMenuRpc(
+    request: VuuRpcMenuRequest,
+    ctx: RequestContext,
+  ): Promise<ViewPortAction> {
+    const { rpcName, type, vpId } = request;
+    const viewport = this.#viewports.get(vpId);
+    if (viewport === undefined || viewport.sessionId !== ctx.session.sessionId) {
+      throw new MenuRpcDispatchError(`viewport ${vpId} not found`);
+    }
+    const menuItem = viewport.viewPortDef.service.menuMap.get(rpcName);
+    if (menuItem === undefined) {
+      throw new MenuRpcDispatchError(
+        `no menu item ${rpcName} on viewport ${vpId}`,
       );
     }
+    if (MenuRpcTypeForContext[menuItem.context] !== type) {
+      throw new MenuRpcDispatchError(
+        `menu item ${rpcName} has context ${menuItem.context}, cannot be invoked by ${type}`,
+      );
+    }
+    const session: MenuRpcSession = {
+      channelId: ctx.session.channelId,
+      requestId: ctx.requestId,
+      sessionId: ctx.session.sessionId,
+      user: ctx.user,
+      viewport,
+    };
+    if (
+      request.type === "VIEW_PORT_MENUS_SELECT_RPC" &&
+      menuItem instanceof SelectionViewPortMenuItem
+    ) {
+      return menuItem.func(
+        ViewPortSelection(viewport.selectedKeys, viewport),
+        session.sessionId,
+        session,
+      );
+    } else if (
+      request.type === "VIEW_PORT_MENU_TABLE_RPC" &&
+      menuItem instanceof TableViewPortMenuItem
+    ) {
+      return menuItem.func(session);
+    } else if (
+      request.type === "VIEW_PORT_MENU_ROW_RPC" &&
+      menuItem instanceof RowViewPortMenuItem
+    ) {
+      return menuItem.func(request.rowKey, request.row ?? {}, session);
+    } else if (
+      request.type === "VIEW_PORT_MENU_CELL_RPC" &&
+      menuItem instanceof CellViewPortMenuItem
+    ) {
+      return menuItem.func(
+        request.rowKey,
+        request.field,
+        request.value as unknown as VuuRowDataItemType,
+        session,
+      );
+    }
+    throw new MenuRpcDispatchError(
+      `menu item ${rpcName} cannot be invoked by ${type}`,
+    );
   }
 
   handleRpcRequest(

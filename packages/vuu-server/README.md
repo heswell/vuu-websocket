@@ -136,3 +136,96 @@ ModuleFactory.withNameSpace("EXCHANGE")
 
 `JoinTableDef` passes all remaining `TableDefConfig` fields, including
 `permissionFunction`, to the underlying `TableDef`.
+
+## Menus and menu RPCs
+
+An `RpcHandler` advertises a context menu by overriding `menuItems`. The
+client fetches it with `GET_VIEW_PORT_MENUS` after `CREATE_VP`, and invokes an
+item with one of four menu RPC messages, matching the item's context. All
+four are supported, as in Scala Vuu:
+
+| Menu item                   | Context         | Client message               | Handler                                        |
+| --------------------------- | --------------- | ---------------------------- | ---------------------------------------------- |
+| `SelectionViewPortMenuItem` | `selected-rows` | `VIEW_PORT_MENUS_SELECT_RPC` | `(selection, sessionId, session) => action`    |
+| `TableViewPortMenuItem`     | `grid`          | `VIEW_PORT_MENU_TABLE_RPC`   | `(session) => action`                          |
+| `RowViewPortMenuItem`       | `row`           | `VIEW_PORT_MENU_ROW_RPC`     | `(rowKey, row, session) => action`             |
+| `CellViewPortMenuItem`      | `cell`          | `VIEW_PORT_MENU_CELL_RPC`    | `(rowKey, field, value, session) => action`    |
+
+Every constructor takes `(name, filter, handler, rpcName)`; `filter` is a Vuu
+filter the UI applies to decide whether to show the item. A cell item takes
+an optional fifth `field` argument (default `"*"`, every column).
+
+```ts
+import {
+  CellViewPortMenuItem,
+  DefaultRpcHandler,
+  NoAction,
+  OpenDialog,
+  RowViewPortMenuItem,
+  SelectionViewPortMenuItem,
+  ShowNotification,
+  TableViewPortMenuItem,
+  ViewPortMenu,
+} from "@heswell/vuu-server";
+
+class InstrumentService extends DefaultRpcHandler {
+  get menuItems() {
+    return ViewPortMenu(
+      new SelectionViewPortMenuItem("Add to watchlist", "",
+        (selection) => ShowNotification(`Added ${selection.rowKeys.size}`),
+        "ADD_TO_WATCHLIST"),
+      ViewPortMenu("Admin",
+        new TableViewPortMenuItem("Reload", "",
+          async ({ user }) => {
+            if (!user.authorizations.includes("admin")) {
+              return ShowNotification("Not permitted", "Reload");
+            }
+            await reload();
+            return NoAction();
+          },
+          "RELOAD"),
+      ),
+      new RowViewPortMenuItem("Buy", 'currency = "GBP"',
+        (rowKey, row, session) => OpenDialog(createTicket(rowKey, session)),
+        "BUY"),
+      new CellViewPortMenuItem("Copy ISIN", "",
+        (rowKey, field, value) => ShowNotification(`${value}`),
+        "COPY_ISIN", "isin"),
+    );
+  }
+}
+```
+
+- **Session:** `session` is a `MenuRpcSession`: the `ClientSessionId`
+  (`sessionId`, `channelId`) plus `requestId`, the `VuuUser` (check
+  `user.authorizations` for permissions) and the `viewport`. It can be passed
+  wherever a `ClientSessionId` is expected, e.g. `createSimpleSessionTable`.
+  Selection handlers keep the legacy `(selection, sessionId)` signature;
+  `session` is their third argument.
+- **Selection:** the viewport's current server-side selection
+  (`selection.rowKeys`); the client sends no row data.
+- **Row and cell data:** `row` and `value` are as sent by the client, as in
+  Scala Vuu. Treat them as untrusted; re-read the row from the table
+  (`session.viewport.table`) if the handler acts on it.
+- **Handlers may be async.** A thrown error or rejected promise is logged and
+  answered with `VIEW_PORT_MENU_REJ` (`Failed to process request <id>`); it
+  does not affect the session.
+- **Dispatch:** the item is looked up by `rpcName` in the `menuMap` of the
+  requesting viewport's own `RpcHandler` (see ServiceFactory lifecycle). The
+  server replies `VIEW_PORT_MENU_REJ` if the viewport does not exist or
+  belongs to another session, if there is no item `rpcName`, or if the item's
+  context does not match the message type.
+
+Handlers return a `ViewPortAction`, the protocol's `VuuRpcMenuAction`, sent
+as the `action` of `VIEW_PORT_MENU_RESP`:
+
+| Constructor                          | Wire `type`                | What vuu-ui does                                           |
+| ------------------------------------ | -------------------------- | ---------------------------------------------------------- |
+| `NoAction()`                         | `NO_ACTION`                | nothing                                                    |
+| `ShowNotification(message, title?)`  | `SHOW_NOTIFICATION_ACTION` | shows a success toast (title defaults to "Success")        |
+| `OpenDialog(table, renderComponent)` | `OPEN_DIALOG_ACTION`       | session table + `"grid"`/`"inline-form"`: session editing UI; session table + a registered component id: that component in a dialog |
+| `CloseDialog()`                      | `CLOSE_DIALOG_ACTION`      | ignored by vuu-ui's default menu handling                  |
+
+`OpenDialogViewPortAction` and `CloseDialogViewPortAction` are aliases of
+`OpenDialog` and `CloseDialog`. `OpenDialog` defaults `renderComponent` to
+`"grid"`, as in Scala Vuu.

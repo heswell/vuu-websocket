@@ -12,6 +12,7 @@ import {
   VuuClientMessage,
   VuuCreateVisualLink,
   VuuRemoveVisualLink,
+  VuuRpcMenuRequest,
   VuuRpcServiceRequest,
   VuuTableListRequest,
   VuuTableMetaRequest,
@@ -45,6 +46,8 @@ import {
   SelectRowRangeSuccess,
   SelectRowSuccess,
   VsMsg,
+  ViewPortMenuRpcReject,
+  ViewPortMenuRpcResponse,
   type ViewServerMessage,
   type ViewServerMessageBody,
 } from "../net/Messages";
@@ -53,7 +56,10 @@ import { RpcErrorResult } from "../net/rpc/RpcResult";
 import { ServerApi } from "../net/ServerApi";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewPortRange } from "../viewport/Viewport";
-import { ViewportContainer } from "../viewport/ViewportContainer";
+import {
+  MenuRpcDispatchError,
+  ViewportContainer,
+} from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { DataTable } from "./table/InMemDataTable";
 
@@ -138,16 +144,11 @@ export class CoreServerApiHandler implements ServerApi {
         return this.processCreateVisualLinkRequest(body, ctx);
       case "REMOVE_VISUAL_LINK":
         return this.processRemoveVisualLinkRequest(body, ctx);
-      // case "DESELECT_ROW":
-      //   return this.processDeselectRowRequest(requestId, body, session);
-      // case "SELECT_ROW_RANGE":
-      //   return this.processSelectRowRangeRequest(requestId, body, session);
-      // case "VIEW_PORT_MENUS_SELECT_RPC":
-      //   return this.processViewPortMenuSelectionRpcCall(
-      //     requestId,
-      //     body,
-      //     session,
-      //   );
+      case "VIEW_PORT_MENUS_SELECT_RPC":
+      case "VIEW_PORT_MENU_TABLE_RPC":
+      case "VIEW_PORT_MENU_ROW_RPC":
+      case "VIEW_PORT_MENU_CELL_RPC":
+        return this.processMenuRpcRequest(body, ctx);
       default:
         throw Error(
           `[VUU:core:CoreServerApiHandler] unsupported message type ${body.type}`,
@@ -340,6 +341,36 @@ export class CoreServerApiHandler implements ServerApi {
       return vsMsg(
         createErrorRpcResponse(
           msg,
+          `Failed to process request ${ctx.requestId}`,
+        ),
+        ctx,
+      );
+    }
+  }
+
+  private async processMenuRpcRequest(
+    msg: VuuRpcMenuRequest,
+    ctx: RequestContext,
+  ) {
+    const { rpcName, type, vpId } = msg;
+    try {
+      const action = await this.viewPortContainer.callMenuRpc(msg, ctx);
+      return vsMsg(ViewPortMenuRpcResponse(vpId, rpcName, action), ctx);
+    } catch (e) {
+      if (e instanceof MenuRpcDispatchError) {
+        console.warn(
+          `[CoreServerApiHandler] ${type} ${rpcName} rejected (${ctx.requestId}): ${e.message}`,
+        );
+        return vsMsg(ViewPortMenuRpcReject(vpId, rpcName, e.message), ctx);
+      }
+      console.error(
+        `[CoreServerApiHandler] ${type} ${rpcName} on vp ${vpId} failed in session ${ctx.session.sessionId} (${ctx.requestId})`,
+        e,
+      );
+      return vsMsg(
+        ViewPortMenuRpcReject(
+          vpId,
+          rpcName,
           `Failed to process request ${ctx.requestId}`,
         ),
         ctx,
