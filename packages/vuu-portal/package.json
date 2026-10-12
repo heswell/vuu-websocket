@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-portal",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "VUU portal server with remote module discovery",
   "type": "module",
   "main": "src/index.ts",
@@ -33,15 +33,20 @@
     "access": "public"
   },
   "scripts": {
-    "build": "etsc",
-    "build:vuu": "node ../../scripts/build.mjs",
+    "build": "rslib build && bun ./scripts/prepare-package.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
     "@heswell/module-admin": "2.0.0",
-    "@heswell/vuu-server": "3.0.0",
+    "@heswell/vuu-server": "3.1.0",
     "@heswell/vuu-table": "1.0.1"
+  },
+  "peerDependencies": {
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
+  },
+  "devDependencies": {
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
   }
 }

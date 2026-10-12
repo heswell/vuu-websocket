@@ -21,6 +21,21 @@ export const PUBLISHABLE_PACKAGES = [
     name: "@heswell/vuu-data-engine-local",
     directory: "vuu-data-engine-local",
   },
+  // Server packages, in dependency order. service-utils depends on
+  // vuu-table; vuu-server on service-utils, vuu-table and vuu-viewport;
+  // vuu-portal on vuu-server and module-admin.
+  {
+    name: "@heswell/service-utils",
+    directory: "service-utils",
+  },
+  {
+    name: "@heswell/vuu-server",
+    directory: "vuu-server",
+  },
+  {
+    name: "@heswell/vuu-portal",
+    directory: "vuu-portal",
+  },
 ] as const;
 
 export type PublishablePackageName = (typeof PUBLISHABLE_PACKAGES)[number]["name"];
