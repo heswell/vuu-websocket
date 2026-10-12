@@ -1,5 +1,11 @@
 export { accurateTimer, Clock } from "./Clock";
-export { ConfigFactory, type Config, type ConfigValue } from "./ConfigFactory";
+export {
+  ConfigFactory,
+  type Config,
+  type ConfigEnvironment,
+  type ConfigLoadOptions,
+  type ConfigValue,
+} from "./ConfigFactory";
 export { parseArgs, type ParseArgsOptionsConfig } from "./parseArgs";
 export * from "./publisher";
 export * from "./random-utils";

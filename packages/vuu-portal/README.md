@@ -65,6 +65,17 @@ In this repository, `npm run start:portal` starts it with
 
 ### Settings
 
+Any setting can be overridden from the environment with a HOCON-style
+`${?VAR}` line in the conf, and the portal's own
+[`application.conf`](./application.conf) already does this for the ports,
+websocket path, auth mode, CORS origin, Keycloak URL and realm, and module
+files (`VUU_HTTPS_PORT`, `VUU_WEBSOCKET_PORT`, `VUU_WEBSOCKET_PATH`,
+`VUU_AUTH_MODE`, `VUU_CORS_ALLOWED_ORIGIN`, `VUU_KEYCLOAK_URL`,
+`VUU_KEYCLOAK_REALM`, `VUU_PORTAL_MODULES_FILE`,
+`VUU_PORTAL_DEFAULT_MODULES_FILE`). See the
+[`@heswell/service-utils` README](../service-utils/README.md#environment-variable-substitution)
+for the syntax.
+
 | Key | Fallback when not set |
 | --- | --- |
 | `vuu.https.port` | `8443` |
@@ -78,9 +89,9 @@ In this repository, `npm run start:portal` starts it with
 
 ### Module catalogue
 
-The portal's modules are defined in YAML, not in code. Both file paths are
-resolved relative to the directory that contains `application.conf`. They
-must be relative paths.
+The portal's modules are defined in YAML, not in code. Relative file paths
+are resolved against the directory that contains `application.conf`;
+absolute paths and `~/` paths are also accepted.
 
 - `vuu.portal.modulesFile` is the runtime state, edited through the module
   admin. If it does not exist, it is created from the default modules file on

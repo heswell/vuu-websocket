@@ -144,7 +144,12 @@ export {
 export * from "./toolbox/thread/LifecycleContainer";
 export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";
 export { ConfigFactory } from "./util/ConfigFactory";
-export type { Config } from "./util/ConfigFactory";
+export type {
+  Config,
+  ConfigEnvironment,
+  ConfigLoadOptions,
+  ConfigValue,
+} from "./util/ConfigFactory";
 export { LoginTokenService } from "./net/auth/LoginTokenService";
 export {
   createAuthHttpHandler,

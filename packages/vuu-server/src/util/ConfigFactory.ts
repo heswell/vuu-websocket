@@ -1,1 +1,7 @@
-export { ConfigFactory, type Config } from "@heswell/service-utils";
+export {
+  ConfigFactory,
+  type Config,
+  type ConfigEnvironment,
+  type ConfigLoadOptions,
+  type ConfigValue,
+} from "@heswell/service-utils";
