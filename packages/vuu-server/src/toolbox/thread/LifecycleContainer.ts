@@ -50,7 +50,7 @@ type LifecycleContainerState =
   | "destroying"
   | "destroyed";
 
-type NodeSignal = "SIGINT" | "SIGTERM";
+export type NodeSignal = "SIGINT" | "SIGTERM";
 
 class LifecycleStartupCancelledError extends Error {
   constructor(cause: unknown) {

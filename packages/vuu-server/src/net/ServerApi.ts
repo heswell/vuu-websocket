@@ -1,9 +1,12 @@
-import { VuuClientMessage, VuuServerMessage } from "@vuu-ui/vuu-protocol-types";
+import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
+import type { ViewServerMessage } from "./Messages";
+import { ClientSessionId } from "./ClientConnectionCreator";
 import { RequestContext } from "./RequestProcessor";
 
 export interface ServerApi {
   process: (
     msg: VuuClientMessage,
     ctx: RequestContext,
-  ) => VuuServerMessage | Promise<VuuServerMessage | void> | void;
+  ) => ViewServerMessage | Promise<ViewServerMessage | void> | void;
+  disconnect: (session: ClientSessionId) => void;
 }

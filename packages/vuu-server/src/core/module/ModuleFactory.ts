@@ -7,7 +7,7 @@ import {
 import { TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
-import tableDefContainer from "./TableDefContainer";
+import { TableDefContainer } from "./TableDefContainer";
 import { Table } from "@heswell/vuu-table";
 import { ProviderContainer } from "../../provider/ProviderContainer";
 import { ViewPortDef } from "../../api/ViewPortDef";
@@ -19,7 +19,7 @@ export type TableDefTuple = [TableDef, ProviderFactory];
 
 export type ServiceFactory = (
   table: DataTable,
-  provider: Provider,
+  provider: IProvider | undefined,
   providerContainer: ProviderContainer,
   tableContainer: TableContainer,
 ) => ViewPortDef;
@@ -139,6 +139,7 @@ function ModuleFactoryNode(
       let mutableTableDefs = TableDefs(justBaseTables, [], []);
 
       // order is important here, add the matable defs before we iterate the joindefs
+      const tableDefContainer = TableDefContainer.instance;
       tableDefContainer.add(moduleName, mutableTableDefs);
 
       tableDefs.joinDefFuncs.forEach((toJTFunc) => {

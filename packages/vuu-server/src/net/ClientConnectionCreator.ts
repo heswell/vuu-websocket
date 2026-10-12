@@ -1,7 +1,7 @@
 import {
   ServerToClientTableRows,
   VuuClientMessage,
-  VuuServerMessage,
+  VuuDataRow,
 } from "@vuu-ui/vuu-protocol-types";
 import { Channel } from "./ws/Channel";
 import { PublishQueue } from "../util/PublishQueue";
@@ -11,7 +11,12 @@ import { ServerApi } from "./ServerApi";
 import { ClientSessionContainer } from "./ClientSessionContainer";
 import { ModuleContainer } from "../core/module/ModuleContainer";
 import { RequestContext } from "./RequestProcessor";
-import { HeartBeat, JsonViewServerMessage, TableRowUpdates } from "./Messages";
+import {
+  HeartBeat,
+  JsonViewServerMessage,
+  TableRowUpdates,
+  type ViewServerMessage,
+} from "./Messages";
 import { RequestId } from "../client/messages/ClientMessage";
 import { RowUpdate } from "./row/RowUpdate";
 import { RowUpdateType } from "./row/RowUpdateType";
@@ -22,11 +27,11 @@ import {
   SendHeartbeat,
 } from "./flowcontrol/FlowController";
 
-const EMPTY_ARRAY = [] as const;
+const EMPTY_ROW: VuuDataRow = [];
 interface InboundMessageHandler {
   handle: (
     msg: VuuClientMessage,
-  ) => VuuServerMessage | Promise<VuuServerMessage | void> | void;
+  ) => ViewServerMessage | Promise<ViewServerMessage | void> | void;
 }
 
 interface OutboundMessageHandler {
@@ -135,7 +140,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         RowUpdateType.SizeOnly,
         ts,
         0,
-        EMPTY_ARRAY,
+        EMPTY_ROW,
       );
     }
   }

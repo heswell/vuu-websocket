@@ -4,7 +4,7 @@ import { VuuColumnDataType } from "@vuu-ui/vuu-protocol-types";
 const isVuuColumnDataType = (dt: string): dt is VuuColumnDataType => true;
 
 export class Columns {
-    static fromNames(...columns: string[]) {
+    static fromNames(...columns: string[]): Column[] {
         return columns.map((nameAndDt, index) => {
             const [name, dataType] = nameAndDt.split(":");
             if (isVuuColumnDataType(dataType)) {

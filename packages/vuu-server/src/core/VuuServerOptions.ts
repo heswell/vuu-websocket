@@ -24,11 +24,11 @@ export interface VuuWebSocketOptions {
   withUri: (uri: string) => VuuWebSocketOptions;
 };
 
-type VuuSslByCertAndKey = {
+export type VuuSslByCertAndKey = {
   certPath: string;
   keyPath: string;
 }
-type VuuSSLOptions = VuuSslByCertAndKey | "ssl-disabled";
+export type VuuSSLOptions = VuuSslByCertAndKey | "ssl-disabled";
 
 export const sslEnabled = (ssl: VuuSSLOptions) : ssl is VuuSslByCertAndKey => ssl !== "ssl-disabled"
 

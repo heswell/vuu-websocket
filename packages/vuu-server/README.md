@@ -1,13 +1,63 @@
-Launching a Vuu Server instance
+# @heswell/vuu-server
 
-VuuServer is created with module structure config then start method invoked
+A TypeScript implementation of the Vuu view server: tables, joins,
+viewports, RPC, menus, visual links, and the websocket and HTTP endpoints
+the Vuu UI talks to.
 
-Applications created with `createVuuServerApplication` can set
-`vuu.websocket.path` to an absolute URL path such as `/websocket-portal`. The
-default remains `/websocket`. Paths with a trailing slash, query, fragment, or
-full URL are rejected during application setup.
+```sh
+npm install @heswell/vuu-server
+```
 
-VuUServer makes use of a number of global singletons
+## Runtime
+
+The server runs under [Bun](https://bun.sh) (it uses `Bun.serve`,
+`Bun.file` and Bun websockets). The package is ESM only and has no
+import-time side effects, so its types, tables and helpers can be imported
+anywhere; Bun is only needed when a server is started.
+
+Some declarations reference Bun types (for example `ServerWebSocket`), so
+TypeScript consumers should install `@types/bun`. It is an optional peer
+dependency. `@vuu-ui/vuu-protocol-types` and `@vuu-ui/vuu-data-types` are
+peer dependencies used by the declarations.
+
+Everything is exported from the package root; there are no supported deep
+imports.
+
+## Starting a server
+
+```ts
+import {
+  ConfigFactory,
+  createConfiguredAuthProviders,
+  createVuuServerApplication,
+} from "@heswell/vuu-server";
+
+const config = ConfigFactory.load(); // or ConfigFactory.load("./application.conf")
+const application = createVuuServerApplication({
+  authProviders: createConfiguredAuthProviders(config),
+  config,
+  defaultHttpsPort: 8444,
+  defaultWebSocketPath: "/websocket-my-app",
+  defaultWebSocketPort: 8092,
+  modules: [myModule],
+});
+await application.start();
+```
+
+The `default*` options are fallbacks used only when `application.conf` does
+not set `vuu.https.port`, `vuu.websocket.port` or `vuu.websocket.path`.
+`ConfigFactory` comes from
+[`@heswell/service-utils`](../service-utils/README.md): see its README for
+how the conf file is located, `${?VAR}` environment overrides, programmatic
+overrides and path resolution.
+
+`vuu.websocket.path` must be an absolute URL path such as
+`/websocket-portal`. The default is `/websocket`. Paths with a trailing
+slash, query, fragment, or full URL are rejected during application setup.
+
+## How it fits together
+
+VuuServer makes use of a number of global singletons
 
 - moduleContainer
 - tableContainer
@@ -27,37 +77,21 @@ VuUServer makes use of a number of global singletons
 
    - creates the ProviderContainer
    - registers each module from the config
-     - register with moduleContaibner
+     - register with moduleContainer
      - for each tableDef of module
        - set module on tableDef
        - call createTable or createJoinTable
        - call registerProvider (table, provider)
          - register with providerContainer
 
-3. vuuServer.start
+3. `application.start()`
 
-- call providerContainer.start
-  - for each provider
-    - call provider.load
-- call moduleContainer.start
-  - for each module
-    - call module.start (does nothing)
-- run the server
-  - starts http server, handles websocket messages with ...
-    - websocketConnectionHandler, processes ws events:
-      - open
-        - create session
-      - close
-        - tear down session
-      - message, one of ...
-        - HB_RESP
-          - set session.incomingHeartBeat
-        - LOGIN
-          - call session.login
-        - other ...
-          - call VuuProtocolHandler.messageAPI[messageType]
-            - CREATE_VP
-            - REMOVE_VP
-            - CHANGE_VP
+   - starts each provider (`provider.load`) and module
+   - starts the HTTP server (auth and admin routes) and the websocket server
+   - each websocket connection gets a client session
+     (`ClientConnectionCreator`); incoming messages go through
+     `RequestProcessor` to the core server API (`CoreServerApiHandler`):
+     login, create/change/remove viewport, RPC, menus and visual links
+   - viewport updates are queued per session and flushed to the client
 
-Mocking the VuuServer - provide MockProvider in config
+Mocking the VuuServer: provide a mock provider in the module config.

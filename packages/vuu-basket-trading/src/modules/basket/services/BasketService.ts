@@ -1,14 +1,13 @@
 import {
+  type DataTable,
   DefaultRpcHandler,
   NoAction,
-} from "@heswell/vuu-server";
-import type { DataTable, TableContainer } from "@heswell/vuu-server";
-import {
+  type RpcParams,
   SelectionViewPortMenuItem,
+  type TableContainer,
   ViewPortMenu,
-} from "@heswell/vuu-server/src/viewport/ViewPortMenu";
+} from "@heswell/vuu-server";
 import type { RpcResult, VuuDataRow } from "@vuu-ui/vuu-protocol-types";
-import type { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
 
 type CreateBasketParams = {
   sourceBasketId?: string;

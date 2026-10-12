@@ -1,7 +1,7 @@
 import { DefaultLifecycleEnabled } from "./LifecycleContainer";
 
-type RunnerCallback = () => void | Promise<void>;
-type RunnerErrorHandler = (error: unknown) => void;
+export type RunnerCallback = () => void | Promise<void>;
+export type RunnerErrorHandler = (error: unknown) => void;
 
 export class LifeCycleRunner extends DefaultLifecycleEnabled {
   readonly lifecycleId: string;

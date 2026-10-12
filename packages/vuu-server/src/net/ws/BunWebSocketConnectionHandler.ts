@@ -1,4 +1,4 @@
-import { ServerWebSocket } from "bun";
+import type { ServerWebSocket } from "bun";
 import { ViewServerHandler } from "../ViewServerHandler";
 import { WebsocketData } from "@heswell/service-utils";
 import { VuuWebSocketOptions } from "../../core/VuuServerOptions";

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { InMemDataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
-import { TableContainer } from "@heswell/vuu-server/src/core/table/TableContainer";
-import { JoinTableProvider } from "@heswell/vuu-server";
+import {
+  InMemDataTable,
+  JoinTableProvider,
+  TableContainer,
+} from "@heswell/vuu-server";
 import { EMPTY_MODULE_CONFIG, type ManagedModule } from "@heswell/module-admin";
 import { ModuleAdminService } from "../src/modules/ModuleDiscovery/ModuleAdminService";
 import { InMemoryModuleStore, ModuleState } from "../src/modules/ModuleDiscovery/ModuleStore";

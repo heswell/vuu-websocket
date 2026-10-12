@@ -1,4 +1,4 @@
-import { VuuClientMessage, VuuServerMessage } from "@vuu-ui/vuu-protocol-types";
+import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ClientSessionId } from "../ClientConnectionCreator";
 
 type BatchSize = {
@@ -98,7 +98,7 @@ class DefaultFlowController implements FlowController {
 }
 
 class NoHeartbeatFlowController implements FlowController {
-  process(msg: VuuServerMessage) {
+  process(_msg: VuuClientMessage) {
     // nothing to do
   }
   shouldSend = () => BatchSize(300);

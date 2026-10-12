@@ -15,7 +15,7 @@ export type RemoteResourceUpdateType = "insert" | "update" | "delete";
 
 export type RemoteResourceMessageType = RemoteResourceUpdateType | "snapshot";
 
-type RemoveSocketListener = () => void;
+export type RemoveSocketListener = () => void;
 
 type RowMapper = (row: VuuDataRow) => VuuDataRow;
 

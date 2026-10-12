@@ -2,7 +2,7 @@ import { JoinTable } from "../core/table/JoinTable";
 import { JoinTableDef } from "../api/TableDef";
 import { DefaultLifecycleEnabled } from "../toolbox/thread/LifecycleContainer";
 
-class JoinDefToJoinTable {
+export class JoinDefToJoinTable {
   constructor(
     public joinDef: JoinTableDef,
     public table: JoinTable,

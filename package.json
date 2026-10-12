@@ -34,7 +34,8 @@
     "test": "bun test",
     "bump:versions": "bun ./scripts/bump-versions.ts",
     "pub": "bun ./scripts/publish.ts",
-    "typecheck": "tsc --noEmit --project tsconfig-typecheck.json"
+    "typecheck": "tsc --noEmit --project tsconfig-typecheck.json",
+    "typecheck:packages": "npm run typecheck -w @heswell/service-utils -w @heswell/vuu-server -w @heswell/vuu-portal"
   },
   "keywords": [],
   "author": "",

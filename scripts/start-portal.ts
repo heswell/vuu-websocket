@@ -1,4 +1,4 @@
 import "./server-runtime";
 
-const { default: start } = await import("@heswell/vuu-portal");
-await start();
+const { main } = await import("@heswell/vuu-portal/main");
+await main();

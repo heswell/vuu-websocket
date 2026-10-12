@@ -31,8 +31,19 @@ import type {
 import { RowUpdate } from "./row/RowUpdate";
 import type { LoginSuccessOptions } from "./LoginSuccess";
 
-interface ViewServerMessage {
-  body: ServerMessageBody;
+/**
+ * RPC response as sent by this server. The protocol type narrows rpcName to
+ * the typeahead methods, but any registered RPC can be answered.
+ */
+export type RpcResponse = Omit<VuuRpcServiceResponse, "error" | "rpcName"> & {
+  error?: unknown;
+  rpcName: string;
+};
+
+export type ViewServerMessageBody = ServerMessageBody | RpcResponse;
+
+export interface ViewServerMessage {
+  body: ViewServerMessageBody;
   module: string;
   requestId: string;
   sessionId: string;
@@ -46,7 +57,7 @@ export const HeartBeat = (ts: number): ServerToClientHeartBeat => ({
 export const JsonViewServerMessage = (
   requestId: string,
   sessionId: string,
-  body: ServerMessageBody,
+  body: ViewServerMessageBody,
   module = "CORE",
 ): ViewServerMessage => ({
   requestId,
@@ -58,7 +69,7 @@ export const JsonViewServerMessage = (
 export const VsMsg = (
   requestId: string,
   sessionId: string,
-  body: ServerMessageBody,
+  body: ViewServerMessageBody,
   module: string = "CORE",
 ) => JsonViewServerMessage(requestId, sessionId, body, module);
 
@@ -172,7 +183,7 @@ export const TableRowUpdates = (
   isLast,
   rows,
   type: "TABLE_ROW",
-  timestamp,
+  timeStamp: timestamp,
 });
 
 export const ChangeViewPortRangeSuccess = (
@@ -191,7 +202,7 @@ export const RpcResponseNew = (
   result: RpcResult,
   // action: UIAction,
   action: unknown,
-): VuuRpcServiceResponse => ({
+): RpcResponse => ({
   action,
   result,
   rpcName,

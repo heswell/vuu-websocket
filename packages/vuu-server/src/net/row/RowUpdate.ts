@@ -1,11 +1,11 @@
-import { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { RowUpdateType } from "./RowUpdateType";
 
 export interface RowUpdate {
-  data: readonly VuuRowDataItemType[];
+  data: VuuDataRow;
   rowIndex: number;
   rowKey: string;
-  sel: number;
+  sel: 0 | 1;
   ts: number;
   updateType: RowUpdateType;
   viewPortId: string;
@@ -23,8 +23,8 @@ export const RowUpdate = (
   rowKey: string,
   updateType: RowUpdateType,
   ts: number,
-  sel: number,
-  data: readonly VuuRowDataItemType[],
+  sel: 0 | 1,
+  data: VuuDataRow,
 ): RowUpdate => ({
   vpVersion,
   viewPortId,

@@ -1,7 +1,10 @@
-import { DefaultRpcHandler } from "@heswell/vuu-server";
-import type { DataTable, TableContainer } from "@heswell/vuu-server";
+import {
+  type DataTable,
+  DefaultRpcHandler,
+  type RpcParams,
+  type TableContainer,
+} from "@heswell/vuu-server";
 import type { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import type { RpcParams } from "@heswell/vuu-server/src/net/rpc/Rpc";
 
 type BasketInstanceParams = {
   basketInstanceId?: string;

@@ -1,17 +1,15 @@
 import { Table } from "@heswell/vuu-table";
 import {
   DefaultRpcHandler,
+  isDataTable,
   NoAction,
+  OpenDialogViewPortAction,
   ProviderContainer,
-  TableContainer,
-} from "@heswell/vuu-server";
-import { isDataTable } from "@heswell/vuu-server/src/core/table/InMemDataTable";
-import { ViewPortSelection } from "@heswell/vuu-server/src/viewport/Viewport";
-import { OpenDialogViewPortAction } from "@heswell/vuu-server/src/viewport/ViewPortAction";
-import {
   SelectionViewPortMenuItem,
+  TableContainer,
   ViewPortMenu,
-} from "@heswell/vuu-server/src/viewport/ViewPortMenu";
+  ViewPortSelection,
+} from "@heswell/vuu-server";
 import { VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
 export class OrdersService extends DefaultRpcHandler {

@@ -1,10 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { YAML } from "bun";
 import {
   type ManagedModule,
   validateModuleConfig,
 } from "@heswell/module-admin";
+
+// Bun's built-in YAML support is read lazily so that the package can be
+// imported (e.g. for its types and module factories) outside of Bun.
+const yaml = () => {
+  if (typeof Bun === "undefined" || !Bun.YAML) {
+    throw new Error("@heswell/vuu-portal module files require the Bun runtime");
+  }
+  return Bun.YAML;
+};
 
 export interface ModuleStore {
   load(): ManagedModule[];
@@ -72,7 +80,7 @@ export class YamlModuleStore implements ModuleStore {
       directory,
       `.${path.basename(this.filePath)}.${process.pid}.${Date.now()}.tmp`,
     );
-    const contents = YAML.stringify({ modules: cloneModules(modules) }, null, 2);
+    const contents = yaml().stringify({ modules: cloneModules(modules) }, null, 2);
     try {
       fs.writeFileSync(tempPath, contents, "utf8");
       fs.renameSync(tempPath, this.filePath);
@@ -108,7 +116,7 @@ export function loadDefaultModules(filePath: string, timestamp: number) {
 }
 
 function readModulesFile(filePath: string): unknown[] {
-  const parsed = YAML.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+  const parsed = yaml().parse(fs.readFileSync(filePath, "utf8")) as unknown;
   if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
     throw new Error(`Modules file '${filePath}' must contain a 'modules' list`);
   }
