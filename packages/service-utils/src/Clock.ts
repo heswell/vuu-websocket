@@ -1,12 +1,17 @@
 const systemStartTime = "2025-05-19T09:00:00.000000Z";
 
-class Clock {
-  static #instance: Clock;
-  public static get instance(): Clock {
-    if (!Clock.#instance) {
-      Clock.#instance = new Clock();
+export interface Clock {
+  readonly baseTime: number;
+  readonly currentTime: number;
+}
+
+class SimulatedClock implements Clock {
+  static #instance: SimulatedClock;
+  public static get instance(): SimulatedClock {
+    if (!SimulatedClock.#instance) {
+      SimulatedClock.#instance = new SimulatedClock();
     }
-    return Clock.#instance;
+    return SimulatedClock.#instance;
   }
 
   #baseEpochMillis: number;
@@ -26,7 +31,9 @@ class Clock {
   }
 }
 
-export default Clock.instance;
+export const Clock: Clock = SimulatedClock.instance;
+
+export default Clock;
 
 export const accurateTimer = (fn: Function, time = 1000) => {
   // nextAt is the value for the next time the timer should fire.

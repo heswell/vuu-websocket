@@ -33,5 +33,3 @@ export class TableDefContainer {
     }
   }
 }
-
-export default TableDefContainer.instance;

@@ -1,4 +1,33 @@
-export { ViewServerModule as Module } from "./core/module/VsModule";
+export {
+  ViewServerModule as Module,
+  type ModuleConstructorProps,
+  type RealizedViewServerModule,
+} from "./core/module/VsModule";
+export type { TableDefContainer } from "./core/module/TableDefContainer";
+export type { TableJoinFactory } from "./TableJoinProvider";
+export type { Column as ColumnDef } from "./api/TableDef";
+export type { ColumnValueProvider } from "./core/table/ColumnValueProvider";
+export type { JoinTable } from "./core/table/JoinTable";
+export type { CoreServerApiHandler } from "./core/CoreServerApiHandler";
+export type { ServerApi } from "./net/ServerApi";
+export type {
+  RpcResponse,
+  ViewServerMessage,
+  ViewServerMessageBody,
+} from "./net/Messages";
+export { ClientSessionId } from "./net/ClientConnectionCreator";
+export type { RpcHandlerFunc } from "./net/rpc/RpcHandler";
+export type { RpcResultErrorWithData } from "./net/rpc/RpcResult";
+export type { PublishQueue } from "./util/PublishQueue";
+export type { RuntimeViewPortVisualLink } from "./viewport/Viewport";
+export type {
+  SessionRowChange,
+  SessionTableAction,
+} from "./core/table/InMemSessionDataTable";
+export type {
+  RunnerCallback,
+  RunnerErrorHandler,
+} from "./toolbox/thread/LifeCycleRunner";
 export { type Column, Columns } from "./core/table/Column";
 export { TableContainer } from "./core/table/TableContainer";
 export {
@@ -40,13 +69,19 @@ export {
 export { EditSessionRpcHandler } from "./net/rpc/EditSessionRpcHandler";
 export {
   JoinTableProvider,
+  type JoinDefToJoinTable,
 } from "./provider/JoinTableProvider";
 export type {
   DataTableDefinition,
   TableColumn,
   TableColumnType,
 } from "./server-types";
-export { Service } from "./Service";
+export {
+  Service,
+  type IService,
+  type RpcNamedParams,
+  type ServiceMessage,
+} from "./Service";
 export * from "./api/TableDef";
 export * from "./api/ViewPortDef";
 export * from "./core/VuuServer";
@@ -68,12 +103,32 @@ export {
   ViewPortMenuFolder,
   ViewPortMenuItem,
 } from "./viewport/ViewPortMenu";
-export { Viewport, ViewPortSelection } from "./viewport/Viewport";
-export { ViewportContainer } from "./viewport/ViewportContainer";
+export {
+  Viewport,
+  ViewPortRange,
+  ViewPortSelection,
+  ViewPortUpdate,
+  ViewPortVisualLink,
+  type ViewportCreateConfig,
+  type ViewportEvents,
+  type ViewPortRowUpdate,
+  type ViewPortStructuralFields,
+  type ViewPortUpdateType,
+} from "./viewport/Viewport";
+export {
+  ViewportContainer,
+  type ViewportCreationEvent,
+  type ViewportEvents as ViewportContainerEvents,
+  type ViewportRemovedEvent,
+} from "./viewport/ViewportContainer";
 export { OutboundRowPublishQueue } from "./util/PublishQueue";
 export { RenderComponent } from "./viewport/RenderComponent";
 export { ModuleFactory } from "./core/module/ModuleFactory";
-export type { ServiceFactory } from "./core/module/ModuleFactory";
+export type {
+  ServiceFactory,
+  TableDefs,
+  TableDefTuple,
+} from "./core/module/ModuleFactory";
 export { NotificationModule } from "./core/module/notifications/NotificationModule";
 export {
   NotificationsSchema,

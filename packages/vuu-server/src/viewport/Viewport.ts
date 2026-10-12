@@ -27,7 +27,7 @@ import {
   PermissionFilter,
 } from "../core/filter/PermissionFilter";
 
-type ViewPortUpdateType = "SIZE" | "ROW";
+export type ViewPortUpdateType = "SIZE" | "ROW";
 
 export interface ViewPortSelection {
   rowKeys: ReadonlySet<string>;

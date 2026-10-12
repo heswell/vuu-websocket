@@ -50,7 +50,7 @@ export interface RemoteTableSubscriptionStatus {
   url: string;
 }
 
-type Listener<T extends unknown[]> = (...args: T) => void;
+export type RemoteTableSubscriptionListener<T extends unknown[]> = (...args: T) => void;
 
 const LOCAL_COLUMNS = new Set(["vuuCreatedTimestamp", "vuuUpdatedTimestamp"]);
 
@@ -72,8 +72,8 @@ export class RemoteTableSubscription {
   #attempt = 0;
   #firstSnapshot = Promise.withResolvers<number>();
   #listeners = {
-    snapshot: new Set<Listener<[count: number, isFirst: boolean]>>(),
-    status: new Set<Listener<[status: RemoteSubscriptionStatus]>>(),
+    snapshot: new Set<RemoteTableSubscriptionListener<[count: number, isFirst: boolean]>>(),
+    status: new Set<RemoteTableSubscriptionListener<[status: RemoteSubscriptionStatus]>>(),
   };
   #log: (message: string) => void;
   #mode: SubscriptionMode;
@@ -154,7 +154,7 @@ export class RemoteTableSubscription {
     };
   }
 
-  onStatusChange(listener: Listener<[status: RemoteSubscriptionStatus]>) {
+  onStatusChange(listener: RemoteTableSubscriptionListener<[status: RemoteSubscriptionStatus]>) {
     this.#listeners.status.add(listener);
     return () => this.#listeners.status.delete(listener);
   }
@@ -162,7 +162,7 @@ export class RemoteTableSubscription {
   /**
    * Invoked each time a snapshot completes, isFirst is false after a reconnect.
    */
-  onSnapshot(listener: Listener<[count: number, isFirst: boolean]>) {
+  onSnapshot(listener: RemoteTableSubscriptionListener<[count: number, isFirst: boolean]>) {
     this.#listeners.snapshot.add(listener);
     return () => this.#listeners.snapshot.delete(listener);
   }

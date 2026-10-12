@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-type ConfigValue = string | number | boolean;
+export type ConfigValue = string | number | boolean;
 
 export interface Config {
   has(key: string): boolean;

@@ -42,7 +42,7 @@ export const RequestContext = (
   user: VuuUser,
   session: ClientSessionId,
   queue: PublishQueue<ViewPortUpdate>,
-) => new RequestContextImpl(requestId, user, session, queue);
+): RequestContext => new RequestContextImpl(requestId, user, session, queue);
 
 export class RequestProcessor {
   constructor(
