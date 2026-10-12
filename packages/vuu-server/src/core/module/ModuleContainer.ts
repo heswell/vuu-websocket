@@ -1,10 +1,13 @@
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { RealizedViewServerModule } from "./VsModule";
 import { ServiceMessage } from "../../Service";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.module");
 
 export class ModuleContainer {
   constructor() {
-    console.log("create ModuleService");
+    log.debug("create ModuleContainer");
   }
 
   #modules = new Map<string, RealizedViewServerModule>();
@@ -14,14 +17,14 @@ export class ModuleContainer {
   }
 
   public async start() {
-    console.log(`[ModuleContainer] start ${this.#modules.size} modules`);
+    log.debug(`start ${this.#modules.size} modules`);
     for (const module of this.#modules.values()) {
       await module.start();
     }
   }
 
   public async stop() {
-    console.log(`[ModuleContainer] stop ${this.#modules.size} modules`);
+    log.debug(`stop ${this.#modules.size} modules`);
     const errors: unknown[] = [];
     for (const module of [...this.#modules.values()].toReversed()) {
       try {

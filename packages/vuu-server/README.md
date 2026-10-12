@@ -55,6 +55,26 @@ overrides and path resolution.
 `/websocket-portal`. The default is `/websocket`. Paths with a trailing
 slash, query, fragment, or full URL are rejected during application setup.
 
+## Logging
+
+vuu-server logs through the leveled logger in
+[`@heswell/service-utils`](../service-utils/README.md#logging), re-exported
+here as `getLogger`, `setLogLevel`, `setLogSink`, `configureLogging` and
+friends. `createVuuServerApplication` applies the level from config:
+
+```hocon
+vuu.log.level="info"            # trace | debug | info | warn | error | silent
+vuu.log.level=${?VUU_LOG_LEVEL}
+vuu.log.levels.vuu.viewport=debug   # optional per-logger override
+```
+
+At the default `info` level only startup (listening addresses) and
+warnings/errors are logged. Table, module, viewport, session and RPC
+activity is at `debug` (the module dump in `ModuleFactory` is at `trace`).
+Without a conf, `VUU_LOG_LEVEL` sets the initial level, e.g.
+`VUU_LOG_LEVEL=debug bun test`. Use `setLogSink` to capture or redirect
+output.
+
 ## TLS and local plain-HTTP mode
 
 `vuu.ssl=true` (with `vuu.certPath` and `vuu.keyPath`) serves the websocket

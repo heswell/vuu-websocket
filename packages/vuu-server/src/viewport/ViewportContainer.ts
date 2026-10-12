@@ -35,6 +35,9 @@ import { VuuUser } from "../core/auths/VuuUser";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.viewport");
 
 export type ViewportCreationEvent = {
   id: string;
@@ -65,7 +68,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     private providerContainer: ProviderContainer,
   ) {
     super();
-    console.log("create ViewportContainer");
+    log.debug("create ViewportContainer");
   }
 
   #sessionViewportMap = new Map<string, string[]>();
@@ -73,7 +76,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   #viewPortDefinitions: Map<string, ServiceFactory> = new Map();
 
   addViewPortDefinition(tableName: string, viewPortDefFunc: ServiceFactory) {
-    console.log(`[ViewportContainer] addViewPortDefinition ${tableName}`);
+    log.debug(`addViewPortDefinition ${tableName}`);
     this.#viewPortDefinitions.set(tableName, viewPortDefFunc);
   }
 
@@ -85,8 +88,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   getViewPortDefinition(table: DataTable) {
     const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
     if (viewPortDefFunc) {
-      console.log(
-        `[ViewportContainer] getViewPortDefinition ${table.name}, instantiate ViewPortDef`,
+      log.debug(
+        `getViewPortDefinition ${table.name}, instantiate ViewPortDef`,
       );
       return viewPortDefFunc(
         table,
@@ -95,8 +98,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
         this.tableContainer,
       );
     } else {
-      console.log(
-        `[ViewPortContainer] no viewPortDefFunc found for table ${table.schema.table.table}, returning default with columns only, no services`,
+      log.debug(
+        `no viewPortDefFunc found for table ${table.schema.table.table}, returning default with columns only, no services`,
       );
       return ViewPortDef.default(table.tableDef.columns);
     }
@@ -135,7 +138,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   ) {
     const { sessionId } = clientSessionId;
     const id = ViewPortId.oneNew();
-    console.log(`[ViewportContainer] create vp ${id}, table ${table.name}`);
+    log.debug(`create vp ${id}, table ${table.name}`);
     const viewPortDef = this.getViewPortDefinition(table);
     const viewport = new Viewport(
       id,
@@ -230,8 +233,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   removeForSession(clientSessionId: ClientSessionId) {
-    console.log(
-      `[ViewportContainer] close all viewports for session ${clientSessionId}`,
+    log.debug(
+      `close all viewports for session ${clientSessionId}`,
     );
     for (const viewPort of this.listViewportsForSession(
       clientSessionId.sessionId,
@@ -241,24 +244,24 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   disableViewport(viewportId: string, clientSessionId: ClientSessionId) {
-    console.log(`[ViewportContainer] disableViewport ${viewportId}`);
+    log.debug(`disableViewport ${viewportId}`);
     const viewport = this.getViewportById(viewportId);
     if (viewport.enabled) {
       viewport.enabled = false;
     } else {
-      console.warn(
-        `[ViewportContainer] enableViewport, viewport ${viewportId} is already disabled`,
+      log.warn(
+        `disableViewport, viewport ${viewportId} is already disabled`,
       );
     }
   }
   enableViewport(viewportId: string, clientSessionId: ClientSessionId) {
-    console.log(`[ViewportContainer] enableViewport ${viewportId}`);
+    log.debug(`enableViewport ${viewportId}`);
     const viewport = this.getViewportById(viewportId);
     if (!viewport.enabled) {
       viewport.enabled = true;
     } else {
-      console.warn(
-        `[ViewportContainer] enableViewport, viewport ${viewportId} is already enabled`,
+      log.warn(
+        `enableViewport, viewport ${viewportId} is already enabled`,
       );
     }
   }
@@ -410,7 +413,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     childColumnName: string,
     parentColumnName: string,
   ) {
-    console.log(`[ViewportContainer] link Viewports`);
+    log.debug(`link viewports ${childVpId} -> ${parentVpId}`);
     const child = this.getViewportById(childVpId);
     const parent = this.getViewportById(parentVpId);
     const childColumn = child.dataTable.columnForName(childColumnName);

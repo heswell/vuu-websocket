@@ -1,10 +1,12 @@
-import { Provider } from "@heswell/vuu-server";
+import { getLogger, Provider } from "@heswell/vuu-server";
 import { getData } from "./instrument-data";
+
+const log = getLogger("demo.test");
 
 export class InstrumentProvider extends Provider {
   async load() {
-    console.log(
-      `[${this.table.schema.table.module}][InstrumentProvider] load  instruments`
+    log.debug(
+      `${this.table.schema.table.module} InstrumentProvider load instruments`
     );
 
     const data = getData(this.table.schema);

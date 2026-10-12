@@ -1,9 +1,11 @@
-import { Provider } from "@heswell/vuu-server";
+import { getLogger, Provider } from "@heswell/vuu-server";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+
+const log = getLogger("demo.system");
 
 export class ViewportProvider extends Provider {
   async load() {
-    console.log(`[${this.table.schema.table.module}][ViewportProvider]`);
+    log.debug(`${this.table.schema.table.module} ViewportProvider load`);
 
     const data: VuuDataRow[] = [];
 

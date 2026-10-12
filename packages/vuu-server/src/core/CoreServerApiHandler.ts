@@ -62,6 +62,10 @@ import {
 } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { DataTable } from "./table/InMemDataTable";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.core");
+const rpcLog = getLogger("vuu.rpc");
 
 const vsMsg = (body: ViewServerMessageBody, ctx: RequestContext) =>
   JsonViewServerMessage(ctx.requestId, ctx.session.sessionId, body);
@@ -198,7 +202,7 @@ export class CoreServerApiHandler implements ServerApi {
     const table = this.tableContainer.getTable<DataTable>(tableName);
     // if (table.getTableDef.visibility !== Public)
     if (msg.columns.length === 1 && msg.columns[0] === "*") {
-      console.log("all columns");
+      log.trace("create viewport with all columns");
     } else {
       // validateColumns(table, msg.columns);
       // ViewPortColumnCreator.create(table, msg.columns)
@@ -217,8 +221,8 @@ export class CoreServerApiHandler implements ServerApi {
     );
 
     if (viewport) {
-      console.log(
-        `[CoreServerApi] created viewport ${viewport.id} on table ${tableName}`,
+      log.debug(
+        `created viewport ${viewport.id} on table ${tableName}`,
       );
 
       // This diverges from the originasl;
@@ -245,7 +249,7 @@ export class CoreServerApiHandler implements ServerApi {
       viewport.changeViewport(options);
       return vsMsg(ChangeViewPortSuccess(viewPortId, options), ctx);
     } catch (e) {
-      console.error(e);
+      log.warn(`Failed to change viewport ${viewPortId}`, e);
       return errorMsg(
         `Failed to change viewport ${viewPortId}: ${(e as Error).message}`,
         ctx,
@@ -294,13 +298,13 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     if (hasViewPortContext(msg)) {
-      console.log(
-        `[CoreServerApiHandler] RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`,
+      rpcLog.debug(
+        `RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`,
       );
       return this.handleViewportRpcRequest(msg, msg.context.viewPortId, ctx);
     } else {
-      console.warn(
-        `[CoreServerApiHandler] Imvalid context on request ${ctx.requestId}`,
+      rpcLog.warn(
+        `Invalid context on request ${ctx.requestId}`,
       );
       return vsMsg(
         createErrorRpcResponse(
@@ -337,7 +341,7 @@ export class CoreServerApiHandler implements ServerApi {
         );
       }
     } catch (e) {
-      console.log({ e });
+      rpcLog.error(`Failed to process request ${ctx.requestId}`, e);
       return vsMsg(
         createErrorRpcResponse(
           msg,
@@ -358,13 +362,13 @@ export class CoreServerApiHandler implements ServerApi {
       return vsMsg(ViewPortMenuRpcResponse(vpId, rpcName, action), ctx);
     } catch (e) {
       if (e instanceof MenuRpcDispatchError) {
-        console.warn(
-          `[CoreServerApiHandler] ${type} ${rpcName} rejected (${ctx.requestId}): ${e.message}`,
+        rpcLog.warn(
+          `${type} ${rpcName} rejected (${ctx.requestId}): ${e.message}`,
         );
         return vsMsg(ViewPortMenuRpcReject(vpId, rpcName, e.message), ctx);
       }
-      console.error(
-        `[CoreServerApiHandler] ${type} ${rpcName} on vp ${vpId} failed in session ${ctx.session.sessionId} (${ctx.requestId})`,
+      rpcLog.error(
+        `${type} ${rpcName} on vp ${vpId} failed in session ${ctx.session.sessionId} (${ctx.requestId})`,
         e,
       );
       return vsMsg(
@@ -574,7 +578,7 @@ export class CoreServerApiHandler implements ServerApi {
   }
 
   disconnect(session: ClientSessionId) {
-    console.log("TODO COreServerApiHandler disconnect");
+    log.debug(`disconnect session ${session.sessionId}`);
     this.viewPortContainer.removeForSession(session);
     this.tableContainer.removeSessionTables(session);
   }

@@ -3,6 +3,9 @@ import type { ClientMessage } from "./protocol";
 import { isSubscribeRequest } from "./protocol";
 import type { RateGenerator } from "./RateGenerator";
 import type { TablePublisher } from "./TablePublisher";
+import { getLogger } from "../Logger";
+
+const defaultLog = getLogger("vuu.data-service");
 
 /**
  * Anything with a lifecycle the service should manage, typically a
@@ -25,6 +28,7 @@ export interface DataServiceOptions {
   /** Interval between heartbeats, 0 disables, default 30s */
   heartbeatInterval?: number;
   hostname?: string;
+  /** Defaults to `info` on the `vuu.data-service` logger. */
   log?: (message: string) => void;
   /** Max bytes buffered on a socket, beyond which it is closed, default 16MB */
   maxBufferedBytes?: number;
@@ -100,7 +104,7 @@ export class DataService {
     this.#maxBufferedBytes = maxBufferedBytes;
     this.#port = port;
     this.#routes = routes;
-    const logger = log ?? console.log;
+    const logger = log ?? ((message: string) => defaultLog.info(message));
     this.#log = (message) => logger(`[${name}] ${message}`);
   }
 

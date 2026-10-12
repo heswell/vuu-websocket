@@ -5,16 +5,19 @@ import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
 import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.table");
 
 export class TableContainer {
   constructor(private joinProvider: JoinTableProvider) {
-    console.log("create TableContainer");
+    log.debug("create TableContainer");
   }
 
   #tables: Map<string, Table> = new Map();
 
   addTable(table: Table) {
-    console.log(`[TableContainer] add table ${table.name}`);
+    log.debug(`add table ${table.name}`);
     this.#tables.set(table.name, table);
   }
 

@@ -8,6 +8,9 @@ import { LoginTokenService } from "./auth/LoginTokenService";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { VuuUser } from "../core/auths/VuuUser";
 import type { LoginSuccessOptions } from "./LoginSuccess";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.session");
 
 export interface ViewServerHandlerFactory {
   create: () => ViewServerHandler;
@@ -42,7 +45,7 @@ export class ViewServerHandler {
   constructor(private processor: RequestProcessor) {}
 
   close() {
-    console.log("closing session on disconnect");
+    log.debug("closing session on disconnect");
   }
 
   async handle(inbound: string, channel: Channel) {

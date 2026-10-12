@@ -9,6 +9,8 @@ Shared utilities for Vuu services and for `@heswell/vuu-server`:
   `RemoteTableSubscription`, `DataService`, `RateGenerator` and the protocol
   types they share.
 - `loadTableFromRemoteResource` and the socket factory types it uses.
+- `getLogger` and friends: a small leveled logger, configured from
+  `vuu.log.level` (see [Logging](#logging)).
 - `Clock`, `accurateTimer` and random-value helpers for simulated data.
 
 ```sh
@@ -113,6 +115,79 @@ given (they are not parsed).
 - expands a leading `~/` (or a bare `~`) to the home directory;
 - resolves any other relative value against the directory of the conf file,
   not the working directory.
+
+## Logging
+
+A small leveled logger with no dependencies. Levels, from most to least
+verbose: `trace`, `debug`, `info`, `warn`, `error`, `silent`. The default is
+`info`, which is quiet in normal operation: `@heswell/vuu-server` logs
+startup (listening addresses) at `info`, per-session, per-viewport and RPC
+activity at `debug`/`trace`, and problems at `warn`/`error`.
+
+```ts
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("trader.oms"); // or getLogger() for the root logger
+log.debug("order", orderId, "amended");
+if (log.isEnabled("trace")) {
+  log.trace("book", expensiveDump());
+}
+const child = log.child("fills"); // logger "trader.oms.fills"
+```
+
+### Setting the level
+
+- In a conf file, applied by `configureLogging(config)`. Apps built with
+  `createVuuServerApplication` (vuu-server) call it for you.
+
+  ```hocon
+  vuu.log.level="info"
+  vuu.log.level=${?VUU_LOG_LEVEL}
+  # optional per-logger overrides, which also apply to child loggers
+  vuu.log.levels.vuu.viewport=debug
+  vuu.log.levels.vuu.rpc=trace
+  ```
+
+- From the environment: `VUU_LOG_LEVEL=debug`. It sets the initial level, so
+  it also works without a conf file (e.g. `VUU_LOG_LEVEL=silent bun test`),
+  and `configureLogging` uses it when the conf has no `vuu.log.level`.
+- In code: `setLogLevel("debug")`, or `setLogLevel("debug", "vuu.net")` for
+  one logger and its children. `clearLogLevel(name?)` removes overrides,
+  `getLogLevel(name?)` reads the effective level. Calling `configureLogging`
+  later re-applies the conf values.
+
+Level names are case-insensitive (`warning` is accepted for `warn`). An
+invalid value in config is reported with `warn` and ignored.
+`setLogLevel` throws on an invalid value.
+
+vuu-server uses these loggers: `vuu.core`, `vuu.module`, `vuu.table`,
+`vuu.provider`, `vuu.viewport`, `vuu.session` (sessions and flow control),
+`vuu.rpc`, `vuu.net` (websocket and REST servers), `vuu.auth` and
+`vuu.lifecycle`. This package uses `vuu.data-service`, `vuu.remote-table`
+and `vuu.resource-loader`.
+
+### Sinks
+
+Output goes to a sink, by default `consoleSink`, which writes `trace` and
+`debug` with `console.debug`, `info` with `console.info`, and `warn`/`error`
+with `console.warn`/`console.error`, prefixed with `[logger name]`. Embedding
+apps and tests can capture or redirect it:
+
+```ts
+import { setLogSink, type LogEntry } from "@heswell/service-utils";
+
+const entries: LogEntry[] = [];
+setLogSink((entry) => entries.push(entry)); // { level, name, args }
+// ...
+setLogSink(); // back to the console
+```
+
+`configureLogging(config, { sink })` sets the sink too, and
+`resetLogging()` restores the defaults. Levels and the sink are process
+wide, and shared by every copy of this package loaded in the process.
+
+`DataService` and `RemoteTableSubscription` still accept a `log` option;
+without it they log at `info` on `vuu.data-service` / `vuu.remote-table`.
 
 ## Peer dependencies
 

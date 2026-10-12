@@ -6,6 +6,9 @@ import {
   DefaultLifecycleEnabled,
   LifecycleContainer,
 } from "../toolbox/thread/LifecycleContainer";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.provider");
 
 export class ProviderContainer extends DefaultLifecycleEnabled {
   readonly lifecycleId = "providerContainer";
@@ -17,7 +20,7 @@ export class ProviderContainer extends DefaultLifecycleEnabled {
     private readonly lifecycle: LifecycleContainer,
   ) {
     super();
-    console.log("create ProviderContainer");
+    log.debug("create ProviderContainer");
     lifecycle.apply(joinProvider);
     lifecycle.apply(this);
   }

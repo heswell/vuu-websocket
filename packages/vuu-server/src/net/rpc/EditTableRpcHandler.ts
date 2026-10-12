@@ -5,10 +5,13 @@ import { RpcParams } from "./Rpc";
 import { DataTable } from "../../core/table/InMemDataTable";
 import { InMemSessionDataTable } from "../../core/table/InMemSessionDataTable";
 import { RpcNames } from "../../util/RpcNames";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.rpc");
 
 export class EditTableRpcHandler extends DefaultRpcHandler {
   editCell = ({ namedParams, viewport }: RpcParams): RpcResult => {
-    console.log(`editCell ${viewport.id} ${JSON.stringify(namedParams)}`);
+    log.debug(`editCell ${viewport.id} ${JSON.stringify(namedParams)}`);
 
     const { column, data, key } = namedParams as {
       column: string;

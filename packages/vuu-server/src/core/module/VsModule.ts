@@ -5,6 +5,9 @@ import { IService, ServiceMessage } from "../../Service";
 import { TableDef } from "../../api/TableDef";
 import { RpcHandler, RpcHandlerFunc } from "../../net/rpc/RpcHandler";
 import { ServiceFactory } from "./ModuleFactory";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.module");
 
 export interface ModuleConstructorProps {
   name: string;
@@ -58,11 +61,11 @@ export class ViewServerModule {
   }
 
   async start() {
-    console.log(`[Module] start #${this.#name}`);
+    log.debug(`start module #${this.#name}`);
   }
 
   async stop() {
-    console.log(`[Module] stop #${this.#name}`);
+    log.debug(`stop module #${this.#name}`);
   }
 
   get tableDefs() {

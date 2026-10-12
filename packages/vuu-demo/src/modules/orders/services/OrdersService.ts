@@ -1,5 +1,6 @@
 import { Table } from "@heswell/vuu-table";
 import {
+  getLogger,
   DefaultRpcHandler,
   isDataTable,
   type MenuRpcSession,
@@ -13,6 +14,8 @@ import {
 } from "@heswell/vuu-server";
 import { VuuRpcServiceRequest } from "@vuu-ui/vuu-protocol-types";
 
+const log = getLogger("demo.orders");
+
 export class OrdersService extends DefaultRpcHandler {
   #tableContainer: TableContainer;
   constructor(
@@ -25,7 +28,7 @@ export class OrdersService extends DefaultRpcHandler {
   }
 
   handleRpcCall(rpcMessage: VuuRpcServiceRequest) {
-    console.log(`rpc message received`);
+    log.debug(`rpc message received`);
   }
 
   private cancelOrders = (
@@ -43,7 +46,7 @@ export class OrdersService extends DefaultRpcHandler {
 
       selection.rowKeys.forEach((key) => {
         const row = baseTable.getRowAtKey(key);
-        console.log(`add row ${row.join(",")}`);
+        log.debug(`add row ${row.join(",")}`);
         sessionTable.processUpdate(key, row.slice());
       });
 

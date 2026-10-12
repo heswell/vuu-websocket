@@ -1,4 +1,7 @@
 import { TableDefs } from "./ModuleFactory";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.module");
 
 // This is created in main class and passed as an implicit parameter in Scala
 export class TableDefContainer {
@@ -10,13 +13,13 @@ export class TableDefContainer {
     return TableDefContainer.#instance;
   }
   private constructor() {
-    console.log("create TableDefContainer");
+    log.debug("create TableDefContainer");
   }
 
   #tablesByModule = new Map<string, TableDefs>();
 
   add(module: string, tableDefs: TableDefs) {
-    console.log(`TableDefContainer add module ${module}`);
+    log.debug(`TableDefContainer add module ${module}`);
     this.#tablesByModule.set(module, tableDefs);
   }
 

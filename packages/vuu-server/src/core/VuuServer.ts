@@ -20,6 +20,9 @@ import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
 import { FlowControllerFactory } from "../net/flowcontrol/FlowController";
 import { RestServer } from "../net/http/RestServer";
 import { DefaultLifecycleEnabled } from "../toolbox/thread/LifecycleContainer";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.core");
 
 export class VuuServer extends DefaultLifecycleEnabled {
   readonly lifecycleId = "vuuServer";
@@ -182,15 +185,13 @@ export class VuuServer extends DefaultLifecycleEnabled {
     this.moduleContainer.register(realizedModule);
 
     module.tableDefs.forEach((tableDef) => {
-      console.log(
-        `VuUServer process tabledef for module ${module.name} table ${tableDef.name}`,
+      log.debug(
+        `process tabledef for module ${module.name} table ${tableDef.name}`,
       );
       tableDef.setModule(module);
       if (isJoinTableDef(tableDef)) {
-        const table = this.createJoinTable(tableDef);
-        console.log(
-          `[VuUServer] what do we do with this joun table we just created`,
-        );
+        this.createJoinTable(tableDef);
+        log.debug(`created join table ${tableDef.name}`);
       } else {
         const table = this.createTable(tableDef);
         const provider = module.getProviderForTable(table);
@@ -199,7 +200,7 @@ export class VuuServer extends DefaultLifecycleEnabled {
     });
 
     module.viewPortDefs.forEach((serviceFactory, tableName) => {
-      console.log(`[VuuServer] set serviceFactory for table ${tableName}`);
+      log.debug(`set serviceFactory for table ${tableName}`);
       this.viewPortContainer.addViewPortDefinition(tableName, serviceFactory);
     });
   };

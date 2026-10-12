@@ -1,5 +1,7 @@
-import { type ProviderContainer, type TableContainer } from "@heswell/vuu-server";
+import { getLogger, type ProviderContainer, type TableContainer } from "@heswell/vuu-server";
 import type { UserAdminSnapshotSource } from "@heswell/user-admin";
+
+const log = getLogger("user-admin");
 
 const USER_ADMIN_TABLES = [
   "users",
@@ -35,7 +37,7 @@ export class UserAdminRefreshCoordinator {
     }
     this.#refreshTimer = setInterval(() => {
       void this.refreshAll("interval").catch((error) => {
-        console.error("[UserAdminRefreshCoordinator] interval refresh failed", error);
+        log.error("interval refresh failed", error);
       });
     }, intervalMs);
     this.#refreshTimer.unref?.();
@@ -49,7 +51,7 @@ export class UserAdminRefreshCoordinator {
   }
 
   private async runRefresh(reason: string) {
-    console.log(`[UserAdminRefreshCoordinator] refresh start ${reason}`);
+    log.debug(`refresh start ${reason}`);
     const snapshot = await this.snapshotSource();
     for (const tableName of USER_ADMIN_TABLES) {
       const provider = this.providerContainer.getProviderForTable(tableName);
@@ -59,6 +61,6 @@ export class UserAdminRefreshCoordinator {
         await provider.load(this.tableContainer);
       }
     }
-    console.log(`[UserAdminRefreshCoordinator] refresh complete ${reason}`);
+    log.debug(`refresh complete ${reason}`);
   }
 }

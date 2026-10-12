@@ -20,6 +20,9 @@ import {
   VuuWebSocketOptions,
 } from "./VuuServerOptions";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
+import { configureLogging, getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.core");
 
 const ConfigKeys = {
   adminEnabled: "vuu.admin.enabled",
@@ -80,6 +83,7 @@ export function createVuuServerApplication({
   loginSuccessProvider,
   modules,
 }: VuuServerApplicationOptions): VuuServerApplication {
+  configureLogging(config);
   const lifecycle = new LifecycleContainer();
   const loginTokenService = LoginTokenService();
   let server: VuuServer | undefined;
@@ -157,8 +161,8 @@ function createAdminHttpHandlers(
     return [];
   }
   const path = config.getString(ConfigKeys.adminPath, "/api/admin");
-  console.warn(
-    `[VUU] UNAUTHENTICATED admin REST api enabled at ${path} (${ConfigKeys.adminEnabled}=true). Do not enable in production.`,
+  log.warn(
+    `UNAUTHENTICATED admin REST api enabled at ${path} (${ConfigKeys.adminEnabled}=true). Do not enable in production.`,
   );
   const routes = [
     ...createNotificationAdminRoutes(() => getServer().tableContainer, {

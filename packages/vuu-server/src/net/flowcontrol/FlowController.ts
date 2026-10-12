@@ -1,5 +1,8 @@
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ClientSessionId } from "../ClientConnectionCreator";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.session");
 
 type BatchSize = {
   type: "BATCHSIZE";
@@ -62,8 +65,8 @@ class DefaultFlowController implements FlowController {
     ) {
       return this.sendHeartbeat();
     } else if (this.shouldDisconnect(timeSinceLastMessage)) {
-      console.warn(
-        `[SESSION] Disconnecting session ${this.sessionId.sessionId} because it has not responded for ${timeSinceLastMessage}ms`,
+      log.warn(
+        `Disconnecting session ${this.sessionId.sessionId} because it has not responded for ${timeSinceLastMessage}ms`,
       );
       return Disconnect;
     } else {
@@ -79,8 +82,8 @@ class DefaultFlowController implements FlowController {
     else if (timeSinceLastHeartbeat < 1_000) return false;
     else {
       if (timeSinceLastMessage > 10_000 && timeSinceLastMessage <= 15_000) {
-        console.warn(
-          `[SESSION] Session ${this.sessionId.sessionId} has not responded for ${timeSinceLastMessage}ms`,
+        log.debug(
+          `Session ${this.sessionId.sessionId} has not responded for ${timeSinceLastMessage}ms`,
         );
       }
       return timeSinceLastMessage > 5_000 && timeSinceLastMessage <= 15_000;

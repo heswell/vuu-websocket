@@ -2,6 +2,7 @@ import {
   DataService,
   RemoteTableSubscription,
   TablePublisher,
+  configureLogging,
 } from "@heswell/service-utils";
 import { Table } from "@heswell/vuu-table";
 import { loadConfig } from "./config";
@@ -25,6 +26,7 @@ export interface PriceServiceOptions {
  */
 export function start(options: PriceServiceOptions = {}) {
   const config = loadConfig();
+  configureLogging(config);
   const log = options.log ?? console.log;
   const port = options.port ?? config.getNumber("service.port");
   const refDataUrl =

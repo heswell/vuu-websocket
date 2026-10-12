@@ -26,6 +26,9 @@ import {
   FlowController,
   SendHeartbeat,
 } from "./flowcontrol/FlowController";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.session");
 
 const EMPTY_ROW: VuuDataRow = [];
 interface InboundMessageHandler {
@@ -168,7 +171,7 @@ class DefaultMessageHandlerImpl implements MessageHandler {
   };
 
   private disconnect() {
-    console.log(`[SESSION] Disconnecting session ${this.session.sessionId}`);
+    log.debug(`Disconnecting session ${this.session.sessionId}`);
     this.serverApi.disconnect(this.session);
     this.sessionContainer.remove(this.user, this.session);
     this.channel.close();

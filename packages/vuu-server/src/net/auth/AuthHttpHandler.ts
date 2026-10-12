@@ -11,6 +11,9 @@ import {
   InvalidAuthenticationRequestError,
 } from "./AuthenticationErrors";
 import { LoginTokenService } from "./LoginTokenService";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.auth");
 
 export type HttpHandlerOptions = {
   allowedOrigin?: string;
@@ -88,7 +91,7 @@ export function createAuthHttpHandler(
       try {
         token = loginTokenService.getToken(vuuUser);
       } catch {
-        console.error(`[AuthHttpHandler] VUU token issuance failed for ${path}`);
+        log.error(`VUU token issuance failed for ${path}`);
         return new Response(JSON.stringify({ error: "Unable to issue token" }), {
           status: 500,
           headers: {
@@ -114,8 +117,8 @@ export function createAuthHttpHandler(
           : error instanceof AuthenticationUnavailableError
             ? 503
             : 401;
-      console.warn(
-        `[AuthHttpHandler] Authentication failed for ${path} status=${status}`,
+      log.warn(
+        `Authentication failed for ${path} status=${status}`,
       );
       return new Response(
         JSON.stringify({

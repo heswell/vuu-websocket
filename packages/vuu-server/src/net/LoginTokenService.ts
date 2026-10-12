@@ -1,6 +1,9 @@
 import { VuuLoginRequest } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { VuuUser } from "../core/auths/VuuUser";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.auth");
 
 const INVALID_TOKEN_MESSAGE = "Invalid token";
 const TOKEN_EXPIRED_MESSAGE = "Token has expired";
@@ -30,8 +33,8 @@ export class LoginTokenServiceImpl implements LoginTokenService {
   getToken(vuuUser: VuuUser) {
     const token = `${btoa(JSON.stringify(vuuUser))}.${uuid()}`;
     this.#userTokens.set(token, vuuUser);
-    console.log(
-      `[LoginTokenService] token issues for user ${vuuUser.name} : ${token}`,
+    log.debug(
+      `token issued for user ${vuuUser.name}`,
     );
     return token;
   }
@@ -41,7 +44,7 @@ export class LoginTokenServiceImpl implements LoginTokenService {
     if (vuuUser) {
       return vuuUser;
     } else {
-      console.warn(`[LoginTokenService]: Invalid token ${msg.token}`);
+      log.warn(`Invalid token ${msg.token}`);
       return INVALID_TOKEN_MESSAGE;
     }
   }

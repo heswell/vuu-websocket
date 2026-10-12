@@ -1,5 +1,8 @@
 import { VuuUser } from "../core/auths/VuuUser";
 import { ClientSessionId, MessageHandler } from "./ClientConnectionCreator";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.session");
 
 export interface ClientSessionContainer {
   getHandler: (sessionId: ClientSessionId) => MessageHandler | undefined;
@@ -15,7 +18,7 @@ export interface ClientSessionContainer {
 
 class ClientSessionContainerImpl implements ClientSessionContainer {
   constructor(private maxSessionsPerUser: number) {
-    console.log(`[ClientSessionContainer] constructor`);
+    log.debug("create ClientSessionContainer");
   }
   private sessionsPerUser: Map<string, Set<string>> = new Map();
   private sessions: Map<string, MessageHandler> = new Map();
@@ -26,8 +29,8 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
     if (handler) {
       return handler;
     }
-    console.log(
-      `[ClientSessionContainer] No handler found for session ${sessionId}`,
+    log.debug(
+      `No handler found for session ${sessionId}`,
     );
   };
 
@@ -44,8 +47,8 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
       set.delete(sessionId);
       if (set.size === 0) this.sessionsPerUser.delete(userKey);
     }
-    console.log(
-      `[ClientSessionContainer] removed session ${sessionId} for user ${userKey}`,
+    log.debug(
+      `removed session ${sessionId} for user ${userKey}`,
     );
   };
   register(
@@ -53,8 +56,8 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
     clientSessionId: ClientSessionId,
     messageHandler: MessageHandler,
   ) {
-    console.log(
-      `[ClientSessionContainer] register handler for session ${clientSessionId}`,
+    log.debug(
+      `register handler for session ${clientSessionId}`,
     );
 
     const { sessionId } = clientSessionId;
@@ -80,8 +83,8 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
     this.sessionIds.set(sessionId, clientSessionId);
 
     set.add(sessionId);
-    console.log(
-      `[ClientSessionContainer] register session ${sessionId} for user ${userKey}`,
+    log.debug(
+      `register session ${sessionId} for user ${userKey}`,
     );
   }
 
