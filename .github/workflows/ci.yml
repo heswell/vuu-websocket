@@ -63,10 +63,18 @@ jobs:
           npm run build:packages -- --package @heswell/vuu-table
           npm run build:packages -- --package @heswell/vuu-viewport
 
+      - name: Build server packages
+        run: |
+          npm run build:packages -- --package @heswell/module-admin
+          npm run build:packages -- --package @heswell/service-utils
+          npm run build:packages -- --package @heswell/vuu-server
+          npm run build:packages -- --package @heswell/vuu-portal
+
       - name: Pack (dry run)
         run: |
-          npm pack --dry-run ./dist/vuu-table
-          npm pack --dry-run ./dist/vuu-viewport
+          for p in vuu-table vuu-viewport module-admin service-utils vuu-server vuu-portal; do
+            npm pack --dry-run ./dist/$p
+          done
 
       - name: Smoke test built packages
         run: npm run test:engine-packages
