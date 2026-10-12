@@ -104,6 +104,8 @@ export {
 } from "./net/auth/KeycloakClientSecrets";
 export { createConfiguredAuthProviders } from "./net/auth/ConfiguredAuthProviders";
 export { composeHttpHandlers } from "./net/http/composeHttpHandlers";
+export * from "./net/http/admin/AdminHttpHandler";
+export * from "./net/http/admin/NotificationAdminRoutes";
 export type {
   LoginSuccessOptions,
   ModuleRecord,

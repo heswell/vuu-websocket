@@ -125,3 +125,36 @@ The `USER_ADMIN` role, group-role, and user-group-role tables also remain.
 They expose live realm-role administration generically and no longer filter the
 role table through the retired VUU seed-role names. VUU application
 authorization roles are client roles and remain managed by bootstrap.
+
+## Development admin API
+
+`createVuuServerApplication` can install an **unauthenticated** admin REST
+API on the HTTPS port, for triggering server-side actions from `curl` during
+development. It is disabled by default and must never be enabled in
+production.
+
+| Key | Purpose |
+| --- | --- |
+| `vuu.admin.enabled` | Installs the admin API (default `false`) |
+| `vuu.admin.path` | Base path, default `/api/admin` |
+| `vuu.admin.notifications.defaultDurationMs` | Expiry applied to created notifications, default `10000` |
+
+`GET {path}` lists the installed routes. Built-in routes act on the
+`notifications` table of a registered `NotificationModule`:
+
+```sh
+# create (id, type, level, audience, expiryTime are defaulted if omitted)
+curl -k -X POST https://localhost:8443/api/admin/notifications \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Hello","message":"From curl","level":"WARNING","durationMs":30000}'
+# list
+curl -k https://localhost:8443/api/admin/notifications
+# remove
+curl -k -X DELETE https://localhost:8443/api/admin/notifications/<id>
+```
+
+Posting an existing `id` updates that notification. Applications add further
+actions (price changes, order creation, ...) via the `additionalAdminRoutes`
+option, supplying `AdminRoute`s (`method`, `path` with optional `:param`
+segments, `handle`). Handlers may throw `AdminRequestError(status, message)`
+and use `readJsonObject(req)` to parse request bodies.
