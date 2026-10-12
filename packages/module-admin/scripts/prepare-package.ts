@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { rewriteDeclarationSpecifiers } from "../../../scripts/prepare-dist-package";
 
 const PACKAGE_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -24,6 +25,9 @@ type PackageManifest = {
   types: string;
   [key: string]: unknown;
 };
+
+// Published declarations need explicit .js specifiers for node16/nodenext.
+rewriteDeclarationSpecifiers(path.join(DIST_ROOT, "src"));
 
 const sourceManifest = JSON.parse(
   fs.readFileSync(path.join(PACKAGE_ROOT, "package.json"), "utf8"),

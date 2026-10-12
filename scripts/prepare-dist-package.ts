@@ -18,9 +18,27 @@ export interface PrepareDistPackageOptions {
   bin?: Record<string, string>;
 }
 
-// Source uses .ts import specifiers (allowImportingTsExtensions); published
-// declarations must use .js so any consumer moduleResolution can follow them.
-const rewriteDeclarationSpecifiers = (dir: string) => {
+// Declarations keep the source's relative specifiers, which are extensionless
+// or end in .ts. Under moduleResolution node16/nodenext, relative ESM imports
+// need a real file extension, so point each one at the .js file (or the
+// directory's index.js) that the matching .d.ts describes.
+const RELATIVE_SPECIFIER =
+  /((?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+)["'])(\.{1,2}(?:\/[^"']*)?)(["'])/g;
+
+const resolveDeclarationSpecifier = (fromDir: string, specifier: string) => {
+  const bare = specifier.replace(/\.(?:ts|js)$/, "").replace(/\/$/, "");
+  if (fs.existsSync(path.join(fromDir, `${bare}.d.ts`))) {
+    return `${bare}.js`;
+  }
+  if (fs.existsSync(path.join(fromDir, bare, "index.d.ts"))) {
+    return `${bare}/index.js`;
+  }
+  throw Error(
+    `prepareDistPackage: cannot resolve '${specifier}' from declarations in ${fromDir}`,
+  );
+};
+
+export const rewriteDeclarationSpecifiers = (dir: string) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -30,8 +48,9 @@ const rewriteDeclarationSpecifiers = (dir: string) => {
       fs.writeFileSync(
         entryPath,
         source.replace(
-          /((?:from|import)\s*\(?\s*["']\.{1,2}\/[^"']+)\.ts(["'])/g,
-          "$1.js$2",
+          RELATIVE_SPECIFIER,
+          (_match, prefix: string, specifier: string, quote: string) =>
+            `${prefix}${resolveDeclarationSpecifier(dir, specifier)}${quote}`,
         ),
       );
     }

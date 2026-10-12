@@ -45,6 +45,7 @@ import {
   SelectRowRangeSuccess,
   SelectRowSuccess,
   VsMsg,
+  type ViewServerMessage,
   type ViewServerMessageBody,
 } from "../net/Messages";
 import { RequestContext } from "../net/RequestProcessor";
@@ -89,7 +90,10 @@ export class CoreServerApiHandler implements ServerApi {
     private providers: ProviderContainer,
   ) {}
 
-  async process({ requestId, body }: VuuClientMessage, ctx: RequestContext) {
+  async process(
+    { requestId, body }: VuuClientMessage,
+    ctx: RequestContext,
+  ): Promise<ViewServerMessage | undefined> {
     switch (body.type) {
       case "HB_RESP":
         // do nothing
