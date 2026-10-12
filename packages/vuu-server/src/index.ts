@@ -59,7 +59,15 @@ export { RpcParams, type RpcFunction } from "./net/rpc/Rpc";
 export { RequestContext } from "./net/RequestProcessor";
 export { RpcErrorResult, RpcSuccessResult } from "./net/rpc/RpcResult";
 export { DefaultRpcHandler } from "./net/rpc/DefaultRpcHandler";
-export { EditTableRpcHandler } from "./net/rpc/EditTableRpcHandler";
+export {
+  EditTableRpcHandler,
+  type CellEdit,
+} from "./net/rpc/EditTableRpcHandler";
+export {
+  VUU_SYSTEM_COLUMNS,
+  coerceCellValue,
+  isSystemColumn,
+} from "./net/rpc/EditValidation";
 export {
   CreateSessionTableRpcHandler,
   type EditSessionMode,
@@ -67,6 +75,8 @@ export {
 } from "./net/rpc/CreateSessionTableRpcHandler";
 export {
   EndEditSessionRpcHandler,
+  type CanSaveSessionResult,
+  type SessionSaveResult,
   type PreparedSessionChange,
   type PreparedSessionSave,
 } from "./net/rpc/EndEditSessionRpcHandler";

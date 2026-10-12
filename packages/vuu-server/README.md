@@ -278,3 +278,88 @@ as the `action` of `VIEW_PORT_MENU_RESP`:
 `OpenDialogViewPortAction` and `CloseDialogViewPortAction` are aliases of
 `OpenDialog` and `CloseDialog`. `OpenDialog` defaults `renderComponent` to
 `"grid"`, as in Scala Vuu.
+
+## Edit sessions and RPC handlers
+
+`EditTableRpcHandler` serves the edit RPCs (`editCell`, `addRow`,
+`deleteRow`, `deleteSelectedRows`, `undoRowChange`).
+`EndEditSessionRpcHandler` adds `endEditSession`, and
+`CreateSessionTableRpcHandler` adds `createSessionTable` and
+`beginEditSession`. An edit session copies source rows into a session table
+owned by the requesting client session. Edits are made to the session table
+and applied to the source table when the session is saved.
+
+### Secure defaults
+
+- **Session tables only.** Every edit RPC targets a session table. `editCell`
+  on a viewport over a source table returns `ERROR_RESULT`, unless the
+  handler opts in with `canEditSource`.
+- **Session tables are private.** Only the client session that created a
+  session table can open a viewport on it or call edit RPCs against it.
+  Viewport RPCs, row selection, range changes and enable/disable are refused
+  for a viewport owned by another session.
+- **Validated columns and values.** `editCell` refuses:
+  - unknown columns;
+  - the key column;
+  - the system columns (`vuuCreatedTimestamp`, `vuuUpdatedTimestamp`,
+    `vuuMsg`, `vuu_action`; see `VUU_SYSTEM_COLUMNS`);
+  - values that don't match the column's `serverDataType`.
+
+  Numeric and boolean strings (`"42"`, `"true"`) are coerced (see
+  `coerceCellValue`).
+- **Row permissions.** The table's `permissionFunction` applies to editing
+  as well as reading:
+  - `beginEditSession` / `createSessionTable` copy only rows visible to the
+    user. "Selected" ignores keys that aren't visible.
+  - A hidden row can't be selected.
+  - `editCell`, `deleteRow`, `deleteSelectedRows` and `undoRowChange` report
+    a hidden row as not found.
+  - A save is refused if it would delete or edit a hidden source row, or add
+    or edit a row so that it falls outside the user's permissions.
+- **Atomic saves.** If the save fails (a vetoed `canSaveSession`, an
+  `applySessionSave` that returns `false` or `ERROR_RESULT`, or one that
+  throws), the RPC returns `ERROR_RESULT` with the reason. The session table
+  stays open and unchanged, so the user can retry or cancel. The default
+  `applySessionSave` rolls back changes already applied to the source table
+  if a later change fails.
+
+### Hooks
+
+Handlers are created per viewport (see above). Hooks receive the
+`RequestContext` as `ctx` (`validateCellEdit` as `edit.ctx`), with
+`ctx.session` and `ctx.user` (including `authorizations`). Decisions can
+therefore depend on the user and their roles.
+
+| Hook (protected) | Default | Purpose |
+| --- | --- | --- |
+| `canEditSource(viewport, column, ctx)` | `false` | Allow `editCell` to write directly to a non-session (shared) table. Edits are still column, type and permission checked, and `vuuUpdatedTimestamp` is bumped. |
+| `isEditableColumn(table, column, viewport, ctx)` | `true` unless key or system column | Restrict which columns `editCell` accepts. `vuu_action` is never editable. |
+| `validateCellEdit(edit: CellEdit)` | no error | Business validation, after the type and permission checks. Return an error message to refuse the edit. |
+| `isRowAccessible(viewport, key)` | permission filter | Whether a row is visible to the user. For session tables, checks the source row. |
+| `canSaveSession(viewport, prepared, ctx)` | `true` | Authorise a save before it is applied. Return `false` or a reason string to refuse it. May be async. |
+| `applySessionSave(sessionTable, prepared)` | apply atomically, close the session | Return `false` or `ERROR_RESULT`, or throw, to report a failed save. May be async. |
+
+```ts
+class OrderEditService extends CreateSessionTableRpcHandler {
+  protected isEditableColumn(_table, column: string) {
+    return column === "quantity" || column === "price";
+  }
+  protected validateCellEdit({ column, value }: CellEdit) {
+    if (column === "quantity" && (value as number) <= 0) {
+      return "quantity must be positive";
+    }
+  }
+  protected canSaveSession(_vp, _prepared, ctx: RequestContext) {
+    return ctx.user.authorizations.includes("trader") || "traders only";
+  }
+}
+```
+
+A module that edits a shared table directly, e.g. a reference data grid,
+opts in explicitly:
+
+```ts
+protected canEditSource(viewport: Viewport) {
+  return viewport.dataTable.name === "instruments";
+}
+```

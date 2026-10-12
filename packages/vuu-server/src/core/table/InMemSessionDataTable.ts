@@ -2,6 +2,7 @@ import { JoinTableProvider } from "../../provider/JoinTableProvider";
 import { DataTable, InMemDataTable } from "./InMemDataTable";
 import { SessionTableDef } from "../../api/TableDef";
 import { VuuDataRow, VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
+import type { PermissionFilter } from "../filter/PermissionFilter";
 
 export type SessionTableAction = "" | "addRow" | "deleteRow";
 export type SessionRowChange = {
@@ -19,12 +20,28 @@ export class InMemSessionDataTable extends InMemDataTable {
 
   creationTimestamp = Date.now();
   #tableId = crypto.randomUUID();
+  /**
+   * Permission filter of the viewport the session was created from, i.e.
+   * the source rows visible to the session owner. Applied to source rows
+   * when the session is edited and saved.
+   */
+  sourcePermissionFilter: PermissionFilter | undefined;
   constructor(
     private sessionId: string,
     tableDef: SessionTableDef,
     joinProvider: JoinTableProvider,
   ) {
     super(tableDef, joinProvider);
+  }
+
+  /** Id of the client session that owns this session table. */
+  get ownerSessionId() {
+    return this.sessionId;
+  }
+
+  /** true if the row was added in this session (it has no source row). */
+  isAddedRow(key: string) {
+    return this.#changes.get(key)?.action === "addRow";
   }
 
   update(rowIdx: number, row: VuuDataRow, columnName?: string) {

@@ -7,6 +7,8 @@ import { EndEditSessionRpcHandler } from "./EndEditSessionRpcHandler";
 import { RpcParams } from "./Rpc";
 import { RpcNames } from "../../util/RpcNames";
 import type { Column } from "../../api/TableDef";
+import { InMemSessionDataTable } from "../../core/table/InMemSessionDataTable";
+import { isRowPermitted, permissionPredicate } from "./EditValidation";
 
 export type SessionTableCopyOption = "All" | "Empty" | "Selected";
 export type EditSessionMode =
@@ -79,27 +81,54 @@ export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
     }
   }
 
+  /**
+   * Copies source rows into a new session table owned by ctx.session. Only
+   * rows visible through the viewport's permission filter are copied, the
+   * filter is retained by the session table and applied to subsequent edits
+   * and to the save.
+   */
   private copySessionTable(
     sourceTable: DataTable,
     copyOption: SessionTableCopyOption | EditSessionMode,
     ctx: RequestContext,
     viewport: Viewport,
   ) {
+    if (sourceTable instanceof InMemSessionDataTable) {
+      throw Error(
+        "createSessionTable: viewport is already using a session table",
+      );
+    }
+
+    const { permissionFilter } = viewport;
+    const isVisible = permissionPredicate(
+      permissionFilter,
+      sourceTable.columnMap,
+    );
+
     const sessionTable = this.tableContainer.createSimpleSessionTable(
       sourceTable,
       ctx.session,
       this.getSessionTableCustomColumns(sourceTable),
     );
+    sessionTable.sourcePermissionFilter = permissionFilter;
 
     try {
       if (copyOption === "All" || copyOption.endsWith("all-rows")) {
-        sourceTable.rows.forEach((row) => sessionTable.insertSourceRow(row));
+        sourceTable.rows.forEach((row) => {
+          if (isRowPermitted(isVisible, row)) {
+            sessionTable.insertSourceRow(row);
+          }
+        });
       } else if (
         copyOption === "Selected" ||
         copyOption === "selected-rows"
       ) {
+        // keys that are not (or no longer) visible are ignored
         viewport.selectedKeys.forEach((key) => {
-          sessionTable.insertSourceRow(sourceTable.getRowAtKey(key));
+          const row = sourceTable.getRowAtKey(key, false);
+          if (isRowPermitted(isVisible, row)) {
+            sessionTable.insertSourceRow(row);
+          }
         });
       } else if (
         copyOption !== "Empty" &&

@@ -21,6 +21,7 @@ import { ViewPortDef } from "../api/ViewPortDef";
 import type { Column } from "../api/TableDef";
 import { RpcParams } from "../net/rpc/Rpc";
 import { DataTable, isDataTable } from "../core/table/InMemDataTable";
+import { InMemSessionDataTable } from "../core/table/InMemSessionDataTable";
 import {
   CellViewPortMenuItem,
   MenuRpcTypeForContext,
@@ -137,6 +138,13 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     }: VuuViewportCreateRequest,
   ) {
     const { sessionId } = clientSessionId;
+    if (
+      table instanceof InMemSessionDataTable &&
+      table.ownerSessionId !== sessionId
+    ) {
+      // a session table is private to the client session that created it
+      throw Error(`[ViewportContainer] no table ${table.name}`);
+    }
     const id = ViewPortId.oneNew();
     log.debug(`create vp ${id}, table ${table.name}`);
     const viewPortDef = this.getViewPortDefinition(table);
@@ -184,7 +192,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   ) {
     // console.log(`[ViewPortContainer] change range ${range.from} - ${range.to}`);
 
-    const viewport = this.getViewportById(vpId);
+    const viewport = this.getViewportForSession(vpId, clientSession);
     if (viewport) {
       viewport.setRange(range);
     } else {
@@ -197,7 +205,23 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (viewport) {
       return viewport;
     } else {
-      throw Error(`[ViewportContainer] viewport not found ${viewport}`);
+      throw Error(`[ViewportContainer] viewport not found ${viewportId}`);
+    }
+  }
+
+  /**
+   * As getViewportById, but only returns viewports owned by the client
+   * session. Viewports of other sessions are reported as not found.
+   */
+  getViewportForSession(
+    viewportId: string,
+    clientSessionId: Pick<ClientSessionId, "sessionId">,
+  ) {
+    const viewport = this.#viewports.get(viewportId);
+    if (viewport && viewport.sessionId === clientSessionId.sessionId) {
+      return viewport;
+    } else {
+      throw Error(`[ViewportContainer] viewport not found ${viewportId}`);
     }
   }
 
@@ -245,7 +269,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
 
   disableViewport(viewportId: string, clientSessionId: ClientSessionId) {
     log.debug(`disableViewport ${viewportId}`);
-    const viewport = this.getViewportById(viewportId);
+    const viewport = this.getViewportForSession(viewportId, clientSessionId);
     if (viewport.enabled) {
       viewport.enabled = false;
     } else {
@@ -256,7 +280,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
   enableViewport(viewportId: string, clientSessionId: ClientSessionId) {
     log.debug(`enableViewport ${viewportId}`);
-    const viewport = this.getViewportById(viewportId);
+    const viewport = this.getViewportForSession(viewportId, clientSessionId);
     if (!viewport.enabled) {
       viewport.enabled = true;
     } else {
@@ -342,7 +366,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     params: Record<string, unknown>,
     ctx: RequestContext,
   ): RpcResult | Promise<RpcResult> {
-    const viewport = this.getViewportById(viewPortId);
+    const viewport = this.getViewportForSession(viewPortId, ctx.session);
     return viewport.viewPortDef.service.processRpcRequest(
       rpcName,
       RpcParams(params, viewport, ctx),
@@ -355,7 +379,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     rowKey: string,
     preserveExistingSelection: boolean,
   ) {
-    const viewport = this.getViewportById(viewPortId);
+    const viewport = this.getViewportForSession(viewPortId, clientSessionId);
 
     const { selectedRowCount } = viewport.selectRow(
       rowKey,
@@ -371,7 +395,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     rowKey: string,
     preserveExistingSelection: boolean,
   ) {
-    const viewport = this.getViewportById(viewPortId);
+    const viewport = this.getViewportForSession(viewPortId, clientSessionId);
     const { selectedRowCount } = viewport.deselectRow(
       rowKey,
       preserveExistingSelection,
