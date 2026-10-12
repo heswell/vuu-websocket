@@ -184,8 +184,12 @@ export {
   resolveKeycloakClientSecret,
   type VuuKeycloakClientId,
 } from "./net/auth/KeycloakClientSecrets";
-export { createConfiguredAuthProviders } from "./net/auth/ConfiguredAuthProviders";
+export {
+  createConfiguredAuthProviders,
+  getConfiguredAuthMode,
+} from "./net/auth/ConfiguredAuthProviders";
 export { composeHttpHandlers } from "./net/http/composeHttpHandlers";
+export { PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH } from "./net/http/RestServer";
 export * from "./net/http/admin/AdminHttpHandler";
 export * from "./net/http/admin/NotificationAdminRoutes";
 export type {

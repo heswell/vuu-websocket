@@ -10,12 +10,20 @@ const AuthConfigKeys = {
   permissiveUsers: "vuu.auth.permissive.users",
 } as const;
 
+/**
+ * The effective auth mode: `vuu.auth.mode`, else the VUU_AUTH_MODE env var,
+ * else "keycloak". Always lower case.
+ */
+export function getConfiguredAuthMode(config: Config): string {
+  return config
+    .getString(AuthConfigKeys.mode, process.env.VUU_AUTH_MODE ?? "keycloak")
+    .toLowerCase();
+}
+
 export function createConfiguredAuthProviders(
   config: Config,
 ): AuthenticationProviders {
-  const mode = config
-    .getString(AuthConfigKeys.mode, process.env.VUU_AUTH_MODE ?? "keycloak")
-    .toLowerCase();
+  const mode = getConfiguredAuthMode(config);
 
   if (mode === "permissive") {
     return {

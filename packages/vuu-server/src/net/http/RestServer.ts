@@ -6,13 +6,28 @@ import {
 
 const DEFAULT_REST_HTTPS_PORT = 8443;
 
+export const PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH =
+  'REST auth over plain HTTP is only allowed with vuu.auth.mode="permissive"; set vuu.ssl=true with vuu.certPath/vuu.keyPath';
+
 export class RestServer {
   #server: Bun.Server<unknown> | undefined;
+  #scheme: "http" | "https" = "https";
 
   constructor(
     private readonly webSocketOptions: VuuWebSocketOptions,
     private readonly httpServerOptions: HttpServerOptions,
   ) {}
+
+  get port() {
+    return this.#server?.port;
+  }
+
+  get url() {
+    const server = this.#server;
+    return server
+      ? `${this.#scheme}://${server.hostname}:${server.port}`
+      : undefined;
+  }
 
   start() {
     if (this.#server) {
@@ -20,6 +35,7 @@ export class RestServer {
     }
     const { sslOptions } = this.webSocketOptions;
     const {
+      authMode,
       requestHandler,
       httpsPort = DEFAULT_REST_HTTPS_PORT,
     } = this.httpServerOptions;
@@ -27,18 +43,26 @@ export class RestServer {
       return;
     }
 
-    if (!sslEnabled(sslOptions)) {
-      throw new Error(
-        "REST HTTPS server requires SSL to be enabled in VuuWebSocketOptions",
+    const tls = sslEnabled(sslOptions)
+      ? {
+          cert: Bun.file(sslOptions.certPath),
+          key: Bun.file(sslOptions.keyPath),
+        }
+      : undefined;
+
+    if (!tls) {
+      if (authMode?.toLowerCase() !== "permissive") {
+        throw new Error(PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH);
+      }
+      console.warn(
+        "[VUU] WARNING: REST server (including /api/authn) is running over plain HTTP without TLS (vuu.ssl=false, vuu.auth.mode=permissive). Local development only.",
       );
     }
 
+    this.#scheme = tls ? "https" : "http";
     this.#server = Bun.serve({
       port: httpsPort,
-      tls: {
-        cert: Bun.file(sslOptions.certPath),
-        key: Bun.file(sslOptions.keyPath),
-      },
+      tls,
       async fetch(req) {
         const url = new URL(req.url);
         const response = await requestHandler(req, url);
@@ -50,9 +74,7 @@ export class RestServer {
       },
     });
 
-    console.log(
-      `[VUU] REST listening on https://${this.#server.hostname}:${this.#server.port}`,
-    );
+    console.log(`[VUU] REST listening on ${this.url}`);
   }
 
   async stop() {
