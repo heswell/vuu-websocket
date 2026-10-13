@@ -6,10 +6,15 @@ the login response. Requires the [Bun](https://bun.sh) runtime to run the
 server. The library exports can be imported under Node.js too.
 
 ```sh
-npm install @heswell/vuu-portal
+npm install @heswell/vuu-portal @heswell/vuu-server @heswell/vuu-table
 # TypeScript consumers: the vuu-server declarations reference Bun types
 npm install -D @types/bun
 ```
+
+`@heswell/vuu-server` and `@heswell/vuu-table` are peer dependencies, so the
+portal shares the application's single copy of each. Two copies would mean two
+module registries and failing `instanceof` checks. npm 7+ and bun install
+missing peers automatically.
 
 ## Entry points
 
