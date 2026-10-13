@@ -46,29 +46,38 @@ const order = (
  */
 const setup = (
   Handler: typeof CreateSessionTableRpcHandler = CreateSessionTableRpcHandler,
+  { timestamps = true } = {},
 ) => {
+  const withoutTimestamps = (row: VuuDataRow) =>
+    timestamps ? row : row.filter((_, index) => index !== 5 && index !== 6);
   const joinProvider = new JoinTableProvider();
   const tableDef = TableDef({
     name: "orders",
     keyField: "id",
     columns: Columns.fromNames(
-      "id:string",
-      "trader:string",
-      "price:double",
-      "qty:int",
-      "active:boolean",
-      "vuuCreatedTimestamp:epochtimestamp",
-      "vuuUpdatedTimestamp:epochtimestamp",
-      "vuuMsg:string",
+      ...[
+        "id:string",
+        "trader:string",
+        "price:double",
+        "qty:int",
+        "active:boolean",
+        "vuuCreatedTimestamp:epochtimestamp",
+        "vuuUpdatedTimestamp:epochtimestamp",
+        "vuuMsg:string",
+      ].filter(
+        (column) =>
+          timestamps ||
+          (!column.startsWith("vuuC") && !column.startsWith("vuuU")),
+      ),
     ),
     permissionFunction: (viewport) =>
       PermissionFilter("trader", new Set([viewport.user.name])),
   });
   tableDef.setModule({ name: "TEST" } as ViewServerModule);
   const orders = new InMemDataTable(tableDef, joinProvider);
-  orders.insert(order("o1", "steve", 10, 100));
-  orders.insert(order("o2", "alice", 20, 200));
-  orders.insert(order("o3", "steve", 30, 300));
+  orders.insert(withoutTimestamps(order("o1", "steve", 10, 100)));
+  orders.insert(withoutTimestamps(order("o2", "alice", 20, 200)));
+  orders.insert(withoutTimestamps(order("o3", "steve", 30, 300)));
 
   const tableContainer = new TableContainer(joinProvider);
   tableContainer.addTable(orders);
@@ -134,8 +143,16 @@ const setup = (
     return { sessionTable, sessionVp: createViewport(sessionTable) };
   };
 
+  /** Concurrent change to a source row, outside the session. */
+  const updateSource = (key: string, column: string, value: unknown) => {
+    const row = orders.getRowAtKey(key).slice();
+    row[orders.columnMap[column]] = value as VuuDataRow[number];
+    orders.update(orders.rowIndexAtKey(key), row);
+  };
+
   return {
     beginSession,
+    updateSource,
     call,
     createViewport,
     ctxFor,
@@ -691,5 +708,132 @@ describe("session save (trader upstream issue 18)", () => {
       ctx.tableContainer.getTable(sessionTable.name) === sessionTable,
     ).toBe(true);
     expect(sessionTable.getSessionChanges()).toHaveLength(2);
+  });
+});
+
+describe("stale rows at session save (trader upstream issue 61)", () => {
+  for (const timestamps of [true, false]) {
+    describe(
+      timestamps ? "with vuuUpdatedTimestamp" : "without vuuUpdatedTimestamp",
+      () => {
+        const editThenChangeSource = (column: string, value: unknown) => {
+          const ctx = setup(CreateSessionTableRpcHandler, { timestamps });
+          const { sessionTable, sessionVp } = ctx.beginSession(
+            ctx.createViewport(ctx.orders),
+          );
+          expect(
+            ctx.call("editCell", sessionVp, {
+              key: "o1",
+              column: "price",
+              data: 11,
+            }),
+          ).toEqual(ok);
+          ctx.updateSource("o1", column, value);
+          return { ...ctx, sessionTable, sessionVp };
+        };
+        const msg = (table: InMemDataTable, key: string) =>
+          table.getRowAtKey(key)[table.columnMap.vuuMsg];
+
+        test("a concurrent change to another column fails the save and keeps the session open", () => {
+          const ctx = editThenChangeSource("qty", 999);
+          expect(
+            ctx.call("endEditSession", ctx.sessionVp, { save: true }),
+          ).toEqual(error("stale update"));
+          expect(ctx.orders.getRowAtKey("o1")[ctx.orders.columnMap.price]).toBe(
+            10,
+          );
+          expect(ctx.orders.getRowAtKey("o1")[ctx.orders.columnMap.qty]).toBe(
+            999,
+          );
+          expect(ctx.tableContainer.hasTable(ctx.sessionTable.name)).toBe(true);
+          expect(ctx.sessionTable.getSessionChanges()).toHaveLength(1);
+          expect(msg(ctx.sessionTable, "o1")).toContain("stale:o1:qty");
+        });
+
+        test("a concurrent change to the edited column fails the save", () => {
+          const ctx = editThenChangeSource("price", 15);
+          expect(
+            ctx.call("endEditSession", ctx.sessionVp, { save: true }),
+          ).toEqual(error("stale update"));
+          expect(ctx.orders.getRowAtKey("o1")[ctx.orders.columnMap.price]).toBe(
+            15,
+          );
+          expect(msg(ctx.sessionTable, "o1")).toContain("stale:o1:price");
+        });
+
+        test("a stale deleteRow fails the save", () => {
+          const ctx = setup(CreateSessionTableRpcHandler, { timestamps });
+          const { sessionVp } = ctx.beginSession(
+            ctx.createViewport(ctx.orders),
+          );
+          expect(ctx.call("deleteRow", sessionVp, { key: "o3" })).toEqual(ok);
+          ctx.updateSource("o3", "qty", 1);
+          expect(ctx.call("endEditSession", sessionVp, { save: true })).toEqual(
+            error("stale update"),
+          );
+          expect(ctx.orders.getRowAtKey("o3", false)).toBeDefined();
+        });
+
+        test("changes to rows the session did not edit don't block the save", () => {
+          const ctx = editThenChangeSource("qty", 999);
+          ctx.call("undoRowChange", ctx.sessionVp, { key: "o1" });
+          ctx.call("editCell", ctx.sessionVp, {
+            key: "o1",
+            column: "price",
+            data: 11,
+          });
+          ctx.updateSource("o3", "qty", 1);
+          expect(
+            ctx.call("endEditSession", ctx.sessionVp, { save: true }),
+          ).toEqual(ok);
+          expect(ctx.orders.getRowAtKey("o1")[ctx.orders.columnMap.price]).toBe(
+            11,
+          );
+        });
+
+        test("force saves over a stale row", () => {
+          const ctx = editThenChangeSource("qty", 999);
+          expect(
+            ctx.call("endEditSession", ctx.sessionVp, {
+              save: true,
+              force: true,
+            }),
+          ).toEqual(ok);
+          const row = ctx.orders.getRowAtKey("o1");
+          expect(row[ctx.orders.columnMap.price]).toBe(11);
+          expect(row[ctx.orders.columnMap.qty]).toBe(999);
+        });
+
+        test("undoRowChange re-bases the row on the live source row", () => {
+          const ctx = editThenChangeSource("qty", 999);
+          expect(
+            ctx.call("undoRowChange", ctx.sessionVp, { key: "o1" }),
+          ).toEqual(ok);
+          expect(
+            ctx.call("editCell", ctx.sessionVp, {
+              key: "o1",
+              column: "price",
+              data: 12,
+            }),
+          ).toEqual(ok);
+          expect(
+            ctx.call("endEditSession", ctx.sessionVp, { save: true }),
+          ).toEqual(ok);
+          const row = ctx.orders.getRowAtKey("o1");
+          expect(row[ctx.orders.columnMap.price]).toBe(12);
+          expect(row[ctx.orders.columnMap.qty]).toBe(999);
+        });
+      },
+    );
+  }
+
+  test("without vuuUpdatedTimestamp the save does not write a timestamp", () => {
+    const ctx = setup(CreateSessionTableRpcHandler, { timestamps: false });
+    const { sessionVp } = ctx.beginSession(ctx.createViewport(ctx.orders));
+    ctx.call("editCell", sessionVp, { key: "o1", column: "price", data: 11 });
+    expect(ctx.call("endEditSession", sessionVp, { save: true })).toEqual(ok);
+    const row = ctx.orders.getRowAtKey("o1");
+    expect(row).toHaveLength(ctx.orders.schema.columns.length);
+    expect(Object.keys(row)).not.toContain("undefined");
   });
 });

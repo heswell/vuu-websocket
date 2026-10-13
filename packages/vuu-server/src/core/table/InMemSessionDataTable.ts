@@ -11,12 +11,19 @@ export type SessionRowChange = {
   key: string;
   lastUpdateTimestamp?: number;
   row: VuuDataRow;
+  /**
+   * Copy of the source row taken when it was copied into the session (or
+   * when a change was undone). Used at save to detect concurrent changes
+   * to the source row, whether or not the table has a vuuUpdatedTimestamp.
+   */
+  sourceSnapshot?: VuuDataRow;
 };
 
 type SessionChangeState = Omit<SessionRowChange, "key" | "row">;
 
 export class InMemSessionDataTable extends InMemDataTable {
   #changes = new Map<string, SessionChangeState>();
+  #sourceSnapshots = new Map<string, VuuDataRow>();
 
   creationTimestamp = Date.now();
   #tableId = crypto.randomUUID();
@@ -67,6 +74,7 @@ export class InMemSessionDataTable extends InMemDataTable {
   }
 
   insertSourceRow(row: VuuDataRow) {
+    this.#sourceSnapshots.set(row[this.indexOfKeyField] as string, row.slice());
     const sessionRow = new Array(this.schema.columns.length).fill("");
     row.forEach((value, index) => {
       sessionRow[index] = value;
@@ -149,6 +157,7 @@ export class InMemSessionDataTable extends InMemDataTable {
       restoredRow[index] = value;
     });
     this.#changes.delete(key);
+    this.#sourceSnapshots.set(key, sourceRow.slice());
     super.update(this.rowIndexAtKey(key), restoredRow);
   }
 
@@ -157,7 +166,13 @@ export class InMemSessionDataTable extends InMemDataTable {
       ...change,
       key,
       row: this.getRowAtKey(key),
+      sourceSnapshot: this.#sourceSnapshots.get(key),
     }));
+  }
+
+  /** The source row as it was when copied into the session, if any. */
+  getSourceSnapshot(key: string): VuuDataRow | undefined {
+    return this.#sourceSnapshots.get(key);
   }
 
   get name() {

@@ -324,6 +324,16 @@ and applied to the source table when the session is saved.
   stays open and unchanged, so the user can retry or cancel. The default
   `applySessionSave` rolls back changes already applied to the source table
   if a later change fails.
+- **Stale rows are detected on any table.** When a source row is copied into
+  the session, the session keeps a snapshot of it. At save, every edited or
+  deleted row is compared with the live source row on all columns. If
+  anything changed (or the row was deleted), the save fails with
+  `ERROR_RESULT` `"stale update"`, the session stays open, and the row's
+  `vuuMsg` names it: `stale:<key>:<changed columns>`. The table does not need
+  a `vuuUpdatedTimestamp` column. `undoRowChange` re-bases the row on the
+  live source row, and `force: true` saves over stale rows. For tables with
+  ticking columns (e.g. market prices) that should not block a save,
+  override `getStaleColumns(sourceTable, sourceRow, change)` to ignore them.
 
 ### Hooks
 
@@ -339,6 +349,7 @@ therefore depend on the user and their roles.
 | `validateCellEdit(edit: CellEdit)` | no error | Business validation, after the type and permission checks. Return an error message to refuse the edit. |
 | `isRowAccessible(viewport, key)` | permission filter | Whether a row is visible to the user. For session tables, checks the source row. |
 | `canSaveSession(viewport, prepared, ctx)` | `true` | Authorise a save before it is applied. Return `false` or a reason string to refuse it. May be async. |
+| `getStaleColumns(sourceTable, sourceRow, change)` | all columns that differ from the session snapshot | Decide which concurrent source changes make a row stale. Return `[]` to accept the row. |
 | `applySessionSave(sessionTable, prepared)` | apply atomically, close the session | Return `false` or `ERROR_RESULT`, or throw, to report a failed save. May be async. |
 
 ```ts

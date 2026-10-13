@@ -201,7 +201,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     let hasPermissionError = false;
 
     for (const change of sessionTable.getSessionChanges()) {
-      const { action, cellUpdates, key, lastUpdateTimestamp, row } = change;
+      const { action, cellUpdates, key, row } = change;
       const sourceRow = sourceTable.getRowAtKey(key, false);
 
       if (action === "addRow") {
@@ -237,18 +237,23 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
         continue;
       }
 
-      if (
-        lastUpdateTimestamp !== sourceRow[columnMap.vuuUpdatedTimestamp] &&
-        !force
-      ) {
-        const updateTimestamp = sourceRow[columnMap.vuuUpdatedTimestamp];
+      const changedColumns = force
+        ? []
+        : this.getStaleColumns(sourceTable, sourceRow, change);
+      if (changedColumns.length > 0) {
+        const tsIndex = columnMap.vuuUpdatedTimestamp;
+        const updateTimestamp =
+          tsIndex === undefined ? undefined : sourceRow[tsIndex];
+        const suffix =
+          updateTimestamp === undefined ? "" : `:${updateTimestamp}`;
         const messages = Object.entries(cellUpdates).map(
           ([column, value]) =>
-            `${column}:${value}:${sourceRow[columnMap[column]]}:${updateTimestamp}`,
+            `${column}:${value}:${sourceRow[columnMap[column]]}${suffix}`,
         );
         if (action === "deleteRow") {
-          messages.push(`deleteRow:${key}:${updateTimestamp}`);
+          messages.push(`deleteRow:${key}${suffix}`);
         }
+        messages.push(`stale:${key}:${changedColumns.join("|")}`);
         this.setSessionRowMessage(sessionTable, row, messages.join(","));
         hasStaleUpdate = true;
         continue;
@@ -316,7 +321,8 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
             sourceRow,
             cellUpdates,
           );
-          updatedRow[sourceTable.columnMap.vuuUpdatedTimestamp] = Date.now();
+          const tsIndex = sourceTable.columnMap.vuuUpdatedTimestamp;
+          if (tsIndex !== undefined) updatedRow[tsIndex] = Date.now();
           sourceTable.update(sourceTable.rowIndexAtKey(key), updatedRow);
           undo.push(() =>
             sourceTable.update(sourceTable.rowIndexAtKey(key), previousRow),
@@ -338,6 +344,34 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     }
 
     this.tableContainer.removeSessionTable(sessionTable.name);
+  }
+
+  /**
+   * Names of the source columns that changed since the row was copied into
+   * the session. Compares the live source row with the snapshot taken when
+   * the session was created, so it works for tables without a
+   * vuuUpdatedTimestamp column. When there is no snapshot, falls back to
+   * the vuuUpdatedTimestamp captured when the row was first edited.
+   */
+  protected getStaleColumns(
+    sourceTable: DataTable,
+    sourceRow: VuuDataRow,
+    { lastUpdateTimestamp, sourceSnapshot }: SessionRowChange,
+  ): string[] {
+    const { columns } = sourceTable.schema;
+    const tsIndex = sourceTable.columnMap.vuuUpdatedTimestamp;
+    if (sourceSnapshot) {
+      return columns
+        .filter(({ name }) => {
+          const index = sourceTable.columnMap[name];
+          return !Object.is(sourceSnapshot[index], sourceRow[index]);
+        })
+        .map(({ name }) => name);
+    }
+    if (tsIndex !== undefined && lastUpdateTimestamp !== sourceRow[tsIndex]) {
+      return ["vuuUpdatedTimestamp"];
+    }
+    return [];
   }
 
   private toSourceRow(
