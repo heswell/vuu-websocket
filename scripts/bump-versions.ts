@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
   getPublishablePackage,
+  nextDependencyRange,
   type PublishablePackageName,
   PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
@@ -130,11 +131,11 @@ const updateDependencies = (
     if (!dependencies || typeof dependencies !== "object") continue;
 
     const dependencyVersions = dependencies as Record<string, unknown>;
-    if (
-      dependencyVersions[packageName] !== undefined &&
-      dependencyVersions[packageName] !== version
-    ) {
-      dependencyVersions[packageName] = version;
+    const current = dependencyVersions[packageName];
+    if (typeof current !== "string") continue;
+    const next = nextDependencyRange(current, version, section);
+    if (next !== current) {
+      dependencyVersions[packageName] = next;
       changed = true;
     }
   }

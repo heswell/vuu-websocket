@@ -48,3 +48,18 @@ export const getPublishablePackage = (packageName: string) =>
 export const PUBLISHABLE_PACKAGE_NAMES_TEXT = PUBLISHABLE_PACKAGES.map(
   ({ name }) => name,
 ).join(", ");
+
+// Keeps the range operator (^, ~) of an existing dependency so published
+// packages do not pin their siblings. A peer range that already admits the new
+// version is left alone, so dependents need no republish for a compatible bump.
+export const nextDependencyRange = (
+  current: string,
+  version: string,
+  section: string,
+) => {
+  if (section === "peerDependencies" && Bun.semver.satisfies(version, current)) {
+    return current;
+  }
+  const prefix = /^[\^~]/.exec(current)?.[0] ?? "";
+  return `${prefix}${version}`;
+};

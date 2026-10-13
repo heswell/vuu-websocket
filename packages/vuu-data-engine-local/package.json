@@ -23,10 +23,10 @@
     "bench": "vitest bench --run"
   },
   "dependencies": {
-    "@heswell/module-admin": "2.0.1",
-    "@heswell/user-admin": "1.0.2",
-    "@heswell/vuu-table": "1.0.1",
-    "@heswell/vuu-viewport": "1.1.2",
+    "@heswell/module-admin": "^2.0.1",
+    "@heswell/user-admin": "^1.0.2",
+    "@heswell/vuu-table": "^1.0.1",
+    "@heswell/vuu-viewport": "^1.1.2",
     "@vuu-ui/vuu-data-editing": "4.0.0-alpha.20",
     "@vuu-ui/vuu-data-local": "4.0.0-alpha.20",
     "@vuu-ui/vuu-filter-parser": "4.0.0-alpha.20",
