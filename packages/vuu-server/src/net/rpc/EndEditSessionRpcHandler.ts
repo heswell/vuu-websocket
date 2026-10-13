@@ -1,4 +1,5 @@
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
+import { getLogger } from "@heswell/service-utils";
 import { TableContainer } from "../../core/table/TableContainer";
 import {
   InMemSessionDataTable,
@@ -38,6 +39,8 @@ export type SessionSaveResult = void | boolean | RpcResult;
 
 const SAVE_NOT_PERMITTED = "endEditSession: save not permitted";
 const SAVE_FAILED = "endEditSession: save failed";
+
+const log = getLogger("vuu.rpc");
 
 const errorResult = (errorMessage: string): RpcResult => ({
   type: "ERROR_RESULT",
@@ -134,11 +137,17 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     reprepare?: () => PreparedSessionSave | RpcResult,
   ): RpcResult | Promise<RpcResult> {
     const fail = (errorMessage: string) => {
+      log.debug(`endEditSession: save refused, ${errorMessage}`);
       // applySessionSave may have closed the session before failing
       this.tableContainer.restoreSessionTable(sessionTable);
       return errorResult(errorMessage);
     };
-    const onError = (error: unknown) => fail(messageOf(error));
+    const onError = (error: unknown) => {
+      log.warn(
+        `endEditSession: save of ${sessionTable.name} threw, ${messageOf(error)}`,
+      );
+      return fail(messageOf(error));
+    };
 
     let isAsync = false;
     return chain(
@@ -198,6 +207,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     const preparedChanges: PreparedSessionChange[] = [];
     let hasDuplicateKey = false;
     let hasStaleUpdate = false;
+    const staleKeys: string[] = [];
     let hasPermissionError = false;
 
     for (const change of sessionTable.getSessionChanges()) {
@@ -233,6 +243,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
           row,
           `${action || "editRow"}:${key}:source row missing`,
         );
+        staleKeys.push(key);
         hasStaleUpdate = true;
         continue;
       }
@@ -255,6 +266,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
         }
         messages.push(`stale:${key}:${changedColumns.join("|")}`);
         this.setSessionRowMessage(sessionTable, row, messages.join(","));
+        staleKeys.push(key);
         hasStaleUpdate = true;
         continue;
       }
@@ -276,6 +288,9 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       preparedChanges.push({ ...change, sourceRow });
     }
 
+    if (staleKeys.length > 0) {
+      log.debug(`endEditSession: stale rows ${staleKeys.join(",")}`);
+    }
     if (hasDuplicateKey) {
       return errorResult("duplicate key");
     }
@@ -334,9 +349,8 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
         try {
           undoChange();
         } catch (undoError) {
-          console.error(
-            `[EndEditSessionRpcHandler] failed to roll back session save`,
-            undoError,
+          log.error(
+            `endEditSession: failed to roll back session save, ${messageOf(undoError)}`,
           );
         }
       }
