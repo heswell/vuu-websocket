@@ -68,4 +68,18 @@ export class TableContainer {
     // do we need to do any kind of cleanup
     this.#tables.delete(tableName);
   }
+
+  hasTable(tableName: string) {
+    return this.#tables.has(tableName);
+  }
+
+  /**
+   * Re-register a session table, e.g. one removed by a session save that
+   * subsequently failed.
+   */
+  restoreSessionTable(table: InMemSessionDataTable) {
+    if (!this.#tables.has(table.name)) {
+      this.#tables.set(table.name, table);
+    }
+  }
 }

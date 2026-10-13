@@ -245,7 +245,10 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     try {
-      const viewport = this.viewPortContainer.getViewportById(viewPortId);
+      const viewport = this.viewPortContainer.getViewportForSession(
+        viewPortId,
+        ctx.session,
+      );
       viewport.changeViewport(options);
       return vsMsg(ChangeViewPortSuccess(viewPortId, options), ctx);
     } catch (e) {
@@ -261,7 +264,10 @@ export class CoreServerApiHandler implements ServerApi {
     { vpId }: VuuViewportVisualLinksRequest,
     ctx: RequestContext,
   ) {
-    const links = this.viewPortContainer.getViewPortVisualLinks(vpId);
+    const links = this.viewPortContainer.getViewPortVisualLinks(
+      vpId,
+      ctx.session,
+    );
     return vsMsg(GetViewPortVisualLinksResponse(vpId, links), ctx);
   }
 
@@ -269,7 +275,10 @@ export class CoreServerApiHandler implements ServerApi {
     { vpId }: VuuViewportMenusRequest,
     ctx: RequestContext,
   ) {
-    const viewPort = this.viewPortContainer.getViewportById(vpId);
+    const viewPort = this.viewPortContainer.getViewportForSession(
+      vpId,
+      ctx.session,
+    );
     const menu = viewPort.viewPortDef.service.menuItems.asJson;
     return vsMsg(GetViewPortMenusResponse(vpId, asRootMenu(menu)), ctx);
   }
@@ -435,7 +444,7 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     try {
-      this.viewPortContainer.removeViewport(viewPortId);
+      this.viewPortContainer.removeViewport(viewPortId, ctx.session);
       return vsMsg(
         {
           type: "REMOVE_VP_SUCCESS",
@@ -475,7 +484,10 @@ export class CoreServerApiHandler implements ServerApi {
 
   private processSelectAllRequest(msg: SelectAllRequest, ctx: RequestContext) {
     try {
-      const selectedRowCount = this.viewPortContainer.selectAll(msg.vpId);
+      const selectedRowCount = this.viewPortContainer.selectAll(
+        msg.vpId,
+        ctx.session,
+      );
       return vsMsg(SelectAllSuccess(msg.vpId, selectedRowCount), ctx);
     } catch (e) {
       return vsMsg(
@@ -489,7 +501,7 @@ export class CoreServerApiHandler implements ServerApi {
     msg: DeselectAllRequest,
     ctx: RequestContext,
   ) {
-    this.viewPortContainer.deselectAll(msg.vpId);
+    this.viewPortContainer.deselectAll(msg.vpId, ctx.session);
     return vsMsg(DeselectAllSuccess(msg.vpId), ctx);
   }
 
@@ -503,6 +515,7 @@ export class CoreServerApiHandler implements ServerApi {
         msg.fromRowKey,
         msg.toRowKey,
         msg.preserveExistingSelection,
+        ctx.session,
       );
       return vsMsg(SelectRowRangeSuccess(msg.vpId, selectedRowCount), ctx);
     } catch (e) {}
@@ -515,7 +528,7 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     try {
-      this.viewPortContainer.openTreeNode(vpId, treeKey);
+      this.viewPortContainer.openTreeNode(vpId, treeKey, ctx.session);
       return vsMsg({ type: "OPEN_TREE_SUCCESS" }, ctx);
     } catch (e) {
       return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
@@ -527,7 +540,7 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     try {
-      this.viewPortContainer.closeTreeNode(vpId, treeKey);
+      this.viewPortContainer.closeTreeNode(vpId, treeKey, ctx.session);
       return vsMsg({ type: "CLOSE_TREE_SUCCESS" }, ctx);
     } catch (e) {
       return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
@@ -549,6 +562,7 @@ export class CoreServerApiHandler implements ServerApi {
         parentVpId,
         childColumnName,
         parentColumnName,
+        ctx.session,
       );
       return vsMsg(
         {
@@ -570,7 +584,7 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     try {
-      this.viewPortContainer.unlinkViewPorts(childVpId);
+      this.viewPortContainer.unlinkViewPorts(childVpId, ctx.session);
       return vsMsg({ childVpId, type: "REMOVE_VISUAL_LINK_SUCCESS" }, ctx);
     } catch (e) {
       return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);

@@ -11,6 +11,7 @@ import type { Table } from "@heswell/vuu-table";
 import {
   inMemoryDataEngine,
   type DataEngine,
+  type RowPredicate,
   type ViewportBatch,
   type ViewportConfig,
   type ViewportEngine,
@@ -252,6 +253,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
   #id: string;
   #outboundQ: PublishQueue<ViewPortUpdate>;
   #permissionFilter: PermissionFilter | undefined;
+  #permissionPredicate: RowPredicate | undefined;
   #requestId: string = "";
   #table: DataTable;
   #user: VuuUser;
@@ -366,14 +368,24 @@ export class Viewport extends EventEmitter<ViewportEvents> {
 
   set permissionFilter(permissionFilter: PermissionFilter | undefined) {
     this.#permissionFilter = permissionFilter;
-    this.post(
-      this.#engine.setPermissionFilter(
-        permissionFilter === undefined ||
-          permissionFilter === AllowAllPermissionFilter
-          ? undefined
-          : permissionFilter.createPredicate(this.#table.columnMap),
-      ),
-    );
+    this.#permissionPredicate =
+      permissionFilter === undefined ||
+      permissionFilter === AllowAllPermissionFilter
+        ? undefined
+        : permissionFilter.createPredicate(this.#table.columnMap);
+    this.post(this.#engine.setPermissionFilter(this.#permissionPredicate));
+  }
+
+  /**
+   * false if key identifies a table row hidden by the permission filter. When
+   * grouped, keys that are not table row keys are treated as tree keys, group
+   * nodes only ever contain permitted rows.
+   */
+  isRowKeyPermitted(key: string) {
+    const predicate = this.#permissionPredicate;
+    if (predicate === undefined) return true;
+    const row = this.#table.getRowAtKey(key, false);
+    return row === undefined ? this.hasGroupBy : predicate(row);
   }
 
   get dataTable() {
@@ -409,9 +421,18 @@ export class Viewport extends EventEmitter<ViewportEvents> {
    * contributes all of its leaf rows.
    */
   get selectedKeys(): ReadonlySet<string> {
-    return this.hasGroupBy
+    const keys = this.hasGroupBy
       ? new Set(this.#engine.getSelectedRowKeys())
       : this.#engine.selectedKeys;
+    const predicate = this.#permissionPredicate;
+    if (predicate === undefined) return keys;
+    // a selected row may since have been hidden by the permission filter
+    const permittedKeys = new Set<string>();
+    for (const key of keys) {
+      const row = this.#table.getRowAtKey(key, false);
+      if (row !== undefined && predicate(row)) permittedKeys.add(key);
+    }
+    return permittedKeys;
   }
 
   get selectedRowCount() {
@@ -469,6 +490,10 @@ export class Viewport extends EventEmitter<ViewportEvents> {
   }
 
   selectRow(rowKey: string, preserveExistingSelection: boolean) {
+    if (!this.isRowKeyPermitted(rowKey)) {
+      // rows hidden by the permission filter cannot be selected
+      return { ...this.flush(), selectedRowCount: this.selectedRowCount };
+    }
     return this.selectionChanged(
       this.#engine.selectRow(rowKey, preserveExistingSelection),
     );

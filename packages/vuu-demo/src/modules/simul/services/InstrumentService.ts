@@ -1,6 +1,9 @@
 import {
   getLogger,
   CellViewPortMenuItem,
+  type CellEdit,
+  type RequestContext,
+  type Viewport,
   type DataTable,
   EditSessionRpcHandler,
   type MenuRpcSession,
@@ -21,6 +24,8 @@ import type {
 
 const log = getLogger("demo.simul");
 
+export const MAX_LOT_SIZE = 1000;
+
 export class InstrumentService extends EditSessionRpcHandler {
   constructor(
     table: DataTable,
@@ -28,6 +33,28 @@ export class InstrumentService extends EditSessionRpcHandler {
     tableContainer: TableContainer,
   ) {
     super(tableContainer);
+  }
+
+  /**
+   * The demo instruments grid edits cells directly, without first opening an
+   * edit session.
+   */
+  protected canEditSource(
+    viewport: Viewport,
+    _column: string,
+    _ctx: RequestContext,
+  ) {
+    return viewport.dataTable.name === "instruments";
+  }
+
+  protected validateCellEdit({ column, value }: CellEdit) {
+    if (
+      column === "lotSize" &&
+      typeof value === "number" &&
+      value > MAX_LOT_SIZE
+    ) {
+      return "max valid value for lotSize is 1,000";
+    }
   }
 
   private editRows = () => {

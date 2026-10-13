@@ -138,12 +138,16 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
 
     test("applies the change and returns CHANGE_VP_SUCCESS", async () => {
       let changedWith: unknown;
+      let lookedUpWith: unknown;
       const viewPortContainer = {
-        getViewportById: () => ({
-          changeViewport: (options: unknown) => {
-            changedWith = options;
-          },
-        }),
+        getViewportForSession: (...args: unknown[]) => {
+          lookedUpWith = args;
+          return {
+            changeViewport: (options: unknown) => {
+              changedWith = options;
+            },
+          };
+        },
       };
       const { CoreServerApiHandler } =
         await import("../src/core/CoreServerApiHandler");
@@ -164,6 +168,10 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
 
       const { type: _, viewPortId: __, ...options } = changeRequest;
       expect(changedWith).toMatchObject(options);
+      expect(lookedUpWith).toEqual([
+        changeRequest.viewPortId,
+        { sessionId: "sess-1", channelId: "chan-1" },
+      ]);
       expect(response).toEqual({
         body: { ...changeRequest, type: "CHANGE_VP_SUCCESS" },
         module: "CORE",
@@ -174,7 +182,7 @@ describe("CoreServerApiHandler GET_TABLE_LIST", () => {
 
     test("returns ERROR when the viewport does not exist", async () => {
       const viewPortContainer = {
-        getViewportById: () => {
+        getViewportForSession: () => {
           throw new Error("no viewport");
         },
       };
