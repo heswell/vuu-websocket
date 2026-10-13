@@ -9,7 +9,7 @@ import {
 const PACKAGES_ROOT = path.resolve(import.meta.dir, "../../packages");
 const SECTIONS = ["dependencies", "peerDependencies"] as const;
 
-type Manifest = Partial<
+type Manifest = { version?: string } & Partial<
   Record<(typeof SECTIONS)[number] | "devDependencies", Record<string, string>>
 >;
 
@@ -27,7 +27,11 @@ describe("publishable package manifests", () => {
           manifest[section] ?? {},
         )) {
           if (dependency.startsWith("@heswell/")) {
-            expect(`${dependency}@${range}`).toMatch(/@\^\d/);
+            for (const alternative of range.split("||")) {
+              expect(`${dependency}@${alternative.trim()}`).toMatch(
+                /@\^\d+\.\d+\.\d+$/,
+              );
+            }
           }
         }
       }
@@ -38,10 +42,16 @@ describe("publishable package manifests", () => {
     const manifest = readManifest("vuu-portal");
     for (const dependency of ["@heswell/vuu-server", "@heswell/vuu-table"]) {
       expect(manifest.dependencies?.[dependency]).toBeUndefined();
-      expect(manifest.peerDependencies?.[dependency]).toMatch(/^\^/);
-      expect(manifest.devDependencies?.[dependency]).toBe(
-        manifest.peerDependencies?.[dependency],
-      );
+      const peerRange = manifest.peerDependencies?.[dependency];
+      const devRange = manifest.devDependencies?.[dependency];
+      expect(peerRange).toBeDefined();
+      expect(devRange).toBeDefined();
+      // The workspace copy used for local builds must satisfy both ranges.
+      const { version } = readManifest(
+        dependency.replace("@heswell/", ""),
+      ) as { version: string };
+      expect(Bun.semver.satisfies(version, peerRange!)).toBe(true);
+      expect(Bun.semver.satisfies(version, devRange!)).toBe(true);
     }
   });
 });
@@ -51,6 +61,18 @@ describe("nextDependencyRange", () => {
     expect(nextDependencyRange("^1.0.1", "1.0.2", "dependencies")).toBe("^1.0.2");
     expect(nextDependencyRange("~1.0.1", "1.0.2", "dependencies")).toBe("~1.0.2");
     expect(nextDependencyRange("1.0.1", "1.0.2", "dependencies")).toBe("1.0.2");
+  });
+
+  test("handles compound peer ranges", () => {
+    const range = "^3.1.0 || ^4.0.0";
+    expect(nextDependencyRange(range, "3.3.0", "peerDependencies")).toBe(range);
+    expect(nextDependencyRange(range, "4.0.0", "peerDependencies")).toBe(range);
+    expect(nextDependencyRange(range, "5.0.0", "peerDependencies")).toBe(
+      "^5.0.0",
+    );
+    expect(nextDependencyRange(range, "4.0.1", "devDependencies")).toBe(
+      "^4.0.1",
+    );
   });
 
   test("leaves a peer range that admits the new version", () => {

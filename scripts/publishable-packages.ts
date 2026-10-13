@@ -51,7 +51,9 @@ export const PUBLISHABLE_PACKAGE_NAMES_TEXT = PUBLISHABLE_PACKAGES.map(
 
 // Keeps the range operator (^, ~) of an existing dependency so published
 // packages do not pin their siblings. A peer range that already admits the new
-// version is left alone, so dependents need no republish for a compatible bump.
+// version (including a compound range such as "^3.1.0 || ^4.0.0") is left
+// alone, so dependents need no republish for a compatible bump. A compound
+// range that does not admit the new version is replaced with a caret range.
 export const nextDependencyRange = (
   current: string,
   version: string,
@@ -60,6 +62,6 @@ export const nextDependencyRange = (
   if (section === "peerDependencies" && Bun.semver.satisfies(version, current)) {
     return current;
   }
-  const prefix = /^[\^~]/.exec(current)?.[0] ?? "";
-  return `${prefix}${version}`;
+  const simple = /^([\^~]?)\d[^\s|]*$/.exec(current.trim());
+  return simple ? `${simple[1]}${version}` : `^${version}`;
 };

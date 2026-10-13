@@ -42,12 +42,12 @@
     "@heswell/module-admin": "^2.0.1"
   },
   "peerDependencies": {
-    "@heswell/vuu-server": "^3.1.0",
+    "@heswell/vuu-server": "^3.1.0 || ^4.0.0",
     "@heswell/vuu-table": "^1.0.1",
     "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
   },
   "devDependencies": {
-    "@heswell/vuu-server": "^3.1.0",
+    "@heswell/vuu-server": "^3.3.0",
     "@heswell/vuu-table": "^1.0.1",
     "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
   },
