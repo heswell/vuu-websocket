@@ -9,6 +9,7 @@ import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { VuuUser } from "../core/auths/VuuUser";
 import type { LoginSuccessOptions } from "./LoginSuccess";
 import { getLogger } from "@heswell/service-utils";
+import { ErrorResponse, JsonViewServerMessage } from "./Messages";
 
 const log = getLogger("vuu.session");
 
@@ -44,18 +45,36 @@ export class ViewServerHandlerFactoryImpl implements ViewServerHandlerFactory {
 export class ViewServerHandler {
   constructor(private processor: RequestProcessor) {}
 
-  close() {
+  /** The channel has closed: tear down any session opened on it. */
+  close(channel?: Channel) {
     log.debug("closing session on disconnect");
+    if (channel) {
+      this.processor.channelClosed(channel);
+    }
   }
 
+  /** Never rejects, see RequestProcessor.handle. */
   async handle(inbound: string, channel: Channel) {
-    // console.log(`[ViewServerHandler] handle inbound ${inbound}`);
-    const viewServerMessage = JSON.parse(inbound) as VuuClientMessage;
+    let viewServerMessage: VuuClientMessage;
+    try {
+      viewServerMessage = JSON.parse(inbound) as VuuClientMessage;
+      if (typeof viewServerMessage?.body?.type !== "string") {
+        throw Error("message has no body.type");
+      }
+    } catch (error) {
+      log.warn(
+        `invalid message on channel ${channel.data.sessionId}: ${(error as Error).message}`,
+      );
+      channel.send(
+        JSON.stringify(
+          JsonViewServerMessage("", "", ErrorResponse("invalid message")),
+        ),
+      );
+      return;
+    }
     const response = await this.processor.handle(viewServerMessage, channel);
     if (response) {
-      const serializedResponse = JSON.stringify(response);
-      // console.log(`[ViewServerHandler] send outbound  ${serializedResponse}`);
-      channel.send(serializedResponse);
+      channel.send(JSON.stringify(response));
     }
   }
 }

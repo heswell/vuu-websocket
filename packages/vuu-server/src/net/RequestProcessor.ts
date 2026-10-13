@@ -13,6 +13,7 @@ import { Channel } from "./ws/Channel";
 import { SessionId } from "../client/messages/ClientMessage";
 import { OutboundRowPublishQueue, PublishQueue } from "../util/PublishQueue";
 import {
+  ErrorResponse,
   JsonViewServerMessage,
   LoginSuccess,
   type ViewServerMessage,
@@ -21,6 +22,9 @@ import { ViewPortUpdate } from "../viewport/Viewport";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { LoginSuccessOptions } from "./LoginSuccess";
 import { getLogger } from "@heswell/service-utils";
+import { errorMessage, isClientRequestError } from "./ClientRequestError";
+import { SessionLimitError } from "./ClientSessionContainer";
+import { VuuCloseCode } from "./CloseCodes";
 
 const log = getLogger("vuu.session");
 
@@ -58,7 +62,14 @@ export class RequestProcessor {
     private loginSuccessProvider?: (user: VuuUser) => LoginSuccessOptions,
   ) {}
 
-  async handle(msg: VuuClientMessage, channel: Channel) {
+  /**
+   * Never rejects. A request that fails is logged and answered with an
+   * ERROR message; the session stays open.
+   */
+  async handle(
+    msg: VuuClientMessage,
+    channel: Channel,
+  ): Promise<ViewServerMessage | void> {
     if (msg.body.type === "LOGIN") {
       try {
         const vuuUser = this.loginTokenService.login(msg.body);
@@ -70,18 +81,25 @@ export class RequestProcessor {
           this.vuuServerId,
         );
       } catch (error) {
+        log.warn(`login refused on channel ${channel.data.sessionId}: ${errorMessage(error)}`);
         return this.sendMessageAndCloseChannel(
-          (error as Error).message,
+          errorMessage(error),
           channel,
+          VuuCloseCode.LoginFailed,
         );
       }
     } else {
       try {
-        return this.handleViewServerMessage(msg, channel);
+        return await this.handleViewServerMessage(msg, channel);
       } catch (error) {
-        this.closeChannel(error as Error, channel);
+        return this.errorResponse(msg, error, channel);
       }
     }
+  }
+
+  /** Channel closed by the client or the network: tear down its sessions. */
+  channelClosed(channel: Channel) {
+    this.clientSessionContainer.removeChannel(channel.data.sessionId);
   }
 
   createSession(
@@ -106,7 +124,13 @@ export class RequestProcessor {
         LoginSuccess(vuUServerId, loginSuccessOptions),
       );
     } catch (e) {
-      this.sendMessageAndCloseChannel((e as Error).message, channel);
+      this.sendMessageAndCloseChannel(
+        errorMessage(e),
+        channel,
+        e instanceof SessionLimitError
+          ? VuuCloseCode.SessionLimitReached
+          : VuuCloseCode.LoginFailed,
+      );
     }
   }
 
@@ -149,22 +173,43 @@ export class RequestProcessor {
     requestSession: ClientSessionId,
     channel: Channel,
   ) {
+    log.warn(
+      `message for invalid session ${requestSession.sessionId} on channel ${channel.data.sessionId}, closing channel`,
+    );
     this.sendMessageAndCloseChannel(
       `Invalid session ${requestSession.sessionId}`,
       channel,
+      VuuCloseCode.InvalidSession,
     );
   }
 
-  private closeChannel(e: Error, channel: Channel) {
-    log.error(
-      `Internal server error. sessionId: ${channel.data.sessionId}`,
-      e,
+  private errorResponse(
+    msg: VuuClientMessage,
+    error: unknown,
+    channel: Channel,
+  ): ViewServerMessage {
+    const where = `${msg.body?.type} (${msg.requestId}, session ${msg.sessionId}, channel ${channel.data.sessionId})`;
+    let reason: string;
+    if (isClientRequestError(error)) {
+      log.warn(`${where} refused: ${error.reason}`);
+      reason = error.reason;
+    } else {
+      log.error(`${where} failed`, error);
+      reason = `Failed to process request ${msg.requestId}`;
+    }
+    return JsonViewServerMessage(
+      msg.requestId,
+      msg.sessionId,
+      ErrorResponse(reason),
     );
-    this.sendMessageAndCloseChannel("Internal server error", channel);
   }
 
-  private sendMessageAndCloseChannel(msg: string, channel: Channel) {
+  private sendMessageAndCloseChannel(
+    msg: string,
+    channel: Channel,
+    code?: number,
+  ) {
     channel.send(msg);
-    channel.close();
+    channel.close(code, msg.slice(0, 120));
   }
 }

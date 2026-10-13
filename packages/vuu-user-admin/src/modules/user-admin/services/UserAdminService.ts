@@ -141,7 +141,7 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
   protected override async handleEndEditSession(
     params: RpcParams<Params>,
   ): Promise<RpcResult> {
-    const { namedParams, viewport } = params;
+    const { ctx, namedParams, viewport } = params;
     const sessionTable = viewport.dataTable;
     const saveSession =
       sessionTable instanceof InMemSessionDataTable
@@ -158,6 +158,7 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     const prepared = this.prepareSessionSave(
       sessionTable,
       namedParams.force === true,
+      ctx,
     );
     if ("type" in prepared) return prepared;
 
@@ -168,7 +169,7 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
       this.applySessionSave(sessionTable, {
         ...prepared,
         changes: prepared.changes.filter(({ action }) => action === ""),
-      });
+      }, ctx);
       await this.refreshAfterMutation(`session:${sessionTable.tableDef.name}`);
       return success();
     } catch (error) {

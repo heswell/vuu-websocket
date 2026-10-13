@@ -27,6 +27,8 @@ import {
   SendHeartbeat,
 } from "./flowcontrol/FlowController";
 import { getLogger } from "@heswell/service-utils";
+import { ClientRequestError } from "./ClientRequestError";
+import { VuuCloseCode } from "./CloseCodes";
 
 const log = getLogger("vuu.session");
 
@@ -42,7 +44,13 @@ interface OutboundMessageHandler {
 }
 
 export interface MessageHandler
-  extends InboundMessageHandler, OutboundMessageHandler {}
+  extends InboundMessageHandler, OutboundMessageHandler {
+  /**
+   * Tears down the session: removes its viewports and session tables and
+   * closes its channel (with code and reason, if given). Idempotent.
+   */
+  close?: (code?: number, reason?: string) => void;
+}
 
 class DefaultMessageHandlerImpl implements MessageHandler {
   constructor(
@@ -55,7 +63,15 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     private sessionContainer: ClientSessionContainer,
     private moduleContainer: ModuleContainer,
   ) {}
+
+  #closed = false;
+
   handle = async (msg: VuuClientMessage) => {
+    if (this.#closed) {
+      throw new ClientRequestError(
+        `session ${this.session.sessionId} is closed`,
+      );
+    }
     const ctx = RequestContext(
       msg.requestId,
       this.user,
@@ -65,7 +81,31 @@ class DefaultMessageHandlerImpl implements MessageHandler {
 
     this.flowController.process(msg);
 
-    return this.serverApi.process(msg, ctx);
+    const response = await this.serverApi.process(msg, ctx);
+    if (this.#closed) {
+      // the session was closed while the request was in flight, remove
+      // anything it created
+      this.serverApi.disconnect(this.session);
+      return;
+    }
+    return response;
+  };
+
+  close = (code?: number, reason?: string) => {
+    if (this.#closed) return;
+    this.#closed = true;
+    log.debug(
+      `closing session ${this.session.sessionId}${reason ? `, ${reason}` : ""}`,
+    );
+    try {
+      this.serverApi.disconnect(this.session);
+    } catch (error) {
+      log.error(
+        `failed to clean up session ${this.session.sessionId}`,
+        error,
+      );
+    }
+    this.channel.close(code, reason);
   };
 
   private sendUpdatesInternal(updates: ViewPortUpdate[], highPriority = false) {
@@ -172,9 +212,8 @@ class DefaultMessageHandlerImpl implements MessageHandler {
 
   private disconnect() {
     log.debug(`Disconnecting session ${this.session.sessionId}`);
-    this.serverApi.disconnect(this.session);
     this.sessionContainer.remove(this.user, this.session);
-    this.channel.close();
+    this.close(VuuCloseCode.HeartbeatTimeout, "heartbeat timeout");
   }
 }
 
