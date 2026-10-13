@@ -180,6 +180,14 @@ The parser is a peer so a vuu-ui host does not bundle a second copy of it and
 lezer. The type packages are peers because the published declarations
 reference them.
 
+Every published @heswell package follows the same rule: `@vuu-ui/*` packages are
+always peers, never dependencies, so the consumer installs a single copy at the
+version it chooses. The peer ranges are carets on the oldest supported
+prerelease (`^4.0.0-alpha.20`), which admit every later 4.0.0 prerelease and
+4.x release. The workspace develops against an exact version in
+`devDependencies`, which must satisfy the peer range.
+`scripts/__tests__/publishable-packages.test.ts` enforces both.
+
 `npm run test:engine-packages` installs the built packages into a temporary
 consumer. It checks the published declarations under `node16` resolution and
 runs the viewport under plain Node ESM. CI runs it, after the build and an

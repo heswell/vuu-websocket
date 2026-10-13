@@ -9,6 +9,14 @@ The package runs alongside `@vuu-ui/vuu-data-test` and has the same public API. 
 meant to replace the `VuuModule` / `TickingArrayDataSource` core in that package. The
 two packages don't depend on each other.
 
+## Peer dependencies
+
+All `@vuu-ui` packages are peers declared as `^4.0.0-alpha.20`, so the engine uses the host
+application's single copy of each (a second `@vuu-ui/vuu-utils` or `@vuu-ui/core` would mean
+a second set of React contexts). They are `@vuu-ui/vuu-utils` and `@vuu-ui/vuu-filter-parser`
+(runtime), `@vuu-ui/core` (React provider), and the type-only `vuu-data-types`,
+`vuu-filter-types`, `vuu-protocol-types` and `vuu-table-types`.
+
 ## Architecture
 
 | Component                              | Role                                                                                                                                                                                                                                  |

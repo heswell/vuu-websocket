@@ -65,3 +65,36 @@ export const nextDependencyRange = (
   const simple = /^([\^~]?)\d[^\s|]*$/.exec(current.trim());
   return simple ? `${simple[1]}${version}` : `^${version}`;
 };
+
+const DEPENDENCY_SECTIONS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+] as const;
+
+// Moves every reference to packageName (and nothing else, so third-party
+// ranges such as @vuu-ui/* are left as written) to the new version.
+export const updateDependencies = (
+  json: Record<string, unknown>,
+  packageName: string,
+  version: string,
+) => {
+  let changed = false;
+
+  for (const section of DEPENDENCY_SECTIONS) {
+    const dependencies = json[section];
+    if (!dependencies || typeof dependencies !== "object") continue;
+
+    const dependencyVersions = dependencies as Record<string, unknown>;
+    const current = dependencyVersions[packageName];
+    if (typeof current !== "string") continue;
+    const next = nextDependencyRange(current, version, section);
+    if (next !== current) {
+      dependencyVersions[packageName] = next;
+      changed = true;
+    }
+  }
+
+  return changed;
+};

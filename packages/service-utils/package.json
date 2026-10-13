@@ -26,10 +26,10 @@
     "@heswell/vuu-table": "^1.0.1"
   },
   "peerDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
+    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.20"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.20"
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21"
   },
   "repository": {
     "type": "git",

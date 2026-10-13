@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   nextDependencyRange,
   PUBLISHABLE_PACKAGES,
+  updateDependencies,
 } from "../publishable-packages";
 
 const PACKAGES_ROOT = path.resolve(import.meta.dir, "../../packages");
@@ -38,6 +39,32 @@ describe("publishable package manifests", () => {
     });
   }
 
+  for (const { name, directory } of PUBLISHABLE_PACKAGES) {
+    test(`${name} peers @vuu-ui packages with ranges that admit later releases`, () => {
+      const manifest = readManifest(directory);
+      // One copy of each @vuu-ui package in the consumer: the consumer
+      // chooses the version, so @vuu-ui is never a runtime dependency.
+      const vuuDependencies = Object.keys(manifest.dependencies ?? {}).filter(
+        (dependency) => dependency.startsWith("@vuu-ui/"),
+      );
+      expect(vuuDependencies).toEqual([]);
+      for (const [dependency, range] of Object.entries(
+        manifest.peerDependencies ?? {},
+      )) {
+        if (!dependency.startsWith("@vuu-ui/")) continue;
+        // Caret on a prerelease, e.g. ^4.0.0-alpha.20, never an exact pin.
+        expect(`${dependency}@${range}`).toMatch(
+          /@\^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/,
+        );
+        expect(Bun.semver.satisfies("4.0.0-alpha.21", range)).toBe(true);
+        // The workspace build and tests use a version the range admits.
+        const devRange = manifest.devDependencies?.[dependency];
+        expect(devRange).toBeDefined();
+        expect(Bun.semver.satisfies(devRange!, range)).toBe(true);
+      }
+    });
+  }
+
   test("vuu-portal shares the consumer's vuu-server and vuu-table", () => {
     const manifest = readManifest("vuu-portal");
     for (const dependency of ["@heswell/vuu-server", "@heswell/vuu-table"]) {
@@ -53,6 +80,41 @@ describe("publishable package manifests", () => {
       expect(Bun.semver.satisfies(version, peerRange!)).toBe(true);
       expect(Bun.semver.satisfies(version, devRange!)).toBe(true);
     }
+  });
+});
+
+describe("updateDependencies", () => {
+  test("bumping a sibling leaves @vuu-ui ranges unchanged", () => {
+    for (const { directory } of PUBLISHABLE_PACKAGES) {
+      const manifest = readManifest(directory);
+      const before = structuredClone(manifest);
+      for (const { name } of PUBLISHABLE_PACKAGES) {
+        updateDependencies(manifest, name, "9.0.0");
+      }
+      for (const section of [...SECTIONS, "devDependencies"] as const) {
+        for (const [dependency, range] of Object.entries(
+          before[section] ?? {},
+        )) {
+          if (dependency.startsWith("@vuu-ui/")) {
+            expect(manifest[section]?.[dependency]).toBe(range);
+          }
+        }
+      }
+    }
+  });
+
+  test("moves only the bumped package", () => {
+    const manifest = {
+      dependencies: { "@heswell/vuu-table": "^1.0.1" },
+      peerDependencies: { "@vuu-ui/vuu-utils": "^4.0.0-alpha.20" },
+    };
+    expect(updateDependencies(manifest, "@heswell/vuu-table", "1.0.2")).toBe(
+      true,
+    );
+    expect(manifest).toEqual({
+      dependencies: { "@heswell/vuu-table": "^1.0.2" },
+      peerDependencies: { "@vuu-ui/vuu-utils": "^4.0.0-alpha.20" },
+    });
   });
 });
 

@@ -18,7 +18,11 @@ anywhere; Bun is only needed when a server is started.
 Some declarations reference Bun types (for example `ServerWebSocket`), so
 TypeScript consumers should install `@types/bun`. It is an optional peer
 dependency. `@vuu-ui/vuu-protocol-types` and `@vuu-ui/vuu-data-types` are
-peer dependencies used by the declarations.
+peer dependencies used by the declarations, and `@vuu-ui/vuu-utils` is a peer
+dependency used at runtime. Each is declared as `^4.0.0-alpha.20`, so the
+application's own `@vuu-ui` version (any later 4.0.0 prerelease or 4.x release)
+is shared rather than duplicated. npm 7+ and bun install missing peers
+automatically.
 
 Everything is exported from the package root; there are no supported deep
 imports.
