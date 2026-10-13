@@ -10,7 +10,7 @@
     "fetch-data": "bun ./scripts/fetch-equities.ts"
   },
   "dependencies": {
-    "@heswell/service-utils": "1.1.0",
+    "@heswell/service-utils": "1.2.0",
     "@heswell/vuu-table": "1.0.1"
   },
   "devDependencies": {

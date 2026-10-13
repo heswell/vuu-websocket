@@ -18,7 +18,7 @@
     "@heswell/equity-refdata-service": "1.0.0"
   },
   "peerDependencies": {
-    "@heswell/vuu-server": "^3.1.0",
+    "@heswell/vuu-server": "^4.0.0",
     "@heswell/vuu-table": "^1.0.1"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@heswell/service-utils",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Shared utilities for Vuu services: config loading, argument parsing, remote table publishing and subscription",
   "type": "module",
   "main": "src/index.ts",
