@@ -14,6 +14,9 @@ import { ViewPortDef } from "../../api/ViewPortDef";
 import { TableContainer } from "../table/TableContainer";
 import { RpcHandlerFunc } from "../../net/rpc/RpcHandler";
 import { DataTable } from "../table/InMemDataTable";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.module");
 
 export type TableDefTuple = [TableDef, ProviderFactory];
 
@@ -183,9 +186,9 @@ function ModuleFactoryNode(
         }
       });
 
-      console.log(`[ModuleFactory] as Module`, {
-        viewPortDefs,
-      });
+      if (log.isEnabled("trace")) {
+        log.trace(`asModule ${moduleName}`, { viewPortDefs });
+      }
 
       return new (class extends ViewServerModule {
         getProviderForTable(table: Table): IProvider {

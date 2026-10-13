@@ -20,6 +20,9 @@ import {
 import { ViewPortUpdate } from "../viewport/Viewport";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { LoginSuccessOptions } from "./LoginSuccess";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.session");
 
 export type RequestContext = {
   queue: PublishQueue<ViewPortUpdate>;
@@ -88,8 +91,8 @@ export class RequestProcessor {
     channel: Channel,
     vuUServerId: string,
   ): ViewServerMessage | void {
-    console.log(
-      `[RequestProcessor] createSession ${requestId} for user ${user.name}`,
+    log.debug(
+      `createSession ${requestId} for user ${user.name}`,
     );
     const session = SessionId.oneNew();
     const id = ClientSessionId(session, channel.data.sessionId);
@@ -153,9 +156,9 @@ export class RequestProcessor {
   }
 
   private closeChannel(e: Error, channel: Channel) {
-    console.error(e);
-    console.error(
-      `[RequestProcessor] Internal server error. sessionId: ${channel.data.sessionId}`,
+    log.error(
+      `Internal server error. sessionId: ${channel.data.sessionId}`,
+      e,
     );
     this.sendMessageAndCloseChannel("Internal server error", channel);
   }

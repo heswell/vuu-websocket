@@ -1,7 +1,9 @@
 import type { ServerWebSocket } from "bun";
 import { ViewServerHandler } from "../ViewServerHandler";
-import { WebsocketData } from "@heswell/service-utils";
+import { getLogger, type WebsocketData } from "@heswell/service-utils";
 import { VuuWebSocketOptions } from "../../core/VuuServerOptions";
+
+const log = getLogger("vuu.net");
 
 export const BunWebSocketConnectionHandler = (
   _vuuWebSocketOptions: Omit<VuuWebSocketOptions,"sslOptions" | "wsPort">,
@@ -13,8 +15,8 @@ export const BunWebSocketConnectionHandler = (
     maxPayloadLength: 16 * 1024 * 1024,
     idleTimeout: 10,
     open: (ws: ServerWebSocket<WebsocketData>) => {
-      console.log(
-        `[BunWebSocketConnectionHandler] new connection  ${ws.data.sessionId}`,
+      log.debug(
+        `new websocket connection ${ws.data.sessionId}`,
       );
     },
     message: async (
@@ -25,10 +27,10 @@ export const BunWebSocketConnectionHandler = (
       await viewserverHandler.handle(msg as string, ws);
     },
     drain: (ws: ServerWebSocket) => {
-      console.log("WebSocket backpressure: ");
+      log.debug("WebSocket backpressure (drain)");
     },
     close: (ws: ServerWebSocket<WebsocketData>) => {
-      console.log(`WebSocket closed`);
+      log.debug(`WebSocket closed ${ws.data.sessionId}`);
     },
   };
 };

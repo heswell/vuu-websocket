@@ -78,7 +78,7 @@ websocket path, auth mode, CORS origin, Keycloak URL and realm, and module
 files (`VUU_HTTPS_PORT`, `VUU_WEBSOCKET_PORT`, `VUU_WEBSOCKET_PATH`,
 `VUU_AUTH_MODE`, `VUU_CORS_ALLOWED_ORIGIN`, `VUU_KEYCLOAK_URL`,
 `VUU_KEYCLOAK_REALM`, `VUU_PORTAL_MODULES_FILE`,
-`VUU_PORTAL_DEFAULT_MODULES_FILE`). See the
+`VUU_PORTAL_DEFAULT_MODULES_FILE`, `VUU_LOG_LEVEL`). See the
 [`@heswell/service-utils` README](../service-utils/README.md#environment-variable-substitution)
 for the syntax.
 
@@ -92,6 +92,7 @@ for the syntax.
 | `vuu.portal.defaultModulesFile` | `default-modules.yaml` |
 | `vuu.portal.modulesFile` | `modules.yaml` |
 | `vuu.portal.moduleAdminRole` | `module-admin-access` |
+| `vuu.log.level`, `vuu.log.levels.<logger>` | `info` (or `$VUU_LOG_LEVEL`), see [Logging](../service-utils/README.md#logging) |
 
 ### Module catalogue
 

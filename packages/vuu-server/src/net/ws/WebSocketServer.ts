@@ -1,6 +1,9 @@
 import { sslEnabled, VuuWebSocketOptions } from "../../core/VuuServerOptions";
 import { type ViewServerHandlerFactory } from "../ViewServerHandler";
 import { BunWebSocketConnectionHandler } from "./BunWebSocketConnectionHandler";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.net");
 
 export class WebSocketServer {
   #server: Bun.Server<unknown> | undefined;
@@ -33,8 +36,8 @@ export class WebSocketServer {
           return new Response("Not found", { status: 404 });
         }
         const sessionId = crypto.randomUUID();
-        console.log(
-          `[VUU:server] websocket upgrade request sessionId ${sessionId}`,
+        log.debug(
+          `websocket upgrade request sessionId ${sessionId}`,
         );
         const success = server.upgrade(req, { data: { sessionId } });
         if (success) {
@@ -50,8 +53,8 @@ export class WebSocketServer {
       ),
     });
 
-    console.log(
-      `[VUU] WebSocket listening on ${sslEnabled(sslOptions) ? "wss" : "ws"}://${this.#server.hostname}:${this.#server.port}${uri}`,
+    log.info(
+      `WebSocket listening on ${sslEnabled(sslOptions) ? "wss" : "ws"}://${this.#server.hostname}:${this.#server.port}${uri}`,
     );
   }
 

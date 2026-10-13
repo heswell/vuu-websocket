@@ -3,6 +3,9 @@ import {
   sslEnabled,
   VuuWebSocketOptions,
 } from "../../core/VuuServerOptions";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.net");
 
 const DEFAULT_REST_HTTPS_PORT = 8443;
 
@@ -54,8 +57,8 @@ export class RestServer {
       if (authMode?.toLowerCase() !== "permissive") {
         throw new Error(PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH);
       }
-      console.warn(
-        "[VUU] WARNING: REST server (including /api/authn) is running over plain HTTP without TLS (vuu.ssl=false, vuu.auth.mode=permissive). Local development only.",
+      log.warn(
+        "WARNING: REST server (including /api/authn) is running over plain HTTP without TLS (vuu.ssl=false, vuu.auth.mode=permissive). Local development only.",
       );
     }
 
@@ -74,7 +77,7 @@ export class RestServer {
       },
     });
 
-    console.log(`[VUU] REST listening on ${this.url}`);
+    log.info(`REST listening on ${this.url}`);
   }
 
   async stop() {

@@ -6,7 +6,10 @@ import {
   type RemoteResourceSocket,
   type RemoteResourceSocketFactory,
 } from "../resource-loader";
+import { getLogger } from "../Logger";
 import type { ResourceMessage, ServerMessage, SubscriptionMode } from "./protocol";
+
+const defaultLog = getLogger("vuu.remote-table");
 
 export type RemoteSubscriptionStatus =
   | "idle"
@@ -31,6 +34,7 @@ export interface RemoteTableSubscriptionOptions {
   columns?: string[];
   /** Used as prefix for log messages */
   name?: string;
+  /** Defaults to `info` on the `vuu.remote-table` logger. */
   log?: (message: string) => void;
   /** subscribe (default) = snapshot + live updates, snapshot = snapshot only */
   mode?: SubscriptionMode;
@@ -111,7 +115,7 @@ export class RemoteTableSubscription {
       maxDelay: reconnect?.maxDelay ?? 5_000,
     };
     const prefix = `[${name ?? "RemoteTableSubscription"}:${resource}]`;
-    const logger = log ?? console.log;
+    const logger = log ?? ((message: string) => defaultLog.info(message));
     this.#log = (message) => logger(`${prefix} ${message}`);
 
     const tableColumns = table.columns.map(({ name }) => name);

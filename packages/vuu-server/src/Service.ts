@@ -2,6 +2,9 @@ import { Table } from "@heswell/vuu-table";
 import { VuuMenu } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "./provider/ProviderContainer";
 import { ViewPortDef } from "./api/ViewPortDef";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.service");
 
 export type RpcNamedParams = Record<string, unknown>;
 
@@ -27,7 +30,7 @@ export abstract class Service implements IService {
   }
 
   invokeService(message: ServiceMessage) {
-    console.log(
+    log.warn(
       `no implementation for service message ${JSON.stringify(message)}`
     );
   }

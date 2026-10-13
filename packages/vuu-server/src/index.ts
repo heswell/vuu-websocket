@@ -158,6 +158,22 @@ export {
 } from "./core/filter/PermissionFilter";
 export * from "./toolbox/thread/LifecycleContainer";
 export { LifeCycleRunner } from "./toolbox/thread/LifeCycleRunner";
+export {
+  clearLogLevel,
+  configureLogging,
+  consoleSink,
+  getLogger,
+  getLogLevel,
+  parseLogLevel,
+  resetLogging,
+  setLogLevel,
+  setLogSink,
+  type LogEntry,
+  type Logger,
+  type LogLevel,
+  type LogMessageLevel,
+  type LogSink,
+} from "@heswell/service-utils";
 export { ConfigFactory } from "./util/ConfigFactory";
 export type {
   Config,

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { DataService, TablePublisher } from "@heswell/service-utils";
+import { DataService, TablePublisher, configureLogging } from "@heswell/service-utils";
 import { Table } from "@heswell/vuu-table";
 import { loadConfig } from "./config";
 import { loadInstruments } from "./instrument-loader";
@@ -22,6 +22,7 @@ const DEFAULT_DATA_PATH = path.resolve(
  */
 export function start(options: ReferenceDataServiceOptions = {}) {
   const config = loadConfig();
+  configureLogging(config);
   const log = options.log ?? console.log;
   const port = options.port ?? config.getNumber("service.port");
   const dataPath =

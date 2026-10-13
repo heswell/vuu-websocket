@@ -1,4 +1,7 @@
 import { DefaultLifecycleEnabled } from "./LifecycleContainer";
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.lifecycle");
 
 export type RunnerCallback = () => void | Promise<void>;
 export type RunnerErrorHandler = (error: unknown) => void;
@@ -14,7 +17,7 @@ export class LifeCycleRunner extends DefaultLifecycleEnabled {
     private readonly func: RunnerCallback,
     private readonly minCycleTime = 100,
     private readonly onError: RunnerErrorHandler = (error) => {
-      console.error(`[LifeCycleRunner:${name}] callback failed`, error);
+      log.error(`LifeCycleRunner:${name} callback failed`, error);
     },
   ) {
     super();

@@ -1,8 +1,12 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   createConfiguredWebSocketOptions,
   createVuuServerApplication,
   type Config,
+  getLogLevel,
+  type LogEntry,
+  resetLogging,
+  setLogSink,
   VuuUserWithAuthorizations,
 } from "../src";
 
@@ -144,6 +148,39 @@ describe("VuuServerApplication", () => {
       name: "alice",
       authorizations: ["module-admin-edit"],
     });
+  });
+});
+
+describe("VuuServerApplication logging", () => {
+  afterEach(() => resetLogging());
+
+  const createApp = (values: Record<string, string | number | boolean>) =>
+    createVuuServerApplication({
+      authProviders: {},
+      config: createConfig({ "vuu.ssl": false, ...values }),
+      defaultHttpsPort: 8443,
+      defaultWebSocketPort: 8091,
+      modules: [],
+    });
+
+  test("applies vuu.log.level and per-logger levels from config", () => {
+    createApp({ "vuu.log.level": "warn", "vuu.log.levels.vuu.rpc": "trace" });
+    expect(getLogLevel()).toBe("warn");
+    expect(getLogLevel("vuu.rpc")).toBe("trace");
+    expect(getLogLevel("vuu.viewport")).toBe("warn");
+  });
+
+  test("is quiet at info and logs server internals at debug", () => {
+    const entries: LogEntry[] = [];
+    setLogSink((entry) => entries.push(entry));
+
+    createApp({ "vuu.log.level": "info" });
+    expect(entries).toEqual([]);
+
+    createApp({ "vuu.log.level": "debug" });
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.every(({ level }) => level === "debug")).toBe(true);
+    expect(entries.map(({ name }) => name)).toContain("vuu.viewport");
   });
 });
 

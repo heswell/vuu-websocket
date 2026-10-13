@@ -3,7 +3,10 @@ import type {
   VuuDataRow,
   VuuRowDataItemType,
 } from "@vuu-ui/vuu-protocol-types";
+import { getLogger } from "./Logger";
 import type { HeartbeatMessage, ResourceMessage } from "./publisher/protocol";
+
+const log = getLogger("vuu.resource-loader");
 
 export interface ResourceRequest {
   columns?: string[];
@@ -85,8 +88,8 @@ export class RemoteResourceLoader {
     private table: Table,
     private url: string,
   ) {
-    console.log(
-      `[service-utils:RemoteResourceLoader] created for ${this.table.name} at ${this.url}`,
+    log.debug(
+      `RemoteResourceLoader: created for ${this.table.name} at ${this.url}`,
     );
   }
   async loadSnapshot() {}
@@ -163,8 +166,8 @@ export const loadTableFromRemoteResource = async ({
   }
 
   try {
-    console.log(
-      `[service-utils:loadTableFromRemoteResource] connect to ${url} (${resource} service)`,
+    log.debug(
+      `loadTableFromRemoteResource: connect to ${url} (${resource} service)`,
     );
     socket = socketFactory(url);
 
@@ -181,8 +184,8 @@ export const loadTableFromRemoteResource = async ({
           if (message.type === "HB") {
             socket?.send(JSON.stringify({ type: "HB", ts: message.ts }));
           } else if (message.type === "snapshot-count") {
-            console.log(
-              `[service-utils:loadTableFromRemoteResource] final snapshot ${message.count} ${resource} rows received`,
+            log.debug(
+              `loadTableFromRemoteResource: final snapshot ${message.count} ${resource} rows received`,
             );
             ready = true;
             resolve(message.count);
@@ -218,8 +221,8 @@ export const loadTableFromRemoteResource = async ({
         if (terminal) {
           return;
         }
-        console.log(
-          `[service-utils:loadTableFromRemoteResource] connected ${resource} at ${url}`,
+        log.debug(
+          `loadTableFromRemoteResource: connected ${resource} at ${url}`,
         );
         if (requestSnapshot && requestInserts) {
           socket?.send(
@@ -240,8 +243,8 @@ export const loadTableFromRemoteResource = async ({
         }
       }),
       socket.onError(() => {
-        console.error(
-          `[service-utils:loadTableFromRemoteResource] error ${resource} at ${url}`,
+        log.error(
+          `loadTableFromRemoteResource: error ${resource} at ${url}`,
         );
         fail(
           new Error(
@@ -250,8 +253,8 @@ export const loadTableFromRemoteResource = async ({
         );
       }),
       socket.onClose(() => {
-        console.log(
-          `[service-utils:loadTableFromRemoteResource] close ${resource} at ${url}`,
+        log.debug(
+          `loadTableFromRemoteResource: close ${resource} at ${url}`,
         );
         if (ready) {
           terminate(false);

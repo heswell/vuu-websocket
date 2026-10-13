@@ -1,4 +1,5 @@
 import {
+  getLogger,
   CellViewPortMenuItem,
   type DataTable,
   EditSessionRpcHandler,
@@ -18,6 +19,8 @@ import type {
   VuuRowDataItemType,
 } from "@vuu-ui/vuu-protocol-types";
 
+const log = getLogger("demo.simul");
+
 export class InstrumentService extends EditSessionRpcHandler {
   constructor(
     table: DataTable,
@@ -28,12 +31,12 @@ export class InstrumentService extends EditSessionRpcHandler {
   }
 
   private editRows = () => {
-    console.log("edit rows");
+    log.debug("edit rows");
     return NoAction();
   };
 
   private addRowsToOrders = () => {
-    console.log("addRowsToOrders");
+    log.debug("addRowsToOrders");
     return NoAction();
   };
 

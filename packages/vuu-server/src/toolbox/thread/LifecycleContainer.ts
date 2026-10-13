@@ -1,3 +1,7 @@
+import { getLogger } from "@heswell/service-utils";
+
+const log = getLogger("vuu.lifecycle");
+
 // Scala lifecycle callbacks are synchronous; TypeScript callbacks may return a
 // promise so dependency readiness and reverse teardown remain fully ordered.
 export type LifecycleCallbackResult = void | Promise<void>;
@@ -202,8 +206,8 @@ export class LifecycleContainer {
             process.exitCode = signal === "SIGINT" ? 130 : 143;
           })
           .catch((error: unknown) => {
-            console.error(
-              `[LifecycleContainer] shutdown failed after ${signal}`,
+            log.error(
+              `shutdown failed after ${signal}`,
               error,
             );
             process.exitCode = 1;
