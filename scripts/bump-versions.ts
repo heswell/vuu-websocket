@@ -4,21 +4,15 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
   getPublishablePackage,
-  nextDependencyRange,
   type PublishablePackageName,
   PUBLISHABLE_PACKAGE_NAMES_TEXT,
+  updateDependencies,
 } from "./publishable-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_ROOT = path.join(ROOT, "packages");
 const VERSION_PATTERN =
   /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/;
-const DEPENDENCY_SECTIONS = [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-  "optionalDependencies",
-] as const;
 
 type PackageJson = {
   name?: string;
@@ -117,30 +111,6 @@ const getOptions = () => {
   }
 
   return { packageName, version };
-};
-
-const updateDependencies = (
-  json: PackageJson,
-  packageName: PublishablePackageName,
-  version: string,
-) => {
-  let changed = false;
-
-  for (const section of DEPENDENCY_SECTIONS) {
-    const dependencies = json[section];
-    if (!dependencies || typeof dependencies !== "object") continue;
-
-    const dependencyVersions = dependencies as Record<string, unknown>;
-    const current = dependencyVersions[packageName];
-    if (typeof current !== "string") continue;
-    const next = nextDependencyRange(current, version, section);
-    if (next !== current) {
-      dependencyVersions[packageName] = next;
-      changed = true;
-    }
-  }
-
-  return changed;
 };
 
 const packageFiles = findPackageJsonFiles(PACKAGES_ROOT);

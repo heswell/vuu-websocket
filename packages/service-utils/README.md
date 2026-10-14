@@ -192,4 +192,4 @@ without it they log at `info` on `vuu.data-service` / `vuu.remote-table`.
 ## Peer dependencies
 
 The declarations reference `@vuu-ui/vuu-protocol-types`, which is a peer
-dependency (npm 7+ installs it automatically).
+dependency (`^4.0.0-alpha.20`; npm 7+ installs it automatically).
