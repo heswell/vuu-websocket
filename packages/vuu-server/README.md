@@ -163,7 +163,7 @@ permissive auth:
 ```hocon
 vuu.ssl=false
 vuu.auth.mode="permissive"
-vuu.auth.permissive.users=""   # optional username:password list
+vuu.auth.permissive.users=""   # optional username[:password] list
 vuu.https.port=8443            # REST port; serves plain http when vuu.ssl=false
 vuu.websocket.port=8091
 ```
@@ -179,6 +179,74 @@ mode (e.g. `keycloak`) the server refuses to start with
 
 Use port `0` for ephemeral ports; `server.webSocketPort`, `server.restPort`
 and `server.restUrl` report the bound values once started.
+
+## REST authentication (`/api/authn`)
+
+`POST /api/authn` (path: `vuu.auth.path`) exchanges either a bearer token
+(`Authorization: Bearer ...`, keycloak mode) or a JSON
+`{ "username": ..., "password": ... }` body (permissive mode) for a VUU
+token. A successful response carries the token in **both** places, and
+clients may read either:
+
+- the JSON body, `{ "token": "..." }`
+- the `vuu-auth-token` response header (listed in
+  `Access-Control-Expose-Headers`, so browsers can read it cross-origin)
+
+No cookie is set. Failures return `400` (malformed body), `401`
+(authentication failed) or `503` (identity provider unavailable) with a
+generic `{ "error": ... }` body.
+
+### Permissive mode
+
+`vuu.auth.mode="permissive"` is for local development and tests:
+
+- With `vuu.auth.permissive.users` empty, any username is accepted with any
+  password, including an empty or missing one.
+- `vuu.auth.permissive.users` is a comma-separated list of
+  `username:password` entries, or a bare `username` for a user that may use
+  any password. When it is set, only the listed users are accepted, and a
+  user listed with a password must supply it.
+- A username is always required.
+
+Other credential providers (anything without `allowsEmptyPassword: true` on
+the `CredentialAuthProvider`) still reject an empty or missing password with
+`401` before the provider is called.
+
+### CORS
+
+```hocon
+vuu.auth.cors.allowedOrigins=["http://localhost:5100", "http://127.0.0.1:5100"]
+vuu.auth.cors.allowedOrigins=${?VUU_CORS_ALLOWED_ORIGIN}
+vuu.auth.cors.allowedOrigins=${?VUU_CORS_ALLOWED_ORIGINS}
+```
+
+- `vuu.auth.cors.allowedOrigins` is a list (as above) or a comma-separated
+  string. The legacy single-value key `vuu.auth.cors.allowedOrigin` still
+  works, also accepts a comma-separated string, and is merged with the list.
+  With neither set the default is `http://localhost:5002`.
+- The stock confs let `VUU_CORS_ALLOWED_ORIGINS` (or the legacy
+  `VUU_CORS_ALLOWED_ORIGIN`) replace the list with a comma-separated list,
+  e.g. `VUU_CORS_ALLOWED_ORIGINS=http://localhost:5100,http://127.0.0.1:5100`.
+- Each entry must be an origin (`scheme://host[:port]`); a trailing slash is
+  dropped and anything with a path, query or fragment refuses to start.
+- A request whose `Origin` is in the list gets that origin echoed in
+  `Access-Control-Allow-Origin` (never the whole list), with
+  `Access-Control-Allow-Credentials: true` and `Vary: Origin`.
+- Preflight (`OPTIONS`) from an allowed origin returns `204` with the allowed
+  methods (`POST, OPTIONS`), headers (`Authorization, Content-Type`) and
+  `Access-Control-Max-Age: 600`. From any other origin it returns `403`
+  without CORS headers.
+- `"*"` allows any origin, but only with `vuu.auth.mode="permissive"` (the
+  server refuses to start otherwise). It is sent as
+  `Access-Control-Allow-Origin: *` and never with credentials.
+
+The same list applies to every auth profile path (`/api/authn/<profile>`).
+The websocket upgrade does not check `Origin`; it is authenticated by the
+VUU token in the `LOGIN` message. The admin api sends no CORS headers.
+`getConfiguredAllowedOrigins(config, authMode)` and `parseAllowedOrigins`
+are exported for applications that serve their own REST endpoints, and
+`createAuthHttpHandler` takes `allowedOrigins` (and the deprecated
+`allowedOrigin`) directly.
 
 ## How it fits together
 

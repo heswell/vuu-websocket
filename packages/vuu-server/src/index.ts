@@ -213,6 +213,13 @@ export {
   createHttpHandler,
   type HttpHandlerOptions,
 } from "./net/auth/AuthHttpHandler";
+export {
+  CorsConfigKeys,
+  DEFAULT_ALLOWED_ORIGINS,
+  getConfiguredAllowedOrigins,
+  isOriginAllowed,
+  parseAllowedOrigins,
+} from "./net/http/CorsOrigins";
 export { PermissiveAuthProvider } from "./net/auth/AuthProvider";
 export type {
   AuthenticationProviders,

@@ -79,9 +79,10 @@ In this repository, `npm run start:portal` starts it with
 Any setting can be overridden from the environment with a HOCON-style
 `${?VAR}` line in the conf, and the portal's own
 [`application.conf`](./application.conf) already does this for the ports,
-websocket path, auth mode, CORS origin, Keycloak URL and realm, and module
+websocket path, auth mode, CORS origins, Keycloak URL and realm, and module
 files (`VUU_HTTPS_PORT`, `VUU_WEBSOCKET_PORT`, `VUU_WEBSOCKET_PATH`,
-`VUU_AUTH_MODE`, `VUU_CORS_ALLOWED_ORIGIN`, `VUU_KEYCLOAK_URL`,
+`VUU_AUTH_MODE`, `VUU_CORS_ALLOWED_ORIGINS` (comma-separated; legacy
+`VUU_CORS_ALLOWED_ORIGIN`), `VUU_KEYCLOAK_URL`,
 `VUU_KEYCLOAK_REALM`, `VUU_PORTAL_MODULES_FILE`,
 `VUU_PORTAL_DEFAULT_MODULES_FILE`, `VUU_LOG_LEVEL`). See the
 [`@heswell/service-utils` README](../service-utils/README.md#environment-variable-substitution)

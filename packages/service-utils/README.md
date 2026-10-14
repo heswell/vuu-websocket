@@ -85,7 +85,7 @@ settings that most often change per environment:
 | `vuu.websocket.port` | `VUU_WEBSOCKET_PORT` |
 | `vuu.websocket.path` | `VUU_WEBSOCKET_PATH` |
 | `vuu.auth.mode` | `VUU_AUTH_MODE` |
-| `vuu.auth.cors.allowedOrigin` | `VUU_CORS_ALLOWED_ORIGIN` |
+| `vuu.auth.cors.allowedOrigins` | `VUU_CORS_ALLOWED_ORIGINS` (comma-separated; the legacy `VUU_CORS_ALLOWED_ORIGIN` also works) |
 | `vuu.keycloak.url` | `VUU_KEYCLOAK_URL` |
 | `vuu.keycloak.realm` | `VUU_KEYCLOAK_REALM` |
 | `vuu.portal.defaultModulesFile` | `VUU_PORTAL_DEFAULT_MODULES_FILE` |
