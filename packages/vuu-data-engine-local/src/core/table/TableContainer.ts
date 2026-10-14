@@ -23,38 +23,55 @@ export const createTable = (
   updateGenerator?: UpdateGenerator,
 ) => new Table(schema, data, dataMap, updateGenerator);
 
+export interface CreateJoinTableOptions {
+  /** Defaults to "inner". */
+  joinType?: JoinType;
+  /**
+   * Ordered column names of the join table, possibly a subset of the columns
+   * of the two source tables. Must include the key column of table1. Types
+   * are taken from the source tables. Defaults to every column of both
+   * tables, in alphabetical order.
+   */
+  columns?: readonly string[];
+  /**
+   * Declared schema of the join table, e.g. the schema a Vuu server would
+   * return in TABLE_META_RESP. Its column order is preserved; every column
+   * must exist in one of the source tables, with the same serverDataType, and
+   * its key must be the key of table1. Cannot be combined with `columns`.
+   */
+  schema?: TableSchema;
+}
+
 /**
  * Create a materialized join of two tables, backed by an engine JoinTable,
  * maintained incrementally as either source changes. `joinType` defaults to
  * "inner" (only rows with a match in table2). With "leftOuter" every table1
  * row is present and unmatched table2 columns are null, as in vuu-server.
+ *
+ * The fifth argument is either a JoinType or a CreateJoinTableOptions, which
+ * can also control the columns (and their order) of the join table. Where a
+ * column exists in both tables, the value comes from table1.
  */
 export const createJoinTable = (
   joinTable: VuuTable,
   table1: Table,
   table2: Table,
   joinColumn: string,
-  joinType: JoinType = "inner",
+  joinTypeOrOptions: JoinType | CreateJoinTableOptions = "inner",
 ) => {
-  const { schema: schema1 } = table1;
-  const { schema: schema2 } = table2;
-
-  const combinedColumns = new Set(
-    [...schema1.columns, ...schema2.columns].map((col) => col.name).sort(),
-  );
-
-  const combinedSchema: TableSchema = {
-    key: schema1.key,
-    table: joinTable,
-    rangeLimits: DEFAULT_RANGE_LIMITS,
-    columns: Array.from(combinedColumns).map<SchemaColumn>((columnName) => ({
-      name: columnName,
-      serverDataType: getServerDataType(columnName, schema1, schema2),
-    })),
-  };
+  const {
+    joinType = "inner",
+    columns,
+    schema,
+  }: CreateJoinTableOptions = typeof joinTypeOrOptions === "string"
+    ? { joinType: joinTypeOrOptions }
+    : joinTypeOrOptions;
 
   const engineJoinTable = new JoinTable({
-    schema: combinedSchema,
+    schema: buildJoinSchema(joinTable, table1.schema, table2.schema, {
+      columns,
+      schema,
+    }),
     baseTable: table1.engineTable,
     joinTable: table2.engineTable,
     leftColumn: joinColumn,
@@ -63,6 +80,82 @@ export const createJoinTable = (
   });
 
   return new Table(engineJoinTable);
+};
+
+const buildJoinSchema = (
+  joinTable: VuuTable,
+  schema1: TableSchema,
+  schema2: TableSchema,
+  { columns, schema }: Pick<CreateJoinTableOptions, "columns" | "schema">,
+): TableSchema => {
+  const name = `${joinTable.module}:${joinTable.table}`;
+  const fail = (message: string): never => {
+    throw Error(`[createJoinTable] ${name}: ${message}`);
+  };
+  if (columns && schema) {
+    fail("pass either columns or schema, not both");
+  }
+  if (schema) {
+    const { module, table } = schema.table;
+    if (module !== joinTable.module || table !== joinTable.table) {
+      fail(`schema is for table ${module}:${table}`);
+    }
+    if (schema.key !== schema1.key) {
+      fail(
+        `schema key ${schema.key} must be the key of ${schema1.table.table} (${schema1.key})`,
+      );
+    }
+  }
+
+  const sourceColumns = new Set(
+    [...schema1.columns, ...schema2.columns].map((col) => col.name),
+  );
+  const columnNames =
+    schema?.columns.map((col) => col.name) ??
+    columns ??
+    Array.from(sourceColumns).sort();
+
+  const seen = new Set<string>();
+  for (const columnName of columnNames) {
+    if (!sourceColumns.has(columnName)) {
+      fail(
+        `unknown column ${columnName}, not in ${schema1.table.table} or ${schema2.table.table}`,
+      );
+    }
+    if (seen.has(columnName)) {
+      fail(`duplicate column ${columnName}`);
+    }
+    seen.add(columnName);
+  }
+  if (!seen.has(schema1.key)) {
+    fail(`columns must include the key column ${schema1.key}`);
+  }
+
+  const joinColumns = columnNames.map<SchemaColumn>((columnName) => ({
+    name: columnName,
+    serverDataType: getServerDataType(columnName, schema1, schema2),
+  }));
+
+  if (schema) {
+    schema.columns.forEach(({ name: columnName, serverDataType }, i) => {
+      if (serverDataType !== joinColumns[i].serverDataType) {
+        fail(
+          `column ${columnName} is declared ${serverDataType} but is ${joinColumns[i].serverDataType} in the source table`,
+        );
+      }
+    });
+    return {
+      ...schema,
+      rangeLimits: schema.rangeLimits ?? DEFAULT_RANGE_LIMITS,
+    };
+  }
+
+  return {
+    key: schema1.key,
+    table: joinTable,
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    columns: joinColumns,
+  };
 };
 
 /**
@@ -93,14 +186,14 @@ export class TableContainer {
     table1: VuuTable | string,
     table2: VuuTable | string,
     joinColumn: string,
-    joinType: JoinType = "inner",
+    joinTypeOrOptions: JoinType | CreateJoinTableOptions = "inner",
   ) {
     const newTable = createJoinTable(
       joinTable,
       this.getTable(table1),
       this.getTable(table2),
       joinColumn,
-      joinType,
+      joinTypeOrOptions,
     );
     this.addTable(newTable);
     return newTable;

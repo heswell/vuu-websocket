@@ -43,6 +43,7 @@ import {
   buildDataColumnMapFromSchema,
 } from "../../Table";
 import { ModuleDataSource } from "../../ModuleDataSource";
+import { nextFrame } from "../../nextFrame";
 import { RuntimeVisualLink } from "../../RuntimeVisualLink";
 import { sessionTableRow, sessionTableSchema } from "../../session-table-utils";
 import {
@@ -375,7 +376,7 @@ export abstract class VuuModule<
   }: DataSourceSubscribedMessage) => {
     const visualLinks = this.getVisualLinks(tableSchema.table.table);
     const { dataSource } = this.getSubscriptionByViewport(clientViewportId);
-    requestAnimationFrame(() => {
+    nextFrame(() => {
       dataSource.links = visualLinks;
     });
 

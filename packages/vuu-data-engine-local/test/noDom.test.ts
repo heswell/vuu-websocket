@@ -1,5 +1,6 @@
-// trader upstream issue 77: the main entry must import in plain Node/Bun,
-// without a DOM. React bindings live in the /react entry.
+// trader upstream issues 77 and 78: the main entry must import and run in
+// plain Node/Bun, without a DOM or any browser-global shims. React bindings
+// live in the /react entry.
 import { describe, expect, it } from "bun:test";
 import { resolve } from "node:path";
 
@@ -24,7 +25,7 @@ const runFixture = async (fixture: string) => {
 
 describe("no DOM", () => {
   it(
-    "the main entry imports and runs an engine without DOM globals",
+    "the main entry imports, subscribes and disposes without DOM globals",
     async () => {
       const { exitCode, stderr, stdout } = await runFixture(
         "import-without-dom.ts",
@@ -34,6 +35,13 @@ describe("no DOM", () => {
       const report = JSON.parse(stdout.trim().split("\n").at(-1) ?? "{}");
       expect(report.reactExports).toEqual([]);
       expect(report.tables).toBeGreaterThan(0);
+      expect(report.browserGlobals).toEqual([]);
+      expect(report.initialRows).toEqual([
+        ["A", "XLON", 1.5],
+        ["B", "XNYS", null],
+      ]);
+      expect(report.updatedRows).toEqual([["B", "XNYS", 2.5]]);
+      expect(report.links).toBe(1);
     },
     TIMEOUT + 5_000,
   );

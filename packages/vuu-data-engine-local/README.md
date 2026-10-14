@@ -33,8 +33,9 @@ a second set of React contexts). They are `@vuu-ui/vuu-utils` and `@vuu-ui/vuu-f
 ## Usage
 
 Importing the package has no side effects: no modules, tables or timers are created
-until you ask for them. The main entry needs no DOM, so it runs in plain Node or Bun. The
-React bindings (`createDataSourceProvider`, `createLocalVuuServer`,
+until you ask for them. The main entry needs no DOM, so it runs in plain Node or Bun with
+no shims: it uses `requestAnimationFrame` when present and falls back to `setTimeout`
+otherwise. The React bindings (`createDataSourceProvider`, `createLocalVuuServer`,
 `LocalDataSourceProvider`) are in `@heswell/vuu-data-engine-local/react`, because
 `@vuu-ui/core` needs a DOM (`ResizeObserver`) at import time.
 
@@ -150,6 +151,29 @@ changes. Pass `"leftOuter"` to keep every `table1` row. For a row with no match,
 `table2` columns are `null` (not `0`), as on vuu-server, and vuu-ui renders them empty.
 Sort places nulls first when ascending; relational filters (`<`, `>=`, …) never match
 null; and aggregations skip nulls.
+
+By default the join table has every column of both tables, in alphabetical order. To
+control the columns, pass an options object as the fifth argument instead of a join type:
+
+```ts
+// an ordered list of column names, possibly a subset (must include table1's key)
+createJoinTable(joinTable, instruments, prices, "ric", {
+  joinType: "leftOuter",
+  columns: ["ric", "exchange", "bid", "ask"],
+});
+
+// or a declared TableSchema for the join table, e.g. the schema vuu-server returns
+createJoinTable(instrumentPricesSchema.table, instruments, prices, "ric", {
+  joinType: "leftOuter",
+  schema: instrumentPricesSchema,
+});
+```
+
+`columns` and `schema` are mutually exclusive, and `joinType` still defaults to `"inner"`.
+Column types come from the source tables; a column in both tables takes its value from
+`table1`. Unknown or duplicate columns, a missing key column, a declared `serverDataType`
+that differs from the source column, or a `schema` whose `table` or `key` does not match
+(`joinTable`, `table1`'s key) throw an error naming the join table and the problem.
 
 ### Ranges
 

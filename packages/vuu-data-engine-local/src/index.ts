@@ -13,6 +13,7 @@ export {
 } from "./core/engine/LocalEngine";
 export * from "./core/user/CurrentUser";
 export {
+  type CreateJoinTableOptions,
   createJoinTable,
   createTable,
   TableContainer,
