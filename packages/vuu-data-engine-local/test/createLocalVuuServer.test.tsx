@@ -8,7 +8,7 @@ import { getDefaultEngine } from "../src/core/engine/LocalEngine";
 import {
   createLocalVuuServer,
   LocalDataSourceProvider,
-} from "../src/local-datasource-provider/LocalDatasourceProvider";
+} from "../src/react";
 import { SimulModule } from "../src/simul/SimulModule";
 import { BasketModule } from "../src/basket/BasketModule";
 

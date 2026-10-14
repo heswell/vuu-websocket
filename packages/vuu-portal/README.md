@@ -49,11 +49,13 @@ Root exports:
 
 ## Starting the portal
 
-Everything is configured in `application.conf`. Point the portal at your own
-conf and run the stock entry unchanged:
+Everything is configured in `application.conf`. With no conf, the portal starts
+from the default bundled with the package, for local development. Point it at
+your own conf to run the stock entry unchanged:
 
 ```sh
 # bin
+bunx vuu-portal   # bundled default conf
 bunx vuu-portal --config ./path/to/application.conf
 VUU_CONFIG_FILE=./path/to/application.conf bunx vuu-portal
 
@@ -70,6 +72,31 @@ The conf file is located in this order:
 3. `$VUU_APP`, which selects `packages/$VUU_APP/application.conf` under the
    current directory.
 4. `./application.conf`.
+5. The conf bundled with the package,
+   [`config/application.conf`](./config/application.conf).
+
+The portal logs which conf it used (logger `vuu.portal`).
+
+### The bundled default conf
+
+`config/application.conf` is meant for zero-config local development, and the
+portal logs a warning when it is used:
+
+- `vuu.auth.mode="permissive"`: any username and password may log in.
+- `vuu.ssl=false`: the websocket is `ws://` and the REST server `http://`. No
+  certificate or key is shipped; for TLS set `VUU_SSL=true`, `VUU_CERT_PATH`
+  and `VUU_KEY_PATH`. `vuu.ssl=true` without both paths fails at startup.
+- Websocket on 8091 (`/websocket-portal`), REST on 8443.
+- No Keycloak secret is shipped; set `VUU_KEYCLOAK_CLIENT_SECRET` (and
+  `VUU_KEYCLOAK_URL`) with `VUU_AUTH_MODE=keycloak`.
+- The seed catalogue, [`config/default-modules.yaml`](./config/default-modules.yaml),
+  is empty. The writable `modules.yaml` is kept in the current directory (or at
+  `$VUU_PORTAL_MODULES_FILE`), never in the installed package.
+  `VUU_PORTAL_MODULES_FILE`, `VUU_PORTAL_DEFAULT_MODULES_FILE`,
+  `VUU_CERT_PATH` and `VUU_KEY_PATH` resolve against the current directory.
+
+Every setting has a `VUU_*` override; see the comments in the file, or
+`vuu-portal --help`. For anything else, copy it and pass `--config`.
 
 In this repository, `npm run start:portal` starts it with
 `VUU_APP=vuu-portal`, which uses [`application.conf`](./application.conf).

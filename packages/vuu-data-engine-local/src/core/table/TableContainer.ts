@@ -1,4 +1,4 @@
-import { JoinTable } from "@heswell/vuu-table";
+import { JoinTable, type JoinType } from "@heswell/vuu-table";
 import type { SchemaColumn, TableSchema } from "@vuu-ui/vuu-data-types";
 import { buildDataColumnMapFromSchema, Table } from "../../Table";
 import type { VuuRowDataItemType, VuuTable } from "@vuu-ui/vuu-protocol-types";
@@ -24,14 +24,17 @@ export const createTable = (
 ) => new Table(schema, data, dataMap, updateGenerator);
 
 /**
- * Create a materialized (inner) join of two tables, backed by an engine
- * JoinTable, maintained incrementally as either source changes.
+ * Create a materialized join of two tables, backed by an engine JoinTable,
+ * maintained incrementally as either source changes. `joinType` defaults to
+ * "inner" (only rows with a match in table2). With "leftOuter" every table1
+ * row is present and unmatched table2 columns are null, as in vuu-server.
  */
 export const createJoinTable = (
   joinTable: VuuTable,
   table1: Table,
   table2: Table,
   joinColumn: string,
+  joinType: JoinType = "inner",
 ) => {
   const { schema: schema1 } = table1;
   const { schema: schema2 } = table2;
@@ -56,7 +59,7 @@ export const createJoinTable = (
     joinTable: table2.engineTable,
     leftColumn: joinColumn,
     rightColumn: joinColumn,
-    joinType: "inner",
+    joinType,
   });
 
   return new Table(engineJoinTable);
@@ -90,12 +93,14 @@ export class TableContainer {
     table1: VuuTable | string,
     table2: VuuTable | string,
     joinColumn: string,
+    joinType: JoinType = "inner",
   ) {
     const newTable = createJoinTable(
       joinTable,
       this.getTable(table1),
       this.getTable(table2),
       joinColumn,
+      joinType,
     );
     this.addTable(newTable);
     return newTable;

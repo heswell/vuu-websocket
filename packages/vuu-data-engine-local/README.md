@@ -14,7 +14,7 @@ two packages don't depend on each other.
 All `@vuu-ui` packages are peers declared as `^4.0.0-alpha.20`, so the engine uses the host
 application's single copy of each (a second `@vuu-ui/vuu-utils` or `@vuu-ui/core` would mean
 a second set of React contexts). They are `@vuu-ui/vuu-utils` and `@vuu-ui/vuu-filter-parser`
-(runtime), `@vuu-ui/core` (React provider), and the type-only `vuu-data-types`,
+(runtime), `@vuu-ui/core` (React provider, `/react` entry only), and the type-only `vuu-data-types`,
 `vuu-filter-types`, `vuu-protocol-types` and `vuu-table-types`.
 
 ## Architecture
@@ -33,14 +33,17 @@ a second set of React contexts). They are `@vuu-ui/vuu-utils` and `@vuu-ui/vuu-f
 ## Usage
 
 Importing the package has no side effects: no modules, tables or timers are created
-until you ask for them.
+until you ask for them. The main entry needs no DOM, so it runs in plain Node or Bun. The
+React bindings (`createDataSourceProvider`, `createLocalVuuServer`,
+`LocalDataSourceProvider`) are in `@heswell/vuu-data-engine-local/react`, because
+`@vuu-ui/core` needs a DOM (`ResizeObserver`) at import time.
 
 ```ts
 import {
   createLocalEngine,
-  createLocalVuuServer,
   registerDemoModules,
 } from "@heswell/vuu-data-engine-local";
+import { createLocalVuuServer } from "@heswell/vuu-data-engine-local/react";
 
 // Your own modules, in an isolated engine
 const engine = createLocalEngine({ modules: [new OrdersModule()] });
@@ -64,20 +67,20 @@ const { simulModule } = registerDemoModules(createLocalEngine());
 
 ### Engines
 
-| API                                                        | Description                                                                                                                                                |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createLocalEngine({ modules? })`                          | A new, isolated `LocalEngine`. Two engines, or two modules in one engine, can use the same table names.                                                    |
-| `engine.register(module)` / `unregister(name)`             | Add or remove a module and its tables. A module is attached to the first engine it is registered with.                                                     |
-| `engine.getModule(name)`, `hasModule`, `modules`           | Look up modules.                                                                                                                                           |
-| `engine.getTableList()`                                    | `VuuTable[]` (`{module, table}`) for every registered module.                                                                                              |
-| `engine.getTableSchema(vuuTable)`                          | A table's schema.                                                                                                                                          |
-| `engine.createDataSource(vuuTable, vp?, cfg?)`             | A `ModuleDataSource` for a table.                                                                                                                          |
-| `engine.tableContainer`                                    | The engine's `TableContainer`. Tables are keyed by `{module, table}`; a bare table name is accepted only if exactly one module has a table with that name. |
-| `engine.dispose()`                                         | Unregisters every module and disposes those attached to this engine (stopping ticking data and timers).                                                    |
-| `createDataSourceProvider(engine)`                         | A React provider installing the legacy and core data contexts for the engine.                                                                              |
-| `createLocalVuuServer({ connectionId, modules, engine? })` | A `LocalVuuServer` (`{connectionId, DataSourceProvider, engine}`). Uses a new engine unless one is passed.                                                 |
-| `registerDemoModules(engine?)`                             | Creates the SIMUL, BASKET and TEST demo modules and registers them with `engine` (default: the default engine).                                            |
-| `getDefaultEngine()` / `resetDefaultEngine()`              | The shared engine behind the deprecated globals below.                                                                                                     |
+| API                                                                   | Description                                                                                                                                                |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createLocalEngine({ modules? })`                                     | A new, isolated `LocalEngine`. Two engines, or two modules in one engine, can use the same table names.                                                    |
+| `engine.register(module)` / `unregister(name)`                        | Add or remove a module and its tables. A module is attached to the first engine it is registered with.                                                     |
+| `engine.getModule(name)`, `hasModule`, `modules`                      | Look up modules.                                                                                                                                           |
+| `engine.getTableList()`                                               | `VuuTable[]` (`{module, table}`) for every registered module.                                                                                              |
+| `engine.getTableSchema(vuuTable)`                                     | A table's schema.                                                                                                                                          |
+| `engine.createDataSource(vuuTable, vp?, cfg?)`                        | A `ModuleDataSource` for a table.                                                                                                                          |
+| `engine.tableContainer`                                               | The engine's `TableContainer`. Tables are keyed by `{module, table}`; a bare table name is accepted only if exactly one module has a table with that name. |
+| `engine.dispose()`                                                    | Unregisters every module and disposes those attached to this engine (stopping ticking data and timers).                                                    |
+| `createDataSourceProvider(engine)` (`/react`)                         | A React provider installing the legacy and core data contexts for the engine.                                                                              |
+| `createLocalVuuServer({ connectionId, modules, engine? })` (`/react`) | A `LocalVuuServer` (`{connectionId, DataSourceProvider, engine}`). Uses a new engine unless one is passed.                                                 |
+| `registerDemoModules(engine?)`                                        | Creates the SIMUL, BASKET and TEST demo modules and registers them with `engine` (default: the default engine).                                            |
+| `getDefaultEngine()` / `resetDefaultEngine()`                         | The shared engine behind the deprecated globals below.                                                                                                     |
 
 ### Edit sessions: hooks and service overrides
 
@@ -115,6 +118,14 @@ class OrdersModule extends VuuModule<"parentOrders" | "childOrders"> {
 }
 ```
 
+`deleteRow` and `deleteSelectedRows` behave as on vuu-server: they are only valid in an edit
+session, and mark the session row `vuuAction = "deleteRow"` whatever the `mode` (`"hard"`,
+vuu-ui's default, or `"soft"`). The row stays in the session until it is saved, when
+`applySessionSave` receives it as a `deleteRow` change, or `undoRowChange` restores it. A
+row added in the session is simply dropped. Outside a session `deleteRow` returns an error;
+`deleteSourceRow` (protected, not registered) keeps the old direct delete for subclasses
+such as SIMUL's `DELETE_ROW`.
+
 `endEditSession({ save: true })`:
 
 1. Rows already handled by `beforeSessionSave` (with a `vuuMsg`) are skipped.
@@ -131,6 +142,15 @@ class OrdersModule extends VuuModule<"parentOrders" | "childOrders"> {
 4. `afterSessionSave`, then the session rows are reset (deleted rows removed, `vuuAction`
    and `vuuMsg` cleared, snapshots refreshed).
 
+### Join tables
+
+`createJoinTable(joinTable, table1, table2, joinColumn, joinType = "inner")` (and
+`tableContainer.createJoinTable`) creates a join that is kept up to date as either table
+changes. Pass `"leftOuter"` to keep every `table1` row. For a row with no match, the
+`table2` columns are `null` (not `0`), as on vuu-server, and vuu-ui renders them empty.
+Sort places nulls first when ascending; relational filters (`<`, `>=`, …) never match
+null; and aggregations skip nulls.
+
 ### Ranges
 
 `subscribe({ range })`, `dataSource.range = …` and `setRange` accept a vuu-utils `Range` or
@@ -139,11 +159,22 @@ a plain `{from, to}`.
 ### Deprecated globals and the `/legacy` entry
 
 `tableContainer`, `LocalDataSourceProvider` and `ensureVuuModule` use the default engine
-(`getDefaultEngine()`). `@heswell/vuu-data-engine-local/legacy` re-exports the main entry and,
+(`getDefaultEngine()`). `@heswell/vuu-data-engine-local/legacy` re-exports the main and
+`/react` entries and,
 on import, registers the demo modules with the default engine, exporting the instances
 `simulModule`, `basketModule`, `testModule`, `moduleAdminModule`, `userAdminModule` and
 `notificationsModule` as 2.x did. It is the only entry point with side effects
 (`"sideEffects": ["./src/legacy.ts"]`).
+
+## Migrating from 3.x
+
+These are breaking changes; the next release should be 4.0.0.
+
+| 3.x                                                                                                       | 4.x                                                                                                                |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `createDataSourceProvider`, `createLocalVuuServer`, `LocalDataSourceProvider` exported by the main entry. | Import them from `@heswell/vuu-data-engine-local/react` (or `/legacy`). The main entry no longer needs a DOM.      |
+| `deleteRow` with `mode: "hard"` removed the session row, so the save never saw the delete.                | The row is marked `vuuAction = "deleteRow"` in either mode and applied on save (or restored by `undoRowChange`).   |
+| `deleteRow` outside an edit session deleted the source row.                                               | Returns an error, as vuu-server does. Use an edit session, or expose the protected `deleteSourceRow` as a service. |
 
 ## Migrating from 2.x
 

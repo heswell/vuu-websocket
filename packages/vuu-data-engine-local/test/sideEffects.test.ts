@@ -80,6 +80,10 @@ describe("side effects", () => {
 
   it("package.json declares only /legacy as having side effects", () => {
     expect(packageJson.sideEffects).toEqual(["./src/legacy.ts"]);
-    expect(Object.keys(packageJson.exports)).toEqual([".", "./legacy"]);
+    expect(Object.keys(packageJson.exports)).toEqual([
+      ".",
+      "./react",
+      "./legacy",
+    ]);
   });
 });

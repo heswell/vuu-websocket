@@ -14,6 +14,7 @@ export default defineConfig({
       source: {
         entry: {
           index: "./src/index.ts",
+          react: "./src/react.ts",
           legacy: "./src/legacy.ts",
         },
         tsconfigPath: "./tsconfig.build.json",

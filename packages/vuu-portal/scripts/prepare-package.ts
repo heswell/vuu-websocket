@@ -15,4 +15,5 @@ prepareDistPackage({
     { subpath: "./main", name: "main" },
   ],
   bin: { "vuu-portal": "bin" },
+  assets: ["config"],
 });

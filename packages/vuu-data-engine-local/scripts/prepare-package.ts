@@ -46,6 +46,10 @@ const distManifest: PackageManifest = {
       types: "./src/index.d.ts",
       import: "./index.js",
     },
+    "./react": {
+      types: "./src/react.d.ts",
+      import: "./react.js",
+    },
     "./legacy": {
       types: "./src/legacy.d.ts",
       import: "./legacy.js",

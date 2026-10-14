@@ -23,3 +23,10 @@ export {
   PORTAL_DEFAULT_WEBSOCKET_PORT,
   type PortalApplicationOptions,
 } from "./PortalApplication";
+export {
+  BUNDLED_CONFIG_FILE,
+  type PortalConfigSource,
+  type ResolvedPortalConfig,
+  type ResolvePortalConfigOptions,
+  resolvePortalConfig,
+} from "./resolvePortalConfig";
