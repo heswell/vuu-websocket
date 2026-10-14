@@ -75,18 +75,10 @@ export const toRange = (range: VuuRange | Range): Range =>
   (range as Range).withBuffer !== undefined
     ? (range as Range)
     : Range(range.from, range.to);
+import { nextFrame } from "./nextFrame";
 import { Table, type TableRow } from "./Table";
 
 const { KEY } = metadataKeys;
-
-// Runtime agnostic: rAF is not available when hosted outside a browser.
-const nextFrame = (callback: () => void) => {
-  if (typeof globalThis.requestAnimationFrame === "function") {
-    globalThis.requestAnimationFrame(callback);
-  } else {
-    globalThis.setTimeout(callback, 0);
-  }
-};
 
 const buildTableSchema = (
   columns: readonly ColumnDescriptor[],
