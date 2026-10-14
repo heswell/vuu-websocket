@@ -117,11 +117,11 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
       return { type: "SUCCESS_RESULT", data: undefined };
     }
 
-    const prepared = this.prepareSessionSave(sessionTable, force === true);
+    const prepared = this.prepareSessionSave(sessionTable, force === true, ctx);
     if ("type" in prepared) return prepared;
 
     return this.saveSession(viewport, sessionTable, prepared, ctx, () =>
-      this.prepareSessionSave(sessionTable, force === true),
+      this.prepareSessionSave(sessionTable, force === true, ctx),
     );
   }
 
@@ -173,7 +173,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
           changes = reprepared;
         }
         return chain(
-          () => this.applySessionSave(sessionTable, changes),
+          () => this.applySessionSave(sessionTable, changes, ctx),
           (result): RpcResult => {
             if (result === false) {
               return fail(SAVE_FAILED);
@@ -192,9 +192,15 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     );
   }
 
+  /**
+   * Validate the session changes against the source table (stale rows,
+   * duplicate keys, permissions). `ctx` is the request context of the
+   * endEditSession RPC.
+   */
   protected prepareSessionSave(
     sessionTable: InMemSessionDataTable,
     force?: boolean,
+    _ctx?: RequestContext,
   ): PreparedSessionSave | RpcResult {
     const sourceTable = this.tableContainer.getTable<DataTable>(
       sessionTable.tableDef.name,
@@ -311,10 +317,16 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
    *
    * Overrides may return false or an ERROR_RESULT (or throw) to report a
    * failed save, the session is then left open.
+   *
+   * `ctx` is the request context (user, session) of the endEditSession RPC,
+   * the same one passed to {@link canSaveSession}. It is always passed by
+   * the base class; it is optional only so that existing overrides and
+   * callers with two arguments still compile.
    */
   protected applySessionSave(
     sessionTable: InMemSessionDataTable,
     { sourceTable, changes }: PreparedSessionSave,
+    _ctx?: RequestContext,
   ): SessionSaveResult | Promise<SessionSaveResult> {
     const undo: Array<() => void> = [];
     try {

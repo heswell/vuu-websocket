@@ -24,13 +24,33 @@ export const BunWebSocketConnectionHandler = (
       msg: string | Buffer,
     ) => {
       // Added by Copilot for issue #10: await async RPC/service handling completion.
-      await viewserverHandler.handle(msg as string, ws);
+      try {
+        await viewserverHandler.handle(String(msg), ws);
+      } catch (error) {
+        // last resort, handle() is not expected to reject
+        log.error(
+          `unhandled error processing message on channel ${ws.data.sessionId}`,
+          error,
+        );
+      }
     },
     drain: (ws: ServerWebSocket) => {
       log.debug("WebSocket backpressure (drain)");
     },
-    close: (ws: ServerWebSocket<WebsocketData>) => {
-      log.debug(`WebSocket closed ${ws.data.sessionId}`);
+    close: (
+      ws: ServerWebSocket<WebsocketData>,
+      code: number,
+      reason: string,
+    ) => {
+      log.debug(`WebSocket closed ${ws.data.sessionId} (${code} ${reason})`);
+      try {
+        viewserverHandler.close(ws);
+      } catch (error) {
+        log.error(
+          `failed to clean up sessions of channel ${ws.data.sessionId}`,
+          error,
+        );
+      }
     },
   };
 };

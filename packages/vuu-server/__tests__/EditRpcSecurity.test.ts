@@ -663,6 +663,68 @@ describe("session save (trader upstream issue 18)", () => {
     expect(ctx.tableContainer.hasTable(ctx.sessionTable.name)).toBe(true);
   });
 
+  test("applySessionSave receives the RequestContext (trader upstream issue 68)", () => {
+    const seen: Array<{ hook: string; ctx: RequestContext | undefined }> = [];
+    class UserAwareSave extends CreateSessionTableRpcHandler {
+      protected canSaveSession(
+        _viewport: Viewport,
+        _prepared: PreparedSessionSave,
+        ctx: RequestContext,
+      ) {
+        seen.push({ hook: "canSaveSession", ctx });
+        return true;
+      }
+      protected prepareSessionSave(
+        sessionTable: InMemSessionDataTable,
+        force?: boolean,
+        ctx?: RequestContext,
+      ) {
+        seen.push({ hook: "prepareSessionSave", ctx });
+        return super.prepareSessionSave(sessionTable, force, ctx);
+      }
+      protected applySessionSave(
+        sessionTable: InMemSessionDataTable,
+        prepared: PreparedSessionSave,
+        ctx: RequestContext,
+      ) {
+        seen.push({ hook: "applySessionSave", ctx });
+        return super.applySessionSave(sessionTable, prepared, ctx);
+      }
+    }
+    const ctx = editAndSave(UserAwareSave);
+    expect(ctx.result).toEqual(ok);
+    expect(seen.map(({ hook }) => hook)).toEqual([
+      "prepareSessionSave",
+      "canSaveSession",
+      "applySessionSave",
+    ]);
+    const [first] = seen;
+    expect(first.ctx?.user.name).toBe("steve");
+    expect(first.ctx?.session).toEqual(SESSION_1);
+    // the same context reaches every hook
+    expect(seen.every(({ ctx }) => ctx === first.ctx)).toBe(true);
+  });
+
+  test("applySessionSave gets the context after an async canSaveSession", async () => {
+    const users: string[] = [];
+    class AsyncApproval extends CreateSessionTableRpcHandler {
+      protected async canSaveSession() {
+        return true;
+      }
+      protected applySessionSave(
+        sessionTable: InMemSessionDataTable,
+        prepared: PreparedSessionSave,
+        ctx: RequestContext,
+      ) {
+        users.push(ctx.user.name);
+        return super.applySessionSave(sessionTable, prepared, ctx);
+      }
+    }
+    const ctx = editAndSave(AsyncApproval);
+    expect(await ctx.result).toEqual(ok);
+    expect(users).toEqual(["steve"]);
+  });
+
   test("an error thrown by applySessionSave leaves the session open", () => {
     class ThrowingSave extends CreateSessionTableRpcHandler {
       protected applySessionSave(): SessionSaveResult {

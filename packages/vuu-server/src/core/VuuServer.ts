@@ -66,6 +66,7 @@ export class VuuServer extends DefaultLifecycleEnabled {
 
     const sessionContainer = ClientSessionContainer(
       config.webSocketOptions.maxSessionsPerUser,
+      config.webSocketOptions.sessionLimitPolicy,
     );
 
     this.joinProvider = new JoinTableProvider();

@@ -37,6 +37,11 @@ import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
 import { getLogger } from "@heswell/service-utils";
+import {
+  ClientRequestError,
+  TableNotFoundError,
+  ViewportNotFoundError,
+} from "../net/ClientRequestError";
 
 const log = getLogger("vuu.viewport");
 
@@ -61,7 +66,7 @@ export type ViewportEvents = {
  * A menu RPC could not be dispatched (unknown viewport or rpcName, or a
  * context mismatch). Its message is safe to return to the client.
  */
-export class MenuRpcDispatchError extends Error {
+export class MenuRpcDispatchError extends ClientRequestError {
   name = "MenuRpcDispatchError";
 }
 
@@ -145,7 +150,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       table.ownerSessionId !== sessionId
     ) {
       // a session table is private to the client session that created it
-      throw Error(`[ViewportContainer] no table ${table.name}`);
+      throw new TableNotFoundError(table.name, "ViewportContainer");
     }
     const id = ViewPortId.oneNew();
     log.debug(`create vp ${id}, table ${table.name}`);
@@ -207,7 +212,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (viewport) {
       return viewport;
     } else {
-      throw Error(`[ViewportContainer] viewport not found ${viewportId}`);
+      throw new ViewportNotFoundError(viewportId);
     }
   }
 
@@ -223,7 +228,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (viewport && viewport.sessionId === clientSessionId.sessionId) {
       return viewport;
     } else {
-      throw Error(`[ViewportContainer] viewport not found ${viewportId}`);
+      throw new ViewportNotFoundError(viewportId);
     }
   }
 

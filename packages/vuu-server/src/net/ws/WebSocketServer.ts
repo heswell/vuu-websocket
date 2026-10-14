@@ -4,6 +4,7 @@ import { BunWebSocketConnectionHandler } from "./BunWebSocketConnectionHandler";
 import { getLogger } from "@heswell/service-utils";
 
 const log = getLogger("vuu.net");
+const STOP_TIMEOUT_MS = 250;
 
 export class WebSocketServer {
   #server: Bun.Server<unknown> | undefined;
@@ -64,6 +65,22 @@ export class WebSocketServer {
       return;
     }
     this.#server = undefined;
-    await server.stop(true);
+    // Bun (1.3.x) never settles the forced stop promise once the server has
+    // closed a websocket itself (eviction, invalid session, login failure),
+    // although the listener and all connections are closed. Don't wait for
+    // it indefinitely.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stopped = await Promise.race([
+      server.stop(true).then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), STOP_TIMEOUT_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (!stopped) {
+      log.debug(
+        `WebSocket server stop did not settle within ${STOP_TIMEOUT_MS}ms, continuing`,
+      );
+    }
   }
 }

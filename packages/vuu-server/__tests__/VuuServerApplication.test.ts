@@ -9,6 +9,7 @@ import {
   setLogSink,
   VuuUserWithAuthorizations,
 } from "../src";
+import { unhandledRejectionGuardEnabled } from "../src/core/VuuServerApplication";
 
 describe("VuuServerApplication", () => {
   test("uses the generic websocket path by default", () => {
@@ -35,6 +36,54 @@ describe("VuuServerApplication", () => {
     );
 
     expect(options.uri).toBe("/websocket-portal");
+  });
+
+  test("applies the session limit config (trader upstream issue 72)", () => {
+    const defaults = createConfiguredWebSocketOptions(
+      createConfig({ "vuu.ssl": false }),
+      8091,
+    );
+    expect(defaults.maxSessionsPerUser).toBe(1);
+    expect(defaults.sessionLimitPolicy).toBe("evict-oldest");
+
+    const configured = createConfiguredWebSocketOptions(
+      createConfig({
+        "vuu.ssl": false,
+        "vuu.server.maxSessionsPerUser": 3,
+        "vuu.server.sessionLimitPolicy": "reject-new",
+      }),
+      8091,
+    );
+    expect(configured.maxSessionsPerUser).toBe(3);
+    expect(configured.sessionLimitPolicy).toBe("reject-new");
+
+    expect(() =>
+      createConfiguredWebSocketOptions(
+        createConfig({
+          "vuu.ssl": false,
+          "vuu.server.sessionLimitPolicy": "evict-newest",
+        }),
+        8091,
+      ),
+    ).toThrow("Invalid sessionLimitPolicy 'evict-newest'");
+  });
+
+  test("the unhandledRejection guard is off under bun test unless asked for", () => {
+    const config = createConfig({});
+    expect(process.env.NODE_ENV).toBe("test");
+    expect(unhandledRejectionGuardEnabled(config)).toBe(false);
+    expect(unhandledRejectionGuardEnabled(config, true)).toBe(true);
+    expect(
+      unhandledRejectionGuardEnabled(
+        createConfig({ "vuu.server.unhandledRejectionGuard": true }),
+      ),
+    ).toBe(true);
+    expect(
+      unhandledRejectionGuardEnabled(
+        createConfig({ "vuu.server.unhandledRejectionGuard": true }),
+        false,
+      ),
+    ).toBe(false);
   });
 
   test.each([

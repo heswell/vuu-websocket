@@ -56,13 +56,17 @@ import { RpcErrorResult } from "../net/rpc/RpcResult";
 import { ServerApi } from "../net/ServerApi";
 import { ProviderContainer } from "../provider/ProviderContainer";
 import { ViewPortRange } from "../viewport/Viewport";
-import {
-  MenuRpcDispatchError,
-  ViewportContainer,
-} from "../viewport/ViewportContainer";
+import { ViewportContainer } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { DataTable } from "./table/InMemDataTable";
-import { getLogger } from "@heswell/service-utils";
+import { InMemSessionDataTable } from "./table/InMemSessionDataTable";
+import { getLogger, type Logger } from "@heswell/service-utils";
+import {
+  ClientRequestError,
+  errorMessage,
+  isClientRequestError,
+  TableNotFoundError,
+} from "../net/ClientRequestError";
 
 const log = getLogger("vuu.core");
 const rpcLog = getLogger("vuu.rpc");
@@ -93,6 +97,72 @@ const createErrorRpcResponse = (
     // ),
   );
 
+const isMenuRpcRequest = (
+  body: VuuClientMessage["body"],
+): body is VuuRpcMenuRequest =>
+  body.type === "VIEW_PORT_MENUS_SELECT_RPC" ||
+  body.type === "VIEW_PORT_MENU_TABLE_RPC" ||
+  body.type === "VIEW_PORT_MENU_ROW_RPC" ||
+  body.type === "VIEW_PORT_MENU_CELL_RPC";
+
+const failedRequest = (ctx: RequestContext) =>
+  `Failed to process request ${ctx.requestId}`;
+
+/**
+ * Logs a failed request. A {@link ClientRequestError} is an expected refusal
+ * (warn, no stack); anything else is a server fault (error, with stack).
+ * Returns the message that is safe to send to the client.
+ */
+const logRequestError = (
+  logger: Logger,
+  description: string,
+  error: unknown,
+  ctx: RequestContext,
+) => {
+  const where = `(${ctx.requestId}, session ${ctx.session.sessionId})`;
+  if (isClientRequestError(error)) {
+    logger.warn(`${description} refused ${where}: ${error.reason}`);
+    return error.reason;
+  }
+  logger.error(`${description} failed ${where}`, error);
+  return failedRequest(ctx);
+};
+
+/**
+ * The reject/error reply for a request that could not be processed, using
+ * the protocol's specific reject message where there is one.
+ */
+const rejectBody = (
+  body: VuuClientMessage["body"],
+  reason: string,
+): ViewServerMessageBody => {
+  switch (body.type) {
+    case "CREATE_VP":
+      return CreateViewPortReject(body.table, reason);
+    case "RPC_REQUEST":
+      return createErrorRpcResponse(body, reason);
+    case "SELECT_ROW":
+      return { type: "SELECT_ROW_REJECT", vpId: body.vpId, errorMsg: reason };
+    case "DESELECT_ROW":
+      return { type: "DESELECT_ROW_REJECT", vpId: body.vpId, errorMsg: reason };
+    case "SELECT_ROW_RANGE":
+      return {
+        type: "SELECT_ROW_RANGE_REJECT",
+        vpId: body.vpId,
+        errorMsg: reason,
+      };
+    case "SELECT_ALL":
+      return SelectAllReject(body.vpId, reason);
+    case "DESELECT_ALL":
+      return { type: "DESELECT_ALL_REJECT", vpId: body.vpId, errorMsg: reason };
+    default:
+      if (isMenuRpcRequest(body)) {
+        return ViewPortMenuRpcReject(body.vpId, body.rpcName, reason);
+      }
+      return ErrorResponse(reason);
+  }
+};
+
 export class CoreServerApiHandler implements ServerApi {
   constructor(
     private viewPortContainer: ViewportContainer,
@@ -100,8 +170,31 @@ export class CoreServerApiHandler implements ServerApi {
     private providers: ProviderContainer,
   ) {}
 
+  /**
+   * Never throws: a request that fails is answered with the matching reject
+   * (CREATE_VP_REJECT, VIEW_PORT_MENU_REJ, an RPC ERROR_RESULT, ...) or an
+   * ERROR message, so one bad request cannot take the server down.
+   */
   async process(
-    { requestId, body }: VuuClientMessage,
+    msg: VuuClientMessage,
+    ctx: RequestContext,
+  ): Promise<ViewServerMessage | undefined> {
+    try {
+      return await this.dispatch(msg, ctx);
+    } catch (error) {
+      const { body } = msg;
+      const reason = logRequestError(
+        body.type === "RPC_REQUEST" || isMenuRpcRequest(body) ? rpcLog : log,
+        body.type,
+        error,
+        ctx,
+      );
+      return vsMsg(rejectBody(body, reason), ctx);
+    }
+  }
+
+  private async dispatch(
+    { body }: VuuClientMessage,
     ctx: RequestContext,
   ): Promise<ViewServerMessage | undefined> {
     switch (body.type) {
@@ -154,8 +247,9 @@ export class CoreServerApiHandler implements ServerApi {
       case "VIEW_PORT_MENU_CELL_RPC":
         return this.processMenuRpcRequest(body, ctx);
       default:
-        throw Error(
-          `[VUU:core:CoreServerApiHandler] unsupported message type ${body.type}`,
+        throw new ClientRequestError(
+          `[VUU:core:CoreServerApiHandler] unsupported message type ${(body as { type: string }).type}`,
+          `unsupported message type ${(body as { type: string }).type}`,
         );
     }
   }
@@ -165,6 +259,13 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     const table = this.tableContainer.getTable<DataTable>(msg.table.table);
+    if (
+      table instanceof InMemSessionDataTable &&
+      table.ownerSessionId !== ctx.session.sessionId
+    ) {
+      // a session table is private to the client session that created it
+      throw new TableNotFoundError(table.name);
+    }
     if (table) {
       const metaColumns = this.viewPortContainer.getTableMetaColumns(table);
       const columns = metaColumns.map((col) => col.name);
@@ -190,7 +291,7 @@ export class CoreServerApiHandler implements ServerApi {
       const tables = this.tableContainer.getDefinedTables();
       return vsMsg(GetTableListResponse(tables), ctx);
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "GET_TABLE_LIST", e, ctx), ctx);
     }
   }
 
@@ -252,9 +353,9 @@ export class CoreServerApiHandler implements ServerApi {
       viewport.changeViewport(options);
       return vsMsg(ChangeViewPortSuccess(viewPortId, options), ctx);
     } catch (e) {
-      log.warn(`Failed to change viewport ${viewPortId}`, e);
+      logRequestError(log, `CHANGE_VP ${viewPortId}`, e, ctx);
       return errorMsg(
-        `Failed to change viewport ${viewPortId}: ${(e as Error).message}`,
+        `Failed to change viewport ${viewPortId}: ${isClientRequestError(e) ? e.reason : errorMessage(e)}`,
         ctx,
       );
     }
@@ -298,7 +399,7 @@ export class CoreServerApiHandler implements ServerApi {
         ctx,
       );
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "CHANGE_VP_RANGE", e, ctx), ctx);
     }
   }
 
@@ -350,11 +451,15 @@ export class CoreServerApiHandler implements ServerApi {
         );
       }
     } catch (e) {
-      rpcLog.error(`Failed to process request ${ctx.requestId}`, e);
       return vsMsg(
         createErrorRpcResponse(
           msg,
-          `Failed to process request ${ctx.requestId}`,
+          logRequestError(
+            rpcLog,
+            `RPC ${msg.rpcName} on vp ${viewPortId}`,
+            e,
+            ctx,
+          ),
         ),
         ctx,
       );
@@ -370,24 +475,13 @@ export class CoreServerApiHandler implements ServerApi {
       const action = await this.viewPortContainer.callMenuRpc(msg, ctx);
       return vsMsg(ViewPortMenuRpcResponse(vpId, rpcName, action), ctx);
     } catch (e) {
-      if (e instanceof MenuRpcDispatchError) {
-        rpcLog.warn(
-          `${type} ${rpcName} rejected (${ctx.requestId}): ${e.message}`,
-        );
-        return vsMsg(ViewPortMenuRpcReject(vpId, rpcName, e.message), ctx);
-      }
-      rpcLog.error(
-        `${type} ${rpcName} on vp ${vpId} failed in session ${ctx.session.sessionId} (${ctx.requestId})`,
+      const reason = logRequestError(
+        rpcLog,
+        `${type} ${rpcName} on vp ${vpId}`,
         e,
-      );
-      return vsMsg(
-        ViewPortMenuRpcReject(
-          vpId,
-          rpcName,
-          `Failed to process request ${ctx.requestId}`,
-        ),
         ctx,
       );
+      return vsMsg(ViewPortMenuRpcReject(vpId, rpcName, reason), ctx);
     }
   }
 
@@ -405,6 +499,7 @@ export class CoreServerApiHandler implements ServerApi {
         ctx,
       );
     } catch (e) {
+      logRequestError(log, "DISABLE_VP", e, ctx);
       return vsMsg(
         {
           type: "ERROR",
@@ -429,6 +524,7 @@ export class CoreServerApiHandler implements ServerApi {
         ctx,
       );
     } catch (e) {
+      logRequestError(log, "ENABLE_VP", e, ctx);
       return vsMsg(
         {
           type: "ERROR",
@@ -453,7 +549,7 @@ export class CoreServerApiHandler implements ServerApi {
         ctx,
       );
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "REMOVE_VP", e, ctx), ctx);
     }
   }
 
@@ -466,7 +562,10 @@ export class CoreServerApiHandler implements ServerApi {
         msg.preserveExistingSelection,
       );
       return vsMsg(SelectRowSuccess(msg.vpId, selectedRowCount), ctx);
-    } catch (e) {}
+    } catch (e) {
+      const reason = logRequestError(log, "SELECT_ROW", e, ctx);
+      return vsMsg(rejectBody(msg, reason), ctx);
+    }
   }
 
   private processDeselectRowRequest(
@@ -491,7 +590,7 @@ export class CoreServerApiHandler implements ServerApi {
       return vsMsg(SelectAllSuccess(msg.vpId, selectedRowCount), ctx);
     } catch (e) {
       return vsMsg(
-        SelectAllReject(msg.vpId, `Failed to process request ${ctx.requestId}`),
+        SelectAllReject(msg.vpId, logRequestError(log, "SELECT_ALL", e, ctx)),
         ctx,
       );
     }
@@ -518,7 +617,10 @@ export class CoreServerApiHandler implements ServerApi {
         ctx.session,
       );
       return vsMsg(SelectRowRangeSuccess(msg.vpId, selectedRowCount), ctx);
-    } catch (e) {}
+    } catch (e) {
+      const reason = logRequestError(log, "SELECT_ROW_RANGE", e, ctx);
+      return vsMsg(rejectBody(msg, reason), ctx);
+    }
   }
 
   //--------------------------------------------------
@@ -531,7 +633,7 @@ export class CoreServerApiHandler implements ServerApi {
       this.viewPortContainer.openTreeNode(vpId, treeKey, ctx.session);
       return vsMsg({ type: "OPEN_TREE_SUCCESS" }, ctx);
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "OPEN_TREE_NODE", e, ctx), ctx);
     }
   }
 
@@ -543,7 +645,7 @@ export class CoreServerApiHandler implements ServerApi {
       this.viewPortContainer.closeTreeNode(vpId, treeKey, ctx.session);
       return vsMsg({ type: "CLOSE_TREE_SUCCESS" }, ctx);
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "CLOSE_TREE_NODE", e, ctx), ctx);
     }
   }
 
@@ -575,7 +677,7 @@ export class CoreServerApiHandler implements ServerApi {
         ctx,
       );
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "CREATE_VISUAL_LINK", e, ctx), ctx);
     }
   }
 
@@ -587,7 +689,7 @@ export class CoreServerApiHandler implements ServerApi {
       this.viewPortContainer.unlinkViewPorts(childVpId, ctx.session);
       return vsMsg({ childVpId, type: "REMOVE_VISUAL_LINK_SUCCESS" }, ctx);
     } catch (e) {
-      return errorMsg(`Failed to process request ${ctx.requestId}`, ctx);
+      return errorMsg(logRequestError(log, "REMOVE_VISUAL_LINK", e, ctx), ctx);
     }
   }
 

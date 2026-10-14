@@ -59,6 +59,78 @@ overrides and path resolution.
 `/websocket-portal`. The default is `/websocket`. Paths with a trailing
 slash, query, fragment, or full URL are rejected during application setup.
 
+## Sessions per user
+
+A login opens a session on the websocket it was sent on. The number of
+sessions a user may hold at once is limited:
+
+```hocon
+vuu.server.maxSessionsPerUser=1             # default 1
+vuu.server.sessionLimitPolicy="evict-oldest" # or "reject-new"
+```
+
+Programmatically: `VuuWebSocketOptions().withMaxSessionsPerUser(3, "reject-new")`.
+
+- **`evict-oldest`** (default): a login beyond the limit evicts the user's
+  oldest session. The evicted session is torn down completely: its viewports,
+  session tables and edit sessions are removed, and its websocket is closed
+  with code `4001` (`VuuCloseCode.SessionEvicted`), reason
+  `session evicted: user logged in again`. A request still in flight on the
+  evicted session is not answered, and anything it created is removed.
+  So with the default of 1, a second tab or a reconnect takes over from the
+  first. Raise `maxSessionsPerUser` to allow several tabs per user.
+- **`reject-new`**: the new login is refused and its websocket closed with
+  `4003` (`SessionLimitReached`). The open sessions are unaffected.
+
+A session id is only accepted on the websocket that logged in. A message for
+an unknown, evicted or foreign session gets the text frame
+`Invalid session <id>` and the websocket is closed with `4002`
+(`InvalidSession`). When a websocket closes for any reason, its sessions are
+torn down straight away (not at the heartbeat timeout) and no longer count
+towards the limit.
+
+Websocket close codes (`VuuCloseCode`):
+
+| Code | Name | When |
+| --- | --- | --- |
+| 4001 | `SessionEvicted` | the user logged in again beyond `maxSessionsPerUser` |
+| 4002 | `InvalidSession` | message for an unknown or foreign session |
+| 4003 | `SessionLimitReached` | login refused under `reject-new` |
+| 4004 | `LoginFailed` | invalid or expired token |
+| 4005 | `HeartbeatTimeout` | the client stopped responding |
+
+## Error handling
+
+A failing request never stops the server or closes the websocket. Every
+message handler, core and module (RPC, menus, service factories), is awaited
+and its error caught. The client gets the protocol's reply for a failure:
+
+| Request | Reply on failure |
+| --- | --- |
+| `CREATE_VP` | `CREATE_VP_REJECT` |
+| `RPC_REQUEST` | `RPC_RESPONSE` with an `ERROR_RESULT` |
+| menu RPCs | `VIEW_PORT_MENU_REJ` |
+| `SELECT_ROW`, `DESELECT_ROW`, `SELECT_ROW_RANGE`, `SELECT_ALL`, `DESELECT_ALL` | the matching `*_REJECT` |
+| anything else, e.g. `GET_TABLE_META`, unparseable JSON | `ERROR` |
+
+Expected refusals, such as an unknown table (`table not found <name>`) or a
+viewport of another session (`viewport not found <id>`), are thrown as a
+`ClientRequestError` (or `TableNotFoundError` / `ViewportNotFoundError`). They
+are logged at `warn`, without a stack trace, and their `reason` is sent to
+the client. Anything else is a bug: it is logged at `error` with the stack
+through the `vuu.*` loggers (`vuu.rpc` for RPC and menus, `vuu.core`
+otherwise), and the client gets `Failed to process request <requestId>`.
+Throw a `ClientRequestError` from module code to refuse a request with a
+specific message.
+
+As a last resort, `application.start()` installs a process-wide
+`unhandledRejection` handler that logs at `error` instead of letting a stray
+promise end the process. Opt out with
+`vuu.server.unhandledRejectionGuard=false` or the
+`unhandledRejectionGuard: false` option. It is off by default under
+`bun test` (`NODE_ENV=test`), so tests still see such bugs.
+`installUnhandledRejectionGuard()` installs it outside the application.
+
 ## Logging
 
 vuu-server logs through the leveled logger in
@@ -303,7 +375,8 @@ and applied to the source table when the session is saved.
   against it. Requests naming a viewport owned by another session are
   refused as if the viewport did not exist. This covers RPCs, menus,
   selection, range, change, remove, enable/disable, tree open/close and
-  visual links.
+  visual links. A refusal is expected, so it is logged at `warn` without a
+  stack trace.
 - **Validated columns and values.** `editCell` refuses:
   - unknown columns;
   - the key column;
@@ -352,9 +425,10 @@ therefore depend on the user and their roles.
 | `isEditableColumn(table, column, viewport, ctx)` | `true` unless key or system column | Restrict which columns `editCell` accepts. `vuu_action` is never editable. |
 | `validateCellEdit(edit: CellEdit)` | no error | Business validation, after the type and permission checks. Return an error message to refuse the edit. |
 | `isRowAccessible(viewport, key)` | permission filter | Whether a row is visible to the user. For session tables, checks the source row. |
+| `prepareSessionSave(sessionTable, force, ctx)` | permission and stale-row checks | Build the changes to save, or return an `ERROR_RESULT`. |
 | `canSaveSession(viewport, prepared, ctx)` | `true` | Authorise a save before it is applied. Return `false` or a reason string to refuse it. May be async. |
 | `getStaleColumns(sourceTable, sourceRow, change)` | all columns that differ from the session snapshot | Decide which concurrent source changes make a row stale. Return `[]` to accept the row. |
-| `applySessionSave(sessionTable, prepared)` | apply atomically, close the session | Return `false` or `ERROR_RESULT`, or throw, to report a failed save. May be async. |
+| `applySessionSave(sessionTable, prepared, ctx)` | apply atomically, close the session | Return `false` or `ERROR_RESULT`, or throw, to report a failed save. May be async. `ctx` is the same context `canSaveSession` gets, for user-aware saves. |
 
 ```ts
 class OrderEditService extends CreateSessionTableRpcHandler {

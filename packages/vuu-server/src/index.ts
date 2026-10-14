@@ -102,6 +102,21 @@ export * from "./core/VuuServer";
 export * from "./core/VuuServerOptions";
 export * from "./core/VuuServerApplication";
 export {
+  installUnhandledRejectionGuard,
+  uninstallUnhandledRejectionGuard,
+} from "./core/UnhandledRejectionGuard";
+export {
+  ClientRequestError,
+  TableNotFoundError,
+  ViewportNotFoundError,
+  isClientRequestError,
+} from "./net/ClientRequestError";
+export {
+  SessionLimitError,
+  SessionLimitPolicies,
+} from "./net/ClientSessionContainer";
+export { VuuCloseCode } from "./net/CloseCodes";
+export {
   CloseDialog,
   CloseDialogViewPortAction,
   NoAction,

@@ -12,9 +12,11 @@ import { createNotificationAdminRoutes } from "../net/http/admin/NotificationAdm
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
 import { ViewServerModule } from "./module/VsModule";
 import { VuuServer } from "./VuuServer";
+import { installUnhandledRejectionGuard } from "./UnhandledRejectionGuard";
 import {
   HttpRequestHandler,
   HttpServerOptions,
+  type SessionLimitPolicy,
   VuuServerConfig,
   VuuSslByCertAndKey,
   VuuWebSocketOptions,
@@ -33,6 +35,9 @@ const ConfigKeys = {
   certPath: "vuu.certPath",
   httpsPort: "vuu.https.port",
   keyPath: "vuu.keyPath",
+  maxSessionsPerUser: "vuu.server.maxSessionsPerUser",
+  sessionLimitPolicy: "vuu.server.sessionLimitPolicy",
+  unhandledRejectionGuard: "vuu.server.unhandledRejectionGuard",
   sslEnabled: "vuu.ssl",
   websocketPath: "vuu.websocket.path",
   websocketPort: "vuu.websocket.port",
@@ -62,6 +67,13 @@ export type VuuServerApplicationOptions = {
    * Only installed when vuu.admin.enabled=true.
    */
   additionalAdminRoutes?: (context: VuuServerApplicationContext) => AdminRoute[];
+  /**
+   * Install a process-wide unhandledRejection handler on start that logs the
+   * rejection at error rather than letting it end the process. Overrides
+   * `vuu.server.unhandledRejectionGuard`. Default true, except under
+   * `bun test` (NODE_ENV=test) so tests still see such bugs.
+   */
+  unhandledRejectionGuard?: boolean;
 };
 
 export type VuuServerApplication = VuuServerApplicationContext & {
@@ -82,6 +94,7 @@ export function createVuuServerApplication({
   defaultWebSocketPort,
   loginSuccessProvider,
   modules,
+  unhandledRejectionGuard,
 }: VuuServerApplicationOptions): VuuServerApplication {
   configureLogging(config);
   const lifecycle = new LifecycleContainer();
@@ -145,11 +158,31 @@ export function createVuuServerApplication({
     httpServerOptions,
     server,
     start: async () => {
+      if (unhandledRejectionGuardEnabled(config, unhandledRejectionGuard)) {
+        installUnhandledRejectionGuard();
+      }
       lifecycle.autoShutdownHook();
       await lifecycle.start();
     },
     webSocketOptions,
   };
+}
+
+/**
+ * The option wins, then `vuu.server.unhandledRejectionGuard`. Off by default
+ * under NODE_ENV=test (bun test) so tests still fail on such bugs.
+ */
+export function unhandledRejectionGuardEnabled(
+  config: Config,
+  option?: boolean,
+) {
+  return (
+    option ??
+    config.getBoolean(
+      ConfigKeys.unhandledRejectionGuard,
+      process.env.NODE_ENV !== "test",
+    )
+  );
 }
 
 function createAdminHttpHandlers(
@@ -185,6 +218,13 @@ export function createConfiguredWebSocketOptions(
     .withUri(config.getString(ConfigKeys.websocketPath, defaultWebSocketPath))
     .withWsPort(
       config.getNumber(ConfigKeys.websocketPort, defaultWebSocketPort),
+    )
+    .withMaxSessionsPerUser(
+      config.getNumber(ConfigKeys.maxSessionsPerUser, 1),
+      config.getString(
+        ConfigKeys.sessionLimitPolicy,
+        "evict-oldest",
+      ) as SessionLimitPolicy,
     );
 
   return config.getBoolean(ConfigKeys.sslEnabled, false)

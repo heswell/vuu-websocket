@@ -1,6 +1,12 @@
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { ViewServerModule } from "./module/VsModule";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
+import {
+  SessionLimitPolicies,
+  type SessionLimitPolicy,
+} from "../net/ClientSessionContainer";
+
+export type { SessionLimitPolicy };
 
 export type HttpRequestHandler = (
   req: Request,
@@ -22,11 +28,21 @@ export type HttpServerOptions = {
 };
 
 export interface VuuWebSocketOptions {
+  /** Concurrent sessions allowed per user, default 1. */
   maxSessionsPerUser?: number;
+  /**
+   * What a login beyond maxSessionsPerUser does: "evict-oldest" (default)
+   * closes the user's oldest session, "reject-new" refuses the login.
+   */
+  sessionLimitPolicy?: SessionLimitPolicy;
   sslOptions: VuuSSLOptions;
   uri: string;
   wsPort: number;
 
+  withMaxSessionsPerUser: (
+    maxSessionsPerUser: number,
+    sessionLimitPolicy?: SessionLimitPolicy,
+  ) => VuuWebSocketOptions;
   withSsl: (sslOptions: VuuSslByCertAndKey) => VuuWebSocketOptions;
   withSslDisabled: () => VuuWebSocketOptions;
   withWsPort: (wsPort: number) => VuuWebSocketOptions;
@@ -50,7 +66,20 @@ class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
     public uri: string,
     public sslOptions: VuuSSLOptions,
     public maxSessionsPerUser: number,
+    public sessionLimitPolicy: SessionLimitPolicy,
   ) {}
+
+  withMaxSessionsPerUser = (
+    maxSessionsPerUser: number,
+    sessionLimitPolicy = this.sessionLimitPolicy,
+  ) =>
+    VuuWebSocketOptions(
+      this.wsPort,
+      this.uri,
+      this.sslOptions,
+      maxSessionsPerUser,
+      sessionLimitPolicy,
+    );
 
   withSsl = (sslOptions: VuuSslByCertAndKey) =>
     VuuWebSocketOptions(
@@ -58,6 +87,7 @@ class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
       this.uri,
       sslOptions,
       this.maxSessionsPerUser,
+      this.sessionLimitPolicy,
     );
   withSslDisabled = () =>
     VuuWebSocketOptions(
@@ -65,6 +95,7 @@ class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
       this.uri,
       "ssl-disabled",
       this.maxSessionsPerUser,
+      this.sessionLimitPolicy,
     );
   withWsPort = (wsPort: number) =>
     VuuWebSocketOptions(
@@ -72,6 +103,7 @@ class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
       this.uri,
       this.sslOptions,
       this.maxSessionsPerUser,
+      this.sessionLimitPolicy,
     );
   withUri = (uri: string) =>
     VuuWebSocketOptions(
@@ -79,6 +111,7 @@ class VuuWebSocketOptionsImpl implements VuuWebSocketOptions {
       uri,
       this.sslOptions,
       this.maxSessionsPerUser,
+      this.sessionLimitPolicy,
     );
 }
 
@@ -87,10 +120,34 @@ export const VuuWebSocketOptions = (
   uri = "/websocket",
   sslOptions: VuuSSLOptions = "ssl-disabled",
   maxSessionsPerUser = 1,
+  sessionLimitPolicy: SessionLimitPolicy = "evict-oldest",
 ): VuuWebSocketOptions => {
   validateWebSocketPath(uri);
-  return new VuuWebSocketOptionsImpl(wsPort, uri, sslOptions, maxSessionsPerUser);
+  validateSessionLimit(maxSessionsPerUser, sessionLimitPolicy);
+  return new VuuWebSocketOptionsImpl(
+    wsPort,
+    uri,
+    sslOptions,
+    maxSessionsPerUser,
+    sessionLimitPolicy,
+  );
 };
+
+function validateSessionLimit(
+  maxSessionsPerUser: number,
+  sessionLimitPolicy: SessionLimitPolicy,
+) {
+  if (!Number.isInteger(maxSessionsPerUser) || maxSessionsPerUser < 1) {
+    throw new Error(
+      `Invalid maxSessionsPerUser '${maxSessionsPerUser}'. Expected a positive integer.`,
+    );
+  }
+  if (!SessionLimitPolicies.includes(sessionLimitPolicy)) {
+    throw new Error(
+      `Invalid sessionLimitPolicy '${sessionLimitPolicy}'. Expected one of ${SessionLimitPolicies.join(", ")}.`,
+    );
+  }
+}
 
 function validateWebSocketPath(uri: string) {
   if (

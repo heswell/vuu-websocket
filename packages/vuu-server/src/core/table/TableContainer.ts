@@ -6,6 +6,7 @@ import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
 import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
 import { getLogger } from "@heswell/service-utils";
+import { TableNotFoundError } from "../../net/ClientRequestError";
 
 const log = getLogger("vuu.table");
 
@@ -34,7 +35,7 @@ export class TableContainer {
     if (table) {
       return table;
     } else {
-      throw Error(`[TableContainer] no table ${tableName}`);
+      throw new TableNotFoundError(tableName);
     }
   }
 
