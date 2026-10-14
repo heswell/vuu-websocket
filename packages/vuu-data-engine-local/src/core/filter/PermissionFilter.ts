@@ -1,7 +1,7 @@
 import type { VuuRowDataItemType } from "@vuu-ui/vuu-protocol-types";
 import type { VuuModuleUser } from "../user/CurrentUser";
 import type { ColumnMap } from "@vuu-ui/vuu-utils";
-import type tableContainer from "../table/TableContainer";
+import type { TableContainer } from "../table/TableContainer";
 
 export type TableRow = Array<bigint | VuuRowDataItemType>;
 export type RowPredicate = (row: TableRow) => boolean;
@@ -34,7 +34,7 @@ export interface PermissionViewport {
   user: VuuModuleUser;
 }
 
-export type TableContainer = typeof tableContainer;
+export type { TableContainer };
 
 /**
  * Creates the PermissionFilter for a viewport. Configured per table on a VuuModule.

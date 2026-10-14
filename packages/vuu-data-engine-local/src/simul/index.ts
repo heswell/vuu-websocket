@@ -3,4 +3,4 @@ export {
   isSimulTable,
   schemas as simulSchemas,
 } from "./simul-schemas";
-export { simulModule } from "./SimulModule";
+export { SimulModule } from "./SimulModule";

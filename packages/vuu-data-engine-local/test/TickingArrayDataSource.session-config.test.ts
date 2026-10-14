@@ -1,5 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { simulModule } from "../src/simul/SimulModule";
+import { afterAll, describe, expect, it } from "bun:test";
+import { SimulModule } from "../src/simul/SimulModule";
+
+const simulModule = new SimulModule();
+afterAll(() => simulModule.dispose());
 
 // TickingArrayDataSource (the local/test datasource) ignores column
 // restriction at construction time - it only takes effect via subscribe().

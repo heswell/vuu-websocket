@@ -1,25 +1,25 @@
 import { isinGenerator } from "./isin-generator";
-import tableContainer from "../../core/table/TableContainer";
+import { createTable } from "../../core/table/TableContainer";
 import { currencies } from "./currencies";
 import { locations, suffixes } from "./locations";
 import { lotsizes } from "./lotsizes";
-import { random } from "../../data-utils";
+import { cloneRows, lazy, random } from "../../data-utils";
 import { buildDataColumnMap } from "../../Table";
 import { schemas } from "../simul-schemas";
 import { Clock } from "@vuu-ui/vuu-utils";
 
-const { createTable } = tableContainer;
-
-const today = new Date();
-const clock = new Clock({
-  year: today.getFullYear(),
-  month: today.getMonth() + 1,
-  day: today.getDate(),
-  hours: 7,
-  minutes: 0,
-  seconds: 0,
-  milliseconds: 0,
-});
+const createClock = () => {
+  const today = new Date();
+  return new Clock({
+    year: today.getFullYear(),
+    month: today.getMonth() + 1,
+    day: today.getDate(),
+    hours: 7,
+    minutes: 0,
+    seconds: 0,
+    milliseconds: 0,
+  });
+};
 
 export type bbg = string;
 export type currency = string;
@@ -56,8 +56,6 @@ export const InstrumentColumnMap = {
   vuuMsg: 9,
 } as const;
 
-const instrumentsData: InstrumentsDataRow[] = [];
-
 const chars1 = Array.from("ABCEFGHKMN");
 const chars2 = Array.from("ABCEFGHKMN");
 const chars3 = Array.from("OPQRTUVWYZ");
@@ -80,55 +78,61 @@ const chars4 = Array.from("OPQRTUVWYZ");
 // };
 
 // const start = performance.now();
-// Create 10_000 Instruments
-let count = 0;
-for (const char1 of chars1) {
-  for (const char2 of chars2) {
-    for (const char3 of chars3) {
-      for (const char4 of chars4) {
-        const suffix = suffixes[count % 8];
-        const ric = char1 + char2 + char3 + char4 + "." + suffix;
-        const bbg = char1 + char2 + char3 + char4 + " " + suffix;
-        const description = `${ric} description`;
-        const currency = currencies[random(0, 4)];
-        const isin = isinGenerator();
-        const lotSize = lotsizes[random(0, lotsizes.length - 1)];
+// Generated once, on first use. Tables copy these rows.
+export const getInstrumentsData = lazy(() => {
+  const clock = createClock();
+  const instrumentsData: InstrumentsDataRow[] = [];
+  let count = 0;
 
-        const exchange = locations[suffix][1];
+  for (const char1 of chars1) {
+    for (const char2 of chars2) {
+      for (const char3 of chars3) {
+        for (const char4 of chars4) {
+          const suffix = suffixes[count % 8];
+          const ric = char1 + char2 + char3 + char4 + "." + suffix;
+          const bbg = char1 + char2 + char3 + char4 + " " + suffix;
+          const description = `${ric} description`;
+          const currency = currencies[random(0, 4)];
+          const isin = isinGenerator();
+          const lotSize = lotsizes[random(0, lotsizes.length - 1)];
 
-        const timestamp = clock.now;
+          const exchange = locations[suffix][1];
 
-        instrumentsData.push([
-          bbg,
-          currency,
-          description,
-          exchange,
-          String(isin),
-          lotSize,
-          ric,
-          timestamp,
-          timestamp,
-          "",
-        ]);
-        count++;
-        clock.advance(random(0, 10000));
+          const timestamp = clock.now;
+
+          instrumentsData.push([
+            bbg,
+            currency,
+            description,
+            exchange,
+            String(isin),
+            lotSize,
+            ric,
+            timestamp,
+            timestamp,
+            "",
+          ]);
+          count++;
+          clock.advance(random(0, 10000));
+        }
       }
     }
   }
-}
+  return instrumentsData;
+});
 
 // const end = performance.now();
 // console.log(`generating 10,000 instruments took ${end - start} ms`);
 
 export const getRic = (defaultRic: string) => {
+  const instrumentsData = getInstrumentsData();
   const row = instrumentsData.at(random(0, instrumentsData.length));
   return row?.[InstrumentColumnMap.ric] ?? defaultRic;
 };
 
-export const instrumentsTable = createTable(
-  schemas.instruments,
-  instrumentsData,
-  buildDataColumnMap(schemas, "instruments"),
-);
-
-export { instrumentsData };
+export const createInstrumentsTable = () =>
+  createTable(
+    schemas.instruments,
+    cloneRows(getInstrumentsData()),
+    buildDataColumnMap(schemas, "instruments"),
+  );

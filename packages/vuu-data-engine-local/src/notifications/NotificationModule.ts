@@ -1,7 +1,7 @@
 import type { SchemaColumn, TableSchema } from "@vuu-ui/vuu-data-types";
 import { type RpcService, VuuModule } from "../core/module/VuuModule";
 import type { PermissionFunction } from "../core/filter/PermissionFilter";
-import tableContainer from "../core/table/TableContainer";
+import { createTable } from "../core/table/TableContainer";
 import { buildDataColumnMapFromSchema, type Table } from "../Table";
 import {
   type ColumnDefinition,
@@ -76,11 +76,7 @@ export class NotificationModule extends VuuModule<NotificationsTableName> {
       rangeLimits: DEFAULT_RANGE_LIMITS,
       table: { module: NAME, table: TABLE_NAME },
     };
-    const table = tableContainer.createTable(
-      schema,
-      [],
-      buildDataColumnMapFromSchema(schema),
-    );
+    const table = createTable(schema, [], buildDataColumnMapFromSchema(schema));
 
     this.#schemas = { [TABLE_NAME]: schema };
     this.#tables = { [TABLE_NAME]: table };
@@ -102,6 +98,11 @@ export class NotificationModule extends VuuModule<NotificationsTableName> {
       this.#running = true;
       this.#provider.start();
     }
+  }
+
+  override dispose() {
+    this.stop();
+    super.dispose();
   }
 
   stop() {

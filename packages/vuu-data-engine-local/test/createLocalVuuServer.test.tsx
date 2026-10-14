@@ -4,14 +4,13 @@ import type { ServerAPI } from "@vuu-ui/vuu-data-types";
 import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "bun:test";
-import moduleContainer from "../src/core/module/ModuleContainer";
+import { getDefaultEngine } from "../src/core/engine/LocalEngine";
 import {
   createLocalVuuServer,
   LocalDataSourceProvider,
 } from "../src/local-datasource-provider/LocalDatasourceProvider";
-// SIMUL creates tables that BASKET joins, so it must be imported first.
-import { simulModule } from "../src/simul/SimulModule";
-import { basketModule } from "../src/basket/BasketModule";
+import { SimulModule } from "../src/simul/SimulModule";
+import { BasketModule } from "../src/basket/BasketModule";
 
 withHappyDom();
 
@@ -52,24 +51,29 @@ describe("createLocalVuuServer", () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = false;
   });
 
-  it("registers its modules", () => {
+  it("registers its modules with its own engine", () => {
+    const simulModule = new SimulModule();
     const server = createLocalVuuServer({
       connectionId: "simul",
       modules: [simulModule],
     });
 
-    expect(moduleContainer.has("SIMUL")).toBe(true);
+    expect(server.engine.hasModule("SIMUL")).toBe(true);
+    expect(server.engine.getModule("SIMUL")).toBe(simulModule);
+    expect(getDefaultEngine().hasModule("SIMUL")).toBe(false);
     expect(server.connectionId).toBe("simul");
+    server.engine.dispose();
   });
 
   it("publishes only the tables of its own modules", async () => {
+    const simulModule = new SimulModule();
     const simul = createLocalVuuServer({
       connectionId: "simul",
       modules: [simulModule],
     });
-    createLocalVuuServer({
+    const basket = createLocalVuuServer({
       connectionId: "basket",
-      modules: [basketModule],
+      modules: [new BasketModule({ prices: simulModule.prices })],
     });
 
     const serverAPI = await captureServerAPI(simul.DataSourceProvider);
@@ -85,12 +89,17 @@ describe("createLocalVuuServer", () => {
     await expect(
       serverAPI.getTableSchema({ module: "BASKET", table: "basket" }),
     ).rejects.toThrow("module BASKET is not available on this server");
+    simul.engine.dispose();
+    basket.engine.dispose();
   });
 
-  it("leaves LocalDataSourceProvider covering every registered module", async () => {
-    createLocalVuuServer({
+  it("LocalDataSourceProvider covers the modules of the default engine", async () => {
+    const simulModule = new SimulModule();
+    const basketModule = new BasketModule({ prices: simulModule.prices });
+    const server = createLocalVuuServer({
       connectionId: "all",
       modules: [simulModule, basketModule],
+      engine: getDefaultEngine(),
     });
     const serverAPI = await captureServerAPI(LocalDataSourceProvider);
     const { tables } = await serverAPI.getTableList();
@@ -98,5 +107,6 @@ describe("createLocalVuuServer", () => {
 
     expect(modules.has("SIMUL")).toBe(true);
     expect(modules.has("BASKET")).toBe(true);
+    server.engine.dispose();
   });
 });

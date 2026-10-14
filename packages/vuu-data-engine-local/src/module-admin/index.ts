@@ -1,7 +1,6 @@
 export {
   ModuleAdminModule,
   MODULE_ADMIN_INITIAL_SNAPSHOT,
-  moduleAdminModule,
 } from "./ModuleAdminModule";
 export {
   MODULE_ADMIN_MODULE_NAME,

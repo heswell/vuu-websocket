@@ -10,7 +10,7 @@ import {
   type RpcService,
   type ServiceHandler,
 } from "../core/module/VuuModule";
-import tableContainer from "../core/table/TableContainer";
+import { createTable as createEngineTable } from "../core/table/TableContainer";
 import { buildDataColumnMapFromSchema, type Table } from "../Table";
 import {
   MODULE_ADMIN_MODULE_NAME,
@@ -26,11 +26,7 @@ type ModuleAdminTables = Record<ModuleAdminTableName, Table>;
 
 const createTable = (tableName: ModuleAdminTableName) => {
   const schema = MODULE_ADMIN_TABLE_SCHEMAS[tableName] satisfies TableSchema;
-  return tableContainer.createTable(
-    schema,
-    [],
-    buildDataColumnMapFromSchema(schema),
-  );
+  return createEngineTable(schema, [], buildDataColumnMapFromSchema(schema));
 };
 
 const createTables = (): ModuleAdminTables => ({
@@ -262,5 +258,3 @@ export class ModuleAdminModule extends VuuModule<ModuleAdminTableName> {
     return undefined;
   }
 }
-
-export const moduleAdminModule = new ModuleAdminModule();

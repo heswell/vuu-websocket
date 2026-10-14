@@ -91,3 +91,23 @@ export const withNanoMs = (ts: number, nanos = 0) => {
     return BigInt(ts) * 1_000_000n;
   }
 };
+
+/**
+ * Copy rows, so tables created from shared reference data do not share
+ * (and mutate) the same row arrays.
+ */
+export const cloneRows = <R extends unknown[]>(rows: readonly R[]): R[] =>
+  rows.map((row) => row.slice() as R);
+
+/** Memoise a zero-arg factory. */
+export const lazy = <V>(factory: () => V) => {
+  let value: V | undefined;
+  let created = false;
+  return () => {
+    if (!created) {
+      value = factory();
+      created = true;
+    }
+    return value as V;
+  };
+};

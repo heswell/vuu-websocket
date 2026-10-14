@@ -4,7 +4,7 @@ import {
   DefaultColumnGenerator,
   defaultGenerators,
 } from "../vuu-row-generator";
-import tableContainer from "../core/table/TableContainer";
+import { createTable } from "../core/table/TableContainer";
 import type { TableSchema } from "@vuu-ui/vuu-data-types";
 import { withNanoMs } from "../data-utils";
 import { toSchemaColumn } from "@vuu-ui/vuu-utils";
@@ -41,105 +41,107 @@ const testEditColumns: TableSchema["columns"] = [
   { name: "externalId", serverDataType: "long" },
 ];
 
-class TestModule extends VuuModule<TestTableName> {
-  #schemas: Record<TestTableName, TableSchema> = {
-    TestDates: {
-      columns: [
-        {
-          name: "id",
-          serverDataType: "long",
-        },
-        {
-          name: "tradeDate",
-          serverDataType: "epochtimestamp",
-        },
-        {
-          name: "settlementDate",
-          serverDataType: "epochtimestamp",
-        },
-        {
-          name: "nanoTimestamp",
-          serverDataType: "epochtimestampnano",
-        },
-      ],
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "TestDates" },
-    },
-    TwoHundredColumns: {
-      columns: DefaultColumnGenerator(200).map((col) =>
-        toSchemaColumn({
-          ...col,
-          serverDataType: "string",
-        }),
-      ),
-      key: "column_1",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "TwoHundredColumns" },
-    },
-    LinkParent: {
-      columns: [
-        { name: "id", serverDataType: "string" },
-        { name: "data", serverDataType: "string" },
-      ],
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "LinkParent" },
-    },
-
-    LinkChild: {
-      columns: [
-        { name: "id", serverDataType: "string" },
-        { name: "parentId", serverDataType: "string" },
-        { name: "data", serverDataType: "string" },
-      ],
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "LinkChild" },
-    },
-    ChartTable: {
-      columns: [
-        { name: "id", serverDataType: "string" },
-        { name: "date", serverDataType: "string" },
-        { name: "price", serverDataType: "double" },
-        { name: "price_excluded", serverDataType: "boolean" },
-        { name: "volume", serverDataType: "double" },
-        { name: "volume_excluded", serverDataType: "boolean" },
-      ],
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "ChartTable" },
-    },
-    MaxScrollEndTable: {
-      columns: DefaultColumnGenerator(6).map((col) =>
-        toSchemaColumn({
-          ...col,
-          serverDataType: "string",
-        }),
-      ),
-      key: "column_1",
-      rangeLimits: {
-        maxRangeEnd: 500,
-        maxRangeWidth: 1_000,
+export const testSchemas: Record<TestTableName, TableSchema> = {
+  TestDates: {
+    columns: [
+      {
+        name: "id",
+        serverDataType: "long",
       },
-      table: { module: "TEST", table: "MaxScrollEndTable" },
+      {
+        name: "tradeDate",
+        serverDataType: "epochtimestamp",
+      },
+      {
+        name: "settlementDate",
+        serverDataType: "epochtimestamp",
+      },
+      {
+        name: "nanoTimestamp",
+        serverDataType: "epochtimestampnano",
+      },
+    ],
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "TestDates" },
+  },
+  TwoHundredColumns: {
+    columns: DefaultColumnGenerator(200).map((col) =>
+      toSchemaColumn({
+        ...col,
+        serverDataType: "string",
+      }),
+    ),
+    key: "column_1",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "TwoHundredColumns" },
+  },
+  LinkParent: {
+    columns: [
+      { name: "id", serverDataType: "string" },
+      { name: "data", serverDataType: "string" },
+    ],
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "LinkParent" },
+  },
+
+  LinkChild: {
+    columns: [
+      { name: "id", serverDataType: "string" },
+      { name: "parentId", serverDataType: "string" },
+      { name: "data", serverDataType: "string" },
+    ],
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "LinkChild" },
+  },
+  ChartTable: {
+    columns: [
+      { name: "id", serverDataType: "string" },
+      { name: "date", serverDataType: "string" },
+      { name: "price", serverDataType: "double" },
+      { name: "price_excluded", serverDataType: "boolean" },
+      { name: "volume", serverDataType: "double" },
+      { name: "volume_excluded", serverDataType: "boolean" },
+    ],
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "ChartTable" },
+  },
+  MaxScrollEndTable: {
+    columns: DefaultColumnGenerator(6).map((col) =>
+      toSchemaColumn({
+        ...col,
+        serverDataType: "string",
+      }),
+    ),
+    key: "column_1",
+    rangeLimits: {
+      maxRangeEnd: 500,
+      maxRangeWidth: 1_000,
     },
-    TestEditEmpty: {
-      columns: testEditColumns,
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "TestEditEmpty" },
-    },
-    TestEdit: {
-      columns: testEditColumns,
-      key: "id",
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      table: { module: "TEST", table: "TestEdit" },
-    },
-  };
+    table: { module: "TEST", table: "MaxScrollEndTable" },
+  },
+  TestEditEmpty: {
+    columns: testEditColumns,
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "TestEditEmpty" },
+  },
+  TestEdit: {
+    columns: testEditColumns,
+    key: "id",
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    table: { module: "TEST", table: "TestEdit" },
+  },
+};
+
+export class TestModule extends VuuModule<TestTableName> {
+  #schemas = testSchemas;
 
   #tables: Record<TestTableName, Table> = {
-    TestDates: tableContainer.createTable(
+    TestDates: createTable(
       this.#schemas.TestDates,
       // prettier-ignore
       [
@@ -156,12 +158,12 @@ class TestModule extends VuuModule<TestTableName> {
       ],
       buildDataColumnMap(this.#schemas, "TestDates"),
     ),
-    TwoHundredColumns: tableContainer.createTable(
+    TwoHundredColumns: createTable(
       this.#schemas.TwoHundredColumns,
       generateRows(this.#schemas.TwoHundredColumns, 100),
       buildDataColumnMap(this.#schemas, "TwoHundredColumns"),
     ),
-    LinkParent: tableContainer.createTable(
+    LinkParent: createTable(
       this.#schemas.LinkParent,
       [
         ["1000000001", "data 1"],
@@ -170,7 +172,7 @@ class TestModule extends VuuModule<TestTableName> {
       ],
       buildDataColumnMap(this.#schemas, "LinkParent"),
     ),
-    LinkChild: tableContainer.createTable(
+    LinkChild: createTable(
       this.#schemas.LinkChild,
       [
         ["200001", "1000000001", "child 1 (linked to 001)"],
@@ -186,7 +188,7 @@ class TestModule extends VuuModule<TestTableName> {
       ],
       buildDataColumnMap(this.#schemas, "LinkChild"),
     ),
-    ChartTable: tableContainer.createTable(
+    ChartTable: createTable(
       this.#schemas.ChartTable,
       [
         ["001", "2026-04-02", 100, false, 1000, false],
@@ -217,17 +219,17 @@ class TestModule extends VuuModule<TestTableName> {
       ],
       buildDataColumnMap(this.#schemas, "ChartTable"),
     ),
-    MaxScrollEndTable: tableContainer.createTable(
+    MaxScrollEndTable: createTable(
       this.#schemas.MaxScrollEndTable,
       generateRows(this.#schemas.MaxScrollEndTable, 1_000),
       buildDataColumnMap(this.#schemas, "MaxScrollEndTable"),
     ),
-    TestEditEmpty: tableContainer.createTable(
+    TestEditEmpty: createTable(
       this.#schemas.TestEditEmpty,
       [],
       buildDataColumnMap(this.#schemas, "TestEditEmpty"),
     ),
-    TestEdit: tableContainer.createTable(
+    TestEdit: createTable(
       this.#schemas.TestEdit,
       // prettier-ignore
       [
@@ -297,8 +299,7 @@ class TestModule extends VuuModule<TestTableName> {
   }
 
   get menuServices():
-    | Record<TestTableName, RpcMenuService[] | undefined>
-    | undefined {
+    Record<TestTableName, RpcMenuService[] | undefined> | undefined {
     return undefined;
   }
 
@@ -313,5 +314,3 @@ class TestModule extends VuuModule<TestTableName> {
     return undefined;
   }
 }
-
-export const testModule = new TestModule();

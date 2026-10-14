@@ -1,10 +1,27 @@
 export * from "./ArrayProxy";
 export * from "./core/filter/PermissionFilter";
 export * from "./core/module/VuuModule";
-export { ensureVuuModule } from "./core/module/ModuleContainer";
+export * from "./core/module/edit-hooks";
+export {
+  type AnyVuuModule,
+  createLocalEngine,
+  ensureVuuModule,
+  getDefaultEngine,
+  LocalEngine,
+  type LocalEngineOptions,
+  resetDefaultEngine,
+} from "./core/engine/LocalEngine";
 export * from "./core/user/CurrentUser";
-export { default as tableContainer } from "./core/table/TableContainer";
+export {
+  createJoinTable,
+  createTable,
+  TableContainer,
+} from "./core/table/TableContainer";
+export { tableContainer } from "./core/table/defaultTableContainer";
+export { registerDemoModules, type DemoModules } from "./demo-modules";
+export { BaseUpdateGenerator } from "./UpdateGenerator";
 export * from "./local-datasource-provider/LocalDatasourceProvider";
+export { createDataSourceProvider } from "./local-datasource-provider/createDataSourceProvider";
 export * from "./makeSuggestions";
 export * from "./notifications";
 export * from "./schemas";

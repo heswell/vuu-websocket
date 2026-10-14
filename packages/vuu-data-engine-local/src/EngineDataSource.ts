@@ -59,6 +59,22 @@ import {
   withConfigDefaults,
 } from "@vuu-ui/vuu-utils";
 import { RowKeys } from "./RowKeys";
+
+/**
+ * Accept either a vuu-utils `Range` or a plain `{from, to}` (VuuRange),
+ * which is converted to a `Range`.
+ */
+/** `range` may be a plain `{from, to}`. */
+export type EngineDataSourceSubscribeProps = Omit<
+  DataSourceSubscribeProps,
+  "range"
+> & { range?: Range | VuuRange };
+
+export const toRange = (range: VuuRange | Range): Range =>
+  typeof (range as Range).equals === "function" &&
+  (range as Range).withBuffer !== undefined
+    ? (range as Range)
+    : Range(range.from, range.to);
 import { Table, type TableRow } from "./Table";
 
 const { KEY } = metadataKeys;
@@ -81,8 +97,10 @@ const buildTableSchema = (
   table: { module: "", table: "Array" },
 });
 
-export interface EngineDataSourceConstructorProps
-  extends Omit<DataSourceConstructorProps, "bufferSize" | "table"> {
+export interface EngineDataSourceConstructorProps extends Omit<
+  DataSourceConstructorProps,
+  "bufferSize" | "table"
+> {
   /**
    * Columns available to the dataSource, defaults to the columns of the
    * table schema. These are the default columns of the dataSource.
@@ -417,7 +435,7 @@ export class EngineDataSource
       sort,
       groupBy,
       filterSpec,
-    }: DataSourceSubscribeProps,
+    }: EngineDataSourceSubscribeProps,
     callback: DataSourceSubscribeCallback,
   ) {
     this.clientCallback = callback;
@@ -464,7 +482,7 @@ export class EngineDataSource
       range &&
       (range.from !== this.#range.from || range.to !== this.#range.to)
     ) {
-      this.setRange(range, true);
+      this.setRange(toRange(range), true);
     } else {
       this.sendRowsToClient();
     }
@@ -530,6 +548,7 @@ export class EngineDataSource
     return this.#range;
   }
 
+  /** A plain `{from, to}` is also accepted at runtime. */
   set range(range: Range) {
     this.setRange(range);
   }
@@ -542,7 +561,8 @@ export class EngineDataSource
     return this.#range.to - this.#range.from;
   }
 
-  protected setRange(range: Range, forceFullRefresh = false) {
+  protected setRange(vuuRange: Range | VuuRange, forceFullRefresh = false) {
+    const range = toRange(vuuRange);
     this.#constrainRangeToMaxRangeEnd(range);
     if (range.from !== this.#range.from || range.to !== this.#range.to) {
       const currentPageCount = Math.ceil(

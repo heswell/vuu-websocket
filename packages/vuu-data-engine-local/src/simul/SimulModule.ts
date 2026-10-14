@@ -11,18 +11,14 @@ import {
   VuuModule,
 } from "../core/module/VuuModule";
 import type { Table } from "../Table";
-import { instrumentsTable } from "./reference-data/instruments";
-import { instrumentsExtendedTable } from "./reference-data/instruments-extended";
-import { ordersTable } from "./reference-data/orders";
-import {
-  childOrdersTable,
-  parentOrdersTable,
-  startGeneratingNewOrders,
-  stopGeneratingNewOrders,
-} from "./reference-data/parent-child-orders";
-import { pricesTable } from "./reference-data/prices";
+import { createJoinTable } from "../core/table/TableContainer";
+import type { BaseUpdateGenerator } from "../UpdateGenerator";
+import { createInstrumentsTable } from "./reference-data/instruments";
+import { createInstrumentsExtendedTable } from "./reference-data/instruments-extended";
+import { createOrdersTable } from "./reference-data/orders";
+import { ParentChildOrders } from "./reference-data/parent-child-orders";
+import { createPricesTable, type PricesTable } from "./reference-data/prices";
 import { schemas, type SimulTableName } from "./simul-schemas";
-import tableContainer from "../core/table/TableContainer";
 
 const undefinedTables = {
   childOrders: undefined,
@@ -40,25 +36,54 @@ const undefinedTables = {
  * methods on the VuuModule.
  */
 export class SimulModule extends VuuModule<SimulTableName> {
+  #schemas = schemas;
+  #tables: Record<SimulTableName, Table>;
+  #orders: ParentChildOrders;
+  #pricesUpdateGenerator: BaseUpdateGenerator;
+
+  /**
+   * Each instance generates its own tables. Prices start ticking when the
+   * first dataSource is created; call `dispose` to stop all timers.
+   */
   constructor() {
     super("SIMUL");
+    const instruments = createInstrumentsTable();
+    const { table: prices, updateGenerator } = createPricesTable();
+    this.#pricesUpdateGenerator = updateGenerator;
+    this.#orders = new ParentChildOrders();
+    this.#tables = {
+      childOrders: this.#orders.childOrdersTable,
+      instruments,
+      instrumentsExtended: createInstrumentsExtendedTable(),
+      instrumentPrices: createJoinTable(
+        { module: "SIMUL", table: "instrumentPrices" },
+        instruments,
+        prices,
+        "ric",
+      ),
+      orders: createOrdersTable(),
+      parentOrders: this.#orders.parentOrdersTable,
+      prices,
+    };
   }
 
-  #schemas = schemas;
-  #tables: Record<SimulTableName, Table> = {
-    childOrders: childOrdersTable,
-    instruments: instrumentsTable,
-    instrumentsExtended: instrumentsExtendedTable,
-    instrumentPrices: tableContainer.createJoinTable(
-      { module: "SIMUL", table: "instrumentPrices" },
-      { module: "SIMUL", table: "instruments" },
-      { module: "SIMUL", table: "prices" },
-      "ric",
-    ),
-    orders: ordersTable,
-    parentOrders: parentOrdersTable,
-    prices: pricesTable,
-  };
+  protected override beforeCreateDataSource() {
+    this.#pricesUpdateGenerator.start();
+  }
+
+  /** The prices table and its update generator, e.g. to share with BasketModule. */
+  get prices(): PricesTable {
+    return {
+      table: this.#tables.prices,
+      updateGenerator: this.#pricesUpdateGenerator,
+    };
+  }
+
+  override dispose() {
+    this.#pricesUpdateGenerator.stop();
+    this.#orders.stopGeneratingNewOrders();
+    super.dispose();
+  }
 
   get menus(): Record<SimulTableName, VuuMenu | undefined> | undefined {
     return {
@@ -113,8 +138,7 @@ export class SimulModule extends VuuModule<SimulTableName> {
   }
 
   get menuServices():
-    | Record<SimulTableName, RpcMenuService[] | undefined>
-    | undefined {
+    Record<SimulTableName, RpcMenuService[] | undefined> | undefined {
     return {
       ...undefinedTables,
       orders: [
@@ -186,19 +210,17 @@ export class SimulModule extends VuuModule<SimulTableName> {
   };
 
   startOrders: ServiceHandler = async () => {
-    startGeneratingNewOrders();
+    this.#orders.startGeneratingNewOrders();
     return {
       type: "SUCCESS_RESULT",
       data: undefined,
     };
   };
   stopOrders: ServiceHandler = async () => {
-    stopGeneratingNewOrders();
+    this.#orders.stopGeneratingNewOrders();
     return {
       type: "SUCCESS_RESULT",
       data: undefined,
     };
   };
 }
-
-export const simulModule = new SimulModule();

@@ -3,7 +3,7 @@ import { MODULE_ADMIN_RPC } from "@heswell/module-admin/contracts";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "bun:test";
-import moduleContainer from "../src/core/module/ModuleContainer";
+import { createLocalEngine } from "../src/core/engine/LocalEngine";
 import {
   ModuleAdminModule,
   MODULE_ADMIN_INITIAL_SNAPSHOT,
@@ -66,7 +66,9 @@ describe("ModuleAdminModule", () => {
     const module = createModule();
 
     expect(module.name).toBe(MODULE_ADMIN_MODULE_NAME);
-    expect(moduleContainer.get(MODULE_ADMIN_MODULE_NAME)).toBe(module);
+    const engine = createLocalEngine({ modules: [module] });
+    expect(engine.getModule(MODULE_ADMIN_MODULE_NAME)).toBe(module);
+    expect(module.engine).toBe(engine);
     expect(module.getTableList().sort()).toEqual([
       "modulePermissions",
       "modules",

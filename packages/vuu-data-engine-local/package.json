@@ -9,6 +9,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./legacy": {
+      "types": "./src/legacy.ts",
+      "import": "./src/legacy.ts"
     }
   },
   "type": "module",
@@ -54,5 +58,7 @@
     "react-dom": "^19.2.3",
     "vitest": "3.1.1"
   },
-  "sideEffects": false
+  "sideEffects": [
+    "./src/legacy.ts"
+  ]
 }

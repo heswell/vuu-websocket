@@ -10,19 +10,64 @@ const DEFAULT_RANGE_LIMITS = {
   maxRangeWidth: 1_000,
 };
 
-class TableContainer {
-  private constructor() {
-    //  empty constructor is all we need
-  }
-  static #instance: TableContainer;
+const tableKey = ({ module, table }: VuuTable) => `${module}:${table}`;
 
-  public static get instance(): TableContainer {
-    if (!TableContainer.#instance) {
-      TableContainer.#instance = new TableContainer();
-    }
-    return TableContainer.#instance;
-  }
+/**
+ * Create a table. The table is not registered anywhere; it belongs to
+ * whichever VuuModule returns it from `tables`.
+ */
+export const createTable = (
+  schema: TableSchema,
+  data: Array<Array<VuuRowDataItemType | bigint>> = [],
+  dataMap: ColumnMap = buildDataColumnMapFromSchema(schema),
+  updateGenerator?: UpdateGenerator,
+) => new Table(schema, data, dataMap, updateGenerator);
 
+/**
+ * Create a materialized (inner) join of two tables, backed by an engine
+ * JoinTable, maintained incrementally as either source changes.
+ */
+export const createJoinTable = (
+  joinTable: VuuTable,
+  table1: Table,
+  table2: Table,
+  joinColumn: string,
+) => {
+  const { schema: schema1 } = table1;
+  const { schema: schema2 } = table2;
+
+  const combinedColumns = new Set(
+    [...schema1.columns, ...schema2.columns].map((col) => col.name).sort(),
+  );
+
+  const combinedSchema: TableSchema = {
+    key: schema1.key,
+    table: joinTable,
+    rangeLimits: DEFAULT_RANGE_LIMITS,
+    columns: Array.from(combinedColumns).map<SchemaColumn>((columnName) => ({
+      name: columnName,
+      serverDataType: getServerDataType(columnName, schema1, schema2),
+    })),
+  };
+
+  const engineJoinTable = new JoinTable({
+    schema: combinedSchema,
+    baseTable: table1.engineTable,
+    joinTable: table2.engineTable,
+    leftColumn: joinColumn,
+    rightColumn: joinColumn,
+    joinType: "inner",
+  });
+
+  return new Table(engineJoinTable);
+};
+
+/**
+ * Tables, keyed by `{module, table}`. Each LocalEngine owns one, populated
+ * from the tables of its registered modules. Tables created through
+ * `createTable` / `createJoinTable` are added to this container.
+ */
+export class TableContainer {
   #tables = new Map<string, Table>();
 
   createTable = (
@@ -31,69 +76,83 @@ class TableContainer {
     dataMap: ColumnMap = buildDataColumnMapFromSchema(schema),
     updateGenerator?: UpdateGenerator,
   ) => {
-    const table = new Table(schema, data, dataMap, updateGenerator);
+    const table = createTable(schema, data, dataMap, updateGenerator);
     this.addTable(table);
     return table;
   };
 
   /**
-   * Create a materialized (inner) join of two existing tables, backed by an
-   * engine JoinTable, maintained incrementally as either source changes.
-   * Both source tables must already have been created.
+   * Create a join of two tables already in this container. Pass full
+   * `{module, table}` references; a bare name is accepted only if unique.
    */
   createJoinTable(
     joinTable: VuuTable,
-    { table: t1 }: VuuTable,
-    { table: t2 }: VuuTable,
+    table1: VuuTable | string,
+    table2: VuuTable | string,
     joinColumn: string,
   ) {
-    const table1 = this.getTable(t1);
-    const table2 = this.getTable(t2);
-    const { schema: schema1 } = table1;
-    const { schema: schema2 } = table2;
-
-    const combinedColumns = new Set(
-      [...schema1.columns, ...schema2.columns].map((col) => col.name).sort(),
+    const newTable = createJoinTable(
+      joinTable,
+      this.getTable(table1),
+      this.getTable(table2),
+      joinColumn,
     );
-
-    const combinedSchema: TableSchema = {
-      key: schema1.key,
-      table: joinTable,
-      rangeLimits: DEFAULT_RANGE_LIMITS,
-      columns: Array.from(combinedColumns).map<SchemaColumn>((columnName) => ({
-        name: columnName,
-        serverDataType: getServerDataType(columnName, schema1, schema2),
-      })),
-    };
-
-    const engineJoinTable = new JoinTable({
-      schema: combinedSchema,
-      baseTable: table1.engineTable,
-      joinTable: table2.engineTable,
-      leftColumn: joinColumn,
-      rightColumn: joinColumn,
-      joinType: "inner",
-    });
-
-    const newTable = new Table(engineJoinTable);
     this.addTable(newTable);
     return newTable;
   }
 
-  addTable(table: Table) {
-    this.#tables.set(table.name, table);
+  /**
+   * Add a table, keyed by `as` if given, otherwise by its schema's
+   * `{module, table}`.
+   */
+  addTable(table: Table, as: VuuTable = table.schema.table) {
+    this.#tables.set(tableKey(as), table);
   }
-  getTable<T = Table>(tableName: string) {
-    const table = this.#tables.get(tableName) as T;
-    if (table) {
-      return table;
-    } else {
-      throw Error(`[TableContainer] no table ${tableName}`);
+
+  removeTable(table: VuuTable) {
+    return this.#tables.delete(tableKey(table));
+  }
+
+  hasTable(table: VuuTable) {
+    return this.#tables.has(tableKey(table));
+  }
+
+  /**
+   * Resolve a table by `{module, table}`. A bare table name is accepted for
+   * backward compatibility, but only resolves if exactly one module has a
+   * table with that name.
+   */
+  getTable(table: VuuTable | string): Table;
+  getTable<T>(table: VuuTable | string): T;
+  getTable<T = Table>(table: VuuTable | string): T {
+    if (typeof table === "string") {
+      const matches = Array.from(this.#tables.keys()).filter((key) =>
+        key.endsWith(`:${table}`),
+      );
+      if (matches.length === 1) {
+        return this.#tables.get(matches[0]) as T;
+      } else if (matches.length > 1) {
+        throw Error(
+          `[TableContainer] table name ${table} is ambiguous (${matches.join(", ")}), use {module, table}`,
+        );
+      }
+      throw Error(`[TableContainer] no table ${table}`);
     }
+    const found = this.#tables.get(tableKey(table));
+    if (found) {
+      return found as T;
+    }
+    throw Error(`[TableContainer] no table ${tableKey(table)}`);
+  }
+
+  get tables(): Table[] {
+    return Array.from(this.#tables.values());
+  }
+
+  clear() {
+    this.#tables.clear();
   }
 }
-
-export default TableContainer.instance;
 
 const getServerDataType = (
   columnName: string,

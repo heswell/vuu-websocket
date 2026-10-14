@@ -1,5 +1,6 @@
-import { instrumentsData } from "./instruments";
-import { pricesData } from "./prices";
+import { lazy } from "../../data-utils";
+import { getInstrumentsData } from "./instruments";
+import { getPricesData } from "./prices";
 
 type ask = number;
 type askSize = number;
@@ -62,41 +63,38 @@ export const InstrumentPricesColumnMap = {
   vuuUpdatedTimestamp: 17,
 };
 
-const instrumentPrices: InstrumentPricesDataRow[] = [];
+export const getInstrumentPrices = lazy(() => {
+  const instrumentPrices: InstrumentPricesDataRow[] = [];
 
-// const start = performance.now();
-// Create 100_000 Instruments
-
-for (let i = 0; i < instrumentsData.length; i++) {
-  // prettier-ignore
-  const [bbg, currency, description, exchange, isin, lotSize, ric] =
+  const instrumentsData = getInstrumentsData();
+  const pricesData = getPricesData();
+  for (let i = 0; i < instrumentsData.length; i++) {
+    // prettier-ignore
+    const [bbg, currency, description, exchange, isin, lotSize, ric] =
     instrumentsData[i];
-  const [ask, askSize, bid, bidSize, close, last, open, phase, , scenario] =
-    pricesData[i];
+    const [ask, askSize, bid, bidSize, close, last, open, phase, , scenario] =
+      pricesData[i];
 
-  instrumentPrices.push([
-    ask,
-    askSize,
-    bbg,
-    bid,
-    bidSize,
-    close,
-    currency,
-    description,
-    exchange,
-    isin,
-    last,
-    lotSize,
-    open,
-    phase,
-    ric,
-    scenario,
-    0,
-    0,
-  ]);
-}
-
-export { instrumentPrices };
-
-// const end = performance.now();
-// console.log(`generating 100,000 instrumentPrices took ${end - start} ms`);
+    instrumentPrices.push([
+      ask,
+      askSize,
+      bbg,
+      bid,
+      bidSize,
+      close,
+      currency,
+      description,
+      exchange,
+      isin,
+      last,
+      lotSize,
+      open,
+      phase,
+      ric,
+      scenario,
+      0,
+      0,
+    ]);
+  }
+  return instrumentPrices;
+});

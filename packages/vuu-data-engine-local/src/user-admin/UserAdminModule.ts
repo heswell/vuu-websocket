@@ -14,7 +14,7 @@ import {
   type RpcService,
   type ServiceHandler,
 } from "../core/module/VuuModule";
-import tableContainer from "../core/table/TableContainer";
+import { createTable } from "../core/table/TableContainer";
 import { buildDataColumnMapFromSchema, Table } from "../Table";
 import { USER_ADMIN_INITIAL_SNAPSHOT } from "./initialSnapshot";
 import {
@@ -26,13 +26,13 @@ type NamedParams = Record<string, unknown>;
 type UserAdminTables = Record<UserAdminTableName, Table>;
 
 const createTables = (): UserAdminTables => ({
-  clients: tableContainer.createTable(schema.clients),
-  group_roles: tableContainer.createTable(schema.group_roles),
-  groups: tableContainer.createTable(schema.groups),
-  roles: tableContainer.createTable(schema.roles),
-  user_group_roles: tableContainer.createTable(schema.user_group_roles),
-  user_groups: tableContainer.createTable(schema.user_groups),
-  users: tableContainer.createTable(schema.users),
+  clients: createTable(schema.clients),
+  group_roles: createTable(schema.group_roles),
+  groups: createTable(schema.groups),
+  roles: createTable(schema.roles),
+  user_group_roles: createTable(schema.user_group_roles),
+  user_groups: createTable(schema.user_groups),
+  users: createTable(schema.users),
 });
 
 const errorResult = (error: unknown) => ({
@@ -829,5 +829,3 @@ export class UserAdminModule extends VuuModule<UserAdminTableName> {
     if (existingUser) throw new Error("username must be unique");
   }
 }
-
-export const userAdminModule = new UserAdminModule();
