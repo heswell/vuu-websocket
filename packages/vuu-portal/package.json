@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-portal",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "VUU portal server with remote module discovery",
   "type": "module",
   "main": "src/index.ts",

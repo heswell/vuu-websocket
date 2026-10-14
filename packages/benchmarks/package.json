@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@heswell/vuu-table": "1.0.2",
-    "@heswell/vuu-viewport": "1.1.4"
+    "@heswell/vuu-viewport": "1.1.5"
   }
 }
