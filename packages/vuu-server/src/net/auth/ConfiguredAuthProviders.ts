@@ -44,7 +44,11 @@ export function createConfiguredAuthProviders(
   );
 }
 
-function parsePermissiveUsers(value: string): Array<[string, string]> {
+/**
+ * Parses `vuu.auth.permissive.users`: comma-separated `username:password`
+ * entries, or a bare `username` for a user that may use any password.
+ */
+export function parsePermissiveUsers(value: string): Array<[string, string?]> {
   const trimmed = value.trim();
   if (!trimmed) {
     return [];
@@ -56,20 +60,16 @@ function parsePermissiveUsers(value: string): Array<[string, string]> {
     .filter(Boolean)
     .map((entry) => {
       const separator = entry.indexOf(":");
-      if (separator <= 0 || separator >= entry.length - 1) {
+      const username = (
+        separator === -1 ? entry : entry.slice(0, separator)
+      ).trim();
+      const password =
+        separator === -1 ? "" : entry.slice(separator + 1).trim();
+      if (!username) {
         throw new Error(
-          `Invalid vuu.auth.permissive.users entry '${entry}'. Expected 'username:password'.`,
+          "Invalid vuu.auth.permissive.users entry. Expected 'username' or 'username:password'.",
         );
       }
-
-      const username = entry.slice(0, separator).trim();
-      const password = entry.slice(separator + 1).trim();
-      if (!username || !password) {
-        throw new Error(
-          `Invalid vuu.auth.permissive.users entry '${entry}'. Username and password are required.`,
-        );
-      }
-
-      return [username, password] as [string, string];
+      return password ? [username, password] : [username];
     });
 }

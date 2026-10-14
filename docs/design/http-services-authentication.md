@@ -103,7 +103,7 @@ to establish requester eligibility.
 | `vuu.auth.keycloak.authorizationClientId` | Sole `resource_access` client used for VUU authorizations |
 | `vuu.auth.keycloak.expectedAuthorizedParty` | Required `azp` on the accepted token |
 | `vuu.auth.keycloak.tokenExchangeEnabled` | Enables Keycloak token exchange |
-| `vuu.auth.cors.allowedOrigin` | Allowed browser origin |
+| `vuu.auth.cors.allowedOrigins` | Allowed browser origins (list or comma-separated; legacy `vuu.auth.cors.allowedOrigin` is merged in) |
 
 Confidential client secrets use these environment overrides in both bootstrap
 and applications: `VUU_PORTAL_SERVER_CLIENT_SECRET`,

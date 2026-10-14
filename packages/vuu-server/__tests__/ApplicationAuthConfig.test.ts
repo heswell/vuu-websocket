@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import path from "node:path";
+import { getConfiguredAllowedOrigins } from "../src/net/http/CorsOrigins";
 import { ConfigFactory } from "../src/util/ConfigFactory";
 
 afterEach(() => ConfigFactory.reset());
@@ -56,6 +57,20 @@ describe("application authentication configuration", () => {
       expect(config.getString("vuu.websocket.path")).toBe(websocketPath);
       expect(config.getNumber("vuu.websocket.port")).toBe(websocketPort);
       expect(config.getString("vuu.auth.path")).toBe("/api/authn");
+    },
+  );
+
+  test.each(["vuu-portal", "vuu-user-admin", "vuu-basket-trading"])(
+    "%s allows its host on both localhost and 127.0.0.1",
+    (app) => {
+      const config = ConfigFactory.fromFile(
+        path.resolve(import.meta.dir, `../../${app}/application.conf`),
+        { env: {} },
+      );
+      expect(getConfiguredAllowedOrigins(config, "keycloak")).toEqual([
+        "http://localhost:5001",
+        "http://127.0.0.1:5001",
+      ]);
     },
   );
 });

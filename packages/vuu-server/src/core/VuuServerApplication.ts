@@ -2,6 +2,7 @@ import { Config } from "../util/ConfigFactory";
 import { AuthenticationProviders } from "../net/auth/AuthProvider";
 import { createAuthHttpHandler } from "../net/auth/AuthHttpHandler";
 import { getConfiguredAuthMode } from "../net/auth/ConfiguredAuthProviders";
+import { getConfiguredAllowedOrigins } from "../net/http/CorsOrigins";
 import { LoginTokenService } from "../net/auth/LoginTokenService";
 import { composeHttpHandlers } from "../net/http/composeHttpHandlers";
 import {
@@ -30,7 +31,6 @@ const ConfigKeys = {
   adminEnabled: "vuu.admin.enabled",
   adminNotificationDurationMs: "vuu.admin.notifications.defaultDurationMs",
   adminPath: "vuu.admin.path",
-  authCorsAllowedOrigin: "vuu.auth.cors.allowedOrigin",
   authPath: "vuu.auth.path",
   certPath: "vuu.certPath",
   httpsPort: "vuu.https.port",
@@ -112,14 +112,16 @@ export function createVuuServerApplication({
     lifecycle,
     loginTokenService,
   };
+  const authMode = getConfiguredAuthMode(config);
+  const allowedOrigins = getConfiguredAllowedOrigins(config, authMode);
+  getLogger("vuu.auth").debug(
+    `CORS allowed origins: ${allowedOrigins.join(", ")}`,
+  );
   const authHandler = createAuthHttpHandler(
     authProviders,
     loginTokenService,
     {
-      allowedOrigin: config.getString(
-        ConfigKeys.authCorsAllowedOrigin,
-        "http://localhost:5002",
-      ),
+      allowedOrigins,
       path: config.getString(ConfigKeys.authPath, "/api/authn"),
       profiles: additionalAuthProfiles,
     },
@@ -130,7 +132,7 @@ export function createVuuServerApplication({
     ...(additionalHttpHandlers?.(context) ?? []),
   ];
   const httpServerOptions: HttpServerOptions = {
-    authMode: getConfiguredAuthMode(config),
+    authMode,
     httpsPort: config.getNumber(ConfigKeys.httpsPort, defaultHttpsPort),
     requestHandler:
       handlers.length === 1 ? handlers[0] : composeHttpHandlers(...handlers),

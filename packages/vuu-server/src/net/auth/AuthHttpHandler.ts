@@ -12,11 +12,27 @@ import {
 } from "./AuthenticationErrors";
 import { LoginTokenService } from "./LoginTokenService";
 import { getLogger } from "@heswell/service-utils";
+import {
+  createCorsHeaders,
+  isOriginAllowed,
+  parseAllowedOrigins,
+  WILDCARD_ORIGIN,
+} from "../http/CorsOrigins";
 
 const log = getLogger("vuu.auth");
 
 export type HttpHandlerOptions = {
+  /**
+   * @deprecated use `allowedOrigins`. A single origin or a comma-separated
+   * list; merged with `allowedOrigins`.
+   */
   allowedOrigin?: string;
+  /**
+   * Browser origins allowed to call the endpoint. A matching request `Origin`
+   * is echoed back. `"*"` allows any origin, without credentials. Defaults to
+   * `"*"` when neither option is given.
+   */
+  allowedOrigins?: readonly string[];
   path?: string;
   profiles?: Record<string, AuthenticationProviders>;
 };
@@ -30,13 +46,22 @@ export function createAuthHttpHandler(
   authProviders: AuthenticationProviders,
   loginTokenService: LoginTokenService,
   {
-    allowedOrigin = "*",
+    allowedOrigin,
+    allowedOrigins: allowedOriginList,
     path = "/api/authn",
     profiles = {},
   }: HttpHandlerOptions = {},
 ): HttpRequestHandler {
   validateAuthPath(path);
   validateProfiles(profiles);
+  const configuredOrigins = [
+    ...parseAllowedOrigins(allowedOriginList),
+    ...parseAllowedOrigins(allowedOrigin),
+  ];
+  const allowedOrigins =
+    configuredOrigins.length === 0
+      ? [WILDCARD_ORIGIN]
+      : configuredOrigins.filter((o, i) => configuredOrigins.indexOf(o) === i);
 
   return async (req, url) => {
     const profileName =
@@ -53,19 +78,25 @@ export function createAuthHttpHandler(
     if (!selectedProviders || profileName.includes("/")) {
       return Response.json(
         { error: "Authentication profile not found" },
-        { status: 404, headers: createCorsHeaders(req, allowedOrigin) },
+        { status: 404, headers: createCorsHeaders(req, allowedOrigins) },
       );
     }
 
-    const corsHeaders = createCorsHeaders(req, allowedOrigin);
+    const corsHeaders = createCorsHeaders(req, allowedOrigins);
 
     if (req.method === "OPTIONS") {
+      const requestOrigin = req.headers.get("Origin");
+      if (requestOrigin && !isOriginAllowed(requestOrigin, allowedOrigins)) {
+        log.debug(`CORS preflight refused for origin ${requestOrigin}`);
+        return new Response(null, { status: 403, headers: corsHeaders });
+      }
       return new Response(null, {
         status: 204,
         headers: {
           ...corsHeaders,
           "Access-Control-Allow-Headers": "Authorization, Content-Type",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Max-Age": "600",
         },
       });
     }
@@ -179,9 +210,12 @@ async function authenticateCredentials(
     );
   }
   const username = credentials.username?.trim();
-  const password = credentials.password;
-  if (!username || !password) {
-    throw new AuthenticationError("username and password are required");
+  const password = credentials.password ?? "";
+  if (!username) {
+    throw new AuthenticationError("username is required");
+  }
+  if (!password && !provider.allowsEmptyPassword) {
+    throw new AuthenticationError("password is required");
   }
   return provider.authenticate(username, password);
 }
@@ -229,25 +263,4 @@ export function createHttpHandler(
   );
 }
 
-export function createCorsHeaders(req: Request, allowedOrigin: string) {
-  const requestOrigin = req.headers.get("Origin");
-  const allowRequestOrigin =
-    allowedOrigin === "*" || requestOrigin === allowedOrigin;
-
-  return {
-    ...(allowRequestOrigin
-      ? {
-          "Access-Control-Allow-Origin":
-            allowedOrigin === "*" ? "*" : allowedOrigin,
-        }
-      : {}),
-    ...(allowedOrigin === "*"
-      ? {}
-      : {
-          "Access-Control-Allow-Credentials": "true",
-          Vary: "Origin",
-        }),
-    "Access-Control-Expose-Headers": "vuu-auth-token",
-    "Cache-Control": "no-cache, no-store, max-age=0, must-revalidate",
-  };
-}
+export { createCorsHeaders };
