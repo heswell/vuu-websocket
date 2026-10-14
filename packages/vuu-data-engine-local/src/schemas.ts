@@ -7,7 +7,7 @@ import {
   type SimulTableName,
   schemas as simulSchemas,
 } from "./simul/simul-schemas";
-import { type TestTableName, testModule } from "./test/TestModule";
+import { type TestTableName, testSchemas } from "./test/TestModule";
 import {
   USER_ADMIN_TABLE_SCHEMAS,
   type UserAdminTableName,
@@ -26,7 +26,7 @@ export type VuuTableName =
 export const schemas: Record<VuuTableName, TableSchema> = {
   ...basketSchemas,
   ...simulSchemas,
-  ...testModule.schemas,
+  ...testSchemas,
   ...USER_ADMIN_TABLE_SCHEMAS,
   ...MODULE_ADMIN_TABLE_SCHEMAS,
 };
@@ -34,7 +34,7 @@ export const schemas: Record<VuuTableName, TableSchema> = {
 const allSchemas: Readonly<Record<VuuTableName, Readonly<TableSchema>>> = {
   ...basketSchemas,
   ...simulSchemas,
-  ...testModule.schemas,
+  ...testSchemas,
   ...USER_ADMIN_TABLE_SCHEMAS,
   ...MODULE_ADMIN_TABLE_SCHEMAS,
 };

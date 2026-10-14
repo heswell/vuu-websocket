@@ -15,16 +15,43 @@ export class BaseUpdateGenerator implements UpdateGenerator {
   private updating = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private tickingColumns: { [key: string]: number };
+  private enabled: boolean;
 
-  constructor(tickingColumns: { [key: string]: number }) {
+  /**
+   * @param autoStart default true, start ticking as soon as a table and
+   * range are set. With false, ticking starts only when `start` is called.
+   */
+  constructor(
+    tickingColumns: { [key: string]: number },
+    { autoStart = true }: { autoStart?: boolean } = {},
+  ) {
     this.tickingColumns = tickingColumns;
+    this.enabled = autoStart;
   }
 
   setRange(range: VuuRange) {
     this.range = range;
-    if (!this.updating && this.table) {
+    if (this.enabled && !this.updating && this.table) {
       this.startUpdating();
     }
+  }
+
+  get isUpdating() {
+    return this.updating;
+  }
+
+  /** Start (or resume) ticking. */
+  start() {
+    this.enabled = true;
+    if (!this.updating && this.table && this.range) {
+      this.startUpdating();
+    }
+  }
+
+  /** Stop ticking, clearing any pending timer. */
+  stop() {
+    this.enabled = false;
+    this.stopUpdating();
   }
 
   setTable(table: Table) {

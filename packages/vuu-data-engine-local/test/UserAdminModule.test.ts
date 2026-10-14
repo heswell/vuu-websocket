@@ -5,7 +5,7 @@ import {
 } from "@heswell/user-admin/contracts";
 import { describe, expect, it, vi } from "bun:test";
 import { Range } from "@vuu-ui/vuu-utils";
-import moduleContainer from "../src/core/module/ModuleContainer";
+import { createLocalEngine } from "../src/core/engine/LocalEngine";
 import { UserAdminModule } from "../src/user-admin/UserAdminModule";
 import { USER_ADMIN_INITIAL_SNAPSHOT } from "../src/user-admin/initialSnapshot";
 import type { TickingArrayDataSource } from "../src/ModuleDataSource";
@@ -47,7 +47,8 @@ describe("UserAdminModule", () => {
     const module = createModule();
 
     expect(module.name).toBe("USER_ADMIN");
-    expect(moduleContainer.get("USER_ADMIN")).toBe(module);
+    const engine = createLocalEngine({ modules: [module] });
+    expect(engine.getModule("USER_ADMIN")).toBe(module);
     expect(module.getTableList().sort()).toEqual(
       Object.keys(USER_ADMIN_TABLE_SCHEMAS).sort(),
     );

@@ -5,12 +5,24 @@ import {
   type ServiceHandler,
   VuuModule,
 } from "../core/module/VuuModule";
-import tableContainer from "../core/table/TableContainer";
+import { createJoinTable, createTable } from "../core/table/TableContainer";
 import { type BasketsTableName, schemas } from "./basket-schemas";
 import basketConstituentData from "./reference-data/constituents";
 import type { Table } from "../Table";
+import { cloneRows } from "../data-utils";
+import {
+  createPricesTable,
+  type PricesTable,
+} from "../simul/reference-data/prices";
 
-const { createTable } = tableContainer;
+export type BasketModuleOptions = {
+  /**
+   * The prices table joined with basket constituents, typically the SIMUL
+   * module's prices (`simulModule.prices`). If not provided, the module
+   * creates its own prices table.
+   */
+  prices?: PricesTable;
+};
 
 let basketIncrement = 1;
 
@@ -65,71 +77,86 @@ const tableMaps: Record<BasketsTableName, ColumnMap> = {
   priceStrategyType: buildDataColumnMap("priceStrategyType"),
 };
 
-const basketTradingConstituent = tableContainer.createTable(
-  schemas.basketTradingConstituent,
-  [],
-  tableMaps.basketTradingConstituent,
-);
-
 /**
  * This is an example of how we might extend the built-in VuuModule to
  * implement a module-specific service in such a way that it can invoke
  * methods on the VuuModule.
  */
 export class BasketModule extends VuuModule<BasketsTableName> {
-  #tables: Record<BasketsTableName, Table> = {
-    algoType: createTable(
-      schemas.algoType,
-      [
-        ["Sniper", 0],
-        ["Dark Liquidity", 1],
-        ["VWAP", 2],
-        ["POV", 3],
-        ["Dynamic Close", 4],
-      ],
-      tableMaps.algoType,
-    ),
-    basket: createTable(
-      schemas.basket,
-      [
-        [".NASDAQ100", ".NASDAQ100", 0, 0],
-        [".HSI", ".HSI", 0, 0],
-        [".FTSE100", ".FTSE100", 0, 0],
-        [".SP500", ".SP500", 0, 0],
-      ],
-      tableMaps.basket,
-    ),
-    basketConstituent: createTable(
-      schemas.basketConstituent,
-      basketConstituentData,
-      tableMaps.basketConstituent,
-    ),
-    basketTrading: createTable(
-      schemas.basketTrading,
-      [],
-      tableMaps.basketTrading,
-    ),
-    basketTradingConstituent,
-    basketTradingConstituentJoin: tableContainer.createJoinTable(
-      { module: "BASKET", table: "basketTradingConstituentJoin" },
-      { module: "BASKET", table: "basketTradingConstituent" },
-      { module: "SIMUL", table: "prices" },
-      "ric",
-    ),
-    priceStrategyType: createTable(
-      schemas.priceStrategyType,
-      [
-        ["Peg to Near Touch", 0],
-        ["Far Touch", 1],
-        ["Limit", 2],
-        ["Algo", 3],
-      ],
-      tableMaps.priceStrategyType,
-    ),
-  };
+  #prices: PricesTable;
+  #ownsPrices: boolean;
+  #tables: Record<BasketsTableName, Table>;
 
-  constructor() {
+  constructor({ prices }: BasketModuleOptions = {}) {
     super("BASKET");
+    this.#ownsPrices = prices === undefined;
+    this.#prices = prices ?? createPricesTable();
+    const basketTradingConstituent = createTable(
+      schemas.basketTradingConstituent,
+      [],
+      tableMaps.basketTradingConstituent,
+    );
+    this.#tables = {
+      algoType: createTable(
+        schemas.algoType,
+        [
+          ["Sniper", 0],
+          ["Dark Liquidity", 1],
+          ["VWAP", 2],
+          ["POV", 3],
+          ["Dynamic Close", 4],
+        ],
+        tableMaps.algoType,
+      ),
+      basket: createTable(
+        schemas.basket,
+        [
+          [".NASDAQ100", ".NASDAQ100", 0, 0],
+          [".HSI", ".HSI", 0, 0],
+          [".FTSE100", ".FTSE100", 0, 0],
+          [".SP500", ".SP500", 0, 0],
+        ],
+        tableMaps.basket,
+      ),
+      basketConstituent: createTable(
+        schemas.basketConstituent,
+        cloneRows(basketConstituentData),
+        tableMaps.basketConstituent,
+      ),
+      basketTrading: createTable(
+        schemas.basketTrading,
+        [],
+        tableMaps.basketTrading,
+      ),
+      basketTradingConstituent,
+      basketTradingConstituentJoin: createJoinTable(
+        { module: "BASKET", table: "basketTradingConstituentJoin" },
+        basketTradingConstituent,
+        this.#prices.table,
+        "ric",
+      ),
+      priceStrategyType: createTable(
+        schemas.priceStrategyType,
+        [
+          ["Peg to Near Touch", 0],
+          ["Far Touch", 1],
+          ["Limit", 2],
+          ["Algo", 3],
+        ],
+        tableMaps.priceStrategyType,
+      ),
+    };
+  }
+
+  protected override beforeCreateDataSource() {
+    this.#prices.updateGenerator?.start();
+  }
+
+  override dispose() {
+    if (this.#ownsPrices) {
+      this.#prices.updateGenerator?.stop();
+    }
+    super.dispose();
   }
 
   get menus(): Record<BasketsTableName, VuuMenu | undefined> {
@@ -182,8 +209,7 @@ export class BasketModule extends VuuModule<BasketsTableName> {
   }
 
   get menuServices():
-    | Record<BasketsTableName, RpcMenuService[] | undefined>
-    | undefined {
+    Record<BasketsTableName, RpcMenuService[] | undefined> | undefined {
     return {
       ...undefinedTables,
     };
@@ -248,7 +274,9 @@ export class BasketModule extends VuuModule<BasketsTableName> {
             venue,
             weighting,
           ];
-        basketTradingConstituent.insert(basketTradingConstituentRow);
+        this.tables.basketTradingConstituent.insert(
+          basketTradingConstituentRow,
+        );
       },
     );
 
@@ -316,5 +344,3 @@ export class BasketModule extends VuuModule<BasketsTableName> {
     throw Error("addConstituent not implemented");
   };
 }
-
-export const basketModule = new BasketModule();

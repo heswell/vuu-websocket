@@ -1,10 +1,10 @@
 import { currencies } from "./currencies";
 import { getRic } from "./instruments";
-import { random } from "../../data-utils";
+import { cloneRows, lazy, random } from "../../data-utils";
 import { buildDataColumnMap } from "../../Table";
 import { schemas } from "../simul-schemas";
 import { sides } from "./sides";
-import tableContainer from "../../core/table/TableContainer";
+import { createTable } from "../../core/table/TableContainer";
 
 export type status = string;
 export type ccy = string;
@@ -55,48 +55,44 @@ export const OrderColumnMap = {
   trader: 8,
 } as const;
 
-const ordersData: OrdersDataRow[] = [];
+export const getOrdersData = lazy(() => {
+  const ordersData: OrdersDataRow[] = [];
+  const now = +new Date();
+  for (let i = 0; i < 100; i++) {
+    const status = orderStatus[random(0, orderStatus.length - 1)];
+    const ccy = currencies[random(0, currencies.length - 1)];
+    const created = now;
+    const lastUpdate = now;
+    const orderId = `ORD${("0000" + i).slice(-4)}`;
+    const quantity = random(1000, 10000);
+    const filledQuantity = isComplete(status)
+      ? quantity
+      : status === "New"
+        ? 0
+        : random(0, quantity);
+    const ric = getRic("AAP.L");
+    const side = sides[random(0, sides.length - 1)];
+    const trader = traders[random(0, traders.length - 1)];
 
-// const start = performance.now();
-// Create 10_000 Instruments
+    ordersData.push([
+      status,
+      ccy,
+      created,
+      filledQuantity,
+      lastUpdate,
+      orderId,
+      quantity,
+      ric,
+      side,
+      trader,
+    ]);
+  }
+  return ordersData;
+});
 
-const now = +new Date();
-for (let i = 0; i < 100; i++) {
-  const status = orderStatus[random(0, orderStatus.length - 1)];
-  const ccy = currencies[random(0, currencies.length - 1)];
-  const created = now;
-  const lastUpdate = now;
-  const orderId = `ORD${("0000" + i).slice(-4)}`;
-  const quantity = random(1000, 10000);
-  const filledQuantity = isComplete(status)
-    ? quantity
-    : status === "New"
-      ? 0
-      : random(0, quantity);
-  const ric = getRic("AAP.L");
-  const side = sides[random(0, sides.length - 1)];
-  const trader = traders[random(0, traders.length - 1)];
-
-  ordersData.push([
-    status,
-    ccy,
-    created,
-    filledQuantity,
-    lastUpdate,
-    orderId,
-    quantity,
-    ric,
-    side,
-    trader,
-  ]);
-}
-// const end = performance.now();
-// console.log(`generating 10,000 instruments took ${end - start} ms`);
-
-export const ordersTable = tableContainer.createTable(
-  schemas.orders,
-  ordersData,
-  buildDataColumnMap(schemas, "orders"),
-);
-
-export { ordersData };
+export const createOrdersTable = () =>
+  createTable(
+    schemas.orders,
+    cloneRows(getOrdersData()),
+    buildDataColumnMap(schemas, "orders"),
+  );

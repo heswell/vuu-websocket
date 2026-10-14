@@ -74,6 +74,29 @@ describe("EngineDataSource", () => {
       expect(dataSource.size).toBe(5);
     });
 
+    // trader upstream issue 26
+    it("accepts a plain {from, to} range on subscribe", async () => {
+      const dataSource = createDataSource();
+      const callback = vi.fn<DataSourceSubscribeCallback>();
+      await dataSource.subscribe({ range: { from: 0, to: 3 } }, callback);
+      expect(callback.mock.calls[0][0].type).toBe("subscribed");
+      expect(lastRows(callback).map((r) => r[KEY])).toEqual(["1", "2", "3"]);
+      expect(dataSource.range.from).toBe(0);
+      expect(dataSource.range.to).toBe(3);
+      expect(typeof dataSource.range.withBuffer).toBe("object");
+    });
+
+    it("accepts a plain {from, to} range when the range changes", async () => {
+      const dataSource = createDataSource();
+      const callback = vi.fn<DataSourceSubscribeCallback>();
+      await dataSource.subscribe({ range: { from: 0, to: 3 } }, callback);
+      callback.mockClear();
+      // biome-ignore lint/suspicious/noExplicitAny: plain range is accepted at runtime
+      dataSource.range = { from: 2, to: 5 } as any;
+      expect(lastRows(callback).map((r) => r[0])).toEqual([3, 4]);
+      expect(dataSource.range.equals(Range(2, 5))).toBe(true);
+    });
+
     it("sends only rows newly in range when range changes", async () => {
       const dataSource = createDataSource();
       const callback = vi.fn<DataSourceSubscribeCallback>();

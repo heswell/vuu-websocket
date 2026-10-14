@@ -3,7 +3,6 @@ import type {
   DataSource,
   DataSourceRowWithBigint,
   DataSourceSubscribeCallback,
-  DataSourceSubscribeProps,
   DataSourceVisualLinkCreatedMessage,
   DeleteRowMode,
   CopyOption,
@@ -39,14 +38,14 @@ import type {
 import {
   EngineDataSource,
   type EngineDataSourceConstructorProps,
+  type EngineDataSourceSubscribeProps,
 } from "./EngineDataSource";
 
 export type VisualLinkHandler = (
   message: VuuCreateVisualLink | VuuRemoveVisualLink,
 ) => Promise<DataSourceVisualLinkCreatedMessage | undefined>;
 
-export interface ModuleDataSourceConstructorProps
-  extends EngineDataSourceConstructorProps {
+export interface ModuleDataSourceConstructorProps extends EngineDataSourceConstructorProps {
   getVisualLinks?: (tableName: string) => LinkDescriptorWithLabel[] | undefined;
   rpcMenuServices?: RpcMenuService[];
   rpcServices?: RpcService[];
@@ -92,7 +91,7 @@ export class ModuleDataSource extends EngineDataSource {
   }
 
   async subscribe(
-    subscribeProps: DataSourceSubscribeProps,
+    subscribeProps: EngineDataSourceSubscribeProps,
     callback: DataSourceSubscribeCallback,
   ) {
     const subscription = super.subscribe(subscribeProps, callback);

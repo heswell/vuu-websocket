@@ -46,7 +46,14 @@ const distManifest: PackageManifest = {
       types: "./src/index.d.ts",
       import: "./index.js",
     },
+    "./legacy": {
+      types: "./src/legacy.d.ts",
+      import: "./legacy.js",
+    },
   },
+  // Importing the main entry is side-effect free; ./legacy registers the
+  // demo modules on import.
+  sideEffects: ["./legacy.js"],
 };
 
 fs.copyFileSync(

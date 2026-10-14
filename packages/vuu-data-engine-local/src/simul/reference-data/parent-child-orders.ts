@@ -1,11 +1,12 @@
 import { Clock } from "@vuu-ui/vuu-utils";
-import tableContainer from "../../core/table/TableContainer";
+import { createTable } from "../../core/table/TableContainer";
 import { random } from "../../data-utils";
 import { buildDataColumnMap } from "../../Table";
 import { schemas } from "../simul-schemas";
 import { accounts } from "./accounts";
 import { algos } from "./algos";
-import { instrumentsData } from "./instruments";
+import { getInstrumentsData } from "./instruments";
+import type { Table } from "../../Table";
 import { orderStatus as statusValues } from "./orderStatus";
 import { sides } from "./sides";
 
@@ -21,81 +22,117 @@ const avgChildOrderPerOrder = Math.round(
 );
 const childMaxMultiple = 10;
 
-const clock = new Clock().goBack(120, "minutes");
-// console.log(`starting order generation at ${clock}`);
+/**
+ * Generated parent and child orders. Each instance has its own tables
+ * and (optional) timer generating new orders.
+ */
+export class ParentChildOrders {
+  readonly parentOrdersTable: Table;
+  readonly childOrdersTable: Table;
+  #clock = new Clock().goBack(120, "minutes");
+  #parentOrderCount = 0;
+  #childOrderCount = 0;
+  #newOrderInterval: undefined | ReturnType<typeof setInterval>;
 
-export const parentOrdersTable = tableContainer.createTable(
-  schemas.parentOrders,
-  [],
-  buildDataColumnMap(schemas, "parentOrders"),
-);
+  constructor() {
+    this.parentOrdersTable = createTable(
+      schemas.parentOrders,
+      [],
+      buildDataColumnMap(schemas, "parentOrders"),
+    );
+    this.childOrdersTable = createTable(
+      schemas.childOrders,
+      [],
+      buildDataColumnMap(schemas, "childOrders"),
+    );
+    for (let i = 0; i < PARENT_ORDER_COUNT; i++) {
+      this.#clock.advance(random(0, 100));
+      this.createParentAndChildOrders();
+    }
+    this.#clock.showCurrentTime = true;
+  }
 
-export const childOrdersTable = tableContainer.createTable(
-  schemas.childOrders,
-  [],
-  buildDataColumnMap(schemas, "childOrders"),
-);
+  get isGenerating() {
+    return this.#newOrderInterval !== undefined;
+  }
 
-let parentOrderCount = 0;
-let childOrderCount = 0;
-let notifyNewOrders = false;
+  startGeneratingNewOrders() {
+    if (this.#newOrderInterval === undefined) {
+      this.#newOrderInterval = setInterval(
+        () => this.createParentAndChildOrders(),
+        100,
+      );
+    }
+  }
 
-function createParentAndChildOrders() {
-  parentOrderCount += 1;
-  const instrument = instrumentsData[random(0, instrumentsData.length - 1)];
-  const orderQuantity = 1000 * random(1, 100);
-  const orderStatus = statusValues[random(0, statusValues.length - 1)];
-  const filledQty =
-    orderStatus === "FILLED"
-      ? orderQuantity
-      : orderStatus === "NEW"
-        ? 0
-        : orderQuantity - random(100, orderQuantity);
-  const openQty = orderQuantity - filledQty;
-  const account = accounts[random(0, accounts.length - 1)];
-  const algo = algos[random(0, algos.length - 1)];
-  const averagePrice = 0;
-  const ccy = "GBP";
-  const exchange = instrument[instrumentMap.exchange];
-  const parentOrderIdAsInt = parentOrderCount;
-  const parentOrderId = parentOrderCount.toString().padStart(10, "0");
-  const price = 100;
-  const quantity = orderQuantity;
-  const ric = instrument[instrumentMap.ric];
-  const side = sides[random(0, sides.length - 1)];
-  const status = orderStatus;
-  const volLimit = 100;
-  const lastUpdate = clock.now;
-  const created = clock.now;
+  stopGeneratingNewOrders() {
+    if (this.#newOrderInterval !== undefined) {
+      clearInterval(this.#newOrderInterval);
+      this.#newOrderInterval = undefined;
+    }
+  }
 
-  const numberOfChildOrders = random(
-    0,
-    avgChildOrderPerOrder * random(1, childMaxMultiple),
-  );
-
-  let remainingQty = orderQuantity;
-  for (let j = 0; j < numberOfChildOrders; j++) {
-    childOrderCount += 1;
-
-    const childOrderQuantity = Math.round(remainingQty / (childOrderCount - j));
-    remainingQty -= childOrderQuantity;
-    const childOrderStatus = statusValues[random(0, statusValues.length - 1)];
-    const childFilledQty =
+  createParentAndChildOrders() {
+    const clock = this.#clock;
+    const instrumentsData = getInstrumentsData();
+    this.#parentOrderCount += 1;
+    const parentOrderCount = this.#parentOrderCount;
+    const instrument = instrumentsData[random(0, instrumentsData.length - 1)];
+    const orderQuantity = 1000 * random(1, 100);
+    const orderStatus = statusValues[random(0, statusValues.length - 1)];
+    const filledQty =
       orderStatus === "FILLED"
-        ? childOrderQuantity
-        : childOrderStatus === "NEW"
+        ? orderQuantity
+        : orderStatus === "NEW"
           ? 0
-          : childOrderQuantity - random(100, childOrderQuantity);
-    const childOpenQty = childOrderQuantity - childFilledQty;
+          : orderQuantity - random(100, orderQuantity);
+    const openQty = orderQuantity - filledQty;
+    const account = accounts[random(0, accounts.length - 1)];
+    const algo = algos[random(0, algos.length - 1)];
     const averagePrice = 0;
-    const childIdAsInt = childOrderCount;
-    const childId = childOrderCount.toString().padStart(10, "0");
-    const lastUpdate = 0;
+    const ccy = "GBP";
+    const exchange = instrument[instrumentMap.exchange];
+    const parentOrderIdAsInt = parentOrderCount;
+    const parentOrderId = parentOrderCount.toString().padStart(10, "0");
     const price = 100;
-    const strategy = 0;
+    const quantity = orderQuantity;
+    const ric = instrument[instrumentMap.ric];
+    const side = sides[random(0, sides.length - 1)];
+    const status = orderStatus;
+    const volLimit = 100;
+    const lastUpdate = clock.now;
+    const created = clock.now;
 
-    childOrdersTable.insert(
-      [
+    const numberOfChildOrders = random(
+      0,
+      avgChildOrderPerOrder * random(1, childMaxMultiple),
+    );
+
+    let remainingQty = orderQuantity;
+    for (let j = 0; j < numberOfChildOrders; j++) {
+      this.#childOrderCount += 1;
+      const childOrderCount = this.#childOrderCount;
+
+      const childOrderQuantity = Math.round(
+        remainingQty / (childOrderCount - j),
+      );
+      remainingQty -= childOrderQuantity;
+      const childOrderStatus = statusValues[random(0, statusValues.length - 1)];
+      const childFilledQty =
+        orderStatus === "FILLED"
+          ? childOrderQuantity
+          : childOrderStatus === "NEW"
+            ? 0
+            : childOrderQuantity - random(100, childOrderQuantity);
+      const childOpenQty = childOrderQuantity - childFilledQty;
+      const averagePrice = 0;
+      const childIdAsInt = childOrderCount;
+      const childId = childOrderCount.toString().padStart(10, "0");
+      const lastUpdate = 0;
+      const price = 100;
+      const strategy = 0;
+
+      this.childOrdersTable.insert([
         account,
         averagePrice,
         ccy,
@@ -115,18 +152,15 @@ function createParentAndChildOrders() {
         lastUpdate,
         created,
         "",
-      ],
-      notifyNewOrders,
-    );
-  }
+      ]);
+    }
 
-  parentOrdersTable.insert(
-    [
+    this.parentOrdersTable.insert([
       account,
       algo,
       averagePrice,
       ccy,
-      childOrderCount,
+      this.#childOrderCount,
       exchange,
       filledQty,
       parentOrderId,
@@ -141,36 +175,6 @@ function createParentAndChildOrders() {
       lastUpdate,
       created,
       "",
-    ],
-    notifyNewOrders,
-  );
-}
-
-function createInitialOrders() {
-  // const start = performance.now();
-  for (let i = 0; i < PARENT_ORDER_COUNT; i++) {
-    clock.advance(random(0, 100));
-    createParentAndChildOrders();
+    ]);
   }
-  // const end = performance.now();
-  // console.log(
-  //   `took ${end - start} to create ${parentOrdersTable.data.length} orders and ${childOrdersTable.data.length} child orders, last order created at ${clock}`,
-  // );
 }
-
-let newOrderInterval: undefined | ReturnType<typeof setInterval>;
-
-export function startGeneratingNewOrders() {
-  newOrderInterval = setInterval(createParentAndChildOrders, 100);
-}
-
-export function stopGeneratingNewOrders() {
-  clearInterval(newOrderInterval);
-}
-
-createInitialOrders();
-
-clock.showCurrentTime = true;
-notifyNewOrders = true;
-
-// startGeneratingNewOrders();
