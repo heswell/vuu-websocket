@@ -16,6 +16,11 @@ export interface PrepareDistPackageOptions {
   entries: DistEntry[];
   /** Built bin entry names keyed by command name, e.g. { "vuu-portal": "bin" }. */
   bin?: Record<string, string>;
+  /**
+   * Files or directories, relative to the package root, copied as-is into
+   * the dist package and added to its `files`, e.g. ["config"].
+   */
+  assets?: string[];
 }
 
 // Declarations keep the source's relative specifiers, which are extensionless
@@ -66,6 +71,7 @@ export const prepareDistPackage = ({
   distRoot,
   entries,
   bin,
+  assets = [],
 }: PrepareDistPackageOptions) => {
   rewriteDeclarationSpecifiers(path.join(distRoot, "src"));
 
@@ -127,8 +133,14 @@ export const prepareDistPackage = ({
         }
       : {}),
     sideEffects: binFiles.length > 0 ? binFiles : false,
-    files: ["*.js", "src/**/*.d.ts", "README.md"],
+    files: ["*.js", "src/**/*.d.ts", "README.md", ...assets],
   };
+
+  for (const asset of assets) {
+    fs.cpSync(path.join(packageRoot, asset), path.join(distRoot, asset), {
+      recursive: true,
+    });
+  }
 
   fs.copyFileSync(
     path.join(packageRoot, "README.md"),

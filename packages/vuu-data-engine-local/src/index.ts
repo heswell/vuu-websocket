@@ -20,8 +20,6 @@ export {
 export { tableContainer } from "./core/table/defaultTableContainer";
 export { registerDemoModules, type DemoModules } from "./demo-modules";
 export { BaseUpdateGenerator } from "./UpdateGenerator";
-export * from "./local-datasource-provider/LocalDatasourceProvider";
-export { createDataSourceProvider } from "./local-datasource-provider/createDataSourceProvider";
 export * from "./makeSuggestions";
 export * from "./notifications";
 export * from "./schemas";

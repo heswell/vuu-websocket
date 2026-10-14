@@ -4,6 +4,7 @@
  * NOTIFICATIONS) and registers them with the default engine, as importing
  * the main entry point did in 2.x. Prefer `registerDemoModules()` or
  * `createLocalEngine({ modules })` from "@heswell/vuu-data-engine-local".
+ * Also re-exports the React bindings from "@heswell/vuu-data-engine-local/react".
  */
 import { getDefaultEngine } from "./core/engine/LocalEngine";
 import { registerDemoModules } from "./demo-modules";
@@ -12,6 +13,7 @@ import { SimulatedNotificationsModule } from "./notifications/simulated/Simulate
 import { UserAdminModule } from "./user-admin/UserAdminModule";
 
 export * from "./index";
+export * from "./react";
 
 const engine = getDefaultEngine();
 

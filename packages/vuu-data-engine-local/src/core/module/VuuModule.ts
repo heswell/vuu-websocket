@@ -4,7 +4,6 @@ import type {
   DataSourceRowWithBigint,
   DataSourceSubscribedMessage,
   DataSourceVisualLinkCreatedMessage,
-  DeleteRowMode,
   EditSessionMode,
   CopyOption,
   SessionDataSourceOverrides,
@@ -689,61 +688,107 @@ export abstract class VuuModule<
     }
   }
 
+  /**
+   * Mark a session row deleted, as vuu-server does: the row stays in the
+   * session table with vuuAction "deleteRow" until the session is saved
+   * (when applySessionSave sees it) or the change is undone. A row added
+   * in the session is simply dropped.
+   */
+  #markSessionRowDeleted(sessionTable: Table, key: string) {
+    const row = sessionTable.findByKey(key);
+    if (!row) {
+      throw Error(`deleteRow: row ${key} not found`);
+    }
+    if (row[sessionTable.map.vuuAction] === "addRow") {
+      sessionTable.delete(key);
+    } else {
+      sessionTable.update(key, "vuuAction", "deleteRow");
+    }
+  }
+
+  /**
+   * deleteRow is only valid in an edit session (as on vuu-server). The
+   * `mode` param is accepted for vuu-ui compatibility but ignored: the row
+   * is always marked, never removed, so the save can apply it.
+   */
   protected deleteRow: ServiceHandler = async (rpcRequest) => {
+    if (rpcRequest.context.type === "VIEWPORT_CONTEXT") {
+      const { viewPortId } = rpcRequest.context;
+      const { key } = rpcRequest.params as { key: string };
+      const sessionTable = this.getSessionTable(viewPortId, false);
+      if (!sessionTable) {
+        return {
+          type: "ERROR_RESULT",
+          errorMessage: "deleteRow: only supported in an edit session",
+        };
+      }
+      try {
+        this.#markSessionRowDeleted(sessionTable, String(key));
+        return { type: "SUCCESS_RESULT", data: undefined };
+      } catch (e) {
+        return { type: "ERROR_RESULT", errorMessage: (e as Error).message };
+      }
+    }
+    return {
+      type: "ERROR_RESULT",
+      errorMessage: "deleteRow: invalid rpc request",
+    };
+  };
+
+  /**
+   * Delete a row directly from the viewport's source table (no edit
+   * session). Not registered as a built-in service; subclasses may expose
+   * it, e.g. SimulModule's DELETE_ROW. `mode: "soft"` sets the session
+   * message column to "SOFT_DELETED" instead.
+   */
+  protected deleteSourceRow: ServiceHandler = async (rpcRequest) => {
     if (rpcRequest.context.type === "VIEWPORT_CONTEXT") {
       const { viewPortId } = rpcRequest.context;
       const { key, mode = "hard" } = rpcRequest.params as {
         key: string;
         mode?: "soft" | "hard";
       };
-      const sessionTable = this.getSessionTable(viewPortId, false);
-      if (sessionTable) {
+      const { dataSource } = this.getSubscriptionByViewport(viewPortId);
+      const table = dataSource.table
+        ? this.tables[dataSource.table.table as T]
+        : undefined;
+      if (table) {
         if (mode === "soft") {
-          sessionTable.update(key, "vuuAction", "deleteRow");
+          table.update(key, this.#sessionTableMessageColumn, "SOFT_DELETED");
         } else {
-          sessionTable.delete(key);
+          table.delete(key);
         }
         return { type: "SUCCESS_RESULT", data: undefined };
-      } else {
-        const { dataSource } = this.getSubscriptionByViewport(viewPortId);
-        if (dataSource.table) {
-          const table = this.tables[dataSource.table.table as T];
-          if (table) {
-            if (mode === "soft") {
-              table.update(
-                key,
-                this.#sessionTableMessageColumn,
-                "SOFT_DELETED",
-              );
-            } else {
-              table.delete(key);
-            }
-            return { type: "SUCCESS_RESULT", data: undefined };
-          }
-        }
       }
     }
-    return { type: "ERROR_RESULT", errorMessage: "something went wrong" };
+    return {
+      type: "ERROR_RESULT",
+      errorMessage: "deleteSourceRow: table not found",
+    };
   };
 
   private deleteSelectedRows: ServiceHandler = async (rpcRequest) => {
     if (isDeleteSelectedRowsRpcRequest(rpcRequest)) {
       const { viewPortId } = rpcRequest.context;
-      const { mode = "soft" } = rpcRequest.params;
       const sessionTable = this.getSessionTable(viewPortId, false);
       if (sessionTable) {
         const { dataSource } = this.getSubscriptionByViewport(viewPortId);
         const selectedRowIds = (
           dataSource as ModuleDataSource
         ).getSelectedRowIds();
-        if (selectedRowIds.length > 0) {
+        try {
           for (const key of selectedRowIds) {
-            if ((mode as DeleteRowMode) === "soft") {
-              sessionTable.update(key, "vuuAction", "deleteRow");
-            } else {
-              sessionTable.delete(key);
+            if (!sessionTable.findByKey(key)) {
+              throw Error(`deleteSelectedRows: row ${key} not found`);
             }
           }
+          for (const key of selectedRowIds) {
+            this.#markSessionRowDeleted(sessionTable, key);
+          }
+        } catch (e) {
+          return { type: "ERROR_RESULT", errorMessage: (e as Error).message };
+        }
+        if (selectedRowIds.length > 0) {
           dataSource.select?.({ type: "DESELECT_ALL" });
         }
         return {

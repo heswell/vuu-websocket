@@ -7,7 +7,13 @@ Starts the Vuu portal server. All settings (ports, websocket path, auth,
 module catalogue files, module admin role) come from application.conf.
 
 Without --config the conf is located via $VUU_CONFIG_FILE, then $VUU_APP
-(packages/<app>/application.conf), then ./application.conf.`;
+(packages/<app>/application.conf), then ./application.conf, then the
+conf bundled with the package. The bundled conf is for local development:
+permissive auth, no TLS (ws:// and http://), websocket on 8091 and REST on
+8443, and modules.yaml in the current directory. Override it with
+VUU_AUTH_MODE, VUU_SSL, VUU_CERT_PATH, VUU_KEY_PATH, VUU_WEBSOCKET_PORT,
+VUU_HTTPS_PORT, VUU_WEBSOCKET_PATH, VUU_PORTAL_MODULES_FILE,
+VUU_PORTAL_DEFAULT_MODULES_FILE, VUU_CORS_ALLOWED_ORIGINS, VUU_LOG_LEVEL.`;
 
 const parseConfigFile = (args: string[]) => {
   let configFile: string | undefined;

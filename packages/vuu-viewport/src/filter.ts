@@ -87,13 +87,25 @@ export function compileFilter(
             return v !== value && v !== alias;
           };
     case ">":
-      return (row) => (row[idx] as number) > (value as number);
+      return (row) => {
+        const v = row[idx];
+        return v != null && (v as number) > (value as number);
+      };
     case ">=":
-      return (row) => (row[idx] as number) >= (value as number);
+      return (row) => {
+        const v = row[idx];
+        return v != null && (v as number) >= (value as number);
+      };
     case "<":
-      return (row) => (row[idx] as number) < (value as number);
+      return (row) => {
+        const v = row[idx];
+        return v != null && (v as number) < (value as number);
+      };
     case "<=":
-      return (row) => (row[idx] as number) <= (value as number);
+      return (row) => {
+        const v = row[idx];
+        return v != null && (v as number) <= (value as number);
+      };
     case "starts": {
       const pattern = String(value).toLowerCase();
       return (row) => {

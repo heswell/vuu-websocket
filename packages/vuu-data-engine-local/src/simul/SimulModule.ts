@@ -156,7 +156,7 @@ export class SimulModule extends VuuModule<SimulTableName> {
       instruments: [
         {
           rpcName: "DELETE_ROW",
-          service: this.deleteRow,
+          service: this.deleteSourceRow,
         },
       ],
       parentOrders: [

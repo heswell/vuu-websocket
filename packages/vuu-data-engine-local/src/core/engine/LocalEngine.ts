@@ -21,7 +21,8 @@ export interface LocalEngineOptions {
  * two engines (or two modules in one engine) can use the same table names.
  *
  * The engine has no React or DOM dependency. Use `createDataSourceProvider`
- * or `createLocalVuuServer` to expose it to a React app.
+ * or `createLocalVuuServer` (from the `/react` entry) to expose it to a
+ * React app.
  */
 export class LocalEngine {
   readonly tableContainer = new TableContainer();

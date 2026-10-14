@@ -1,0 +1,22 @@
+# Default portal modules for the bundled application.conf. Seeds modules.yaml
+# (in the current directory) on first startup; add modules there, or with the
+# module admin service. To ship your own defaults, point
+# VUU_PORTAL_DEFAULT_MODULES_FILE at a file like this one.
+#
+# Example entry:
+#
+#   - id: 1
+#     version: 1
+#     parentModuleId: 0
+#     name: "moduleAdmin"
+#     title: "Manage remote modules"
+#     description: "Create new remote module, update existing modules"
+#     enabled: true
+#     location: "/Modules/Manage Modules"
+#     path: "/modules/admin"
+#     mfComponent: "ModuleAdmin"
+#     mfScope: "moduleAdmin"
+#     mfUrl: "http://localhost:5002"
+#     navIconUrl: ""
+#     accessRole: "module-admin-access"
+modules: []
