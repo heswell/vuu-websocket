@@ -16,6 +16,7 @@ export {
   type CreateJoinTableOptions,
   createJoinTable,
   createTable,
+  type JoinTableHandle,
   TableContainer,
 } from "./core/table/TableContainer";
 export { tableContainer } from "./core/table/defaultTableContainer";
@@ -31,6 +32,7 @@ export * from "./user-admin";
 export {
   buildDataColumnMap,
   buildDataColumnMapFromSchema,
+  type RangeLimits,
   Table,
   type TableEvents,
 } from "./Table";

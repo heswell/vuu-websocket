@@ -175,6 +175,26 @@ Column types come from the source tables; a column in both tables takes its valu
 that differs from the source column, or a `schema` whose `table` or `key` does not match
 (`joinTable`, `table1`'s key) throw an error naming the join table and the problem.
 
+With `schema`, the join's `Table.schema` is exactly the declared schema (no keys added), so
+it matches `getTableSchema` / TABLE_META_RESP and can be published as a module's
+`schemas`. If the declared schema has no `rangeLimits`, the engine default
+(`maxRangeEnd: 1_000_000`, `maxRangeWidth: 1_000`) still applies, exposed as
+`table.rangeLimits` rather than added to the schema. Joins created without `schema`
+(default or `columns`) generate a schema that includes those default `rangeLimits`.
+
+`createJoinTable` returns a `JoinTableHandle` (`Table<JoinTable>`), whose `engineTable` is
+typed as the `@heswell/vuu-table` `JoinTable`. Call `table.destroy()` to detach a join from
+its source tables, after which source changes no longer propagate to it. `destroy()` is
+available on every `Table` and is safe to call more than once. You rarely need to call it
+yourself:
+
+- `module.dispose()` (called by `engine.dispose()` for modules the engine owns) destroys the
+  join tables the module publishes.
+- `tableContainer.clear()` (also called by `engine.dispose()`) destroys tables created by
+  that container's `createTable` / `createJoinTable`.
+- `engine.unregister()` and `tableContainer.removeTable()` do not destroy tables, as they
+  may still be in use.
+
 ### Ranges
 
 `subscribe({ range })`, `dataSource.range = …` and `setRange` accept a vuu-utils `Range` or

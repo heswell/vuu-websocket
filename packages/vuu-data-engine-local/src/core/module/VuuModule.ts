@@ -1,3 +1,4 @@
+import { JoinTable } from "@heswell/vuu-table";
 import type {
   DataSourceBase,
   DataSourceConfig,
@@ -204,10 +205,16 @@ export abstract class VuuModule<
 
   /**
    * Release resources (timers, providers). Called by `LocalEngine.dispose`
-   * for modules it owns. Subclasses that start timers should override,
-   * calling super.dispose().
+   * for modules it owns. Join tables published by the module are destroyed,
+   * detaching them from their source tables. Subclasses that start timers
+   * should override, calling super.dispose().
    */
   dispose() {
+    for (const table of Object.values<Table>(this.tables)) {
+      if (table.engineTable instanceof JoinTable) {
+        table.destroy();
+      }
+    }
     this.#sessionTableMap = {};
     this.#sessionSourceTableMap = {};
     this.#sessionSnapshots.clear();
