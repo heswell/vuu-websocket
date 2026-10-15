@@ -434,8 +434,9 @@ export class EngineDataSource
     this.viewport = viewport;
     this.#status = "subscribed";
 
-    if (this.tableSchema.rangeLimits) {
-      this.#maxRangeEnd = this.tableSchema.rangeLimits.maxRangeEnd;
+    const rangeLimits = this.#table.rangeLimits;
+    if (rangeLimits) {
+      this.#maxRangeEnd = rangeLimits.maxRangeEnd;
     }
 
     let config = this._config;

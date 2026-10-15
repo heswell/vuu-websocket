@@ -199,7 +199,9 @@ describe("createJoinTable options", () => {
     expect(join.schema.columns).toEqual(declared.columns);
     expect(join.schema.key).toBe("ric");
     expect(join.schema.table).toEqual(JOIN);
-    expect(join.schema.rangeLimits).toBeDefined();
+    // trader upstream issue 80: exactly the declared schema, no rangeLimits added
+    expect(join.schema).toEqual(declared);
+    expect(join.schema.rangeLimits).toBeUndefined();
     const dataSource = new EngineDataSource({
       columnDescriptors: join.schema.columns,
       table: join,

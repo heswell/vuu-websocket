@@ -1,4 +1,8 @@
-import { Table as EngineTable } from "@heswell/vuu-table";
+import {
+  Table as EngineTable,
+  JoinTable,
+  type TableListener,
+} from "@heswell/vuu-table";
 import type { TableSchema } from "@vuu-ui/vuu-data-types";
 import type {
   VuuDataRow,
@@ -8,6 +12,21 @@ import { type ColumnMap, EventEmitter } from "@vuu-ui/vuu-utils";
 import type { UpdateGenerator } from "./rowUpdates";
 
 export type TableRow = Array<VuuRowDataItemType | bigint>;
+
+export type RangeLimits = NonNullable<TableSchema["rangeLimits"]>;
+
+const defaultRangeLimits = new WeakMap<Table<EngineTable>, RangeLimits>();
+
+/**
+ * @internal Range limits applied when the table's schema declares none,
+ * without adding them to the (exposed) schema.
+ */
+export const setDefaultRangeLimits = (
+  table: Table<EngineTable>,
+  rangeLimits: RangeLimits,
+) => {
+  defaultRangeLimits.set(table, rangeLimits);
+};
 
 export type TableEvents = {
   delete: (key: string) => void;
@@ -23,15 +42,22 @@ export type TableEvents = {
  *
  * Events are emitted from engine table listeners, so changes applied
  * directly to the engine table (e.g. by a JoinTable) are also observed.
+ *
+ * `E` is the type of the engine table, `JoinTable` for tables created by
+ * `createJoinTable` (see `JoinTableHandle`).
  */
-export class Table extends EventEmitter<TableEvents> {
-  readonly engineTable: EngineTable;
+export class Table<
+  E extends EngineTable = EngineTable,
+> extends EventEmitter<TableEvents> {
+  readonly engineTable: E;
   #dataMap: ColumnMap;
+  #destroyed = false;
   #indexOfKey: number;
+  #listener: TableListener;
   #updateColumnName: string | undefined;
 
   constructor(
-    schemaOrEngineTable: TableSchema | EngineTable,
+    schemaOrEngineTable: TableSchema | E,
     data: TableRow[] = [],
     dataMap?: ColumnMap,
     updateGenerator?: UpdateGenerator,
@@ -40,7 +66,7 @@ export class Table extends EventEmitter<TableEvents> {
     this.engineTable =
       schemaOrEngineTable instanceof EngineTable
         ? schemaOrEngineTable
-        : new EngineTable(schemaOrEngineTable);
+        : (new EngineTable(schemaOrEngineTable) as E);
     this.#dataMap = dataMap ?? this.engineTable.columnMap;
     this.#indexOfKey = this.engineTable.indexOfKeyField;
 
@@ -48,14 +74,15 @@ export class Table extends EventEmitter<TableEvents> {
       this.engineTable.insert(row as VuuDataRow);
     }
 
-    this.engineTable.addListener({
+    this.#listener = {
       onInsert: (_rowIdx, row) => this.emit("insert", row),
       onUpdate: (_rowIdx, row) =>
         this.emit("update", row, this.#updateColumnName),
       onDelete: (_rowIdx, row) =>
         this.emit("delete", String(row[this.#indexOfKey])),
       onClear: () => undefined,
-    });
+    };
+    this.engineTable.addListener(this.#listener);
 
     updateGenerator?.setTable(this);
     updateGenerator?.setRange({ from: 0, to: 100 });
@@ -71,6 +98,35 @@ export class Table extends EventEmitter<TableEvents> {
 
   get schema() {
     return this.engineTable.schema;
+  }
+
+  /**
+   * The range limits in effect: those of the schema if it declares any,
+   * otherwise any engine default (applied to join tables), else undefined
+   * (unlimited). Never added to `schema`.
+   */
+  get rangeLimits(): RangeLimits | undefined {
+    return this.schema.rangeLimits ?? defaultRangeLimits.get(this);
+  }
+
+  get destroyed() {
+    return this.#destroyed;
+  }
+
+  /**
+   * Release the table. For a join table this detaches the join from its
+   * source tables, so source changes no longer propagate. This table stops
+   * emitting events. Safe to call on any table, and more than once.
+   */
+  destroy() {
+    if (this.#destroyed) {
+      return;
+    }
+    this.#destroyed = true;
+    this.engineTable.removeListener(this.#listener);
+    if (this.engineTable instanceof JoinTable) {
+      this.engineTable.destroy();
+    }
   }
 
   get name() {

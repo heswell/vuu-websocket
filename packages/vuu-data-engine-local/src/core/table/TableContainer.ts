@@ -1,6 +1,10 @@
 import { JoinTable, type JoinType } from "@heswell/vuu-table";
 import type { SchemaColumn, TableSchema } from "@vuu-ui/vuu-data-types";
-import { buildDataColumnMapFromSchema, Table } from "../../Table";
+import {
+  buildDataColumnMapFromSchema,
+  setDefaultRangeLimits,
+  Table,
+} from "../../Table";
 import type { VuuRowDataItemType, VuuTable } from "@vuu-ui/vuu-protocol-types";
 import type { ColumnMap } from "@vuu-ui/vuu-utils";
 import type { UpdateGenerator } from "../../rowUpdates";
@@ -9,6 +13,12 @@ const DEFAULT_RANGE_LIMITS = {
   maxRangeEnd: 1_000_000,
   maxRangeWidth: 1_000,
 };
+
+/**
+ * A Table backed by an engine `JoinTable`, as returned by `createJoinTable`.
+ * `destroy()` detaches the join from its source tables.
+ */
+export type JoinTableHandle = Table<JoinTable>;
 
 const tableKey = ({ module, table }: VuuTable) => `${module}:${table}`;
 
@@ -38,6 +48,9 @@ export interface CreateJoinTableOptions {
    * return in TABLE_META_RESP. Its column order is preserved; every column
    * must exist in one of the source tables, with the same serverDataType, and
    * its key must be the key of table1. Cannot be combined with `columns`.
+   * The join's `schema` is exactly this schema; if it declares no
+   * `rangeLimits`, the engine default limits are applied without being added
+   * to the schema.
    */
   schema?: TableSchema;
 }
@@ -51,6 +64,9 @@ export interface CreateJoinTableOptions {
  * The fifth argument is either a JoinType or a CreateJoinTableOptions, which
  * can also control the columns (and their order) of the join table. Where a
  * column exists in both tables, the value comes from table1.
+ *
+ * Call `destroy()` on the returned table to detach it from its source tables.
+ * Tables published by a module are destroyed when the module is disposed.
  */
 export const createJoinTable = (
   joinTable: VuuTable,
@@ -58,7 +74,7 @@ export const createJoinTable = (
   table2: Table,
   joinColumn: string,
   joinTypeOrOptions: JoinType | CreateJoinTableOptions = "inner",
-) => {
+): JoinTableHandle => {
   const {
     joinType = "inner",
     columns,
@@ -79,7 +95,9 @@ export const createJoinTable = (
     joinType,
   });
 
-  return new Table(engineJoinTable);
+  const table = new Table(engineJoinTable);
+  setDefaultRangeLimits(table, DEFAULT_RANGE_LIMITS);
+  return table;
 };
 
 const buildJoinSchema = (
@@ -144,10 +162,8 @@ const buildJoinSchema = (
         );
       }
     });
-    return {
-      ...schema,
-      rangeLimits: schema.rangeLimits ?? DEFAULT_RANGE_LIMITS,
-    };
+    // trader upstream issue 80: the declared schema, exactly as given
+    return schema;
   }
 
   return {
@@ -161,10 +177,12 @@ const buildJoinSchema = (
 /**
  * Tables, keyed by `{module, table}`. Each LocalEngine owns one, populated
  * from the tables of its registered modules. Tables created through
- * `createTable` / `createJoinTable` are added to this container.
+ * `createTable` / `createJoinTable` are added to this container, and are
+ * destroyed by `clear()`.
  */
 export class TableContainer {
   #tables = new Map<string, Table>();
+  #created = new Set<Table>();
 
   createTable = (
     schema: TableSchema,
@@ -174,6 +192,7 @@ export class TableContainer {
   ) => {
     const table = createTable(schema, data, dataMap, updateGenerator);
     this.addTable(table);
+    this.#created.add(table);
     return table;
   };
 
@@ -187,7 +206,7 @@ export class TableContainer {
     table2: VuuTable | string,
     joinColumn: string,
     joinTypeOrOptions: JoinType | CreateJoinTableOptions = "inner",
-  ) {
+  ): JoinTableHandle {
     const newTable = createJoinTable(
       joinTable,
       this.getTable(table1),
@@ -196,6 +215,7 @@ export class TableContainer {
       joinTypeOrOptions,
     );
     this.addTable(newTable);
+    this.#created.add(newTable);
     return newTable;
   }
 
@@ -207,8 +227,17 @@ export class TableContainer {
     this.#tables.set(tableKey(as), table);
   }
 
+  /**
+   * Remove a table from the container. The table is not destroyed, it may
+   * still be in use elsewhere; call its `destroy()` if not.
+   */
   removeTable(table: VuuTable) {
-    return this.#tables.delete(tableKey(table));
+    const key = tableKey(table);
+    const found = this.#tables.get(key);
+    if (found) {
+      this.#created.delete(found);
+    }
+    return this.#tables.delete(key);
   }
 
   hasTable(table: VuuTable) {
@@ -247,7 +276,16 @@ export class TableContainer {
     return Array.from(this.#tables.values());
   }
 
+  /**
+   * Remove every table, destroying those created by this container's
+   * `createTable` / `createJoinTable` (detaching join tables from their
+   * sources). Tables added with `addTable` are not destroyed.
+   */
   clear() {
+    for (const table of this.#created) {
+      table.destroy();
+    }
+    this.#created.clear();
     this.#tables.clear();
   }
 }
