@@ -11,7 +11,7 @@ import type { RpcResult, VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 
 type CreateBasketParams = {
   sourceBasketId?: string;
-  tradeBasketName?: string;
+  basketTradeName?: string;
 };
 
 let basketIncrement = 1;
@@ -62,9 +62,9 @@ export class BasketService extends DefaultRpcHandler {
         namedParams.sourceBasketId,
         "sourceBasketId",
       );
-      const tradeBasketName = requiredString(
-        namedParams.tradeBasketName,
-        "tradeBasketName",
+      const basketTradeName = requiredString(
+        namedParams.basketTradeName,
+        "basketTradeName",
       );
       this.basketTable.getRowAtKey(sourceBasketId);
 
@@ -72,7 +72,7 @@ export class BasketService extends DefaultRpcHandler {
       instanceId = generatedInstanceId;
       const tradingRow: VuuDataRow = [
         sourceBasketId,
-        tradeBasketName,
+        basketTradeName,
         0,
         1.25,
         generatedInstanceId,

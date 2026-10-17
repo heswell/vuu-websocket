@@ -69,7 +69,7 @@ describe("BasketModule", () => {
     );
     const result = await rpc("basket", "createBasket", {
       sourceBasketId: ".NASDAQ100",
-      tradeBasketName: "NASDAQ trade",
+      basketTradeName: "NASDAQ trade",
     });
 
     expect(result.type).toBe("SUCCESS_RESULT");
@@ -108,7 +108,7 @@ describe("BasketModule", () => {
   test("publishes market status changes", async () => {
     const createResult = await rpc("basket", "createBasket", {
       sourceBasketId: ".HSI",
-      tradeBasketName: "HSI trade",
+      basketTradeName: "HSI trade",
     });
     const instanceId = createResult.type === "SUCCESS_RESULT"
       ? createResult.data as string
@@ -140,7 +140,7 @@ describe("BasketModule", () => {
     expect(
       await rpc("basket", "createBasket", {
         sourceBasketId: ".UNKNOWN",
-        tradeBasketName: "Invalid",
+        basketTradeName: "Invalid",
       }),
     ).toEqual({
       type: "ERROR_RESULT",
@@ -158,6 +158,31 @@ describe("BasketModule", () => {
       type: "ERROR_RESULT",
       errorMessage: "addConstituent not implemented",
     });
+  });
+
+  test("requires the Scala basketTradeName parameter without mutating state", async () => {
+    const basketCount = table("basketTrading").rowCount;
+    const constituentCount = table("basketTradingConstituent").rowCount;
+
+    for (const params of [
+      {},
+      { basketTradeName: "" },
+      { basketTradeName: "   " },
+      { basketTradeName: 123 },
+      { tradeBasketName: "Legacy name" },
+    ]) {
+      expect(
+        await rpc("basket", "createBasket", {
+          sourceBasketId: ".NASDAQ100",
+          ...params,
+        }),
+      ).toEqual({
+        type: "ERROR_RESULT",
+        errorMessage: 'Invalid RPC param "basketTradeName"',
+      });
+      expect(table("basketTrading").rowCount).toBe(basketCount);
+      expect(table("basketTradingConstituent").rowCount).toBe(constituentCount);
+    }
   });
 
   test("exposes the basket visual link and menu", () => {

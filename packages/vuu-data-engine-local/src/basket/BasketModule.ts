@@ -286,13 +286,13 @@ export class BasketModule extends VuuModule<BasketsTableName> {
 
   private createNewBasket: ServiceHandler = async (rpcRequest) => {
     if (rpcRequest.context.type === "VIEWPORT_CONTEXT") {
-      const { sourceBasketId, tradeBasketName } = rpcRequest.params as {
+      const { sourceBasketId, basketTradeName } = rpcRequest.params as {
         sourceBasketId: string;
-        tradeBasketName: string;
+        basketTradeName: string;
       };
       const key = this.createTradingBasket(
         sourceBasketId as string,
-        tradeBasketName as string,
+        basketTradeName,
       );
       return {
         type: "SUCCESS_RESULT",

@@ -160,8 +160,13 @@ the basket join without requiring the external price service.
 
 ```text
 sourceBasketId: string
-tradeBasketName: string
+basketTradeName: string
 ```
+
+These are named fields in the RPC request's `params` object, matching the Scala
+basket module. In particular, the name field is `basketTradeName`, not
+`tradeBasketName`. Invoke `createBasket` with a `VIEWPORT_CONTEXT` identifying a
+viewport on `BASKET.basket`.
 
 The operation:
 
