@@ -5,7 +5,7 @@ import {
   ModuleFactory,
   VisualLinks,
   ViewPortDef,
-  type Column,
+  type ColumnDef as Column,
   type DataTable,
 } from "@heswell/vuu-server";
 import {
@@ -23,6 +23,7 @@ import { BasketPricesProvider } from "./providers/BasketPricesProvider";
 import { InMemoryProvider } from "./providers/InMemoryProvider";
 import { BasketService } from "./services/BasketService";
 import { BasketTradingConstituentService } from "./services/BasketTradingConstituentService";
+import { BasketTradingConstituentJoinService } from "./services/BasketTradingConstituentJoinService";
 import { BasketTradingService } from "./services/BasketTradingService";
 
 const algoRows = [
@@ -114,5 +115,10 @@ export const BasketModule = () =>
         ),
         links: VisualLinks(),
       }),
+      (table, _provider, _providerContainer, tableContainer) =>
+        ViewPortDef(
+          viewportColumns(table.tableDef.columns),
+          new BasketTradingConstituentJoinService(tableContainer),
+        ),
     )
     .asModule();

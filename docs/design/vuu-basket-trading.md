@@ -57,6 +57,7 @@ packages/vuu-basket-trading/
       services/
         BasketService.ts
         BasketTradingConstituentService.ts
+        BasketTradingConstituentJoinService.ts
         BasketTradingService.ts
 ```
 
@@ -238,6 +239,44 @@ The join combines trading controls and execution fields with current price
 fields. Its declared output columns preserve the schema expected by basket
 trading clients.
 
+`BasketTradingConstituentJoinService` is registered on the join viewport and
+supports direct `editCell` calls without an edit session or session table.
+Validated edits write through to `basketTradingConstituent`; the join's source
+listener then publishes the updated joined row. The materialized join is never
+edited directly, so later price updates preserve trading-field changes.
+
+This follows the Scala
+[`BasketTradingConstituentJoinService`](https://github.com/finos/vuu/blob/main/example/basket/src/main/scala/org/finos/vuu/core/module/basket/service/BasketTradingConstituentJoinService.scala),
+including numeric edits to `weighting` and `limitPrice`. TypeScript uses the
+shared schema-based coercion and validation for all fields, and rejects edits
+to price-only columns, the row key, invalid values, missing rows, or rows outside
+the viewport's permission filter. Direct editing is explicitly enabled only for
+this join.
+
+The join service also supports the Scala editing operations:
+
+| Operation | Behavior |
+| --- | --- |
+| `editRow` | Validates the supplied field map before writing the row through to the base table. An unchanged key can be included, but key changes and price-only fields are rejected. |
+| `setBuy` / `setSell` | Changes the selected constituents' sides to `BUY` / `SELL`. Uses a supplied `ViewPortSelection`, or the viewport's server-side selection when omitted. |
+| Direction menu | Exposes `Set Sell` (`SET_SELECTION_SELL`) and `Set Buy` (`SET_SELECTION_Buy`), preserving Scala's RPC spelling. |
+| `addConstituent` | Accepts `ric`, inserts a base row, and returns its `${instanceId}.${ric}` key. |
+
+New constituents use Scala's defaults: `BUY`, weighting `0.1`, quantity `10`,
+price strategy `2`, and algorithm `"-1"` (represented as a string to match the
+declared schema). Descriptions come from reference constituents when available.
+Unknown RICs have an empty description and unmatched price fields are null.
+Adding to an empty basket remains unsupported, as in Scala.
+
+Intentional differences from Scala are stricter type and permission checks,
+validation of all row/selection changes before mutation, and writing `editRow`
+through to the base rather than directly modifying the materialized join.
+Additions require a viewport showing a single trading basket instead of using
+the first row of the shared table, and duplicate constituents are rejected.
+This prevents an addition from targeting another basket or overwriting an
+existing constituent. Deletion and undo are not implemented in the Scala join
+service and are not enabled for direct edits here.
+
 The shared in-memory `JoinTable` implementation was corrected as part of this
 work to:
 
@@ -273,8 +312,16 @@ RPC parameters are validated before mutation. Invalid or unknown identifiers
 return `ERROR_RESULT` with an explicit message.
 
 `createBasket` rolls back partial inserts. Market-status RPCs reject missing or
-unknown basket instances. `addConstituent` reports its unsupported state
-explicitly rather than silently succeeding.
+unknown basket instances. The base-table `addConstituent` stub still reports its
+unsupported state; clients must invoke constituent creation on the join
+viewport. Join edit RPCs return explicit errors without mutating rows when
+validation fails, and menu failures produce a notification.
+
+The shared RPC boundary logs returned `ERROR_RESULT` responses at error level
+under `vuu.rpc`, including the RPC name, viewport ID, request ID, session ID,
+and error message. This includes unsupported RPCs such as an unregistered
+`editCell`. RPC parameters and cell values are not included. Errors are visible
+with the basket server's default `info` logging configuration.
 
 ## Verification
 
@@ -285,6 +332,11 @@ explicitly rather than silently succeeding.
 - trading basket creation produces the expected basket and constituent rows;
 - the constituent join resolves prices through `ric`;
 - market status RPCs update rows;
+- joined cell and row edits write through without edit sessions;
+- numeric coercion, read-only fields, and row permissions are enforced;
+- direction RPCs and menus update only selected constituents;
+- constituent creation uses the selected basket context and Scala defaults;
+- price updates preserve trading-field edits;
 - invalid creation leaves table counts unchanged;
 - `addConstituent` is exposed on the base constituent table;
 - basket visual-link metadata is present; and

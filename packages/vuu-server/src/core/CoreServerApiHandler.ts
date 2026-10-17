@@ -441,6 +441,9 @@ export class CoreServerApiHandler implements ServerApi {
       if (rpcResult.type === "SUCCESS_RESULT") {
         return vsMsg(RpcResponseNew(msg.rpcName, rpcResult, {}), ctx);
       } else {
+        rpcLog.error(
+          `RPC ${msg.rpcName} on vp ${viewPortId} failed (${ctx.requestId}, session ${ctx.session.sessionId}): ${rpcResult.errorMessage}`,
+        );
         return vsMsg(
           createErrorRpcResponse(
             msg,

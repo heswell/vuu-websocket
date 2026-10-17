@@ -403,6 +403,40 @@ describe("cross-session viewport requests (trader upstream issue 69)", () => {
   });
 });
 
+describe("RPC error logging", () => {
+  test("logs returned errors with request context without logging cell values", async () => {
+    const { login } = await startServer();
+    const { client, sessionId } = await login();
+    const created = await client.request("vp-error-log", createVp(), sessionId);
+    const vpId = created.body.viewPortId as string;
+    const response = await client.request(
+      "edit-error-log",
+      {
+        type: "RPC_REQUEST",
+        rpcName: "editCell",
+        params: { key: "AAA.L", column: "description", data: "private-cell-value" },
+        context: { type: "VIEWPORT_CONTEXT", viewPortId: vpId },
+      },
+      sessionId,
+    );
+    expect(response.body.result).toEqual({
+      type: "ERROR_RESULT",
+      errorMessage: "rpc service editCell not implemented",
+    });
+    const entries = logs.filter(
+      ({ level, name, args }) =>
+        level === "error" &&
+        name === "vuu.rpc" &&
+        String(args[0]).includes("edit-error-log"),
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0].args).toEqual([
+      `RPC editCell on vp ${vpId} failed (edit-error-log, session ${sessionId}): rpc service editCell not implemented`,
+    ]);
+    expect(JSON.stringify(entries)).not.toContain("private-cell-value");
+  });
+});
+
 describe("maxSessionsPerUser (trader upstream issue 72)", () => {
   test("a second login evicts and fully tears down the first session", async () => {
     const { login, server } = await startServer();

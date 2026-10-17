@@ -2,7 +2,7 @@ import {
   Link,
   TableDef,
   VisualLinks,
-  type Column,
+  type ColumnDef as Column,
 } from "@heswell/vuu-server";
 
 export const algoType = TableDef({

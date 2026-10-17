@@ -90,6 +90,14 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
   }
 
   /**
+   * Persist a validated edit. Join services can write through to a source
+   * table instead of mutating the materialized join.
+   */
+  protected applyCellEdit({ table, key, newRow, column }: CellEdit): void {
+    table.update(table.rowIndexAtKey(key), newRow, column);
+  }
+
+  /**
    * true if the row with key is visible to the viewport user. For session
    * tables the SOURCE row is checked against the permission filter of the
    * viewport the session was created from. Rows added in the session have
@@ -130,7 +138,11 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
     }
   }
 
-  editCell = ({ namedParams, viewport, ctx }: RpcParams): RpcResult => {
+  /** Validate without mutation, allowing services to prepare multi-cell edits. */
+  protected prepareCellEdit(
+    { namedParams, viewport, ctx }: RpcParams,
+    pendingRow?: VuuDataRow,
+  ): CellEdit {
     const { column, data, key } = namedParams as {
       column: string;
       data: VuuRowDataItemType;
@@ -138,79 +150,84 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
     };
     log.debug(`editCell ${viewport.id} ${key} ${column}`);
 
+    const table = viewport.dataTable;
+    const isSessionTable = table instanceof InMemSessionDataTable;
+    if (isSessionTable) {
+      this.assertSessionOwner(table, ctx, "editCell");
+    } else if (!this.canEditSource(viewport, column, ctx)) {
+      throw Error(
+        "editCell: viewport is not using a session table, direct edits are not permitted",
+      );
+    }
+
+    const columnIndex =
+      typeof column === "string" ? table.columnMap[column] : undefined;
+    if (columnIndex === undefined) {
+      throw Error(`editCell: column ${column} not found`);
+    }
+    if (column === "vuu_action") {
+      throw Error("editCell: vuu_action is server controlled");
+    }
+    if (!this.isEditableColumn(table, column, viewport, ctx)) {
+      throw Error(`editCell: column ${column} is not editable`);
+    }
+
+    const dataType = table.schema.columns.find(
+      ({ name }) => name === column,
+    )?.serverDataType;
+    let value: VuuRowDataItemType;
     try {
-      const table = viewport.dataTable;
-      const isSessionTable = table instanceof InMemSessionDataTable;
-      if (isSessionTable) {
-        this.assertSessionOwner(table, ctx, "editCell");
-      } else if (!this.canEditSource(viewport, column, ctx)) {
+      value = coerceCellValue(data, dataType, column);
+    } catch (error) {
+      throw Error(`editCell: ${(error as Error).message}`);
+    }
+
+    const row =
+      typeof key === "string" ? table.getRowAtKey(key, false) : undefined;
+    if (row === undefined || !this.isRowAccessible(viewport, key)) {
+      throw Error(`editCell: row ${key} not found`);
+    }
+
+    const newRow = (pendingRow ?? row).slice();
+    newRow[columnIndex] = value;
+
+    if (!isSessionTable) {
+      // a direct edit must not move the row out of the user's permissions
+      const predicate = permissionPredicate(
+        viewport.permissionFilter,
+        table.columnMap,
+      );
+      if (!isRowPermitted(predicate, newRow)) {
         throw Error(
-          "editCell: viewport is not using a session table, direct edits are not permitted",
+          `editCell: edit would make row ${key} inaccessible to the user`,
         );
       }
+      const tsIndex = table.columnMap.vuuUpdatedTimestamp;
+      if (tsIndex !== undefined) newRow[tsIndex] = Date.now();
+    }
 
-      const columnIndex =
-        typeof column === "string" ? table.columnMap[column] : undefined;
-      if (columnIndex === undefined) {
-        throw Error(`editCell: column ${column} not found`);
-      }
-      if (column === "vuu_action") {
-        throw Error("editCell: vuu_action is server controlled");
-      }
-      if (!this.isEditableColumn(table, column, viewport, ctx)) {
-        throw Error(`editCell: column ${column} is not editable`);
-      }
+    const edit: CellEdit = {
+      column,
+      ctx,
+      dataType,
+      key,
+      newRow,
+      row,
+      table,
+      value,
+      viewport,
+    };
+    const validationError = this.validateCellEdit(edit);
+    if (validationError) {
+      throw Error(validationError);
+    }
 
-      const dataType = table.schema.columns.find(
-        ({ name }) => name === column,
-      )?.serverDataType;
-      let value: VuuRowDataItemType;
-      try {
-        value = coerceCellValue(data, dataType, column);
-      } catch (error) {
-        throw Error(`editCell: ${(error as Error).message}`);
-      }
+    return edit;
+  }
 
-      const row =
-        typeof key === "string" ? table.getRowAtKey(key, false) : undefined;
-      if (row === undefined || !this.isRowAccessible(viewport, key)) {
-        throw Error(`editCell: row ${key} not found`);
-      }
-
-      const newRow = row.slice();
-      newRow[columnIndex] = value;
-
-      if (!isSessionTable) {
-        // a direct edit must not move the row out of the user's permissions
-        const predicate = permissionPredicate(
-          viewport.permissionFilter,
-          table.columnMap,
-        );
-        if (!isRowPermitted(predicate, newRow)) {
-          throw Error(
-            `editCell: edit would make row ${key} inaccessible to the user`,
-          );
-        }
-        const tsIndex = table.columnMap.vuuUpdatedTimestamp;
-        if (tsIndex !== undefined) newRow[tsIndex] = Date.now();
-      }
-
-      const validationError = this.validateCellEdit({
-        column,
-        ctx,
-        dataType,
-        key,
-        newRow,
-        row,
-        table,
-        value,
-        viewport,
-      });
-      if (validationError) {
-        throw Error(validationError);
-      }
-
-      table.update(table.rowIndexAtKey(key), newRow, column);
+  editCell = (params: RpcParams): RpcResult => {
+    try {
+      this.applyCellEdit(this.prepareCellEdit(params));
       return { type: "SUCCESS_RESULT", data: undefined };
     } catch (error) {
       return this.errorResult(error);
