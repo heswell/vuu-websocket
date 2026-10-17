@@ -64,8 +64,8 @@ describe("BasketModule", () => {
       [".FTSE100", ".FTSE100", 0, 0],
       [".SP500", ".SP500", 0, 0],
     ]);
-    expect(table("basketConstituent").rows.length).toBe(318);
-    expect(table("prices").rows.length).toBe(303);
+    expect(table("basketConstituent").rows.length).toBe(782);
+    expect(table("prices").rows.length).toBe(699);
   });
 
   test("creates a trading basket and joins its constituents to BASKET prices", async () => {
@@ -328,7 +328,7 @@ describe("BasketModule", () => {
     expect(base.getRowAtKey(key)).toEqual(original);
   });
 
-  test("adds constituents using Scala defaults and publishes joined rows", async () => {
+  test("adds constituents to the explicit basket and publishes joined rows", async () => {
     const { call, instanceId } = await constituentEditor();
     const base = table("basketTradingConstituent");
     const joined = table("basketTradingConstituentJoin");
@@ -337,8 +337,8 @@ describe("BasketModule", () => {
       row[reference.columnMap.basketId] === ".NASDAQ100",
     )!;
     const ric = source[reference.columnMap.ric] as string;
-    const key = `${instanceId}.${ric}`;
-    expect(await call("addConstituent", { ric })).toEqual({
+    const key = `${instanceId}-${ric}`;
+    expect(await call("addConstituent", { ric, basketInstanceId: instanceId })).toEqual({
       type: "SUCCESS_RESULT", data: key,
     });
     const row = base.getRowAtKey(key);
@@ -347,38 +347,44 @@ describe("BasketModule", () => {
     expect(row[base.columnMap.description]).toBe(source[reference.columnMap.description]);
     for (const [column, value] of [
       ["quantity", 10], ["weighting", 0.1], ["side", "BUY"],
-      ["priceStrategyId", 2], ["algo", "-1"],
+      ["priceStrategyId", 2], ["algo", ""], ["orderStatus", "PENDING"], ["filledQty", 0],
     ] as const) {
       expect(row[base.columnMap[column]]).toBe(value);
       expect(joined.getRowAtKey(key)[joined.columnMap[column]]).toBe(value);
     }
     expect(joined.getRowAtKey(key)[joined.columnMap.ask]).toBeNumber();
     const count = base.rows.length;
-    expect((await call("addConstituent", { ric })).type).toBe("ERROR_RESULT");
-    expect(base.rows.length).toBe(count);
-    expect(await call("addConstituent", { ric: "UNKNOWN.RIC" })).toEqual({
-      type: "SUCCESS_RESULT", data: `${instanceId}.UNKNOWN.RIC`,
+    expect(await call("addConstituent", { ric, basketInstanceId: instanceId })).toEqual({
+      type: "ERROR_RESULT", errorMessage: `${ric} is already in this basket`,
     });
-    expect(base.getRowAtKey(`${instanceId}.UNKNOWN.RIC`)[base.columnMap.description]).toBe("");
-    expect(joined.getRowAtKey(`${instanceId}.UNKNOWN.RIC`)[joined.columnMap.ask]).toBeNull();
+    expect(base.rows.length).toBe(count);
+    expect(await call("addConstituent", {
+      ric: "UNKNOWN.RIC", basketInstanceId: instanceId,
+    })).toEqual({
+      type: "ERROR_RESULT", errorMessage: "Unknown constituent UNKNOWN.RIC",
+    });
+    expect(base.rows.length).toBe(count);
   });
 
-  test("rejects invalid, empty, ambiguous, or inaccessible constituent additions", async () => {
-    const { call, key, viewport } = await constituentEditor();
+  test("rejects invalid, missing-target or inaccessible constituent additions", async () => {
+    const { call, key, instanceId, viewport } = await constituentEditor();
     const base = table("basketTradingConstituent");
     const count = base.rows.length;
     for (const ric of [undefined, "", "   ", 123]) {
-      expect((await call("addConstituent", { ric })).type).toBe("ERROR_RESULT");
+      expect((await call("addConstituent", { ric, basketInstanceId: instanceId })).type).toBe("ERROR_RESULT");
     }
+    expect(await call("addConstituent", { ric: "AAPL" })).toEqual({
+      type: "ERROR_RESULT", errorMessage: "Invalid add constituent request",
+    });
+    expect(await call("addConstituent", { ric: "AAPL", basketInstanceId: "missing" })).toEqual({
+      type: "ERROR_RESULT", errorMessage: "Basket not found",
+    });
     viewport.permissionFilter = PermissionFilter("ric", new Set([
       base.getRowAtKey(key)[base.columnMap.ric] as string,
     ]));
-    expect((await call("addConstituent", { ric: "NEW.RIC" })).type).toBe("ERROR_RESULT");
-    viewport.permissionFilter = undefined;
-    viewport.engine.setConfig({ filterSpec: { filter: 'instanceId = "missing"' } });
-    expect((await call("addConstituent", { ric: "NEW.RIC" })).type).toBe("ERROR_RESULT");
-    viewport.engine.setConfig({ filterSpec: { filter: "" } });
-    expect((await call("addConstituent", { ric: "NEW.RIC" })).type).toBe("ERROR_RESULT");
+    expect((await call("addConstituent", {
+      ric: "AAPL", basketInstanceId: instanceId,
+    })).type).toBe("ERROR_RESULT");
     expect(base.rows.length).toBe(count);
   });
 

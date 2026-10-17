@@ -69,6 +69,17 @@ export class BasketPersistence {
       }
       const keys = new Set<string>();
       const rows = records.map((record: unknown) => {
+        if (isObject(record) && def === basketTradingConstituent) {
+          // Version 1 snapshots predate the live-grid fields.
+          if (!("orderStatus" in record) && !("filledQty" in record)) {
+            record = {
+              ...record,
+              orderStatus: record.status === "ON_MARKET" ? "ACKED"
+                : record.status === "OFF-MARKET" ? "CANCELLED" : "PENDING",
+              filledQty: 0,
+            };
+          }
+        }
         if (
           !isObject(record) ||
           Object.keys(record).length !== def.columns.length

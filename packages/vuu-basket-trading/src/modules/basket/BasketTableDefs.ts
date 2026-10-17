@@ -82,6 +82,8 @@ export const basketTradingConstituent = TableDef({
     { name: "status", dataType: "string" },
     { name: "venue", dataType: "string" },
     { name: "weighting", dataType: "double" },
+    { name: "orderStatus", dataType: "string" },
+    { name: "filledQty", dataType: "long" },
   ],
   joinFields: ["instanceIdRic", "ric"],
   keyField: "instanceIdRic",
@@ -144,6 +146,8 @@ const joinColumnNames = [
   "status",
   "venue",
   "weighting",
+  "orderStatus",
+  "filledQty",
 ] as const;
 
 export const basketTradingConstituentJoinColumns = (

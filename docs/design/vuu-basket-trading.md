@@ -40,6 +40,7 @@ packages/vuu-basket-trading/
     BasketRuntime.test.ts
   application.conf
   package.json
+  scripts/generate-basket-data.ts
   src/
     BasketTradingMain.ts
     index.ts
@@ -52,15 +53,13 @@ packages/vuu-basket-trading/
         InMemoryProvider.ts
       reference-data/
         constituents.ts
-        ftse100.ts
-        hsi.ts
-        nasdaq100.ts
-        sp500.ts
+        constituents.json
       services/
         BasketService.ts
         BasketTradingConstituentService.ts
         BasketTradingConstituentJoinService.ts
         BasketTradingService.ts
+        trading-rows.ts
 ```
 
 `BasketTradingMain.ts` creates a `KeycloakAuthProvider` and delegates common
@@ -123,12 +122,27 @@ in `BasketTableDefs.ts`.
 - basket constituents; and
 - price strategy types.
 
-The package contains the canonical FTSE 100, Hang Seng, NASDAQ 100, and S&P 500
-source datasets copied from the UI test implementation. `constituents.ts`
-normalizes those sources into the `basketConstituent` schema.
+`constituents.json` is generated from the canonical `finos/vuu` server CSVs:
+`example/main/src/main/resources/static/{ftse100,hsi,nasdaq100,sp500}.csv`.
+The same source feeds the local `vuu-data-test` module. The package ships the
+generated named-field JSON, not separately maintained arrays or a runtime
+dependency on another checkout. `constituents.ts` maps it into the table schema.
 
-The resulting constituent table has 318 rows. Its `basketId` column has a
-visual link to `basket.id`.
+To regenerate from a local `finos/vuu` worktree:
+
+```sh
+npm run generate:basket-data -w @heswell/vuu-basket-trading -- \
+  --source-dir /path/to/vuu/example/main/src/main/resources/static
+```
+
+Add `--check` to verify the checked-in JSON matches those CSVs without writing.
+The converter validates required fields, numeric weights/price seeds, and
+per-basket duplicate symbols. It preserves names, symbol punctuation and leading
+zeros, display-volume strings, and literal source weight values. In particular,
+weights are not normalized between indices.
+
+There are 782 constituent rows: 98 FTSE, 80 HSI, 101 NASDAQ, and 503 S&P.
+The `basketId` column has a visual link to `basket.id`.
 
 The initial baskets are:
 
@@ -142,7 +156,7 @@ The initial baskets are:
 ## Price Data
 
 `BasketPricesProvider` creates one deterministic price row for each unique
-constituent RIC. Prices are contained in `BASKET.prices`.
+constituent RIC (699 unique RICs). Prices are contained in `BASKET.prices`.
 
 The table provides:
 
@@ -219,11 +233,12 @@ to an inconsistent or nonexistent parent. Runtime save failures are logged under
 `basket.persistence` and retried after one second; a failed shutdown flush is
 also reported.
 
-Initial trading quantities are normalized from reference display volumes
-(including commas and `K`/`M`/`B` suffixes) into integers. Missing volumes log a
-warning and initialize quantity to zero; price strategy defaults to `2`.
-Two malformed source records (HSBC and Keurig Dr Pepper) have their name/RIC
-fields separated so generated trading rows match their string RIC schema.
+Legacy version-1 snapshots without both `orderStatus` and `filledQty` are
+accepted: filled quantity defaults to zero, and order status is inferred as
+`ACKED` for `ON_MARKET`, `CANCELLED` for `OFF-MARKET`, otherwise `PENDING`.
+All other saved values, including legacy keys, quantities and weights, are
+preserved. Partially missing execution fields remain an error. New snapshots
+include both fields.
 
 ## Trading Basket Creation
 
@@ -264,22 +279,37 @@ New trading baskets use:
 | `units` | `100` |
 
 Each trading constituent copies its RIC, description, and weighting from the
-source row, and normalizes the reference volume into its numeric quantity.
-Its key is `${instanceId}-${ric}`.
+source row.
+Its quantity is `Math.trunc(weighting * units)` using the literal CSV weight,
+not the reference display volume. Its key is `${instanceId}-${ric}`.
+New constituents use `BUY`, `OFF-MARKET`, price strategy `2` (Limit),
+limit price `95`, empty algorithm/parameters, venue `"venue"`, order status
+`PENDING` and filled quantity `0`. Other numeric execution values start at zero.
 
 The operation prepares all constituent rows before mutation. If an insertion
 fails, it deletes any inserted constituents and the trading basket so callers
 do not observe partial state.
 
-## Market Status
+## Basket Editing and Market Status
+
+`basketTrading` supports direct `editCell` without an edit session. Integer
+unit edits recalculate quantities only for that basket, using each constituent's
+current weight. Changing the basket side inverts each constituent's existing
+side independently, preserving mixed buy/sell positions. Editing units or side
+to its current value is a no-op, so it does not overwrite manual constituent
+quantity edits. The shared edit handler enforces types, keys and row permissions.
+The source basket cannot be changed while incompatible constituents exist.
 
 `BasketTradingService` is installed on `basketTrading` and exposes:
 
 - `sendToMarket`, which sets status to `ON_MARKET`;
 - `takeOffMarket`, which sets status to `OFF-MARKET`.
 
-Both RPCs require a valid `basketInstanceId`. Updates use the table's normal
-upsert path so active viewports receive row-update events.
+Both RPCs require a valid `basketInstanceId`. They update only that basket and
+its constituents. Sending sets constituent order status to `ACKED`; taking off
+market sets it to `CANCELLED`. Filled quantities remain zero unless explicitly
+edited; fills are not simulated. Normal table updates publish changes to joins
+and active viewports.
 
 The different `OFF MARKET` and `OFF-MARKET` spellings intentionally preserve
 the behavior of the source implementation.
@@ -295,10 +325,9 @@ It registers `addConstituent`, but the operation currently returns:
 addConstituent not implemented
 ```
 
-The service is deliberately attached to the base table rather than the join.
-When constituent creation is implemented, it will insert into
-`basketTradingConstituent`; `JoinTableProvider` will then publish the
-corresponding joined row automatically.
+The base-table service remains a compatibility stub. Clients use the implemented
+`addConstituent` RPC on the join viewport, which inserts into this source table;
+the join automatically publishes the new joined row.
 
 ## Constituent Price Join
 
@@ -324,8 +353,8 @@ This follows the Scala
 including numeric edits to `weighting` and `limitPrice`. TypeScript uses the
 shared schema-based coercion and validation for all fields, and rejects edits
 to price-only columns, the row key, invalid values, missing rows, or rows outside
-the viewport's permission filter. Direct editing is explicitly enabled only for
-this join.
+the viewport's permission filter. Direct editing is explicitly enabled for
+this join and the parent `basketTrading` table, not the base constituent table.
 
 The join service also supports the Scala editing operations:
 
@@ -334,22 +363,29 @@ The join service also supports the Scala editing operations:
 | `editRow` | Validates the supplied field map before writing the row through to the base table. An unchanged key can be included, but key changes and price-only fields are rejected. |
 | `setBuy` / `setSell` | Changes the selected constituents' sides to `BUY` / `SELL`. Uses a supplied `ViewPortSelection`, or the viewport's server-side selection when omitted. |
 | Direction menu | Exposes `Set Sell` (`SET_SELECTION_SELL`) and `Set Buy` (`SET_SELECTION_Buy`), preserving Scala's RPC spelling. |
-| `addConstituent` | Accepts `ric`, inserts a base row, and returns its `${instanceId}.${ric}` key. |
+| `addConstituent` | Accepts `{ ric, basketInstanceId }`, inserts into the explicitly requested basket, and returns `${basketInstanceId}-${ric}` in a `SUCCESS_RESULT`. |
 
-New constituents use Scala's defaults: `BUY`, weighting `0.1`, quantity `10`,
-price strategy `2`, and algorithm `"-1"` (represented as a string to match the
-declared schema). Descriptions come from reference constituents when available.
-Unknown RICs have an empty description and unmatched price fields are null.
-Adding to an empty basket remains unsupported, as in Scala.
+Added constituents use the same standard defaults as basket creation, but with
+weight `0.1` and quantity `Math.trunc(0.1 * currentBasketUnits)`. The RIC must exist
+in reference data; its description and current prices are joined immediately.
+Additions reject invalid parameters, missing baskets, `ON_MARKET` baskets,
+unknown RICs, duplicates and inaccessible resulting rows without overwriting
+existing data. Duplicate checks cover legacy persisted keys as well.
 
 Intentional differences from Scala are stricter type and permission checks,
 validation of all row/selection changes before mutation, and writing `editRow`
 through to the base rather than directly modifying the materialized join.
-Additions require a viewport showing a single trading basket instead of using
-the first row of the shared table, and duplicate constituents are rejected.
-This prevents an addition from targeting another basket or overwriting an
-existing constituent. Deletion and undo are not implemented in the Scala join
-service and are not enabled for direct edits here.
+The add contract matches the local `vuu-data-test` module: the explicit target
+works even for empty baskets or viewports containing multiple baskets, instead
+of relying on a viewport's first row. Deletion and undo are not implemented in
+the Scala join service and are not enabled for direct edits here.
+
+Lookup subscriptions support projected columns such as `["id", "priceStrategy"]`
+with an initial range. Full-membership subscriptions can project `["ric"]` only,
+filter by `instanceId`, and expand their range to the reported viewport size.
+They receive live size/insertion updates beyond the main grid's visible range,
+allowing clients to maintain complete constituent exclusion lists. Price updates
+fan out to every basket instance sharing a RIC, without replacing source edits.
 
 The shared in-memory `JoinTable` implementation was corrected as part of this
 work to:
@@ -409,24 +445,30 @@ with the basket server's default `info` logging configuration.
 - joined cell and row edits write through without edit sessions;
 - numeric coercion, read-only fields, and row permissions are enforced;
 - direction RPCs and menus update only selected constituents;
-- constituent creation uses the selected basket context and Scala defaults;
+- constituent creation uses an explicit basket target and standard defaults;
 - price updates preserve trading-field edits;
 - invalid creation leaves table counts unchanged;
 - `addConstituent` is exposed on the base constituent table;
 - basket visual-link metadata is present; and
 - the `Add Basket` menu has the expected wire representation.
 
-The basket tests are run with the existing VUU server lifecycle tests:
+`BasketRuntime.test.ts` additionally covers all canonical memberships and
+literal weights, parent edit propagation/no-ops, target isolation, execution
+statuses, current-unit additions, price fan-out, sparse ticks, automatic
+persistence/restarts, legacy migration, and malformed-snapshot rejection.
+Its real WebSocket test verifies projected lookup rows, filtered `["ric"]`
+membership, range expansion, and live insertion outside the grid.
+
+Run the basket tests with:
 
 ```sh
-bun test packages/vuu-basket-trading/__tests__/BasketModule.test.ts \
-  packages/vuu-server/__tests__/VuuServer.test.ts
+bun test packages/vuu-basket-trading/__tests__
 ```
 
 ## Current Limitations
 
-- Data is in memory and is not persisted across server restarts.
-- Price rows are deterministic local fixtures rather than a live market feed.
-- `addConstituent` is registered but not implemented.
+- Persistence is a single-writer JSON snapshot, not a transactional database.
+- Price rows are simulated rather than a live market feed.
+- Fills and real order execution are not simulated.
 - No order-management integration or basket-trading UI is included in this
   package.

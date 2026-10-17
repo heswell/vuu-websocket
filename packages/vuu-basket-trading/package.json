@@ -12,7 +12,8 @@
   "scripts": {
     "build": "etsc",
     "build:vuu": "node ../../scripts/build.mjs",
-    "test": "bun test"
+    "test": "bun test",
+    "generate:basket-data": "bun scripts/generate-basket-data.ts"
   },
   "author": "heswell",
   "license": "MIT",
@@ -21,6 +22,7 @@
     "@heswell/vuu-table": "1.0.2"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21"
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21",
+    "csv-parse": "^7.0.3"
   }
 }

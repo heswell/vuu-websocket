@@ -15,6 +15,7 @@ import {
   type Viewport,
 } from "@heswell/vuu-server";
 import type { RpcResult, VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { createTradingConstituent } from "./trading-rows";
 
 export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
   private readonly constituentTable: DataTable;
@@ -73,7 +74,10 @@ export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
     table.update(table.rowIndexAtKey(key), row, column);
   }
 
-  protected validateCellEdit({ table, newRow, viewport, key }: CellEdit) {
+  protected validateCellEdit({ table, column, value, newRow, viewport, key }: CellEdit) {
+    if (column === "side" && value !== "BUY" && value !== "SELL") {
+      return "Constituent side must be BUY or SELL";
+    }
     const trading = this.tableContainer.getTable<DataTable>("basketTrading");
     const instanceId = String(newRow[table.columnMap.instanceId]);
     const basket = trading.getRowAtKey(instanceId, false);
@@ -185,60 +189,52 @@ export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
 
   private addConstituent = ({ namedParams, viewport }: RpcParams): RpcResult => {
     try {
-      const { ric } = namedParams;
-      if (typeof ric !== "string" || ric.trim() === "") {
-        throw new Error('Invalid RPC param "ric"');
+      const { ric, basketInstanceId } = namedParams;
+      if (
+        typeof ric !== "string" || ric.trim() === "" ||
+        typeof basketInstanceId !== "string" || basketInstanceId.trim() === ""
+      ) {
+        throw new Error("Invalid add constituent request");
       }
       const joined = viewport.dataTable;
       if (joined.name !== "basketTradingConstituentJoin") {
         throw new Error("addConstituent requires the constituent join table");
       }
-      const instances = viewport.engine.getUniqueValues("instanceId", "", 2);
-      if (instances.length === 0) {
-        throw new Error(
-          `Failed to add constituents to ${joined.name} as adding row to empty table is currently not supported`,
-        );
-      }
-      if (instances.length !== 1) {
-        throw new Error(
-          "addConstituent requires a viewport showing a single trading basket",
-        );
-      }
-      const [instanceId] = instances;
       const trading = this.tableContainer.getTable<DataTable>("basketTrading");
-      const trade = trading.getRowAtKey(instanceId);
-      const table = this.constituentTable;
-      if (
-        table.rows.some(
-          (row) =>
-            row[table.columnMap.instanceId] === instanceId &&
-            row[table.columnMap.ric] === ric,
-        )
-      ) {
-        throw new Error(
-          `Constituent ${ric} already exists in basket ${instanceId}`,
-        );
+      const trade = trading.getRowAtKey(basketInstanceId, false);
+      if (!trade) throw new Error("Basket not found");
+      const parentPermission = trading.tableDef.permissionFunction?.(viewport, this.tableContainer)
+        .createPredicate(trading.columnMap);
+      if (parentPermission && !parentPermission(trade)) {
+        throw new Error("Basket not found");
       }
+      if (trade[trading.columnMap.status] === "ON_MARKET") {
+        throw new Error("Take the basket off market before adding constituents");
+      }
+      const table = this.constituentTable;
       const source = this.tableContainer.getTable<DataTable>("basketConstituent");
       const reference = source.rows.find(
         (row) => row[source.columnMap.ric] === ric,
       );
-      const key = `${instanceId}.${ric}`;
-      const values: Record<string, string | number> = {
-        instanceIdRic: key,
-        instanceId,
-        basketId: trade[trading.columnMap.basketId] as string,
-        ric,
-        description: String(reference?.[source.columnMap.description] ?? ""),
-        side: "BUY",
-        weighting: 0.1,
-        quantity: 10,
-        priceStrategyId: 2,
-        algo: "-1",
-      };
-      const row = table.schema.columns.map(({ name, serverDataType }) =>
-        values[name] ?? (serverDataType === "string" ? "" : 0),
+      if (!reference) throw new Error(`Unknown constituent ${ric}`);
+      if (
+        table.rows.some(
+          (row) =>
+            row[table.columnMap.instanceId] === basketInstanceId &&
+            row[table.columnMap.ric] === ric,
+        )
+      ) {
+        throw new Error(
+          `${ric} is already in this basket`,
+        );
+      }
+      const row = createTradingConstituent(
+        trading, trade, ric, String(reference[source.columnMap.description]), 0.1,
       );
+      const key = String(row[table.indexOfKeyField]);
+      if (table.getRowAtKey(key, false)) {
+        throw new Error(`${ric} is already in this basket`);
+      }
       const permitted = viewport.permissionFilter?.createPredicate(
         joined.columnMap,
       );

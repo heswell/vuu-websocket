@@ -1,7 +1,6 @@
 import {
   type DataTable,
   DefaultRpcHandler,
-  getLogger,
   NoAction,
   type RpcParams,
   SelectionViewPortMenuItem,
@@ -9,6 +8,7 @@ import {
   ViewPortMenu,
 } from "@heswell/vuu-server";
 import type { RpcResult, VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import { createTradingConstituent } from "./trading-rows";
 
 type CreateBasketParams = {
   sourceBasketId?: string;
@@ -16,25 +16,6 @@ type CreateBasketParams = {
 };
 
 let basketIncrement = 1;
-const log = getLogger("basket.service");
-
-const tradingQuantity = (volume: unknown, ric: string): number => {
-  const text = String(volume ?? "").trim().replaceAll(",", "");
-  if (text === "") {
-    log.warn(`No reference volume for ${ric}; initializing quantity to zero`);
-    return 0;
-  }
-  const match = /^(\d+(?:\.\d+)?)\s*([KMB]?)$/i.exec(text);
-  if (!match) throw new Error(`Invalid reference volume for ${ric}`);
-  const suffix = match[2].toUpperCase();
-  const multiplier = suffix === "B" ? 1_000_000_000
-    : suffix === "M" ? 1_000_000 : suffix === "K" ? 1_000 : 1;
-  const quantity = Math.round(Number(match[1]) * multiplier);
-  if (!Number.isSafeInteger(quantity)) {
-    throw new Error(`Invalid reference volume for ${ric}`);
-  }
-  return quantity;
-};
 
 const failure = (errorMessage: string): RpcResult => ({
   type: "ERROR_RESULT",
@@ -108,26 +89,13 @@ export class BasketService extends DefaultRpcHandler {
       );
       const tradingRows = sourceRows.map((row): VuuDataRow => {
         const ric = row[this.constituentTable.columnMap.ric] as string;
-        return [
-          "",
-          "",
-          sourceBasketId,
-          row[this.constituentTable.columnMap.description],
-          generatedInstanceId,
-          `${generatedInstanceId}-${ric}`,
-          95,
-          0,
-          0,
-          0,
-          0,
-          2,
-          tradingQuantity(row[this.constituentTable.columnMap.volume], ric),
+        return createTradingConstituent(
+          this.basketTradingTable,
+          tradingRow,
           ric,
-          "BUY",
-          "",
-          "venue",
-          row[this.constituentTable.columnMap.weighting],
-        ];
+          String(row[this.constituentTable.columnMap.description]),
+          Number(row[this.constituentTable.columnMap.weighting]),
+        );
       });
 
       this.basketTradingTable.insert(tradingRow);
