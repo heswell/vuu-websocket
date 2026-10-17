@@ -7,24 +7,39 @@ const log = getLogger("basket.prices");
 export type BasketPriceSimulationOptions = {
   /** Zero disables ticking. */
   intervalMs?: number;
+  /** Independent chance of updating each instrument on a tick, from zero to one. */
+  updateProbability?: number;
   random?: () => number;
 };
 
 export class BasketPricesProvider extends Provider {
   private timer: ReturnType<typeof setInterval> | undefined;
   private readonly intervalMs: number;
+  private readonly updateProbability: number;
   private readonly random: () => number;
 
   constructor(
     table: Table,
     private readonly constituentRows: readonly VuuDataRow[],
-    { intervalMs = 250, random = Math.random }: BasketPriceSimulationOptions = {},
+    {
+      intervalMs = 250,
+      updateProbability = 0.1,
+      random = Math.random,
+    }: BasketPriceSimulationOptions = {},
   ) {
     super(table);
     if (!Number.isSafeInteger(intervalMs) || intervalMs < 0) {
       throw new Error("Basket price intervalMs must be a non-negative integer");
     }
     this.intervalMs = intervalMs;
+    if (
+      !Number.isFinite(updateProbability) ||
+      updateProbability < 0 ||
+      updateProbability > 1
+    ) {
+      throw new Error("Basket price updateProbability must be between zero and one");
+    }
+    this.updateProbability = updateProbability;
     this.random = random;
   }
 
@@ -58,9 +73,10 @@ export class BasketPricesProvider extends Provider {
   runOnce() {
     const { columnMap } = this.table;
     for (let index = 0; index < this.table.rows.length; index++) {
-      const row = this.table.rows[index].slice();
+      if (this.random() >= this.updateProbability) continue;
       const mode = this.random();
       if (mode < 0.1) continue;
+      const row = this.table.rows[index].slice();
       const bid = Number(row[columnMap.bid]);
       const ask = Number(row[columnMap.ask]);
       const fast = mode > 0.8;

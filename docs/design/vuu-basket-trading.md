@@ -153,7 +153,9 @@ ask, askSize, bid, bidSize, close, last, open, phase, ric, scenario
 Initial rows use stable values based on source order, a two-cent spread,
 `CONTINUOUS` phase, and `default` scenario. After startup the provider ticks
 every 250 ms by default, randomly walking bid/ask, widening spreads, or making
-faster moves, with occasional no-op ticks. These scenarios are inspired by the
+faster moves. Each instrument independently has a 10% chance of being selected
+on a tick, with occasional no-op ticks after selection, so most prices remain
+unchanged each cycle. These scenarios are inspired by the
 Scala `SimulatedPricesProvider`; this lightweight simulation does not reproduce
 its timed market-open/close cycle. Last prices and quote sizes also change.
 Quotes are positive, rounded to cents, and never crossed. Open/close reference
@@ -166,7 +168,10 @@ stops ticking rather than escaping as an unhandled timer error.
 
 Set `VUU_BASKET_PRICE_INTERVAL_MS` (configuration:
 `vuu.basket.prices.intervalMs`) to change the interval; zero disables ticking.
-The module API also accepts `priceSimulation: { intervalMs }`.
+Set `VUU_BASKET_PRICE_UPDATE_PROBABILITY` (configuration:
+`vuu.basket.prices.updateProbability`) to adjust the per-instrument chance from
+zero to one. The module API also accepts
+`priceSimulation: { intervalMs, updateProbability }`.
 
 ## Basket Persistence
 

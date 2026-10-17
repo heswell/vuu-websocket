@@ -25,6 +25,9 @@ export default async function main() {
           : undefined,
         priceSimulation: {
           intervalMs: config.getNumber("vuu.basket.prices.intervalMs", 250),
+          updateProbability: config.getNumber(
+            "vuu.basket.prices.updateProbability", 0.1,
+          ),
         },
       }),
       NotificationModule(

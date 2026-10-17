@@ -59,7 +59,7 @@ async function start(path?: string, intervalMs = 0) {
       LoginTokenService(),
     ).withModule(BasketModule({
       persistencePath: path,
-      priceSimulation: { intervalMs, random: () => 0.4 },
+      priceSimulation: { intervalMs, updateProbability: 1, random: () => 0.4 },
     })),
     lifecycle,
   );
@@ -150,7 +150,7 @@ describe("Basket price simulation", () => {
     const prices = runtime.table("prices");
     for (const mode of [0.4, 0.7, 0.9]) {
       const provider = new BasketPricesProvider(prices, [], {
-        intervalMs: 0, random: () => mode,
+        intervalMs: 0, updateProbability: 1, random: () => mode,
       });
       const original = prices.rows[0].slice();
       provider.runOnce();
@@ -176,6 +176,49 @@ describe("Basket price simulation", () => {
     await Bun.sleep(30);
     expect(prices.rows).toEqual(original);
     expect(() => new BasketPricesProvider(prices, [], { intervalMs: -1 })).toThrow();
+  });
+
+  test("updates a sparse random subset without publishing unchanged prices", async () => {
+    const runtime = await start();
+    const prices = runtime.table("prices");
+    const original = prices.rows.map((row) => row.slice());
+    const updates: number[] = [];
+    prices.addListener({ onUpdate: (index) => { updates.push(index); } });
+    let index = 0;
+    let remaining = 0;
+    const provider = new BasketPricesProvider(prices, [], {
+      intervalMs: 0,
+      random: () => {
+        if (remaining > 0) {
+          remaining--;
+          return 0.4;
+        }
+        const selected = index++ % 10 === 0;
+        if (selected) remaining = 5;
+        return selected ? 0.05 : 0.5;
+      },
+    });
+    provider.runOnce();
+    expect(updates).toEqual(
+      original.map((_, index) => index).filter((index) => index % 10 === 0),
+    );
+    for (let index = 0; index < original.length; index++) {
+      if (index % 10 === 0) {
+        expect(prices.rows[index]).not.toEqual(original[index]);
+      } else {
+        expect(prices.rows[index]).toEqual(original[index]);
+      }
+    }
+    const after = prices.rows.map((row) => row.slice());
+    new BasketPricesProvider(prices, [], {
+      intervalMs: 0, updateProbability: 0, random: () => 0,
+    }).runOnce();
+    expect(prices.rows).toEqual(after);
+    for (const updateProbability of [-0.1, 1.1, NaN, Infinity]) {
+      expect(() => new BasketPricesProvider(prices, [], {
+        updateProbability,
+      })).toThrow("updateProbability must be between zero and one");
+    }
   });
 });
 
