@@ -449,7 +449,7 @@ and applied to the source table when the session is saved.
   - unknown columns;
   - the key column;
   - the system columns (`vuuCreatedTimestamp`, `vuuUpdatedTimestamp`,
-    `vuuMsg`, `vuu_action`; see `VUU_SYSTEM_COLUMNS`);
+    `vuuMsg`, `vuuAction`; see `VUU_SYSTEM_COLUMNS`);
   - values that don't match the column's `serverDataType`.
 
   Numeric and boolean strings (`"42"`, `"true"`) are coerced (see
@@ -490,7 +490,7 @@ therefore depend on the user and their roles.
 | Hook (protected) | Default | Purpose |
 | --- | --- | --- |
 | `canEditSource(viewport, column, ctx)` | `false` | Allow `editCell` to write directly to a non-session (shared) table. Edits are still column, type and permission checked, and `vuuUpdatedTimestamp` is bumped. |
-| `isEditableColumn(table, column, viewport, ctx)` | `true` unless key or system column | Restrict which columns `editCell` accepts. `vuu_action` is never editable. |
+| `isEditableColumn(table, column, viewport, ctx)` | `true` unless key or system column | Restrict which columns `editCell` accepts. `vuuAction` is never editable. |
 | `validateCellEdit(edit: CellEdit)` | no error | Business validation, after the type and permission checks. Return an error message to refuse the edit. |
 | `isRowAccessible(viewport, key)` | permission filter | Whether a row is visible to the user. For session tables, checks the source row. |
 | `prepareSessionSave(sessionTable, force, ctx)` | permission and stale-row checks | Build the changes to save, or return an `ERROR_RESULT`. |

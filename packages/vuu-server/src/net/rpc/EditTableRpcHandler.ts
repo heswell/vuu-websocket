@@ -70,7 +70,7 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
    * Whether column may be edited through editCell. Called only for columns
    * that exist in the table. The key column and the server-maintained
    * system columns (vuuCreatedTimestamp, vuuUpdatedTimestamp, vuuMsg,
-   * vuu_action) are not editable by default. vuu_action is never editable.
+   * vuuAction) are not editable by default. vuuAction is never editable.
    */
   protected isEditableColumn(
     table: DataTable,
@@ -165,8 +165,8 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
     if (columnIndex === undefined) {
       throw Error(`editCell: column ${column} not found`);
     }
-    if (column === "vuu_action") {
-      throw Error("editCell: vuu_action is server controlled");
+    if (column === "vuuAction") {
+      throw Error("editCell: vuuAction is server controlled");
     }
     if (!this.isEditableColumn(table, column, viewport, ctx)) {
       throw Error(`editCell: column ${column} is not editable`);

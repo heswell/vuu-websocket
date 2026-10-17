@@ -84,7 +84,7 @@ export const schemaToSessionTableDef = (
     ...(tableDef.columns.some(({ name }) => name === "vuuMsg")
       ? []
       : [{ name: "vuuMsg", dataType: "string" as const }]),
-    { name: "vuu_action", dataType: "string" as const },
+    { name: "vuuAction", dataType: "string" as const },
   ];
   const sessionColumns: Column[] = [
     ...tableDef.columns,

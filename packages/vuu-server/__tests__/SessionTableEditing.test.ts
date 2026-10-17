@@ -24,8 +24,11 @@ describe("session table editing", () => {
     const allTable = sessionTableFromResult(tableContainer, allResult);
     const allTableName = allTable.name;
     expect(allTable.rows).toHaveLength(2);
-    expect(allTable.schema.columns.at(-1)?.name).toBe("vuu_action");
-    expect(allTable.rows.map((row) => row[allTable.columnMap.vuu_action])).toEqual([
+    expect(allTable.schema.columns.at(-1)).toEqual({
+      name: "vuuAction",
+      serverDataType: "string",
+    });
+    expect(allTable.rows.map((row) => row[allTable.columnMap.vuuAction])).toEqual([
       "",
       "",
     ]);
@@ -130,7 +133,7 @@ describe("session table editing", () => {
     expect(emptyTable.rows).toEqual([]);
   });
 
-  test("keeps vuu_action server controlled", () => {
+  test("keeps vuuAction server controlled", () => {
     const { baseTable, handler, tableContainer } = testContext();
     const sessionTable = createSessionTable(
       handler,
@@ -140,13 +143,13 @@ describe("session table editing", () => {
 
     expect(
       call(handler, "editCell", sessionTable, {
-        column: "vuu_action",
+        column: "vuuAction",
         data: "addRow",
         key: "A",
       }),
     ).toEqual({
       type: "ERROR_RESULT",
-      errorMessage: "editCell: vuu_action is server controlled",
+      errorMessage: "editCell: vuuAction is server controlled",
     });
     expect(action(sessionTable, "A")).toBe("");
   });
@@ -330,7 +333,7 @@ function sessionTableFromResult(
 }
 
 function action(sessionTable: InMemSessionDataTable, key: string) {
-  return sessionTable.getRowAtKey(key)[sessionTable.columnMap.vuu_action];
+  return sessionTable.getRowAtKey(key)[sessionTable.columnMap.vuuAction];
 }
 
 function call(

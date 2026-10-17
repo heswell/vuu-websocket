@@ -58,7 +58,7 @@ export class InMemSessionDataTable extends InMemDataTable {
       const tsIndex = columnMap.vuuUpdatedTimestamp;
       const existingChange = this.#changes.get(key);
 
-      if (existingChange?.action !== "addRow" && columnName !== "vuu_action") {
+      if (existingChange?.action !== "addRow" && columnName !== "vuuAction") {
         const change =
           existingChange ??
           ({
@@ -100,7 +100,7 @@ export class InMemSessionDataTable extends InMemDataTable {
       row[columnIndex] = value;
     }
     row[this.indexOfKeyField] = key;
-    row[this.columnMap.vuu_action] = "addRow";
+    row[this.columnMap.vuuAction] = "addRow";
     this.#changes.set(key, {
       action: "addRow",
       cellUpdates: {},
@@ -131,7 +131,7 @@ export class InMemSessionDataTable extends InMemDataTable {
     change.action = "deleteRow";
     this.#changes.set(key, change);
     const newRow = row.slice();
-    newRow[this.columnMap.vuu_action] = "deleteRow";
+    newRow[this.columnMap.vuuAction] = "deleteRow";
     super.update(this.rowIndexAtKey(key), newRow);
   }
 

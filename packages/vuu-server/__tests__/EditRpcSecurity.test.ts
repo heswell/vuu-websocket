@@ -266,8 +266,8 @@ describe("editCell column and type validation", () => {
         error(`editCell: column ${column} is not editable`),
       );
     }
-    expect(edit("vuu_action")).toEqual(
-      error("editCell: vuu_action is server controlled"),
+    expect(edit("vuuAction")).toEqual(
+      error("editCell: vuuAction is server controlled"),
     );
   });
 

@@ -17,7 +17,7 @@ import {
  */
 export const VUU_SYSTEM_COLUMNS: ReadonlySet<string> = new Set([
   ...VUU_DEFAULT_COLUMNS.map(({ name }) => name),
-  "vuu_action",
+  "vuuAction",
 ]);
 
 export const isSystemColumn = (column: string) =>
