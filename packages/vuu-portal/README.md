@@ -1,7 +1,7 @@
 # @heswell/vuu-portal
 
 Vuu portal server: a [`@heswell/vuu-server`](../vuu-server) application that
-hosts the `MODULE_DISCOVERY` module and returns each user's module registry in
+hosts the `MODULE_DISCOVERY` and `NOTIFICATIONS` modules and returns each user's module registry in
 the login response. Requires the [Bun](https://bun.sh) runtime to run the
 server. The library exports can be imported under Node.js too.
 

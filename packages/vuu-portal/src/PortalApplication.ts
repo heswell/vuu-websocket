@@ -4,6 +4,10 @@ import {
   createConfiguredAuthProviders,
   createVuuServerApplication,
   getLogger,
+  NotificationModule,
+  NullProvider,
+  PermissionFilter,
+  ViewPortDef,
   type VuuServerApplication,
 } from "@heswell/vuu-server";
 import { createModuleRegistry } from "./ModuleRegistry";
@@ -55,6 +59,12 @@ export function createPortalApplication({
       moduleRegistry: createModuleRegistry(tableContainer, user),
     }),
     modules: [
+      NotificationModule(
+        (table) => new NullProvider(table),
+        (viewport) =>
+          PermissionFilter("audience", new Set(["all", viewport.user.name])),
+        (table) => ViewPortDef.default(table.tableDef.columns),
+      ),
       ModuleDiscoveryModule(loadModuleState(portalConfig), {
         adminRole: loadModuleAdminRole(portalConfig),
       }),

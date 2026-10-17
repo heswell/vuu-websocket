@@ -2,6 +2,10 @@ import {
   ConfigFactory,
   createVuuServerApplication,
   KeycloakAuthProvider,
+  NotificationModule,
+  NullProvider,
+  PermissionFilter,
+  ViewPortDef,
 } from "@heswell/vuu-server";
 import { BasketModule } from "./modules/basket/BasketModule";
 
@@ -14,7 +18,15 @@ export default async function main() {
     defaultHttpsPort: 8445,
     defaultWebSocketPath: "/websocket-basket-trading",
     defaultWebSocketPort: 8093,
-    modules: [BasketModule()],
+    modules: [
+      BasketModule(),
+      NotificationModule(
+        (table) => new NullProvider(table),
+        (viewport) =>
+          PermissionFilter("audience", new Set(["all", viewport.user.name])),
+        (table) => ViewPortDef.default(table.tableDef.columns),
+      ),
+    ],
   });
 
   await application.start();

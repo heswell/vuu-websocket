@@ -58,4 +58,35 @@ describe("createPortalApplication", () => {
     expect(application.webSocketOptions.uri).toBe("/websocket-portal");
     expect(fs.existsSync(path.join(root, "modules.yaml"))).toBe(true);
   });
+
+  test("registers an empty notifications table and accepts admin notifications", async () => {
+    fs.mkdirSync(root, { recursive: true });
+    fs.copyFileSync(DEFAULT_MODULES_FILE, path.join(root, "default-modules.yaml"));
+    const configFile = path.join(root, "application.conf");
+    fs.writeFileSync(
+      configFile,
+      'vuu.auth.mode="permissive"\nvuu.ssl=false\nvuu.admin.enabled=true\n',
+    );
+    const application = createPortalApplication({ configFile });
+    const table = application.server.tableContainer.getTable("notifications");
+    expect(table.rows).toHaveLength(0);
+
+    const url = new URL("http://localhost:8443/api/admin/notifications");
+    const response = await application.httpServerOptions.requestHandler?.(
+      new Request(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Hello", message: "From curl" }),
+      }),
+      url,
+    );
+
+    expect(response?.status).toBe(201);
+    expect(await response?.json()).toMatchObject({
+      title: "Hello",
+      message: "From curl",
+      audience: "all",
+    });
+    expect(table.rows).toHaveLength(1);
+  });
 });

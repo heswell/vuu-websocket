@@ -142,6 +142,13 @@ production.
 `GET {path}` lists the installed routes. Built-in routes act on the
 `notifications` table of a registered `NotificationModule`:
 
+The portal, basket-trading and user-admin applications register this module
+with an empty provider (no simulated notifications). Each user can see notifications
+addressed to `"all"` or their username. Their default REST ports are `8443`,
+`8445` and `8444`, respectively. Their repository `application.conf` files enable
+the development admin API with `vuu.admin.enabled=true`; disable it in production.
+The portal's bundled default configuration leaves the admin API disabled.
+
 ```sh
 # create (id, type, level, audience, expiryTime are defaulted if omitted)
 curl -k -X POST https://localhost:8443/api/admin/notifications \
