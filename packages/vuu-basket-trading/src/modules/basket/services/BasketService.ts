@@ -1,6 +1,7 @@
 import {
   type DataTable,
   DefaultRpcHandler,
+  getLogger,
   NoAction,
   type RpcParams,
   SelectionViewPortMenuItem,
@@ -15,6 +16,25 @@ type CreateBasketParams = {
 };
 
 let basketIncrement = 1;
+const log = getLogger("basket.service");
+
+const tradingQuantity = (volume: unknown, ric: string): number => {
+  const text = String(volume ?? "").trim().replaceAll(",", "");
+  if (text === "") {
+    log.warn(`No reference volume for ${ric}; initializing quantity to zero`);
+    return 0;
+  }
+  const match = /^(\d+(?:\.\d+)?)\s*([KMB]?)$/i.exec(text);
+  if (!match) throw new Error(`Invalid reference volume for ${ric}`);
+  const suffix = match[2].toUpperCase();
+  const multiplier = suffix === "B" ? 1_000_000_000
+    : suffix === "M" ? 1_000_000 : suffix === "K" ? 1_000 : 1;
+  const quantity = Math.round(Number(match[1]) * multiplier);
+  if (!Number.isSafeInteger(quantity)) {
+    throw new Error(`Invalid reference volume for ${ric}`);
+  }
+  return quantity;
+};
 
 const failure = (errorMessage: string): RpcResult => ({
   type: "ERROR_RESULT",
@@ -100,8 +120,8 @@ export class BasketService extends DefaultRpcHandler {
           0,
           0,
           0,
-          "",
-          row[this.constituentTable.columnMap.volume],
+          2,
+          tradingQuantity(row[this.constituentTable.columnMap.volume], ric),
           ric,
           "BUY",
           "",

@@ -54,7 +54,7 @@ export default [
   ["NXP Semiconductors NV", "NXPI", 0.434,196.76,-0.04, "(-0.02%)"],
   ["Workday Inc", "WDAY", 0.414,235.55,4.73, "(2.05%)"],
   ["Lululemon Athletica Inc", "LULU", 0.405,386.36,-1.69, "(-0.44%)"],
-  ["Keurig Dr Pepper Inc,KDP", 0.404,33.25,0.13, "(0.39%)"],
+  ["Keurig Dr Pepper Inc", "KDP", 0.404,33.25,0.13, "(0.39%)"],
   ["Fortinet Inc", "FTNT", 0.401,58.29,0.05, "(0.09%)"],
   ["Marvell Technology Inc", "MRVL", 0.388,52.38,0.08, "(0.14%)"],
   ["PACCAR Inc", "PCAR", 0.38,84.97,0.04, "(0.04%)"],

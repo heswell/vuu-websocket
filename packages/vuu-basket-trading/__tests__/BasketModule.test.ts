@@ -27,7 +27,7 @@ describe("BasketModule", () => {
         VuuWebSocketOptions().withWsPort(0).withSslDisabled(),
         {},
         LoginTokenService(),
-      ).withModule(BasketModule()),
+      ).withModule(BasketModule({ priceSimulation: { intervalMs: 0 } })),
       lifecycle,
     );
     await lifecycle.start();

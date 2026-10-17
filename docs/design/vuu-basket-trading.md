@@ -37,6 +37,7 @@ The application exposes:
 packages/vuu-basket-trading/
   __tests__/
     BasketModule.test.ts
+    BasketRuntime.test.ts
   application.conf
   package.json
   src/
@@ -47,6 +48,7 @@ packages/vuu-basket-trading/
       BasketTableDefs.ts
       providers/
         BasketPricesProvider.ts
+        BasketPersistence.ts
         InMemoryProvider.ts
       reference-data/
         constituents.ts
@@ -148,9 +150,75 @@ The table provides:
 ask, askSize, bid, bidSize, close, last, open, phase, ric, scenario
 ```
 
-Generated rows use stable values based on source order, a two-cent spread,
-`CONTINUOUS` phase, and `default` scenario. This provides local price data for
-the basket join without requiring the external price service.
+Initial rows use stable values based on source order, a two-cent spread,
+`CONTINUOUS` phase, and `default` scenario. After startup the provider ticks
+every 250 ms by default, randomly walking bid/ask, widening spreads, or making
+faster moves, with occasional no-op ticks. These scenarios are inspired by the
+Scala `SimulatedPricesProvider`; this lightweight simulation does not reproduce
+its timed market-open/close cycle. Last prices and quote sizes also change.
+Quotes are positive, rounded to cents, and never crossed. Open/close reference
+values remain fixed.
+
+Updates flow through the prices table's normal update path into the constituent
+join and its viewports without overwriting trading fields. The timer starts and
+stops with the provider lifecycle. An unexpected simulation error is logged and
+stops ticking rather than escaping as an unhandled timer error.
+
+Set `VUU_BASKET_PRICE_INTERVAL_MS` (configuration:
+`vuu.basket.prices.intervalMs`) to change the interval; zero disables ticking.
+The module API also accepts `priceSimulation: { intervalMs }`.
+
+## Basket Persistence
+
+The standalone server automatically saves trading baskets and constituents
+across connections and server restarts. **Versioned JSON with named fields**
+is used rather than CSV: it preserves numbers and strings, groups both related
+tables in one snapshot, is easy to inspect, and avoids depending on column order.
+The snapshot structure is:
+
+```json
+{
+  "version": 1,
+  "tables": {
+    "basketTrading": [],
+    "basketTradingConstituent": []
+  }
+}
+```
+
+Each table array contains objects with its column names as keys. Every source
+field is retained, including IDs, basket names, market status, edited trading
+controls, and added constituents. Prices, materialized joins and static reference
+tables are not saved. New simulated prices are generated at startup.
+
+The default file is `./data/basket-trading.json`, relative to the server's working
+directory, and is git-ignored. Set `VUU_BASKET_PERSISTENCE_PATH` (configuration:
+`vuu.basket.persistence.path`) to choose a stable absolute path independent of
+the checkout or working directory. `VUU_BASKET_PERSISTENCE_ENABLED=false` disables
+persistence. Programmatic `BasketModule()` instances remain non-persistent unless
+given `{ persistencePath }`, so embedded modules and tests need not share a file.
+
+Creates, edits, status changes, additions and deletions trigger a coalesced save
+after 100 ms. Both trading tables are written together to an exclusive temporary
+file in the same directory, flushed with `fsync`, then atomically renamed over the
+snapshot. Files are created with owner-only access. Pending changes are flushed
+on graceful shutdown. A hard kill can lose changes within the short autosave
+window; this is intentionally a small snapshot store, not a transactional database.
+Use one server process per file; there is no multi-process writer coordination.
+
+A missing file starts an empty trading workspace. Corrupt JSON, unsupported
+versions, invalid row types, duplicate keys and orphaned constituents abort
+startup with an error log rather than silently starting empty and overwriting
+saved baskets. Constituent edits cannot change their instance/basket references
+to an inconsistent or nonexistent parent. Runtime save failures are logged under
+`basket.persistence` and retried after one second; a failed shutdown flush is
+also reported.
+
+Initial trading quantities are normalized from reference display volumes
+(including commas and `K`/`M`/`B` suffixes) into integers. Missing volumes log a
+warning and initialize quantity to zero; price strategy defaults to `2`.
+Two malformed source records (HSBC and Keurig Dr Pepper) have their name/RIC
+fields separated so generated trading rows match their string RIC schema.
 
 ## Trading Basket Creation
 
@@ -190,8 +258,9 @@ New trading baskets use:
 | `totalNotionalUsd` | `1250000` |
 | `units` | `100` |
 
-Each trading constituent copies its RIC, description, volume, and weighting
-from the source row. Its key is `${instanceId}-${ric}`.
+Each trading constituent copies its RIC, description, and weighting from the
+source row, and normalizes the reference volume into its numeric quantity.
+Its key is `${instanceId}-${ric}`.
 
 The operation prepares all constituent rows before mutation. If an insertion
 fails, it deletes any inserted constituents and the trading basket so callers

@@ -19,7 +19,14 @@ import {
   priceStrategyType,
 } from "./BasketTableDefs";
 import constituentRows from "./reference-data/constituents";
-import { BasketPricesProvider } from "./providers/BasketPricesProvider";
+import {
+  BasketPricesProvider,
+  type BasketPriceSimulationOptions,
+} from "./providers/BasketPricesProvider";
+import {
+  BasketPersistence,
+  PersistentBasketProvider,
+} from "./providers/BasketPersistence";
 import { InMemoryProvider } from "./providers/InMemoryProvider";
 import { BasketService } from "./services/BasketService";
 import { BasketTradingConstituentService } from "./services/BasketTradingConstituentService";
@@ -50,8 +57,19 @@ const priceStrategyRows = [
 
 const viewportColumns = (columns: Column[]) => columns;
 
-export const BasketModule = () =>
-  ModuleFactory.withNameSpace("BASKET")
+export type BasketModuleOptions = {
+  persistencePath?: string;
+  priceSimulation?: BasketPriceSimulationOptions;
+};
+
+export const BasketModule = ({
+  persistencePath,
+  priceSimulation,
+}: BasketModuleOptions = {}) => {
+  const persistence = persistencePath === undefined
+    ? undefined
+    : new BasketPersistence(persistencePath);
+  return ModuleFactory.withNameSpace("BASKET")
     .addTable(
       algoType,
       (table) => new InMemoryProvider(table, algoRows),
@@ -77,7 +95,9 @@ export const BasketModule = () =>
     )
     .addTable(
       basketTrading,
-      (table) => new InMemoryProvider(table, []),
+      (table) => persistence
+        ? new PersistentBasketProvider(table, persistence)
+        : new InMemoryProvider(table, []),
       (table, _provider, _providerContainer, tableContainer) =>
         ViewPortDef(
           viewportColumns(table.tableDef.columns),
@@ -86,7 +106,9 @@ export const BasketModule = () =>
     )
     .addTable(
       basketTradingConstituent,
-      (table) => new InMemoryProvider(table, []),
+      (table) => persistence
+        ? new PersistentBasketProvider(table, persistence)
+        : new InMemoryProvider(table, []),
       (table, _provider, _providerContainer, tableContainer) =>
         ViewPortDef(
           viewportColumns(table.tableDef.columns),
@@ -95,7 +117,7 @@ export const BasketModule = () =>
     )
     .addTable(
       prices,
-      (table) => new BasketPricesProvider(table, constituentRows),
+      (table) => new BasketPricesProvider(table, constituentRows, priceSimulation),
     )
     .addTable(
       priceStrategyType,
@@ -122,3 +144,4 @@ export const BasketModule = () =>
         ),
     )
     .asModule();
+};

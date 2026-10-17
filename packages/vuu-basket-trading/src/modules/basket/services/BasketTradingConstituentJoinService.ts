@@ -74,6 +74,15 @@ export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
   }
 
   protected validateCellEdit({ table, newRow, viewport, key }: CellEdit) {
+    const trading = this.tableContainer.getTable<DataTable>("basketTrading");
+    const instanceId = String(newRow[table.columnMap.instanceId]);
+    const basket = trading.getRowAtKey(instanceId, false);
+    if (
+      !basket ||
+      basket[trading.columnMap.basketId] !== newRow[table.columnMap.basketId]
+    ) {
+      return "A constituent must reference an existing trading basket and its basketId";
+    }
     const permitted = viewport.permissionFilter?.createPredicate(table.columnMap);
     if (permitted && !permitted(this.joinedRow(viewport, table, newRow))) {
       return `editCell: edit would make row ${key} inaccessible to the user`;

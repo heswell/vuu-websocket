@@ -19,7 +19,14 @@ export default async function main() {
     defaultWebSocketPath: "/websocket-basket-trading",
     defaultWebSocketPort: 8093,
     modules: [
-      BasketModule(),
+      BasketModule({
+        persistencePath: config.getBoolean("vuu.basket.persistence.enabled", true)
+          ? config.getString("vuu.basket.persistence.path", "./data/basket-trading.json")
+          : undefined,
+        priceSimulation: {
+          intervalMs: config.getNumber("vuu.basket.prices.intervalMs", 250),
+        },
+      }),
       NotificationModule(
         (table) => new NullProvider(table),
         (viewport) =>
