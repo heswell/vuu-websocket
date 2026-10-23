@@ -18,8 +18,8 @@ export const quiet = () => undefined;
 
 /**
  * Records metrics for a perf test file. Each metric is checked against
- * perf/baseline.json (unless PERF_NO_ASSERT is set) and, when PERF_RESULTS
- * names a file, written there for comparison by scripts/perf.ts.
+ * perf/baseline.json (unless PERF_NO_ASSERT is set). PERF_NO_TIME_ASSERT
+ * skips only timing checks. PERF_RESULTS writes metrics for scripts/perf.ts.
  */
 export const createRecorder = () => {
   const baseline = loadResults();
@@ -36,6 +36,7 @@ export const createRecorder = () => {
     const reference = baseline?.metrics[metric.name]?.value;
     if (
       !process.env.PERF_NO_ASSERT &&
+      !(metric.kind === "time" && process.env.PERF_NO_TIME_ASSERT) &&
       reference !== undefined &&
       isRegression(metric, reference)
     ) {

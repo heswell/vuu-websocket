@@ -38,6 +38,8 @@ jobs:
 
       - name: Run tests
         run: bun test
+        env:
+          PERF_NO_TIME_ASSERT: "1"
 
   engine-packages:
     name: Engine packages

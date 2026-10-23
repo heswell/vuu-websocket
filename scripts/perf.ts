@@ -20,6 +20,7 @@ const usage = `Run the perf suite (perf/*.perf.test.ts) and compare with a refer
 Options:
   --iterations <n>  samples per timing, median is reported (default 5)
   --filter <text>   only run perf test files whose path contains text
+  --advisory-timings  report timing regressions without failing the run
 
 Exits 1 if any metric regressed beyond tolerance (PERF_TOLERANCE for timings,
 default 3x, 10% for counts and sizes). Status ≈ marks changes within noise
@@ -28,6 +29,7 @@ default 3x, 10% for counts and sizes). Status ≈ marks changes within noise
 const { values: args } = parseArgs({
   options: {
     compare: { type: "string" },
+    "advisory-timings": { type: "boolean" },
     filter: { type: "string" },
     help: { type: "boolean" },
     iterations: { type: "string", default: "5" },
@@ -126,7 +128,14 @@ const rows = Object.values(current.metrics).map((metric) => {
 
 console.table(rows);
 
-const regressions = rows.filter((row) => row.status === "REGRESSED");
+const regressions = rows.filter(
+  (row) =>
+    row.status === "REGRESSED" &&
+    !(args["advisory-timings"] && current.metrics[row.metric].kind === "time"),
+);
+if (args["advisory-timings"]) {
+  console.log("Timing regressions are advisory; count and size checks still fail.");
+}
 if (regressions.length > 0) {
   console.log(`${regressions.length} regression(s)`);
   process.exit(1);

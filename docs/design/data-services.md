@@ -166,6 +166,44 @@ npm run perf -- --filter publisher          # run a subset
 To add a metric, call the `record` function returned by `createRecorder()`
 (`perf/harness.ts`) in a perf test, then update the baseline.
 
+### CI and historical results
+
+The `Performance` workflow (`.github/workflows/performance.yml`) runs the
+WebSocket/data-service suite, the vuu-server outbound benchmark, and the local
+engine/legacy comparison sequentially on `ubuntu-24.04`, Node `24.16.0`, and
+Bun `1.3.14`. The table benchmarks use 100k rows. Each push to `main` publishes
+charts at <https://heswell.github.io/vuu-websocket/dev/bench/>. Pull requests
+and manual runs on other branches only measure and report; they cannot publish.
+
+The Actions summary compares every metric with the latest published successful
+`main` run, showing percentage improvements and regressions. The first successful
+main run establishes the CI reference, independently of the Apple M2 baseline
+committed in this repository. Chart tooltips include runtime/CPU information and
+a workflow-run link; chart points link to commits. Raw JSON, the normalized chart
+data, and the comparison summary are retained as artifacts for 90 days. The full
+chart history persists on the `gh-pages` branch.
+
+Timing changes are advisory because GitHub-hosted runners have variable CPU
+performance. CI disables timing assertions with `PERF_NO_TIME_ASSERT=1`; the
+dedicated suite uses `npm run perf -- --advisory-timings`. Both retain the existing
+10% count/size checks against `perf/baseline.json`. Local runs retain timing
+assertions by default. Some publisher timings are single-shot even when the
+sampling count is five; local-engine results use Vitest's mean and relative
+margin of error, while outbound timings use a median after one warmup.
+
+Enable **Settings > Pages > Build and deployment > Source: GitHub Actions**.
+The workflow initializes `gh-pages` automatically, appends results using
+`benchmark-action/github-action-benchmark`, and explicitly deploys a Pages
+artifact (a push made with `GITHUB_TOKEN` alone does not trigger a Pages build).
+Only the main-branch publishing job receives write permissions. No personal
+access token is needed. The first deployment may require approval if the
+`github-pages` environment has protection rules.
+
+When changing runtime versions, runner architecture, row counts, or measurement
+semantics, start a new chart series (change the suite name in both
+`scripts/perf-report.ts` and the workflow) rather than treating those changes as
+code regressions. For tight timing gates, use a stable dedicated runner.
+
 ## Creating a new data publisher
 
 A service is a table, a publisher and (optionally) a generator and
