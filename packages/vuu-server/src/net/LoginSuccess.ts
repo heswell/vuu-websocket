@@ -19,6 +19,18 @@ export interface ModuleRecord {
   navLocation: string;
   navIconName?: string;
   navIconUrl?: string;
+  /**
+   * Sort order within the nav section. Lower numbers first; modules without
+   * one come after those with one.
+   */
+  navOrder?: number;
+  /**
+   * Opaque badge-source key, e.g. `orders.working`, mapped to a live value by
+   * the client.
+   */
+  navBadge?: string;
+  /** Notification topics this module claims, e.g. `["orders", "fills"]`. */
+  notificationTopics?: string[];
   path: string;
   mfComponent: string;
   mfScope: string;

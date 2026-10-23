@@ -124,7 +124,15 @@ function readModulesFile(filePath: string): unknown[] {
 }
 
 function cloneModules(modules: readonly ManagedModule[]) {
-  return modules.map((module) => ({ ...module }));
+  // Unset optional fields are dropped so they are not written to YAML.
+  return modules.map(
+    (module) =>
+      Object.fromEntries(
+        Object.entries(module)
+          .filter(([, value]) => value !== undefined)
+          .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+      ) as ManagedModule,
+  );
 }
 
 const managedModuleKeys = [
@@ -146,6 +154,12 @@ const managedModuleKeys = [
   "accessRole",
 ] as const satisfies readonly (keyof ManagedModule)[];
 
+const optionalModuleKeys = [
+  "navOrder",
+  "navBadge",
+  "notificationTopics",
+] as const satisfies readonly (keyof ManagedModule)[];
+
 // Fields written by earlier versions; ignored on load and dropped on next save.
 const retiredModuleKeys = ["vuuConnectionId", "vuuWebsocketUrl", "vuuRestUrl"];
 
@@ -156,6 +170,7 @@ function parseManagedModule(value: unknown, index: number): ManagedModule {
   for (const key of Object.keys(value)) {
     if (
       !(managedModuleKeys as readonly string[]).includes(key) &&
+      !(optionalModuleKeys as readonly string[]).includes(key) &&
       !retiredModuleKeys.includes(key)
     ) {
       throw new Error(`Modules file entry ${index} contains unknown field '${key}'`);
@@ -179,6 +194,27 @@ function parseManagedModule(value: unknown, index: number): ManagedModule {
       throw new Error(`Modules file entry ${index} field '${key}' must be an integer`);
     }
     module[key] = fieldValue;
+  }
+  for (const key of optionalModuleKeys) {
+    const fieldValue = value[key];
+    if (fieldValue === undefined || fieldValue === null) continue;
+    const valid =
+      key === "navOrder"
+        ? typeof fieldValue === "number"
+        : key === "navBadge"
+          ? typeof fieldValue === "string"
+          : Array.isArray(fieldValue) &&
+            fieldValue.every((topic) => typeof topic === "string");
+    if (!valid) {
+      const expected =
+        key === "navOrder"
+          ? "a number"
+          : key === "navBadge"
+            ? "a string"
+            : "a list of strings";
+      throw new Error(`Modules file entry ${index} field '${key}' must be ${expected}`);
+    }
+    module[key] = Array.isArray(fieldValue) ? [...fieldValue] : fieldValue;
   }
   return module as ManagedModule;
 }

@@ -28,6 +28,10 @@ export const MODULE_ADMIN_TABLE_SCHEMAS: Readonly<
       { name: "mfScope", serverDataType: "string" },
       { name: "mfUrl", serverDataType: "string" },
       { name: "navIconUrl", serverDataType: "string" },
+      { name: "navOrder", serverDataType: "double" },
+      { name: "navBadge", serverDataType: "string" },
+      // Comma-separated.
+      { name: "notificationTopics", serverDataType: "string" },
       ...VUU_DEFAULT_COLUMNS,
     ],
     key: "id",

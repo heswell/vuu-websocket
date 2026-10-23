@@ -150,17 +150,24 @@ the development admin API with `vuu.admin.enabled=true`; disable it in productio
 The portal's bundled default configuration leaves the admin API disabled.
 
 ```sh
-# create (id, type, level, audience, expiryTime are defaulted if omitted)
+# create (id, type, level, audience, topic, expiryTime are defaulted if omitted)
 curl -k -X POST https://localhost:8443/api/admin/notifications \
   -H 'Content-Type: application/json' \
   -d '{"title":"Hello","message":"From curl","level":"WARNING","durationMs":30000}'
+# create with a topic, routed by clients to the modules that claim it
+curl -k -X POST https://localhost:8443/api/admin/notifications \
+  -H 'Content-Type: application/json' \
+  -d '{"topic":"orders","level":"ERROR","title":"Order rejected"}'
 # list
 curl -k https://localhost:8443/api/admin/notifications
 # remove
 curl -k -X DELETE https://localhost:8443/api/admin/notifications/<id>
 ```
 
-Posting an existing `id` updates that notification. Applications add further
+The generic notification columns are `id`, `type`, `expiryTime`, `title`,
+`message`, `level`, `audience` and `topic`. `topic` is optional (empty by
+default); clients route a notification to the modules whose
+`notificationTopics` include it. Posting an existing `id` updates that notification. Applications add further
 actions (price changes, order creation, ...) via the `additionalAdminRoutes`
 option, supplying `AdminRoute`s (`method`, `path` with optional `:param`
 segments, `handle`). Handlers may throw `AdminRequestError(status, message)`

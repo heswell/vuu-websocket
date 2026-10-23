@@ -25,7 +25,7 @@ const NumericTypes = new Set([
  *
  *   curl -k -X POST https://localhost:8443/api/admin/notifications \
  *     -H 'Content-Type: application/json' \
- *     -d '{"title":"Hello","message":"From curl","level":"WARNING"}'
+ *     -d '{"title":"Hello","message":"From curl","level":"WARNING","topic":"orders"}'
  *
  *   GET    /notifications       list current notifications
  *   POST   /notifications       create (or update, if id supplied) a notification
@@ -100,6 +100,7 @@ function createRow(
         level: "INFO",
         message: "",
         title: "Admin notification",
+        topic: "",
         type: "toast",
         vuuCreatedTimestamp: now,
         vuuUpdatedTimestamp: now,

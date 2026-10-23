@@ -21,6 +21,7 @@ import {
 } from "../src/ModuleRegistry";
 import { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } from "../src/modules/ModuleDiscovery/ModuleDiscoveryModule";
 import { defaultModules, navIconUrl } from "./defaultModules";
+import type { ManagedModule } from "@heswell/module-admin";
 
 describe("portal module registry", () => {
   let lifecycle: LifecycleContainer;
@@ -244,6 +245,79 @@ describe("portal module registry", () => {
   });
 });
 
+describe("portal module registry nav metadata", () => {
+  let lifecycle: LifecycleContainer;
+  let vuuServer: VuuServer;
+
+  beforeAll(async () => {
+    lifecycle = new LifecycleContainer();
+    const metadata: Record<string, Partial<ManagedModule>> = {
+      "basket-trading": {
+        navOrder: 2,
+        navBadge: "orders.working",
+        notificationTopics: ["orders", "fills"],
+      },
+      userAdmin: { navOrder: 1 },
+      "vuu-table-browser": { navOrder: 1 },
+    };
+    const modules = defaultModules().map((module) => ({
+      ...module,
+      ...metadata[module.name],
+    }));
+    const config = VuuServerConfig(
+      VuuWebSocketOptions().withWsPort(0),
+      {},
+      LoginTokenService(),
+    ).withModule(
+      ModuleDiscoveryModule(
+        new ModuleState(new InMemoryModuleStore(modules), modules),
+      ),
+    );
+    vuuServer = new VuuServer(config, lifecycle);
+    await lifecycle.start();
+  });
+
+  afterAll(async () => {
+    await lifecycle.stop();
+  });
+
+  test("serializes nav metadata and sorts by navOrder, then name", () => {
+    const registry = createModuleRegistry(
+      vuuServer.tableContainer,
+      VuuUserWithAuthorizations("admin", [
+        "module-admin-access",
+        "user-admin-access",
+        "basket-trading-access",
+        "vuu-table-browser-access",
+        "vuu-table-viewer-access",
+      ]),
+    );
+
+    expect(registry.modules.map(({ name }) => name)).toEqual([
+      "userAdmin",
+      "vuu-table-browser",
+      "basket-trading",
+      "moduleAdmin",
+      "vuu-table-viewer",
+    ]);
+    expect(registry.modules[2]).toMatchObject({
+      name: "basket-trading",
+      navOrder: 2,
+      navBadge: "orders.working",
+      notificationTopics: ["orders", "fills"],
+    });
+    expect(registry.modules[0]).toMatchObject({ name: "userAdmin", navOrder: 1 });
+    expect(registry.modules[0]).not.toContainAnyKeys([
+      "navBadge",
+      "notificationTopics",
+    ]);
+    expect(registry.modules[3]).not.toContainAnyKeys([
+      "navOrder",
+      "navBadge",
+      "notificationTopics",
+    ]);
+  });
+});
 
 function moduleState() {
   const modules = defaultModules();

@@ -35,6 +35,9 @@ type ModuleRecord = {
   navLocation: string;
   navIconName?: string;
   navIconUrl?: string;
+  navOrder?: number;
+  navBadge?: string;
+  notificationTopics?: string[];
   path: string;
   mfComponent: string;
   mfScope: string;
@@ -44,10 +47,30 @@ type ModuleRecord = {
 
 Only enabled records permitted by the authenticated user's roles are returned.
 For duplicate names, the highest version wins, followed by the highest id.
+Records are sorted by `navOrder` (lowest first), then records without one,
+with ties broken by `name`. Records without `navOrder` therefore keep the
+previous name order.
 
 `navLocation` is the module table's `location` column. `navIconUrl` (an SVG
 data URL) comes from the optional `navIconUrl` column and is omitted when
-empty. `mfScope` must equal the remote's module-federation name (for example
+empty.
+
+The optional nav metadata used by the portal nav is omitted when unset:
+
+| Field | Meaning | `modules` table column |
+| --- | --- | --- |
+| `navOrder` | Sort order within a nav section; a finite number | `navOrder` (`double`), empty when unset |
+| `navBadge` | Opaque badge-source key, e.g. `orders.working`, mapped to a live value by the client | `navBadge` (`string`), `""` when unset |
+| `notificationTopics` | Notification topics the module claims, e.g. `["orders", "fills"]`; routes notifications whose `topic` matches | `notificationTopics` (`string`), comma-separated, `""` when unset |
+
+The VUU table has no array column type, so `notificationTopics` is stored as a
+comma-separated string and split back into `string[]` for the registry. Topics
+must be non-empty and may not contain commas. In `modules.yaml` and
+`default-modules.yaml` all three are optional keys, with `notificationTopics`
+written as a YAML list. Module admin `updateModule` changes may set any of them
+to `null` to clear it.
+
+`mfScope` must equal the remote's module-federation name (for example
 `userAdmin`), or the UI cannot load it. `accessRole` is the
 role that granted access. `clientIdentifier` is the module's own client,
 derived from its name (`userAdmin` -> `vuu-user-admin`; names that already

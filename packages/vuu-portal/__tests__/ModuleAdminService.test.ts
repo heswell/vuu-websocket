@@ -50,6 +50,20 @@ describe("ModuleAdminService", () => {
     expect(state.modules.map(({ id }) => id)).toEqual([1]);
   });
 
+  test("syncs optional nav metadata into the modules table", async () => {
+    const { service, tables } = setup([baseModule]);
+    const columnValue = (column: string) =>
+      tables.modules.getRowAtKey("1")[tables.modules.columnMap[column]];
+    expect([columnValue("navOrder"), columnValue("navBadge"), columnValue("notificationTopics")]).toEqual(["", "", ""]);
+
+    const update = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ navOrder: 3, navBadge: "orders.working", notificationTopics: ["orders", "fills"] }), expectedVersion: 1 });
+    expect(update).toEqual({ type: "SUCCESS_RESULT", data: { id: 1, version: 2 } });
+    expect([columnValue("navOrder"), columnValue("navBadge"), columnValue("notificationTopics")]).toEqual([3, "orders.working", "orders,fills"]);
+
+    const invalid = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ notificationTopics: ["a,b"] }), expectedVersion: 2 });
+    expect(invalid).toMatchObject({ type: "ERROR_RESULT" });
+  });
+
   test("rejects module admin rpcs from users without the admin role", async () => {
     const { service, state, store } = setup([baseModule]);
     for (const [rpcName, params] of [
