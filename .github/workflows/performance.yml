@@ -1,0 +1,148 @@
+name: Performance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: Measure and compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BENCH_ROWS: "100000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: npm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare results directory
+        run: |
+          echo "RESULTS=$RUNNER_TEMP/performance" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/performance"
+
+      - name: Read published main history
+        run: |
+          git ls-remote --heads origin gh-pages > "$RUNNER_TEMP/pages-ref"
+          if test -s "$RUNNER_TEMP/pages-ref"; then
+            git fetch --depth=1 origin gh-pages
+            if git cat-file -e FETCH_HEAD:dev/bench/data.js; then
+              git show FETCH_HEAD:dev/bench/data.js > "$RESULTS/history.js"
+            else
+              echo "No published benchmark history yet."
+            fi
+          else
+            echo "First benchmark run: no gh-pages branch yet."
+          fi
+
+      - name: WebSocket and data services
+        run: npm run perf -- --advisory-timings --save "$RESULTS/services.json"
+
+      - name: Server outbound pipeline
+        run: npm run bench:outbound -w @heswell/vuu-server -- --out="$RESULTS/outbound.json"
+
+      - name: Local data engine and legacy comparison
+        run: npm run bench -w @heswell/vuu-data-engine-local -- --outputJson="$RESULTS/local.json"
+
+      - name: Prepare charts and comparison summary
+        run: |
+          bun scripts/perf-report.ts \
+            --services "$RESULTS/services.json" \
+            --outbound "$RESULTS/outbound.json" \
+            --local "$RESULTS/local.json" \
+            --history "$RESULTS/history.js" \
+            --out "$RESULTS/benchmark.json" \
+            --summary "$RESULTS/summary.md"
+          cat "$RESULTS/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain raw results and metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: ${{ runner.temp }}/performance/
+          if-no-files-found: warn
+          retention-days: 90
+
+  publish:
+    name: Publish performance history
+    needs: measure
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}dev/bench/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: performance-results
+          path: ${{ runner.temp }}/performance
+
+      - name: Initialize history branch on the first run
+        id: history
+        run: |
+          git ls-remote --heads origin gh-pages > "$RUNNER_TEMP/pages-ref"
+          if ! test -s "$RUNNER_TEMP/pages-ref"; then
+            empty_tree=$(git hash-object -w -t tree /dev/null)
+            initial_commit=$(git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+              commit-tree "$empty_tree" -m "Initialize performance history")
+            git update-ref refs/heads/gh-pages "$initial_commit"
+            echo "skip-fetch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip-fetch=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Append results and generate dashboard
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1
+        with:
+          name: Vuu performance
+          tool: customSmallerIsBetter
+          output-file-path: ${{ runner.temp }}/performance/benchmark.json
+          benchmark-data-dir-path: dev/bench
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-fetch-gh-pages: ${{ steps.history.outputs.skip-fetch }}
+          auto-push: true
+          summary-always: true
+          fail-on-alert: false
+          comment-on-alert: false
+
+      - name: Stage the generated site
+        run: |
+          mkdir -p "$RUNNER_TEMP/performance-site"
+          git archive gh-pages | tar -x -C "$RUNNER_TEMP/performance-site"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/performance-site
+
+      - name: Deploy dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4

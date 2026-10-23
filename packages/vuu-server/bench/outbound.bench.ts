@@ -10,7 +10,11 @@
  *
  *   bun packages/vuu-server/bench/outbound.bench.ts [--rows=100000]
  *     [--iterations=5] [--filter=<scenario substring>]
+ *     [--out=<path to JSON results file>]
  */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { createMeta, type Metric, type PerfResults } from "../../../perf/metrics";
 import { Columns, TableDef, VuuUser } from "@heswell/vuu-server";
 import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
 import { InMemDataTable } from "../src/core/table/InMemDataTable";
@@ -37,6 +41,12 @@ const args = Object.fromEntries(
 const ROWS = Number(args.rows ?? 100_000);
 const ITERATIONS = Number(args.iterations ?? 5);
 const VP_SIZE = 100;
+if (!Number.isInteger(ROWS) || ROWS < 25_100) {
+  throw Error("--rows must be an integer >= 25100 for the scroll scenario");
+}
+if (!Number.isInteger(ITERATIONS) || ITERATIONS < 1) {
+  throw Error("--iterations must be a positive integer");
+}
 
 let seed = 1;
 const random = () => {
@@ -275,6 +285,7 @@ log("");
 log("| scenario | median ms | min ms | messages | rows sent | KB sent |");
 log("|---|---:|---:|---:|---:|---:|");
 
+const metrics: Metric[] = [];
 for (const scenario of scenarios) {
   if (filter && !scenario.name.includes(filter)) continue;
   const times: number[] = [];
@@ -314,4 +325,31 @@ for (const scenario of scenarios) {
   log(
     `| ${scenario.name} | ${median.toFixed(2)} | ${times[0].toFixed(2)} | ${messages} | ${rows} | ${(bytes / 1024).toFixed(0)} |`,
   );
+  for (const [suffix, kind, unit, value] of [
+    ["time", "time", "ms", median],
+    ["messages", "count", "msgs", messages],
+    ["rows", "count", "rows", rows],
+    ["bytes", "size", "B", bytes],
+  ] as const) {
+    metrics.push({
+      better: "lower",
+      description: `${scenario.name}, ${ROWS} table rows, ${ITERATIONS} iterations (+1 warmup)`,
+      kind,
+      name: `outbound.${ROWS}.${scenario.name}.${suffix}`,
+      unit,
+      value,
+    });
+  }
+}
+
+if (metrics.length === 0) {
+  throw Error(`no outbound scenarios match ${filter}`);
+}
+if (args.out) {
+  const results: PerfResults = {
+    meta: createMeta(ITERATIONS),
+    metrics: Object.fromEntries(metrics.map((metric) => [metric.name, metric])),
+  };
+  mkdirSync(dirname(args.out), { recursive: true });
+  writeFileSync(args.out, JSON.stringify(results, null, 2) + "\n");
 }

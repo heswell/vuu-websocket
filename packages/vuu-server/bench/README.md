@@ -8,8 +8,13 @@ table.update -> flushViewports -> Viewport.post -> OutboundRowPublishQueue
 ```
 
 ```sh
-bun run bench:outbound [--rows=100000] [--iterations=5] [--filter=<scenario>]
+npm run bench:outbound -w @heswell/vuu-server -- [--rows=100000] [--iterations=5] [--filter=<scenario>]
 ```
+
+Add `--out=/tmp/outbound.json` to save timing, message, row and byte metrics
+with runtime/CPU metadata. At least 25,100 table rows are required for the scroll
+scenario. The repository's `Performance` workflow publishes these results with
+the other suites; see [CI and historical results](../../../docs/design/data-services.md#ci-and-historical-results).
 
 The production runner sends one batch (max 300 rows) per session every 60ms.
 The benchmark drains the queue after each cycle so CPU cost is measured.

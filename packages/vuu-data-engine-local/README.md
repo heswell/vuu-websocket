@@ -272,7 +272,12 @@ npm run pub -- --package=@heswell/vuu-data-engine-local --tag alpha
 ```sh
 npm run bench:data-engine-local                    # 100k rows
 BENCH_ROWS=10000 npm run bench:data-engine-local   # smaller run
+npm run bench -w @heswell/vuu-data-engine-local -- --outputJson=/tmp/local-bench.json
 ```
+
+The repository's `Performance` workflow records this comparison at 100k rows
+and publishes historical charts alongside the WebSocket and outbound suites.
+See [CI and historical results](../../docs/design/data-services.md#ci-and-historical-results).
 
 `requestAnimationFrame` is made synchronous during the bench, so each timing includes delivering
 rows to the client. The bench runs under vitest (Node) using `vitest.config.ts` in this
