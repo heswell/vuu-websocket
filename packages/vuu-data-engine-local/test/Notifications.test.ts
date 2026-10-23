@@ -174,6 +174,7 @@ describe("NotificationsSchema", () => {
       { name: "message", serverDataType: "string" },
       { name: "level", serverDataType: "string" },
       { name: "audience", serverDataType: "string" },
+      { name: "topic", serverDataType: "string" },
       { name: "source", serverDataType: "string" },
       { name: "priority", serverDataType: "int" },
     ]);
@@ -319,6 +320,7 @@ describe("NotificationModule", () => {
       "message",
       "level",
       "audience",
+      "topic",
       "source",
       "priority",
       "status",

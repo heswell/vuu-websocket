@@ -28,6 +28,18 @@ export type ModuleConfig = {
    * this empty to inherit their parent's access role.
    */
   accessRole: string;
+  /**
+   * Sort order within the module's nav section. Lower numbers first; modules
+   * without one come after those with one.
+   */
+  navOrder?: number;
+  /**
+   * Opaque badge-source key, e.g. `orders.working`. The client maps it to a
+   * live value; the server only stores and forwards it.
+   */
+  navBadge?: string;
+  /** Notification topics the module claims, e.g. `["orders", "fills"]`. */
+  notificationTopics?: string[];
 };
 
 /** A module as held by module discovery. */
@@ -108,9 +120,37 @@ export const EMPTY_MODULE_CONFIG: ModuleConfig = {
   accessRole: "",
 };
 
-const MODULE_CONFIG_KEYS = Object.keys(EMPTY_MODULE_CONFIG) as Array<
-  keyof ModuleConfig
->;
+/** Optional nav metadata fields. Absent (undefined) when unset. */
+export const OPTIONAL_MODULE_CONFIG_KEYS = [
+  "navOrder",
+  "navBadge",
+  "notificationTopics",
+] as const satisfies readonly (keyof ModuleConfig)[];
+
+type OptionalModuleConfigKey = (typeof OPTIONAL_MODULE_CONFIG_KEYS)[number];
+
+const isOptionalKey = (key: string): key is OptionalModuleConfigKey =>
+  (OPTIONAL_MODULE_CONFIG_KEYS as readonly string[]).includes(key);
+
+const MODULE_CONFIG_KEYS = [
+  ...(Object.keys(EMPTY_MODULE_CONFIG) as Array<keyof ModuleConfig>),
+  ...OPTIONAL_MODULE_CONFIG_KEYS,
+];
+
+/**
+ * `notificationTopics` are stored in the `modules` VUU table as a single
+ * comma-separated string, so a topic may not contain a comma.
+ */
+export const NOTIFICATION_TOPIC_SEPARATOR = ",";
+
+export const joinNotificationTopics = (topics: readonly string[] | undefined) =>
+  topics?.join(NOTIFICATION_TOPIC_SEPARATOR) ?? "";
+
+export const splitNotificationTopics = (value: string) =>
+  value
+    .split(NOTIFICATION_TOPIC_SEPARATOR)
+    .map((topic) => topic.trim())
+    .filter(Boolean);
 
 export const MODULE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9-]*$/;
 export const MF_SCOPE_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -159,6 +199,11 @@ const parseConfigValues = (
     if (key === "name" && !allowName) {
       throw new Error("Module name can't be changed");
     }
+    if (isOptionalKey(key)) {
+      // null (or an empty value) clears the field.
+      result[key] = parseOptionalValue(key, fieldValue);
+      continue;
+    }
     const expected = typeof EMPTY_MODULE_CONFIG[key as keyof ModuleConfig];
     if (typeof fieldValue !== expected) {
       throw new Error(`Module field "${key}" must be a ${expected}`);
@@ -169,6 +214,37 @@ const parseConfigValues = (
   return result as Partial<ModuleConfig>;
 };
 
+const parseOptionalValue = (
+  key: OptionalModuleConfigKey,
+  value: unknown,
+): ModuleConfig[OptionalModuleConfigKey] => {
+  if (value === null || value === undefined) return undefined;
+  switch (key) {
+    case "navOrder":
+      if (typeof value !== "number") {
+        throw new Error(`Module field "navOrder" must be a number`);
+      }
+      return value;
+    case "navBadge":
+      if (typeof value !== "string") {
+        throw new Error(`Module field "navBadge" must be a string`);
+      }
+      return value.trim() || undefined;
+    case "notificationTopics":
+      if (
+        !Array.isArray(value) ||
+        !value.every((topic) => typeof topic === "string")
+      ) {
+        throw new Error(
+          `Module field "notificationTopics" must be an array of strings`,
+        );
+      }
+      return value.length
+        ? value.map((topic: string) => topic.trim())
+        : undefined;
+  }
+};
+
 const parseJson = (json: string, what: string) => {
   try {
     return JSON.parse(json) as unknown;
@@ -177,13 +253,22 @@ const parseJson = (json: string, what: string) => {
   }
 };
 
-/** Parses the `module` param of createModule. Missing fields take defaults. */
-export const parseModuleConfig = (json: string): ModuleConfig => ({
-  ...EMPTY_MODULE_CONFIG,
-  ...parseConfigValues(parseJson(json, "module"), { allowName: true }),
-});
+const withoutUndefined = <T extends object>(value: T): T =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined),
+  ) as T;
 
-/** Parses the `changes` param of updateModule. */
+/** Parses the `module` param of createModule. Missing fields take defaults. */
+export const parseModuleConfig = (json: string): ModuleConfig =>
+  withoutUndefined({
+    ...EMPTY_MODULE_CONFIG,
+    ...parseConfigValues(parseJson(json, "module"), { allowName: true }),
+  });
+
+/**
+ * Parses the `changes` param of updateModule. An optional nav field given as
+ * `null` is returned as `undefined`, which clears it.
+ */
 export const parseModuleConfigChanges = (json: string): ModuleConfigChanges =>
   parseConfigValues(parseJson(json, "changes"), {
     allowName: false,
@@ -295,6 +380,35 @@ export const validateModuleConfig = (
     errors.accessRole = "An access role is required to enable a module";
   }
 
+  if (
+    config.navOrder !== undefined &&
+    (typeof config.navOrder !== "number" || !Number.isFinite(config.navOrder))
+  ) {
+    errors.navOrder = "Nav order must be a finite number";
+  }
+
+  if (config.navBadge !== undefined && typeof config.navBadge !== "string") {
+    errors.navBadge = "Nav badge must be a string";
+  }
+
+  if (config.notificationTopics !== undefined) {
+    if (
+      !Array.isArray(config.notificationTopics) ||
+      !config.notificationTopics.every(
+        (topic) => typeof topic === "string" && topic.trim() !== "",
+      )
+    ) {
+      errors.notificationTopics =
+        "Notification topics must be an array of non-empty strings";
+    } else if (
+      config.notificationTopics.some((topic) =>
+        topic.includes(NOTIFICATION_TOPIC_SEPARATOR),
+      )
+    ) {
+      errors.notificationTopics = "Notification topics may not contain commas";
+    }
+  }
+
   return errors;
 };
 
@@ -314,6 +428,10 @@ export const managedModuleColumnValues = (
   mfScope: module.mfScope,
   mfUrl: module.mfUrl,
   navIconUrl: module.navIconUrl,
+  // Left empty when unset.
+  ...(module.navOrder !== undefined ? { navOrder: module.navOrder } : {}),
+  navBadge: module.navBadge ?? "",
+  notificationTopics: joinNotificationTopics(module.notificationTopics),
   vuuCreatedTimestamp: module.created,
   vuuUpdatedTimestamp: module.updated,
   vuuMsg: "",
@@ -335,5 +453,8 @@ export const managedModulePermissionValues = (
 
 export const toModuleConfig = (module: ModuleConfig): ModuleConfig =>
   Object.fromEntries(
-    MODULE_CONFIG_KEYS.map((key) => [key, module[key]]),
+    MODULE_CONFIG_KEYS.filter((key) => module[key] !== undefined).map((key) => [
+      key,
+      module[key],
+    ]),
   ) as ModuleConfig;

@@ -190,9 +190,13 @@ function findModule(modules: readonly ManagedModule[], id: number) {
 }
 
 function hasActualChanges(module: ManagedModule, changes: ModuleConfigChanges) {
-  return Object.entries(changes).some(
-    ([key, value]) => module[key as keyof ModuleConfigChanges] !== value,
-  );
+  return Object.entries(changes).some(([key, value]) => {
+    const current = module[key as keyof ModuleConfigChanges];
+    return Array.isArray(current) && Array.isArray(value)
+      ? current.length !== value.length ||
+          current.some((item, index) => item !== value[index])
+      : current !== value;
+  });
 }
 
 function stringParam(params: NamedParams, name: string) {
@@ -220,7 +224,13 @@ function optionalBooleanParam(params: NamedParams, name: string) {
 }
 
 function cloneModules(modules: readonly ManagedModule[]) {
-  return modules.map((module) => ({ ...module }));
+  return modules.map((module) =>
+    Object.fromEntries(
+      Object.entries(module)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+    ) as ManagedModule,
+  );
 }
 
 function isRecord(value: unknown): value is NamedParams {

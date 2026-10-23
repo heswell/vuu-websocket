@@ -19,4 +19,8 @@
 #     mfUrl: "http://localhost:5002"
 #     navIconUrl: ""
 #     accessRole: "module-admin-access"
+#     # Optional nav metadata:
+#     navOrder: 1
+#     navBadge: "modules.pending"
+#     notificationTopics: ["modules"]
 modules: []

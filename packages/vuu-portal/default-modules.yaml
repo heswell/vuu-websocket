@@ -2,6 +2,8 @@
 # runtime edits (via the module admin service) are persisted to modules.yaml.
 # A child module (parentModuleId != 0) may leave accessRole empty to inherit
 # its parent's role.
+# Optional nav metadata: navOrder (number), navBadge (string) and
+# notificationTopics (list of strings, no commas).
 modules:
   - id: 1
     version: 1

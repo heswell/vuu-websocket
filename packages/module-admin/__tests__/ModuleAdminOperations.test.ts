@@ -5,6 +5,7 @@ import {
   formatModuleValidationErrors,
   isModuleAdminRpcName,
   nextModuleId,
+  toModuleConfig,
   type ManagedModule,
 } from "../src/contracts";
 
@@ -65,6 +66,29 @@ describe("module admin operations", () => {
     expect(executeModuleAdminRpc([baseModule], "updateModule", { id: 1, changes: JSON.stringify({ title: "Alpha" }), expectedVersion: 1 })).toEqual({ modules: [baseModule], result: { id: 1, version: 1 } });
     expect(() => executeModuleAdminRpc([baseModule], "updateModule", { id: 1, changes: JSON.stringify({ title: "x" }), expectedVersion: 0 })).toThrow("stale update: module alpha is now version 1");
     expect(() => executeModuleAdminRpc([baseModule], "updateModule", { id: 1, changes: JSON.stringify({ name: "x" }), expectedVersion: 1 })).toThrow("Module name can't be changed");
+  });
+
+  test("creates, updates and clears optional nav metadata", () => {
+    const metadata = { navOrder: 1, navBadge: "orders.working", notificationTopics: ["orders", "fills"] };
+    const created = executeModuleAdminRpc(
+      [baseModule],
+      "createModule",
+      { module: JSON.stringify({ ...toModuleConfig(baseModule), name: "beta", path: "/beta", mfScope: "beta", ...metadata }) },
+      () => 5,
+    );
+    expect(created.modules[1]).toMatchObject({ name: "beta", ...metadata });
+    expect(() => executeModuleAdminRpc([baseModule], "createModule", { module: JSON.stringify({ ...toModuleConfig(baseModule), name: "beta", path: "/beta", mfScope: "beta", notificationTopics: [""] }) })).toThrow("notificationTopics");
+
+    const withMetadata = { ...baseModule, ...metadata };
+    const unchanged = executeModuleAdminRpc([withMetadata], "updateModule", { id: 1, changes: JSON.stringify({ notificationTopics: ["orders", "fills"] }), expectedVersion: 1 });
+    expect(unchanged.result).toEqual({ id: 1, version: 1 });
+
+    const changed = executeModuleAdminRpc([withMetadata], "updateModule", { id: 1, changes: JSON.stringify({ notificationTopics: ["fills"], navOrder: 2 }), expectedVersion: 1 });
+    expect(changed.modules[0]).toMatchObject({ version: 2, navOrder: 2, notificationTopics: ["fills"] });
+
+    const cleared = executeModuleAdminRpc([withMetadata], "updateModule", { id: 1, changes: JSON.stringify({ navOrder: null, navBadge: null, notificationTopics: null }), expectedVersion: 1 });
+    expect(cleared.result).toEqual({ id: 1, version: 2 });
+    expect(cleared.modules[0]).not.toContainAnyKeys(["navOrder", "navBadge", "notificationTopics"]);
   });
 
   test("sets enabled without bumping version and validates enabled top-level access", () => {

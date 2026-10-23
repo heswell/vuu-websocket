@@ -24,6 +24,12 @@ const sampleTemplates: NotificationTemplate[] = [
   ["banner", "Market Status", "US Equity markets are now OPEN. Trading session #%d active", "INFO", 60000, "SYSTEM", 1, "all"],
 ];
 
+/** Notification topic for each template source; others have no topic. */
+const topicBySource: Record<string, string> = {
+  OMS: "orders",
+  RISK: "risk",
+};
+
 const MAX_ACTIVE_NOTIFICATIONS = 8;
 const INITIAL_NOTIFICATIONS = 3;
 const CYCLE_TIME_MS = 4_000;
@@ -136,6 +142,7 @@ export class SimulatedNotificationsProvider extends Provider {
       message,
       level,
       audience,
+      topic: topicBySource[source] ?? "",
       source,
       priority,
     };

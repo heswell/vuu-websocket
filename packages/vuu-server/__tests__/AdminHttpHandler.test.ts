@@ -132,6 +132,7 @@ describe("NotificationAdminRoutes", () => {
       message: "From curl",
       level: "INFO",
       audience: "all",
+      topic: "",
       priority: 3,
     });
     expect(notification.expiryTime as number).toBeGreaterThanOrEqual(
@@ -141,6 +142,28 @@ describe("NotificationAdminRoutes", () => {
     const table = notificationsTable(application);
     expect(table.rows.length).toBe(1);
     expect(table.getRowAtKey(id)).toBeDefined();
+  });
+
+  test("publishes a notification with a topic", async () => {
+    const application = createApplication({ "vuu.admin.enabled": true });
+    const response = await post(application, {
+      topic: "orders",
+      level: "ERROR",
+      title: "Order rejected",
+    });
+    expect(response?.status).toBe(201);
+    const notification = (await response?.json()) as Record<string, unknown>;
+    expect(notification).toMatchObject({
+      topic: "orders",
+      level: "ERROR",
+      title: "Order rejected",
+    });
+    const table = notificationsTable(application);
+    const row = table.getRowAtKey(notification.id as string);
+    expect(row?.[table.columnMap.topic]).toBe("orders");
+
+    const invalid = await post(application, { topic: 42 });
+    expect(invalid?.status).toBe(400);
   });
 
   test("honours durationMs, configured path and explicit id; updates existing", async () => {

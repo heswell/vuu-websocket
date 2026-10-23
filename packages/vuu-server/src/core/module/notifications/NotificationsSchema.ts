@@ -42,8 +42,25 @@ const Title = "title:String";
 const Message = "message:String";
 const Level = "level:String";
 const Audience = "audience:String";
+/**
+ * Optional routing key, e.g. "orders". Clients route a notification to the
+ * modules that claim its topic (see ModuleRecord.notificationTopics).
+ */
+const Topic = "topic:String";
 
-const genericColumns = [Id, Type, ExpiryTime, Title, Message, Level, Audience];
+const genericColumns = [
+  Id,
+  Type,
+  ExpiryTime,
+  Title,
+  Message,
+  Level,
+  Audience,
+  Topic,
+];
+const genericColumnNames = new Set(
+  genericColumns.map((column) => column.split(":")[0]),
+);
 
 export const NotificationsSchema = {
   Id,
@@ -53,9 +70,15 @@ export const NotificationsSchema = {
   Message,
   Level,
   Audience,
+  Topic,
   /**
-   * The generic notification columns, plus any additional columns.
+   * The generic notification columns, plus any additional columns. An
+   * additional column that repeats a generic column name is ignored.
    */
-  allFrom: (...additionalColumns: ColumnDefinition[]): Column[] =>
-    [...genericColumns, ...additionalColumns].map(toColumn),
+  allFrom: (...additionalColumns: ColumnDefinition[]): Column[] => [
+    ...genericColumns.map(toColumn),
+    ...additionalColumns
+      .map(toColumn)
+      .filter(({ name }) => !genericColumnNames.has(name)),
+  ],
 };

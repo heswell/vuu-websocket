@@ -6,6 +6,7 @@ import {
   managedModulePermissionValues,
   parseModuleConfig,
   parseModuleConfigChanges,
+  splitNotificationTopics,
   validateModuleConfig,
 } from "../src/contracts";
 
@@ -51,5 +52,58 @@ describe("module administration contract", () => {
     expect(managedModulePermissionValues(modules)).toEqual([
       expect.objectContaining({ id: 1, module_id: 1, role: "alpha-access" }),
     ]);
+  });
+
+  test("parses optional nav metadata", () => {
+    expect(
+      parseModuleConfig(
+        JSON.stringify({
+          name: "alpha",
+          navOrder: 2.5,
+          navBadge: " orders.working ",
+          notificationTopics: [" orders ", "fills"],
+        }),
+      ),
+    ).toMatchObject({
+      navOrder: 2.5,
+      navBadge: "orders.working",
+      notificationTopics: ["orders", "fills"],
+    });
+    const withoutMetadata = parseModuleConfig(JSON.stringify({ name: "alpha" }));
+    expect(withoutMetadata).not.toHaveProperty("navOrder");
+    expect(withoutMetadata).not.toHaveProperty("navBadge");
+    expect(withoutMetadata).not.toHaveProperty("notificationTopics");
+    expect(
+      parseModuleConfig(
+        JSON.stringify({ name: "alpha", navBadge: "", notificationTopics: [] }),
+      ),
+    ).not.toContainKeys(["navBadge", "notificationTopics"]);
+    expect(() => parseModuleConfig(JSON.stringify({ navOrder: "1" }))).toThrow("must be a number");
+    expect(() => parseModuleConfig(JSON.stringify({ navBadge: 1 }))).toThrow("must be a string");
+    expect(() => parseModuleConfig(JSON.stringify({ notificationTopics: "orders" }))).toThrow("array of strings");
+    expect(() => parseModuleConfig(JSON.stringify({ notificationTopics: [1] }))).toThrow("array of strings");
+    const changes = parseModuleConfigChanges(JSON.stringify({ navOrder: null, notificationTopics: null }));
+    expect(changes).toHaveProperty("navOrder", undefined);
+    expect(changes).toHaveProperty("notificationTopics", undefined);
+  });
+
+  test("validates optional nav metadata", () => {
+    expect(validateModuleConfig({ ...validConfig, navOrder: 1, navBadge: "orders.working", notificationTopics: ["orders", "fills"] }, [])).toEqual({});
+    expect(validateModuleConfig({ ...validConfig, navOrder: Number.NaN }, [])).toMatchObject({ navOrder: expect.any(String) });
+    expect(validateModuleConfig({ ...validConfig, navOrder: Number.POSITIVE_INFINITY }, [])).toMatchObject({ navOrder: expect.any(String) });
+    expect(validateModuleConfig({ ...validConfig, notificationTopics: ["orders", ""] }, [])).toMatchObject({ notificationTopics: expect.any(String) });
+    expect(validateModuleConfig({ ...validConfig, notificationTopics: ["orders,fills"] }, [])).toMatchObject({ notificationTopics: "Notification topics may not contain commas" });
+  });
+
+  test("projects nav metadata to table column values", () => {
+    const module = { ...validConfig, id: 1, version: 1, created: 1, updated: 1 };
+    const withoutMetadata = managedModuleColumnValues(module);
+    expect(withoutMetadata).not.toHaveProperty("navOrder");
+    expect(withoutMetadata).toMatchObject({ navBadge: "", notificationTopics: "" });
+    expect(
+      managedModuleColumnValues({ ...module, navOrder: 3, navBadge: "orders.working", notificationTopics: ["orders", "fills"] }),
+    ).toMatchObject({ navOrder: 3, navBadge: "orders.working", notificationTopics: "orders,fills" });
+    expect(splitNotificationTopics("orders, fills,")).toEqual(["orders", "fills"]);
+    expect(splitNotificationTopics("")).toEqual([]);
   });
 });

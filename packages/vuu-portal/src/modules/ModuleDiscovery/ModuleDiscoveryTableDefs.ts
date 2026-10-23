@@ -15,6 +15,10 @@ export const modulesTable = TableDef({
     { name: "mfScope", dataType: "string" },
     { name: "mfUrl", dataType: "string" },
     { name: "navIconUrl", dataType: "string" },
+    { name: "navOrder", dataType: "double" },
+    { name: "navBadge", dataType: "string" },
+    // Comma-separated; exposed as string[] in the module registry.
+    { name: "notificationTopics", dataType: "string" },
     ...VUU_DEFAULT_COLUMNS
   ],
   keyField: "id",

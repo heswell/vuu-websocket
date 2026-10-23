@@ -28,6 +28,51 @@ describe("YamlModuleStore", () => {
     expect(fs.readdirSync(root).filter((name) => name.includes(".tmp"))).toEqual([]);
   });
 
+  test("round-trips optional nav metadata and omits it when unset", () => {
+    const filePath = path.join(root, "modules.yaml");
+    const store = new YamlModuleStore(filePath, () => []);
+    const [first, ...rest] = seeded(100);
+    const modules = [
+      {
+        ...first,
+        navOrder: 1.5,
+        navBadge: "orders.working",
+        notificationTopics: ["orders", "fills"],
+      },
+      ...rest,
+    ];
+    store.save(modules);
+
+    expect(store.load()).toEqual(modules);
+    const saved = Bun.YAML.parse(fs.readFileSync(filePath, "utf8")) as {
+      modules: Record<string, unknown>[];
+    };
+    expect(saved.modules[0].notificationTopics).toEqual(["orders", "fills"]);
+    expect(saved.modules[1]).not.toContainAnyKeys([
+      "navOrder",
+      "navBadge",
+      "notificationTopics",
+    ]);
+  });
+
+  test("rejects invalid nav metadata", () => {
+    fs.mkdirSync(root, { recursive: true });
+    const filePath = path.join(root, "modules.yaml");
+    const write = (overrides: Record<string, unknown>) =>
+      fs.writeFileSync(
+        filePath,
+        Bun.YAML.stringify({ modules: [{ ...seeded(100)[0], ...overrides }] }),
+        "utf8",
+      );
+
+    write({ navOrder: "first" });
+    expect(() => new YamlModuleStore(filePath, () => []).load()).toThrow("field 'navOrder' must be a number");
+    write({ notificationTopics: "orders" });
+    expect(() => new YamlModuleStore(filePath, () => []).load()).toThrow("field 'notificationTopics' must be a list of strings");
+    write({ notificationTopics: ["orders,fills"] });
+    expect(() => new YamlModuleStore(filePath, () => []).load()).toThrow("may not contain commas");
+  });
+
   test("fails fast on malformed files", () => {
     fs.mkdirSync(root, { recursive: true });
     const filePath = path.join(root, "modules.yaml");

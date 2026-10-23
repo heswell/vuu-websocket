@@ -5,6 +5,7 @@ import type {
   TableContainer,
   VuuUser,
 } from "@heswell/vuu-server";
+import { splitNotificationTopics } from "@heswell/module-admin";
 
 /**
  * Derives a module's own client identifier from its name, e.g.
@@ -65,6 +66,7 @@ function readModules(table: DataTable): DiscoveredModuleRecord[] {
       mfScope: stringValue(table, row, "mfScope"),
       mfUrl: stringValue(table, row, "mfUrl"),
       ...navIcon(table, row),
+      ...navMetadata(table, row),
     };
   });
 }
@@ -75,6 +77,38 @@ function navIcon(table: DataTable, row: unknown[]) {
   return typeof navIconUrl === "string" && navIconUrl
     ? { navIconUrl }
     : {};
+}
+
+/**
+ * Optional nav metadata. Each field is omitted when unset, including for rows
+ * from tables that predate the column.
+ */
+function navMetadata(table: DataTable, row: unknown[]) {
+  const metadata: Pick<
+    ModuleRecord,
+    "navOrder" | "navBadge" | "notificationTopics"
+  > = {};
+  const navOrder = optionalValue(table, row, "navOrder");
+  if (typeof navOrder === "number" && Number.isFinite(navOrder)) {
+    metadata.navOrder = navOrder;
+  }
+  const navBadge = optionalValue(table, row, "navBadge");
+  if (typeof navBadge === "string" && navBadge) {
+    metadata.navBadge = navBadge;
+  }
+  const topics = optionalValue(table, row, "notificationTopics");
+  if (typeof topics === "string") {
+    const notificationTopics = splitNotificationTopics(topics);
+    if (notificationTopics.length) {
+      metadata.notificationTopics = notificationTopics;
+    }
+  }
+  return metadata;
+}
+
+function optionalValue(table: DataTable, row: unknown[], column: string) {
+  const index = table.tableDef.columns.findIndex(({ name }) => name === column);
+  return index === -1 ? undefined : row[index];
 }
 
 function readModulePermissions(table: DataTable): ModulePermission[] {
@@ -132,7 +166,20 @@ function selectModules(
         parentModuleId === 0 || permittedIds.has(parentModuleId),
     )
     .map(({ parentModuleId: _parentModuleId, ...module }) => module)
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .sort(compareModules);
+}
+
+/**
+ * By navOrder (lowest first), then modules without one, then by name. Records
+ * without navOrder therefore keep their previous name order.
+ */
+function compareModules(left: ModuleRecord, right: ModuleRecord) {
+  const leftOrder = left.navOrder ?? Number.POSITIVE_INFINITY;
+  const rightOrder = right.navOrder ?? Number.POSITIVE_INFINITY;
+  if (leftOrder !== rightOrder) {
+    return leftOrder < rightOrder ? -1 : 1;
+  }
+  return left.name.localeCompare(right.name);
 }
 
 function accessRoleForModule(

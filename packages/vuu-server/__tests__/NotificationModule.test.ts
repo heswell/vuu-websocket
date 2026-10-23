@@ -37,6 +37,7 @@ describe("NotificationsSchema", () => {
       "message",
       "level",
       "audience",
+      "topic",
     ]);
   });
 
@@ -51,9 +52,18 @@ describe("NotificationsSchema", () => {
       { name: "message", dataType: "string" },
       { name: "level", dataType: "string" },
       { name: "audience", dataType: "string" },
+      { name: "topic", dataType: "string" },
       { name: "source", dataType: "string" },
       { name: "priority", dataType: "int" },
     ]);
+  });
+
+  test("ignores additional columns that repeat a generic column", () => {
+    const names = NotificationsSchema.allFrom("topic:String", "source:String").map(
+      (c) => c.name,
+    );
+    expect(names.filter((name) => name === "topic")).toHaveLength(1);
+    expect(names.at(-1)).toBe("source");
   });
 
   test("rejects invalid column definitions", () => {
@@ -81,6 +91,7 @@ describe("NotificationModule", () => {
       "message",
       "level",
       "audience",
+      "topic",
       "source",
       "priority",
       "vuuCreatedTimestamp",
