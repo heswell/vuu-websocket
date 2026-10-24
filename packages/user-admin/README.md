@@ -11,7 +11,6 @@ contracts and an in-memory demo store. It has three entry points:
 
 ## Publishing
 
-This repository publishes `@heswell/user-admin` and `@heswell/module-admin`.
 Bump this package and the version consumed by workspace dependants with:
 
 ```sh
@@ -19,7 +18,21 @@ npm run bump:versions -- --version=1.0.1
 ```
 
 Omit `--version` to increment the patch version. Prereleases use
-`n.n.n-alpha.n` or `n.n.n-beta.n`. Build all publishable packages with `npm run build:packages`, or build only
+`n.n.n-alpha.n` or `n.n.n-beta.n`; their prerelease number is incremented
+instead. Select any workspace package (including private or non-publishable
+packages) with `--package`, for example:
+
+```sh
+npm run bump:versions -- --package=@heswell/vuu-demo
+npm run bump:versions -- --package @heswell/vuu-demo --version 3.0.1
+```
+
+Only the selected package's version changes; references in root/workspace
+manifests and the npm lockfile are updated, preserving dependency range
+operators and compatible peer ranges. Without `--package`, the default
+remains `@heswell/user-admin`.
+
+Build all publishable packages with `npm run build:packages`, or build only
 this package with `npm run build:packages -- --package=@heswell/user-admin`.
 The package is written to `dist/user-admin`; `npm run pub` builds it
 automatically. Before publishing, inspect the package or the registry version:
@@ -28,6 +41,11 @@ automatically. Before publishing, inspect the package or the registry version:
 npm run pub -- --dry-run
 npm run pub -- --version-check
 ```
+
+Without `--package`, `--version-check` lists every workspace package, including
+private and non-publishable packages, with its source version and npm alpha,
+beta and latest dist-tags. Use `--package=@heswell/user-admin` to check only
+this package. Version checks do not build or publish anything.
 
 Publish the release with `npm run pub`, or add `--tag alpha` or `--tag beta`
 for a prerelease. To release module administration instead, select it with

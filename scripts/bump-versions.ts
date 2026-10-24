@@ -3,11 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
-  getPublishablePackage,
-  type PublishablePackageName,
-  PUBLISHABLE_PACKAGE_NAMES_TEXT,
   updateDependencies,
 } from "./publishable-packages";
+import { getWorkspacePackages } from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES_ROOT = path.join(ROOT, "packages");
@@ -24,13 +22,13 @@ const printHelp = () => {
   console.log(`Usage: npm run bump:versions -- [options]
 
 Updates ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default, or the package selected with
---package. Workspace dependencies on the selected package are also updated.
+--package. Root and workspace dependencies on the selected package are also updated.
 
 Without --version, increments the patch version. For alpha or beta releases,
 the prerelease number is incremented instead.
 
 Options:
-  --package=<name>  Select one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
+  --package <name>  Select any workspace package by its package.json name.
   --version=<version>
                     Set the package version explicitly.
   --help            Print this help message.
@@ -44,14 +42,6 @@ const readJson = (filePath: string): PackageJson =>
 const writeJson = (filePath: string, json: PackageJson) => {
   fs.writeFileSync(filePath, `${JSON.stringify(json, null, 2)}\n`);
 };
-
-const findPackageJsonFiles = (directory: string): string[] =>
-  fs
-    .readdirSync(directory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(directory, entry.name, "package.json"))
-    .filter((filePath) => fs.existsSync(filePath))
-    .sort();
 
 const parseVersion = (version: string) => {
   const match = VERSION_PATTERN.exec(version);
@@ -86,23 +76,20 @@ const getOptions = () => {
     process.exit(0);
   }
 
-  let packageName: PublishablePackageName = DEFAULT_PUBLISHABLE_PACKAGE_NAME;
+  let packageName: string = DEFAULT_PUBLISHABLE_PACKAGE_NAME;
   let version: string | undefined;
-  for (const argument of args) {
-    if (argument.startsWith("--package=")) {
-      const requestedPackage = argument.slice("--package=".length);
-      const selectedPackage = getPublishablePackage(requestedPackage);
-      if (!selectedPackage) {
-        throw new Error(
-          `Unsupported package "${requestedPackage}". Use one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.`,
-        );
+  for (let index = 0; index < args.length; index++) {
+    const argument = args[index];
+    const flag = argument.split("=")[0];
+    if (flag === "--package" || flag === "--version") {
+      const value = argument.startsWith(`${flag}=`)
+        ? argument.slice(flag.length + 1)
+        : args[++index];
+      if (!value || value.startsWith("--")) {
+        throw new Error(`The ${flag} option requires a value.`);
       }
-      packageName = selectedPackage.name;
-      continue;
-    }
-    if (argument.startsWith("--version=")) {
-      version = argument.slice("--version=".length);
-      if (!version) throw new Error("The --version option requires a value.");
+      if (flag === "--package") packageName = value;
+      else version = value;
       continue;
     }
     throw new Error(
@@ -113,8 +100,10 @@ const getOptions = () => {
   return { packageName, version };
 };
 
-const packageFiles = findPackageJsonFiles(PACKAGES_ROOT);
 const { packageName: targetPackageName, version: requestedVersion } = getOptions();
+const packageFiles = getWorkspacePackages().map(({ directory }) =>
+  path.join(PACKAGES_ROOT, directory, "package.json"),
+);
 const targetPackageFile = packageFiles.find(
   (filePath) => readJson(filePath).name === targetPackageName,
 );
@@ -131,7 +120,7 @@ const version = requestedVersion ?? incrementVersion(targetPackage.version);
 parseVersion(version);
 
 const changedFiles: string[] = [];
-for (const filePath of packageFiles) {
+for (const filePath of [path.join(ROOT, "package.json"), ...packageFiles]) {
   const json = filePath === targetPackageFile ? targetPackage : readJson(filePath);
   let changed = false;
 

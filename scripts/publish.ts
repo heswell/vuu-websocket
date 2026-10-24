@@ -15,9 +15,9 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_PUBLISHABLE_PACKAGE_NAME,
   getPublishablePackage,
-  type PublishablePackageName,
   PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
+import { getWorkspacePackages } from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
@@ -44,7 +44,7 @@ type PackageVersionCheck = {
 
 type Options = {
   dryRun: boolean;
-  packageName: PublishablePackageName;
+  packageName?: string;
   publishTag?: string;
   versionCheck: boolean;
 };
@@ -56,13 +56,15 @@ Builds and publishes ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default.
 
 Options:
   --package <name>   Publish one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
+                     For --version-check, select any workspace package.
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
   --dry-run           Validate the npm package without publishing it.
-  --version-check     Show the version and current npm dist-tags.
+  --version-check     Show all workspace versions and npm dist-tags, unless
+                      filtered with --package. Does not build or publish.
   --help              Print this help message.`);
 };
 
-const getPackage = (packageName: PublishablePackageName) => {
+const getPackage = (packageName: string) => {
   const selectedPackage = getPublishablePackage(packageName);
   if (!selectedPackage) {
     throw new Error(`Unsupported package "${packageName}".`);
@@ -75,7 +77,7 @@ const getPackage = (packageName: PublishablePackageName) => {
 };
 
 const readManifest = (
-  packageName: PublishablePackageName,
+  packageName: string,
   sourceManifestPath: string,
 ): PackageManifest => {
   const sourceManifest = JSON.parse(
@@ -130,7 +132,6 @@ const getOptionValue = (args: string[], index: number, flag: string) => {
 const parseOptions = (): Options => {
   const options: Options = {
     dryRun: false,
-    packageName: DEFAULT_PUBLISHABLE_PACKAGE_NAME,
     versionCheck: false,
   };
   const args = process.argv.slice(2);
@@ -151,13 +152,7 @@ const parseOptions = (): Options => {
     }
     if (argument === "--package" || argument.startsWith("--package=")) {
       const { nextIndex, value } = getOptionValue(args, index, "--package");
-      const selectedPackage = getPublishablePackage(value);
-      if (!selectedPackage) {
-        throw new Error(
-          `Unsupported package "${value}". Use one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.`,
-        );
-      }
-      options.packageName = selectedPackage.name;
+      options.packageName = value;
       index = nextIndex;
       continue;
     }
@@ -198,7 +193,7 @@ const runNpm = (args: string[]) => {
 };
 
 const checkPackageVersion = async (
-  packageName: PublishablePackageName,
+  packageName: string,
   sourceManifestPath: string,
 ): Promise<PackageVersionCheck> => {
   const { name, version } = readManifest(packageName, sourceManifestPath);
@@ -230,22 +225,35 @@ const checkPackageVersion = async (
 };
 
 const printVersionCheck = async (
-  packageName: PublishablePackageName,
-  sourceManifestPath: string,
+  packages: { name: string; sourceManifestPath: string }[],
 ) => {
-  const result = await checkPackageVersion(packageName, sourceManifestPath);
-  console.table([
-    {
-      "npm alpha": result["npm alpha"],
-      "npm beta": result["npm beta"],
-      "npm latest": result["npm latest"],
-      package: result.package,
-      "package.json": result["package.json"],
-    },
-  ]);
+  const results = await Promise.allSettled(
+    packages.map(({ name, sourceManifestPath }) =>
+      checkPackageVersion(name, sourceManifestPath),
+    ),
+  );
+  console.table(
+    results.map((result, index) => {
+      if (result.status === "rejected") {
+        return {
+          package: packages[index].name,
+          error:
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason),
+        };
+      }
+      const { published, ...row } = result.value;
+      return row;
+    }),
+  );
+  const failures = results.filter(({ status }) => status === "rejected");
+  if (failures.length) {
+    throw new Error(`${failures.length} version check(s) failed.`);
+  }
 };
 
-const reportPublishSuccess = (packageName: PublishablePackageName) => {
+const reportPublishSuccess = (packageName: string) => {
   console.table([
     {
       message: "publish succeeded",
@@ -256,14 +264,28 @@ const reportPublishSuccess = (packageName: PublishablePackageName) => {
 };
 
 const options = parseOptions();
-const { directory: packageDirectory, sourceManifestPath } = getPackage(
-  options.packageName,
-);
-const sourceManifest = readManifest(options.packageName, sourceManifestPath);
 
 if (options.versionCheck) {
-  await printVersionCheck(options.packageName, sourceManifestPath);
+  const packages = getWorkspacePackages();
+  if (
+    options.packageName &&
+    !packages.some(({ name }) => name === options.packageName)
+  ) {
+    throw new Error(`Unknown workspace package "${options.packageName}".`);
+  }
+  await printVersionCheck(
+    packages
+      .filter(({ name }) => !options.packageName || name === options.packageName)
+      .map(({ name, directory }) => ({
+        name,
+        sourceManifestPath: path.join(ROOT, "packages", directory, "package.json"),
+      })),
+  );
 } else {
+  const packageName = options.packageName ?? DEFAULT_PUBLISHABLE_PACKAGE_NAME;
+  const { directory: packageDirectory, sourceManifestPath } =
+    getPackage(packageName);
+  const sourceManifest = readManifest(packageName, sourceManifestPath);
   runNpm(["run", "build:packages"]);
   assertBuiltPackageMatchesSource(sourceManifest, packageDirectory);
   runNpm(["pack", "--dry-run", `./${packageDirectory}`]);
@@ -281,10 +303,10 @@ if (options.versionCheck) {
   runNpm(publishArgs);
 
   if (!options.dryRun) {
-    reportPublishSuccess(options.packageName);
+    reportPublishSuccess(packageName);
     await new Promise((resolve) =>
       setTimeout(resolve, PUBLISH_VERIFICATION_DELAY_MS),
     );
-    await printVersionCheck(options.packageName, sourceManifestPath);
+    await printVersionCheck([{ name: packageName, sourceManifestPath }]);
   }
 }
