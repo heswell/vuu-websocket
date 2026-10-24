@@ -67,6 +67,10 @@ beforeEach(() => {
       "": readJson("package.json"),
       "packages/vuu-demo": readJson("packages/vuu-demo/package.json"),
       "packages/nested/consumer": readJson("packages/nested/consumer/package.json"),
+      "node_modules/@external/pkg": {
+        version: "1.0.0",
+        dependencies: { "@heswell/vuu-demo": "1.1.0" },
+      },
     },
   });
   fs.writeFileSync(
@@ -105,6 +109,7 @@ describe("bump:versions", () => {
     expect(lock["packages/vuu-demo"].version).toBe("3.0.1");
     expect(lock[""].dependencies["@heswell/vuu-demo"]).toBe("^3.0.1");
     expect(lock["packages/nested/consumer"].dependencies["@heswell/vuu-demo"]).toBe("~3.0.1");
+    expect(lock["node_modules/@external/pkg"].dependencies["@heswell/vuu-demo"]).toBe("1.1.0");
   });
 
   test("bumps private nested prereleases and accepts explicit versions", () => {

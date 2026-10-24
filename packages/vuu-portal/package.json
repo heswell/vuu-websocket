@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-portal",
-  "version": "2.2.0",
+  "version": "2.2.2",
   "description": "VUU portal server with remote module discovery",
   "type": "module",
   "main": "src/index.ts",
@@ -39,7 +39,7 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/module-admin": "^2.0.1"
+    "@heswell/module-admin": "^2.1.0"
   },
   "peerDependencies": {
     "@heswell/vuu-server": "^3.1.0 || ^4.0.0",

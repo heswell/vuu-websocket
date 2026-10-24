@@ -143,8 +143,14 @@ if (fs.existsSync(lockfilePath)) {
   if (packages && typeof packages === "object") {
     const lockfilePackages = packages as Record<string, PackageJson>;
     let changed = false;
+    const workspacePaths = new Set([
+      "",
+      ...packageFiles.map((filePath) => path.dirname(path.relative(ROOT, filePath))),
+    ]);
 
     for (const [packagePath, json] of Object.entries(lockfilePackages)) {
+      // Entries for installed registry packages record their published metadata.
+      if (!workspacePaths.has(packagePath)) continue;
       if (
         packagePath === path.dirname(path.relative(ROOT, targetPackageFile)) &&
         json.version !== version
