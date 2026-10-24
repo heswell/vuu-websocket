@@ -158,6 +158,53 @@ describe("pub --version-check", () => {
     }
   });
 
+  test("shows source and stale dist versions side by side", () => {
+    writeJson("dist/vuu-demo/package.json", {
+      name: "@heswell/vuu-demo",
+      version: "2.9.7",
+    });
+    const { code, output } = run(
+      "publish", "--version-check", "--package=@heswell/vuu-demo",
+    );
+    expect(code).toBe(0);
+    expect(output).toContain("dist/package.json");
+    expect(output).toContain("3.0.0");
+    expect(output).toContain("2.9.7");
+  });
+
+  test("shows unavailable for missing dist output", () => {
+    const { code, output } = run(
+      "publish", "--version-check", "--package=@heswell/vuu-demo",
+    );
+    expect(code).toBe(0);
+    expect(output).toContain("dist/package.json");
+    expect(output).toContain("unavailable");
+  });
+
+  test("shows nested dist versions even when the package is unpublished", () => {
+    writeJson("dist/nested/consumer/package.json", {
+      name: "@heswell/consumer",
+      version: "1.0.0-beta.1",
+    });
+    const { code, output } = run(
+      "publish", "--version-check", "--package=@heswell/consumer",
+    );
+    expect(code).toBe(0);
+    expect(output).toContain("1.0.0-beta.2");
+    expect(output).toContain("1.0.0-beta.1");
+    expect(output).toContain("unavailable");
+  });
+
+  test("reports invalid dist manifests instead of masking them as unavailable", () => {
+    writeJson("dist/vuu-demo/package.json", { name: "@heswell/vuu-demo" });
+    const { code, output } = run(
+      "publish", "--version-check", "--package=@heswell/vuu-demo",
+    );
+    expect(code).not.toBe(0);
+    expect(output).toContain("Invalid package manifest");
+    expect(output).toContain("dist/vuu-demo/package.json");
+  });
+
   test("shows successful rows and reports registry failures with a failing exit code", () => {
     const preload = path.join(root, "registry.ts");
     fs.writeFileSync(preload, fs.readFileSync(preload, "utf8").replace(

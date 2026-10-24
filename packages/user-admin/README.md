@@ -43,8 +43,10 @@ npm run pub -- --version-check
 ```
 
 Without `--package`, `--version-check` lists every workspace package, including
-private and non-publishable packages, with its source version and npm alpha,
-beta and latest dist-tags. Use `--package=@heswell/user-admin` to check only
+private and non-publishable packages, with its source version (`package.json`),
+built version (`dist/package.json`) and npm alpha, beta and latest dist-tags.
+Missing build output is shown as `unavailable`; stale build versions are shown
+as they are, so they can be compared with source. Use `--package=@heswell/user-admin` to check only
 this package. Version checks do not build or publish anything.
 
 Publish the release with `npm run pub`, or add `--tag alpha` or `--tag beta`

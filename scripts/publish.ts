@@ -39,6 +39,7 @@ type PackageVersionCheck = {
   "npm latest": string;
   package: string;
   "package.json": string;
+  "dist/package.json": string;
   published: boolean;
 };
 
@@ -59,7 +60,7 @@ Options:
                      For --version-check, select any workspace package.
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
   --dry-run           Validate the npm package without publishing it.
-  --version-check     Show all workspace versions and npm dist-tags, unless
+  --version-check     Show source/dist versions and npm dist-tags, unless
                       filtered with --package. Does not build or publish.
   --help              Print this help message.`);
 };
@@ -78,14 +79,14 @@ const getPackage = (packageName: string) => {
 
 const readManifest = (
   packageName: string,
-  sourceManifestPath: string,
+  manifestPath: string,
 ): PackageManifest => {
   const sourceManifest = JSON.parse(
-    fs.readFileSync(sourceManifestPath, "utf8"),
+    fs.readFileSync(manifestPath, "utf8"),
   ) as Partial<PackageManifest>;
 
   if (sourceManifest.name !== packageName || !sourceManifest.version) {
-    throw new Error(`Invalid source package manifest at ${sourceManifestPath}.`);
+    throw new Error(`Invalid package manifest at ${manifestPath}.`);
   }
 
   return sourceManifest as PackageManifest;
@@ -197,6 +198,14 @@ const checkPackageVersion = async (
   sourceManifestPath: string,
 ): Promise<PackageVersionCheck> => {
   const { name, version } = readManifest(packageName, sourceManifestPath);
+  const distManifestPath = path.join(
+    ROOT,
+    "dist",
+    path.relative(path.join(ROOT, "packages"), sourceManifestPath),
+  );
+  const distVersion = fs.existsSync(distManifestPath)
+    ? readManifest(packageName, distManifestPath).version
+    : "unavailable";
   const response = await fetch(`${REGISTRY}/${encodeURIComponent(name)}`);
 
   if (response.status === 404) {
@@ -206,6 +215,7 @@ const checkPackageVersion = async (
       "npm latest": "unavailable",
       package: name,
       "package.json": version,
+      "dist/package.json": distVersion,
       published: false,
     };
   }
@@ -220,6 +230,7 @@ const checkPackageVersion = async (
     "npm latest": metadata["dist-tags"]?.latest ?? "unavailable",
     package: name,
     "package.json": version,
+    "dist/package.json": distVersion,
     published: Object.hasOwn(metadata.versions ?? {}, version),
   };
 };
