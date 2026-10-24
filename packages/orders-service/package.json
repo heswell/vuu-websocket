@@ -11,7 +11,7 @@
   "author": "heswell",
   "type": "module",
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "4.0.0-alpha.24"
+    "@vuu-ui/vuu-data-types": "4.0.0-alpha.25"
   },
   "dependencies": {
     "@heswell/service-utils": "1.2.2",
