@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/user-admin": "1.0.2",
-    "@heswell/vuu-server": "4.2.0",
+    "@heswell/vuu-server": "4.2.1",
     "@heswell/vuu-table": "1.0.2"
   }
 }

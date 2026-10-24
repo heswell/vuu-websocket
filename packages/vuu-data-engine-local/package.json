@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-data-engine-local",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "In-browser Vuu server (VuuModule, tables, EngineDataSource) built on @heswell/vuu-table and @heswell/vuu-viewport",
   "main": "src/index.ts",
   "module": "src/index.ts",

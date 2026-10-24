@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-server",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "Vuu view server for Bun: tables, viewports, modules, RPC and websocket/HTTP hosting",
   "type": "module",
   "main": "src/index.ts",
