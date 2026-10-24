@@ -31,7 +31,7 @@
     "bench": "vitest bench --run"
   },
   "dependencies": {
-    "@heswell/module-admin": "^2.0.1",
+    "@heswell/module-admin": "^2.1.0",
     "@heswell/user-admin": "^1.0.2",
     "@heswell/vuu-table": "^1.0.2",
     "@heswell/vuu-viewport": "^1.1.5"
