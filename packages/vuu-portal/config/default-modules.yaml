@@ -12,7 +12,7 @@
 #     title: "Manage remote modules"
 #     description: "Create new remote module, update existing modules"
 #     enabled: true
-#     location: "/Modules/Manage Modules"
+#     location: "/Admin/Manage Modules"
 #     path: "/modules/admin"
 #     mfComponent: "ModuleAdmin"
 #     mfScope: "moduleAdmin"
