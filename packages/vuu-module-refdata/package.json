@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-module-refdata",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reusable Vuu server module publishing reference data tables (equities) sourced from remote data services",
   "type": "module",
   "main": "src/index.ts",
@@ -15,7 +15,7 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/equity-refdata-service": "1.0.0"
+    "@heswell/equity-refdata-service": "1.0.1"
   },
   "peerDependencies": {
     "@heswell/vuu-server": "^4.0.0",

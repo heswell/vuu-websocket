@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-portal",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "VUU portal server with remote module discovery",
   "type": "module",
   "main": "src/index.ts",
@@ -44,12 +44,12 @@
   "peerDependencies": {
     "@heswell/vuu-server": "^3.1.0 || ^4.0.0",
     "@heswell/vuu-table": "^1.0.1",
-    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.20"
+    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.24"
   },
   "devDependencies": {
-    "@heswell/vuu-server": "^4.2.1",
-    "@heswell/vuu-table": "^1.0.2",
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21"
+    "@heswell/vuu-server": "^4.2.2",
+    "@heswell/vuu-table": "^1.0.3",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.24"
   },
   "repository": {
     "type": "git",

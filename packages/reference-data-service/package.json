@@ -1,6 +1,6 @@
 {
   "name": "@heswell/reference-data-service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "module": "src/index.ts",
   "scripts": {
     "create-data": "bun ./scripts/generate-instruments.ts",
@@ -9,8 +9,8 @@
   "author": "heswell",
   "type": "module",
   "dependencies": {
-    "@heswell/service-utils": "1.2.1",
-    "@heswell/vuu-table": "1.0.2",
+    "@heswell/service-utils": "1.2.2",
+    "@heswell/vuu-table": "1.0.3",
     "pino": "9.6.0"
   }
 }

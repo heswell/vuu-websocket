@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-server",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "description": "Vuu view server for Bun: tables, viewports, modules, RPC and websocket/HTTP hosting",
   "type": "module",
   "main": "src/index.ts",
@@ -24,15 +24,15 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/service-utils": "^1.2.1",
-    "@heswell/vuu-table": "^1.0.2",
-    "@heswell/vuu-viewport": "^1.1.5"
+    "@heswell/service-utils": "^1.2.2",
+    "@heswell/vuu-table": "^1.0.3",
+    "@heswell/vuu-viewport": "^1.1.6"
   },
   "peerDependencies": {
     "@types/bun": ">=1.3.0",
-    "@vuu-ui/vuu-data-types": "^4.0.0-alpha.20",
-    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.20",
-    "@vuu-ui/vuu-utils": "^4.0.0-alpha.20"
+    "@vuu-ui/vuu-data-types": "^4.0.0-alpha.24",
+    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.24",
+    "@vuu-ui/vuu-utils": "^4.0.0-alpha.24"
   },
   "peerDependenciesMeta": {
     "@types/bun": {
@@ -40,9 +40,9 @@
     }
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "4.0.0-alpha.21",
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21",
-    "@vuu-ui/vuu-utils": "4.0.0-alpha.21"
+    "@vuu-ui/vuu-data-types": "4.0.0-alpha.24",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.24",
+    "@vuu-ui/vuu-utils": "4.0.0-alpha.24"
   },
   "repository": {
     "type": "git",

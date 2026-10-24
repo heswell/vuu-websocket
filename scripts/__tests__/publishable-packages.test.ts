@@ -56,7 +56,7 @@ describe("publishable package manifests", () => {
         expect(`${dependency}@${range}`).toMatch(
           /@\^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/,
         );
-        expect(Bun.semver.satisfies("4.0.0-alpha.21", range)).toBe(true);
+        expect(Bun.semver.satisfies("4.0.0", range)).toBe(true);
         // The workspace build and tests use a version the range admits.
         const devRange = manifest.devDependencies?.[dependency];
         expect(devRange).toBeDefined();

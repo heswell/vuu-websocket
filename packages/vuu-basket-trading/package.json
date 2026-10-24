@@ -1,6 +1,6 @@
 {
   "name": "@heswell/vuu-basket-trading",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "VUU basket trading server",
   "type": "module",
   "main": "dist/src/BasketTradingMain.js",
@@ -18,11 +18,11 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/vuu-server": "4.2.1",
-    "@heswell/vuu-table": "1.0.2"
+    "@heswell/vuu-server": "4.2.2",
+    "@heswell/vuu-table": "1.0.3"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.21",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.24",
     "csv-parse": "^7.0.3"
   }
 }

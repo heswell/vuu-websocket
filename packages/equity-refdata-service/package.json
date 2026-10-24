@@ -1,6 +1,6 @@
 {
   "name": "@heswell/equity-refdata-service",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Publishes real EU equity reference data (ESMA FIRDS/FITRS, GLEIF, OpenFIGI)",
   "author": "heswell",
   "type": "module",
@@ -10,11 +10,11 @@
     "fetch-data": "bun ./scripts/fetch-equities.ts"
   },
   "dependencies": {
-    "@heswell/service-utils": "1.2.1",
-    "@heswell/vuu-table": "1.0.2"
+    "@heswell/service-utils": "1.2.2",
+    "@heswell/vuu-table": "1.0.3"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "4.0.0-alpha.21"
+    "@vuu-ui/vuu-data-types": "4.0.0-alpha.24"
   },
   "exports": {
     ".": {
