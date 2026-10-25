@@ -72,7 +72,9 @@ describe("YamlModuleStore", () => {
       modules: Record<string, unknown>[];
     };
     expect(saved.modules[0].workspace).toEqual(workspace);
-    expect(saved.modules[1]).not.toHaveProperty("workspace");
+    const browser = saved.modules.find(({ name }) => name === "vuu-table-browser");
+    expect(browser).toBeDefined();
+    expect(browser).not.toHaveProperty("workspace");
   });
 
   test("rejects invalid workspace metadata", () => {

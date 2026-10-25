@@ -138,3 +138,80 @@ absolute paths and `~/` paths are also accepted.
   start.
 - `vuu.portal.defaultModulesFile` is the seed catalogue. See
   [`default-modules.yaml`](./default-modules.yaml) for the format.
+
+## Workspaces and the Panels palette
+
+`@vuu-ui/*` 4.0.0-alpha.26 adds named workspaces to the portal UI: a
+**Workspaces** section in the nav with **+ New workspace**, the
+`/workspaces/:id` route, **Reset to default**, and an **Add panel** button that
+opens the **Panels** palette (tabs Modules, Tables and Recent) inline beside
+the workspace grid. Tables › Browse lists the Vuu servers; each server page is
+an unsaved workspace with the Tables palette pinned, which **Save as
+workspace** keeps.
+
+This package is the portal *server*. It doesn't render the UI; it supplies the
+module records the palette is built from.
+
+### What the server provides
+
+A module record with a `workspace` descriptor is listed in the palette's
+Modules tab, grouped by `workspace.paletteGroup`. A module without one isn't.
+See [Workspace metadata](../../docs/requirements/vuu-portal-module-discovery.md#workspace-metadata)
+for the field. In [`default-modules.yaml`](./default-modules.yaml):
+
+| Module | `workspace` | Why |
+| --- | --- | --- |
+| `moduleAdmin`, `userAdmin` | `{ paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } }` | Standalone pages |
+| `basket-trading` | `{ paletteGroup: "Trading", defaultSize: { cols: 12, rows: 8 } }` | Standalone page |
+| `vuu-table-browser` | none | It is itself a workspace page; its tables are in the palette's Tables tab |
+| `vuu-table-viewer` | none | Nested module; it only works inside the table browser |
+
+The seed only applies when `modules.yaml` is first created. To change an
+existing deployment, edit `modules.yaml` or use the module admin
+(`updateModule` with `workspace`, or `workspace: null` to remove a module from
+the palette).
+
+### Portal host requirements
+
+The host is the `PortalShell` application, for example finos/vuu
+`vuu-ui/portal-examples/portal-host`. See its
+`docs/module-federation-architecture.md`. Workspaces are opt in:
+
+```tsx
+import {
+  AddPanelButton,
+  createPortalComponentRegistries,
+  PortalShell,
+  type PortalWorkspacesOptions,
+} from "@vuu-ui/core/portal";
+
+const { renderers, settingsCodecs } = createPortalComponentRegistries();
+
+const workspaces: PortalWorkspacesOptions = {
+  componentRenderers: renderers,
+  headerActions: <AddPanelButton />,
+  settingsCodecs,
+};
+
+<PortalShell contextPanel={{ placement: "inline" }} workspaces={workspaces} ...>
+```
+
+- `PortalShell` renders the single `GridLayoutProvider` above both the palette
+  and the workspace. Don't add another one in the host or in a remote.
+- `contextPanel={{ placement: "inline" }}` shows the palette beside the grid
+  instead of over it.
+- Module Federation must share these as strict singletons
+  (`singleton: true, strictVersion: true`) in the host *and* every remote:
+  `react`, `react-dom`, `react-router-dom`, `@vuu-ui/core`,
+  `@vuu-ui/core/portal`, `@vuu-ui/grid-layout` and
+  `@vuu-ui/vuu-notifications`. A second copy of grid-layout breaks dragging
+  from the palette into the workspace; a second React or router breaks
+  rendering.
+- Workspaces are saved by `workspaces.persistenceService`. By default that is
+  browser local storage, scoped to the `PortalShell` id and the signed-in
+  user. Servers added under Tables › Browse are kept in the per-user portal
+  state (`servers/manual`). This server doesn't store either.
+
+To turn workspaces off, leave the `workspaces` prop off `PortalShell`. To
+keep workspaces but hide a module from the palette, remove its `workspace`
+descriptor.

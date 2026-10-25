@@ -22,7 +22,7 @@
     "@heswell/vuu-table": "1.0.3"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.25",
+    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.26",
     "csv-parse": "^7.0.3"
   }
 }
