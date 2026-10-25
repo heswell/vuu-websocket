@@ -147,7 +147,7 @@ describe("version-check", () => {
     for (const name of ["@heswell/user-admin", "@heswell/vuu-demo", "@heswell/consumer"]) {
       expect(output).toContain(name);
     }
-    expect(output).toContain("unavailable");
+    expect(output).toMatch(/│\s+-\s+│/);
     expect(output).toContain("3.0.1-alpha.1");
     expect(output).toContain("3.0.1-beta.1");
     expect(output).toContain("1.0.0-beta.2");
@@ -178,13 +178,14 @@ describe("version-check", () => {
     expect(output).toContain("2.9.7");
   });
 
-  test("shows unavailable for missing dist output", () => {
+  test("shows a dash for missing dist output", () => {
     const { code, output } = run(
       "version-check", "--package=@heswell/vuu-demo",
     );
     expect(code).toBe(0);
     expect(output).toMatch(/src\s+│\s+dist/);
-    expect(output).toContain("unavailable");
+    expect(output).toMatch(/│\s+-\s+│/);
+    expect(output).not.toContain("unavailable");
     expect(output).not.toContain(" *");
   });
 
@@ -233,9 +234,9 @@ describe("version-check", () => {
   });
 
   test.each([
-    ["1.0.0-alpha.1", /unavailable \*\s+│\s+unavailable\s+│\s+unavailable/],
-    ["1.0.0-beta.1", /unavailable\s+│\s+unavailable \*\s+│\s+unavailable/],
-    ["1.0.0", /unavailable\s+│\s+unavailable\s+│\s+unavailable \*/],
+    ["1.0.0-alpha.1", /- \*\s+│\s+-\s+│\s+-/],
+    ["1.0.0-beta.1", /-\s+│\s+- \*\s+│\s+-/],
+    ["1.0.0", /-\s+│\s+-\s+│\s+- \*/],
   ])("marks the matching channel for unpublished nested dist %s", (version, marked) => {
     writeJson("dist/nested/consumer/package.json", {
       name: "@heswell/consumer",

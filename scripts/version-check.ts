@@ -62,7 +62,7 @@ const checkPackageVersion = async (packageName: string, directory: string) => {
   const distManifestPath = path.join(ROOT, "dist", directory, "package.json");
   const distVersion = fs.existsSync(distManifestPath)
     ? readManifest(packageName, distManifestPath).version
-    : "unavailable";
+    : "-";
   const response = await fetch(`${REGISTRY}/${encodeURIComponent(name)}`);
   if (!response.ok && response.status !== 404) {
     throw new Error(`npm registry returned ${response.status} for ${name}.`);
@@ -74,9 +74,9 @@ const checkPackageVersion = async (packageName: string, directory: string) => {
     package: name,
     src: version,
     dist: distVersion,
-    "npm alpha": metadata["dist-tags"]?.alpha ?? "unavailable",
-    "npm beta": metadata["dist-tags"]?.beta ?? "unavailable",
-    "npm latest": metadata["dist-tags"]?.latest ?? "unavailable",
+    "npm alpha": metadata["dist-tags"]?.alpha ?? "-",
+    "npm beta": metadata["dist-tags"]?.beta ?? "-",
+    "npm latest": metadata["dist-tags"]?.latest ?? "-",
   };
 };
 
@@ -107,7 +107,7 @@ console.table(
       };
     }
     const row = result.value;
-    if (row.dist !== "unavailable") {
+    if (row.dist !== "-") {
       const prerelease = row.dist.split("+")[0].split("-")[1];
       const channel = prerelease ? prerelease.split(".")[0] : "latest";
       const column = !prerelease
@@ -117,7 +117,7 @@ console.table(
           : undefined;
       if (
         column &&
-        (row[column] === "unavailable" ||
+        (row[column] === "-" ||
           Bun.semver.order(row[column], row.dist) < 0)
       ) {
         row[column] += " *";
