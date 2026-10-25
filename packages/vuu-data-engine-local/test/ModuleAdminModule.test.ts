@@ -129,6 +129,24 @@ describe("ModuleAdminModule", () => {
     expect(cell(module, 6, "enabled")).toBe(false);
   });
 
+  it("seeds workspace metadata only for modules placeable in a workspace", () => {
+    const module = createModule();
+    const workspaces = Object.fromEntries(
+      MODULE_ADMIN_INITIAL_SNAPSHOT.modules.map(({ id, name }) => [
+        name,
+        cell(module, id, "workspace"),
+      ]),
+    );
+    expect(JSON.parse(String(workspaces["basket-trading"]))).toEqual({
+      paletteGroup: "Trading",
+      defaultSize: { cols: 12, rows: 8 },
+    });
+    expect(JSON.parse(String(workspaces.moduleAdmin)).paletteGroup).toBe("Admin");
+    expect(JSON.parse(String(workspaces.userAdmin)).paletteGroup).toBe("Admin");
+    expect(workspaces["vuu-table-browser"]).toBe("");
+    expect(workspaces["vuu-table-viewer"]).toBe("");
+  });
+
   it("exposes the module admin RPCs on both tables", () => {
     const module = createModule();
     const names = Object.keys(MODULE_ADMIN_RPC).sort();

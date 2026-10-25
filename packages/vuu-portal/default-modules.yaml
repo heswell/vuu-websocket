@@ -6,6 +6,10 @@
 # notificationTopics (list of strings, no commas).
 # Optional workspace metadata lists a module in the workspace Panels palette:
 # workspace: { paletteGroup: "Trading", iconUrl: "...", defaultSize: { cols: 6, rows: 4 } }
+# iconUrl falls back to navIconUrl. Leave workspace out for modules that cannot
+# stand alone in a workspace: vuu-table-browser is itself a workspace page (its
+# tables appear in the palette's Tables tab) and vuu-table-viewer only works
+# inside its parent.
 modules:
   - id: 1
     version: 1
@@ -21,6 +25,7 @@ modules:
     mfUrl: "http://localhost:5002"
     navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%2214%22%20y%3D%223%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%2214%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3Crect%20x%3D%2214%22%20y%3D%2214%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221%22%2F%3E%3C%2Fsvg%3E"
     accessRole: "module-admin-access"
+    workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } }
   - id: 2
     version: 1
     parentModuleId: 0
@@ -35,6 +40,7 @@ modules:
     mfUrl: "http://localhost:5003"
     navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%229%22%20cy%3D%228%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M2%2021v-1a6%206%200%200%201%206-6h2a6%206%200%200%201%206%206v1%22%2F%3E%3Cpath%20d%3D%22M16%204a4%204%200%200%201%200%208%22%2F%3E%3Cpath%20d%3D%22M22%2021v-1a6%206%200%200%200-4-5.6%22%2F%3E%3C%2Fsvg%3E"
     accessRole: "user-admin-access"
+    workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } }
   - id: 3
     version: 1
     parentModuleId: 0
@@ -49,6 +55,7 @@ modules:
     mfUrl: "http://localhost:5006"
     navIconUrl: "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%203v18h18%22%2F%3E%3Cpath%20d%3D%22m7%2015%204-4%203%203%206-6%22%2F%3E%3C%2Fsvg%3E"
     accessRole: "basket-trading-access"
+    workspace: { paletteGroup: "Trading", defaultSize: { cols: 12, rows: 8 } }
   - id: 4
     version: 1
     parentModuleId: 0

@@ -62,6 +62,7 @@ describe("portal module registry", () => {
         name: "basket-trading",
         mfUrl: "http://localhost:5006",
         navIconUrl: navIconUrl("basket-trading"),
+        workspace: { paletteGroup: "Trading", defaultSize: { cols: 12, rows: 8 } },
       }),
       {
         clientIdentifier: "vuu-module-admin",
@@ -78,6 +79,7 @@ describe("portal module registry", () => {
         mfScope: "moduleAdmin",
         mfUrl: "http://localhost:5002",
         navIconUrl: navIconUrl("moduleAdmin"),
+        workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } },
       },
       {
         clientIdentifier: "vuu-user-admin",
@@ -94,6 +96,7 @@ describe("portal module registry", () => {
         mfScope: "userAdmin",
         mfUrl: "http://localhost:5003",
         navIconUrl: navIconUrl("userAdmin"),
+        workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } },
       },
       {
         clientIdentifier: "vuu-table-browser",
@@ -316,19 +319,22 @@ describe("portal module registry nav metadata", () => {
       "navBadge",
       "notificationTopics",
     ]);
+    expect(registry.modules[3]).toMatchObject({
+      name: "moduleAdmin",
+      workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } },
+    });
     expect(registry.modules[3]).not.toContainAnyKeys([
       "navOrder",
       "navBadge",
       "notificationTopics",
-      "workspace",
     ]);
-    // Without workspace metadata a module is not offered in the palette,
-    // including nested modules such as the table viewer.
+    // Without workspace metadata a module is not offered in the palette:
+    // the table browser (itself a workspace page) and the nested table viewer.
     expect(
       registry.modules
         .filter(({ workspace }) => workspace)
         .map(({ name }) => name),
-    ).toEqual(["basket-trading"]);
+    ).toEqual(["userAdmin", "basket-trading", "moduleAdmin"]);
   });
 });
 

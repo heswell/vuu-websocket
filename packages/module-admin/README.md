@@ -10,6 +10,15 @@ administration functionality.
 
 It exports the module-admin RPC contract. The default module catalog is not part of this package; the portal seeds it from `default-modules.yaml`. The contract includes `ModuleConfig`, `ManagedModule`, `ModuleConfigChanges`, `MODULE_ADMIN_RPC`, `MODULE_ADMIN_RPC_CONTRACT`, parse/validate helpers, pure RPC operation helpers (`executeModuleAdminRpc` and per-RPC functions), access-role helpers, and projections for managed module and permission rows. Server table wiring and YAML persistence deliberately remain portal-specific.
 
+`ManagedModule` and `ModuleConfig` have an optional `workspace` descriptor
+(`{ paletteGroup, iconUrl?, defaultSize?: { cols?, rows? } }`). A module that
+has one is listed in the portal's Panels palette and can be placed in a
+workspace. Leave it out for modules that only work inside their parent. In
+the `modules` table it is a JSON string column; use
+`serializeModuleWorkspace` and `deserializeModuleWorkspace` to convert it.
+`updateModule` replaces the whole descriptor, and `null` clears it. See
+[Workspace metadata](../../docs/requirements/vuu-portal-module-discovery.md#workspace-metadata).
+
 ## Publishing
 
 Build all publishable packages with:

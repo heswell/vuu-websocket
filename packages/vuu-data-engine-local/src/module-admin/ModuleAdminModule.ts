@@ -84,6 +84,7 @@ const INITIAL_MODULES: readonly ManagedModule[] = [
     mfUrl: "http://localhost:5002",
     navIconUrl: NAV_ICONS.modules,
     accessRole: "module-admin-access",
+    workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } },
   }),
   localModule({
     id: 2,
@@ -100,6 +101,7 @@ const INITIAL_MODULES: readonly ManagedModule[] = [
     mfUrl: "http://localhost:5003",
     navIconUrl: NAV_ICONS.users,
     accessRole: "user-admin-access",
+    workspace: { paletteGroup: "Admin", defaultSize: { cols: 12, rows: 6 } },
   }),
   localModule({
     id: 3,
@@ -116,6 +118,7 @@ const INITIAL_MODULES: readonly ManagedModule[] = [
     mfUrl: "http://localhost:5006",
     navIconUrl: NAV_ICONS.trading,
     accessRole: "basket-trading-access",
+    workspace: { paletteGroup: "Trading", defaultSize: { cols: 12, rows: 8 } },
   }),
   localModule({
     id: 4,
