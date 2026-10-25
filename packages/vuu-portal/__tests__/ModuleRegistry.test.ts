@@ -256,6 +256,10 @@ describe("portal module registry nav metadata", () => {
         navOrder: 2,
         navBadge: "orders.working",
         notificationTopics: ["orders", "fills"],
+        workspace: {
+          paletteGroup: "Trading",
+          defaultSize: { cols: 6, rows: 4 },
+        },
       },
       userAdmin: { navOrder: 1 },
       "vuu-table-browser": { navOrder: 1 },
@@ -305,6 +309,7 @@ describe("portal module registry nav metadata", () => {
       navOrder: 2,
       navBadge: "orders.working",
       notificationTopics: ["orders", "fills"],
+      workspace: { paletteGroup: "Trading", defaultSize: { cols: 6, rows: 4 } },
     });
     expect(registry.modules[0]).toMatchObject({ name: "userAdmin", navOrder: 1 });
     expect(registry.modules[0]).not.toContainAnyKeys([
@@ -315,7 +320,15 @@ describe("portal module registry nav metadata", () => {
       "navOrder",
       "navBadge",
       "notificationTopics",
+      "workspace",
     ]);
+    // Without workspace metadata a module is not offered in the palette,
+    // including nested modules such as the table viewer.
+    expect(
+      registry.modules
+        .filter(({ workspace }) => workspace)
+        .map(({ name }) => name),
+    ).toEqual(["basket-trading"]);
   });
 });
 

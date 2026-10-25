@@ -23,4 +23,9 @@
 #     navOrder: 1
 #     navBadge: "modules.pending"
 #     notificationTopics: ["modules"]
+#     # Optional: list the module in the workspace Panels palette.
+#     workspace:
+#       paletteGroup: "Admin"
+#       iconUrl: ""            # optional; data:image/... or http(s) URL
+#       defaultSize: { cols: 6, rows: 4 }  # optional; positive integers
 modules: []

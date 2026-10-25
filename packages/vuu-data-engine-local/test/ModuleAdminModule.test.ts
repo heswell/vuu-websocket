@@ -92,6 +92,7 @@ describe("ModuleAdminModule", () => {
       "navOrder",
       "navBadge",
       "notificationTopics",
+      "workspace",
       "vuuCreatedTimestamp",
       "vuuUpdatedTimestamp",
       "vuuMsg",

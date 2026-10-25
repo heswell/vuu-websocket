@@ -31,10 +31,25 @@ export interface ModuleRecord {
   navBadge?: string;
   /** Notification topics this module claims, e.g. `["orders", "fills"]`. */
   notificationTopics?: string[];
+  /**
+   * Present when the module can be placed in a workspace: the portal lists it
+   * in the Panels palette under `paletteGroup`. Absent for modules that are
+   * not offered there, such as nested modules that need their parent.
+   */
+  workspace?: ModuleWorkspaceDescriptor;
   path: string;
   mfComponent: string;
   mfScope: string;
   mfUrl: string;
+}
+
+export interface ModuleWorkspaceDescriptor {
+  /** Palette group heading, e.g. `Trading`. */
+  paletteGroup: string;
+  /** Palette icon as a data URL (SVG) or an http(s) URL. */
+  iconUrl?: string;
+  /** Default size when placed in a workspace grid, in grid tracks. */
+  defaultSize?: { cols?: number; rows?: number };
 }
 
 export interface ModuleRegistry {

@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
   defaultAccessRole,
+  deserializeModuleWorkspace,
   EMPTY_MODULE_CONFIG,
   managedModuleColumnValues,
   managedModulePermissionValues,
   parseModuleConfig,
   parseModuleConfigChanges,
   splitNotificationTopics,
+  serializeModuleWorkspace,
   validateModuleConfig,
 } from "../src/contracts";
 
@@ -105,5 +107,75 @@ describe("module administration contract", () => {
     ).toMatchObject({ navOrder: 3, navBadge: "orders.working", notificationTopics: "orders,fills" });
     expect(splitNotificationTopics("orders, fills,")).toEqual(["orders", "fills"]);
     expect(splitNotificationTopics("")).toEqual([]);
+  });
+
+  describe("workspace metadata", () => {
+    const workspace = {
+      paletteGroup: "Trading",
+      iconUrl: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E",
+      defaultSize: { cols: 6, rows: 4 },
+    };
+
+    test("is optional", () => {
+      expect(parseModuleConfig(JSON.stringify({ name: "alpha" }))).not.toHaveProperty("workspace");
+      expect(validateModuleConfig(validConfig, [])).toEqual({});
+    });
+
+    test("parses and normalises a workspace", () => {
+      expect(parseModuleConfig(JSON.stringify({ name: "alpha", workspace })).workspace).toEqual(workspace);
+      expect(
+        parseModuleConfig(
+          JSON.stringify({
+            name: "alpha",
+            workspace: { paletteGroup: " Trading ", iconUrl: " ", defaultSize: { cols: null } },
+          }),
+        ).workspace,
+      ).toEqual({ paletteGroup: "Trading" });
+      expect(
+        parseModuleConfig(JSON.stringify({ name: "alpha", workspace: { paletteGroup: "Trading", defaultSize: { rows: 3 } } })).workspace,
+      ).toEqual({ paletteGroup: "Trading", defaultSize: { rows: 3 } });
+      expect(parseModuleConfigChanges(JSON.stringify({ workspace: null }))).toHaveProperty("workspace", undefined);
+    });
+
+    test.each([
+      [[], "Workspace must be an object"],
+      ["Trading", "Workspace must be an object"],
+      [{}, "Workspace palette group is required"],
+      [{ paletteGroup: " " }, "Workspace palette group is required"],
+      [{ paletteGroup: 1 }, "Workspace palette group is required"],
+      [{ paletteGroup: "Trading", icon: "x" }, 'Workspace has unknown field "icon"; expected paletteGroup, iconUrl, defaultSize'],
+      [{ paletteGroup: "Trading", iconUrl: "ticket.svg" }, "Workspace icon must be an image data URL or http(s) URL"],
+      [{ paletteGroup: "Trading", defaultSize: 4 }, "Workspace default size must be an object"],
+      [{ paletteGroup: "Trading", defaultSize: { width: 4 } }, 'Workspace default size has unknown field "width"; expected cols, rows'],
+      [{ paletteGroup: "Trading", defaultSize: { cols: 0 } }, "Workspace default size cols must be a positive integer"],
+      [{ paletteGroup: "Trading", defaultSize: { rows: 1.5 } }, "Workspace default size rows must be a positive integer"],
+      [{ paletteGroup: "Trading", defaultSize: { rows: "2" } }, "Workspace default size rows must be a positive integer"],
+    ])("rejects invalid workspace %j", (value, message) => {
+      expect(() => parseModuleConfig(JSON.stringify({ name: "alpha", workspace: value }))).toThrow(`workspace: ${message}`);
+      expect(() => parseModuleConfigChanges(JSON.stringify({ workspace: value }))).toThrow(`workspace: ${message}`);
+      expect(
+        validateModuleConfig({ ...validConfig, workspace: value as never }, []),
+      ).toEqual({ workspace: message });
+    });
+
+    test("validates a workspace", () => {
+      expect(validateModuleConfig({ ...validConfig, workspace }, [])).toEqual({});
+      expect(
+        validateModuleConfig({ ...validConfig, workspace: { paletteGroup: "Tools", iconUrl: "https://example.com/i.svg" } }, []),
+      ).toEqual({});
+    });
+
+    test("projects to and from a JSON table column", () => {
+      const module = { ...validConfig, id: 1, version: 1, created: 1, updated: 1 };
+      expect(managedModuleColumnValues(module)).toMatchObject({ workspace: "" });
+      const value = managedModuleColumnValues({ ...module, workspace }).workspace;
+      expect(value).toBe(JSON.stringify(workspace));
+      expect(deserializeModuleWorkspace(value)).toEqual(workspace);
+      expect(serializeModuleWorkspace(undefined)).toBe("");
+      expect(deserializeModuleWorkspace("")).toBeUndefined();
+      expect(deserializeModuleWorkspace(undefined)).toBeUndefined();
+      expect(deserializeModuleWorkspace("{not json")).toBeUndefined();
+      expect(deserializeModuleWorkspace(JSON.stringify({ paletteGroup: "" }))).toBeUndefined();
+    });
   });
 });

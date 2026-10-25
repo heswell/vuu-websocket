@@ -64,6 +64,27 @@ describe("ModuleAdminService", () => {
     expect(invalid).toMatchObject({ type: "ERROR_RESULT" });
   });
 
+  test("syncs workspace metadata into the modules table as JSON", async () => {
+    const { service, tables, state } = setup([baseModule]);
+    const columnValue = () =>
+      tables.modules.getRowAtKey("1")[tables.modules.columnMap.workspace];
+    expect(columnValue()).toBe("");
+
+    const workspace = { paletteGroup: "Trading", defaultSize: { cols: 6 } };
+    const update = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ workspace }), expectedVersion: 1 });
+    expect(update).toEqual({ type: "SUCCESS_RESULT", data: { id: 1, version: 2 } });
+    expect(JSON.parse(columnValue())).toEqual(workspace);
+    expect(state.modules[0].workspace).toEqual(workspace);
+
+    const invalid = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ workspace: { paletteGroup: "Trading", defaultSize: { cols: -1 } } }), expectedVersion: 2 });
+    expect(invalid).toEqual({ type: "ERROR_RESULT", errorMessage: "workspace: Workspace default size cols must be a positive integer" });
+
+    const cleared = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ workspace: null }), expectedVersion: 2 });
+    expect(cleared).toEqual({ type: "SUCCESS_RESULT", data: { id: 1, version: 3 } });
+    expect(columnValue()).toBe("");
+    expect(state.modules[0]).not.toHaveProperty("workspace");
+  });
+
   test("rejects module admin rpcs from users without the admin role", async () => {
     const { service, state, store } = setup([baseModule]);
     for (const [rpcName, params] of [

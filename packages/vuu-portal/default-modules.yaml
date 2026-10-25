@@ -4,6 +4,8 @@
 # its parent's role.
 # Optional nav metadata: navOrder (number), navBadge (string) and
 # notificationTopics (list of strings, no commas).
+# Optional workspace metadata lists a module in the workspace Panels palette:
+# workspace: { paletteGroup: "Trading", iconUrl: "...", defaultSize: { cols: 6, rows: 4 } }
 modules:
   - id: 1
     version: 1

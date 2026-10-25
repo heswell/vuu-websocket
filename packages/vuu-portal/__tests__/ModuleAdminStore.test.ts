@@ -55,6 +55,47 @@ describe("YamlModuleStore", () => {
     ]);
   });
 
+  test("round-trips workspace metadata and omits it when unset", () => {
+    const filePath = path.join(root, "modules.yaml");
+    const store = new YamlModuleStore(filePath, () => []);
+    const [first, ...rest] = seeded(100);
+    const workspace = {
+      paletteGroup: "Trading",
+      iconUrl: "https://example.com/ticket.svg",
+      defaultSize: { cols: 6, rows: 4 },
+    };
+    const modules = [{ ...first, workspace }, ...rest];
+    store.save(modules);
+
+    expect(store.load()).toEqual(modules);
+    const saved = Bun.YAML.parse(fs.readFileSync(filePath, "utf8")) as {
+      modules: Record<string, unknown>[];
+    };
+    expect(saved.modules[0].workspace).toEqual(workspace);
+    expect(saved.modules[1]).not.toHaveProperty("workspace");
+  });
+
+  test("rejects invalid workspace metadata", () => {
+    fs.mkdirSync(root, { recursive: true });
+    const filePath = path.join(root, "modules.yaml");
+    const write = (workspace: unknown) =>
+      fs.writeFileSync(
+        filePath,
+        Bun.YAML.stringify({ modules: [{ ...seeded(100)[0], workspace }] }),
+        "utf8",
+      );
+    const load = () => new YamlModuleStore(filePath, () => []).load();
+
+    write("Trading");
+    expect(load).toThrow("field 'workspace' must be an object");
+    write({ group: "Trading" });
+    expect(load).toThrow('workspace: Workspace has unknown field "group"');
+    write({ paletteGroup: "Trading", defaultSize: { cols: 0 } });
+    expect(load).toThrow("workspace: Workspace default size cols must be a positive integer");
+    write(null);
+    expect(load()[0]).not.toHaveProperty("workspace");
+  });
+
   test("rejects invalid nav metadata", () => {
     fs.mkdirSync(root, { recursive: true });
     const filePath = path.join(root, "modules.yaml");

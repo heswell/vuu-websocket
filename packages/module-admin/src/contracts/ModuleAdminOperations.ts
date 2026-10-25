@@ -190,13 +190,27 @@ function findModule(modules: readonly ManagedModule[], id: number) {
 }
 
 function hasActualChanges(module: ManagedModule, changes: ModuleConfigChanges) {
-  return Object.entries(changes).some(([key, value]) => {
-    const current = module[key as keyof ModuleConfigChanges];
-    return Array.isArray(current) && Array.isArray(value)
-      ? current.length !== value.length ||
-          current.some((item, index) => item !== value[index])
-      : current !== value;
-  });
+  return Object.entries(changes).some(
+    ([key, value]) => !isEqualValue(module[key as keyof ModuleConfigChanges], value),
+  );
+}
+
+function isEqualValue(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length &&
+      left.every((item, index) => isEqualValue(item, right[index]))
+    );
+  }
+  if (isRecord(left) && isRecord(right)) {
+    const leftKeys = Object.keys(left).filter((key) => left[key] !== undefined);
+    const rightKeys = Object.keys(right).filter((key) => right[key] !== undefined);
+    return (
+      leftKeys.length === rightKeys.length &&
+      leftKeys.every((key) => isEqualValue(left[key], right[key]))
+    );
+  }
+  return left === right;
 }
 
 function stringParam(params: NamedParams, name: string) {
@@ -228,9 +242,19 @@ function cloneModules(modules: readonly ManagedModule[]) {
     Object.fromEntries(
       Object.entries(module)
         .filter(([, value]) => value !== undefined)
-        .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+        .map(([key, value]) => [key, cloneValue(value)]),
     ) as ManagedModule,
   );
+}
+
+function cloneValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cloneValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, cloneValue(item)]),
+    );
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is NamedParams {
