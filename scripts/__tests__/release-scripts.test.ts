@@ -31,6 +31,7 @@ beforeEach(() => {
   for (const name of [
     "bump-versions",
     "publish",
+    "version-check",
     "publishable-packages",
     "workspace-packages",
   ]) {
@@ -139,9 +140,9 @@ describe("bump:versions", () => {
   });
 });
 
-describe("pub --version-check", () => {
+describe("version-check", () => {
   test("lists every workspace, including non-publishable, private and unpublished packages", () => {
-    const { code, output } = run("publish", "--version-check");
+    const { code, output } = run("version-check");
     expect(code).toBe(0);
     for (const name of ["@heswell/user-admin", "@heswell/vuu-demo", "@heswell/consumer"]) {
       expect(output).toContain(name);
@@ -155,7 +156,7 @@ describe("pub --version-check", () => {
 
   test("filters to any explicitly selected workspace package", () => {
     for (const args of [["--package=@heswell/vuu-demo"], ["--package", "@heswell/vuu-demo"]]) {
-      const { code, output } = run("publish", "--version-check", ...args);
+      const { code, output } = run("version-check", ...args);
       expect(code).toBe(0);
       expect(output).toContain("@heswell/vuu-demo");
       expect(output).not.toContain("@heswell/user-admin");
@@ -169,41 +170,90 @@ describe("pub --version-check", () => {
       version: "2.9.7",
     });
     const { code, output } = run(
-      "publish", "--version-check", "--package=@heswell/vuu-demo",
+      "version-check", "--package=@heswell/vuu-demo",
     );
     expect(code).toBe(0);
-    expect(output).toContain("dist/package.json");
+    expect(output).toMatch(/package\s+│\s+src\s+│\s+dist\s+│\s+npm alpha\s+│\s+npm beta\s+│\s+npm latest/);
     expect(output).toContain("3.0.0");
     expect(output).toContain("2.9.7");
   });
 
   test("shows unavailable for missing dist output", () => {
     const { code, output } = run(
-      "publish", "--version-check", "--package=@heswell/vuu-demo",
+      "version-check", "--package=@heswell/vuu-demo",
     );
     expect(code).toBe(0);
-    expect(output).toContain("dist/package.json");
+    expect(output).toMatch(/src\s+│\s+dist/);
     expect(output).toContain("unavailable");
+    expect(output).not.toContain(" *");
   });
 
-  test("shows nested dist versions even when the package is unpublished", () => {
-    writeJson("dist/nested/consumer/package.json", {
-      name: "@heswell/consumer",
-      version: "1.0.0-beta.1",
+  test.each([
+    ["3.0.1-alpha.10", "3.0.1-alpha.1 *"],
+    ["3.0.1-beta.10", "3.0.1-beta.1 *"],
+    ["3.0.1", "3.0.0 *"],
+    ["3.0.1+build.1", "3.0.0 *"],
+    ["3.0.1-alpha.10+build.1", "3.0.1-alpha.1 *"],
+  ])("marks only the matching npm channel for dist %s", (version, marked) => {
+    writeJson("dist/vuu-demo/package.json", {
+      name: "@heswell/vuu-demo",
+      version,
     });
     const { code, output } = run(
-      "publish", "--version-check", "--package=@heswell/consumer",
+      "version-check", "--package=@heswell/vuu-demo",
+    );
+    expect(code).toBe(0);
+    expect(output).toContain(marked);
+    for (const npmVersion of ["3.0.1-alpha.1", "3.0.1-beta.1", "3.0.0"]) {
+      if (!marked.startsWith(npmVersion)) {
+        expect(output).not.toContain(`${npmVersion} *`);
+      }
+    }
+    expect(output).toContain("* npm tag is older than dist or unavailable");
+  });
+
+  test.each([
+    "3.0.1-alpha.1",
+    "3.0.1-beta.1",
+    "3.0.0",
+    "3.0.1-alpha.0",
+    "3.0.1-beta.0",
+    "2.9.7",
+    "3.0.1-rc.1",
+  ])("does not flag equal/newer npm versions or unrelated channels for dist %s", (version) => {
+    writeJson("dist/vuu-demo/package.json", {
+      name: "@heswell/vuu-demo",
+      version,
+    });
+    const { code, output } = run(
+      "version-check", "--package=@heswell/vuu-demo",
+    );
+    expect(code).toBe(0);
+    expect(output).not.toContain(" *");
+  });
+
+  test.each([
+    ["1.0.0-alpha.1", /unavailable \*\s+│\s+unavailable\s+│\s+unavailable/],
+    ["1.0.0-beta.1", /unavailable\s+│\s+unavailable \*\s+│\s+unavailable/],
+    ["1.0.0", /unavailable\s+│\s+unavailable\s+│\s+unavailable \*/],
+  ])("marks the matching channel for unpublished nested dist %s", (version, marked) => {
+    writeJson("dist/nested/consumer/package.json", {
+      name: "@heswell/consumer",
+      version,
+    });
+    const { code, output } = run(
+      "version-check", "--package=@heswell/consumer",
     );
     expect(code).toBe(0);
     expect(output).toContain("1.0.0-beta.2");
-    expect(output).toContain("1.0.0-beta.1");
-    expect(output).toContain("unavailable");
+    expect(output).toContain(version);
+    expect(output).toMatch(marked);
   });
 
   test("reports invalid dist manifests instead of masking them as unavailable", () => {
     writeJson("dist/vuu-demo/package.json", { name: "@heswell/vuu-demo" });
     const { code, output } = run(
-      "publish", "--version-check", "--package=@heswell/vuu-demo",
+      "version-check", "--package=@heswell/vuu-demo",
     );
     expect(code).not.toBe(0);
     expect(output).toContain("Invalid package manifest");
@@ -216,7 +266,7 @@ describe("pub --version-check", () => {
       'process.argv.includes("--registry-error")',
       "true",
     ));
-    const { code, output } = run("publish", "--version-check");
+    const { code, output } = run("version-check");
     expect(code).not.toBe(0);
     expect(output).toContain("@heswell/user-admin");
     expect(output).toContain("@heswell/consumer");
@@ -224,11 +274,27 @@ describe("pub --version-check", () => {
     expect(output).toContain("1 version check(s) failed");
   });
 
-  test("rejects unknown packages, conflicting flags and unsupported publishing", () => {
+  test("rejects unknown packages and unsupported flags", () => {
     for (const args of [
-      ["--version-check", "--package=missing"],
-      ["--version-check", "--dry-run"],
-      ["--version-check", "--tag=beta"],
+      ["--package=missing"],
+      ["--package"],
+      ["--package="],
+      ["--dry-run"],
+      ["--tag=beta"],
+      ["--version-check"],
+      ["--unknown"],
+    ]) {
+      const { code, output } = run("version-check", ...args);
+      expect(code).not.toBe(0);
+      expect(output).not.toContain("Unexpected build or publish");
+    }
+  });
+});
+
+describe("pub", () => {
+  test("rejects the removed version-check flag and unsupported publishing", () => {
+    for (const args of [
+      ["--version-check"],
       ["--package=@heswell/vuu-demo", "--dry-run"],
     ]) {
       const { code, output } = run("publish", ...args);
@@ -236,4 +302,37 @@ describe("pub --version-check", () => {
       expect(output).not.toContain("Unexpected build or publish");
     }
   });
+
+  test.each([[undefined], ["--tag=alpha"], ["--tag=beta"], ["--dry-run"]])(
+    "publishes without a delayed registry check (%j)",
+    (option) => {
+      writeJson("dist/user-admin/package.json", {
+        name: "@heswell/user-admin",
+        version: "1.0.0",
+      });
+      fs.writeFileSync(
+        path.join(root, "registry.ts"),
+        `Bun.spawnSync = (args) => {
+  console.log("mock npm:", args.join(" "));
+  return { exitCode: 0 };
+};
+globalThis.fetch = () => { throw new Error("Unexpected registry check"); };
+globalThis.setTimeout = () => { throw new Error("Unexpected verification delay"); };`,
+      );
+      const { code, output } = run("publish", ...(option ? [option] : []));
+      expect(code).toBe(0);
+      expect(output).toContain("mock npm: npm run build:packages");
+      expect(output).toContain("mock npm: npm pack --dry-run ./dist/user-admin");
+      expect(output).toContain("mock npm: npm publish ./dist/user-admin");
+      if (option === "--dry-run") {
+        expect(output).not.toContain("publish succeeded");
+      } else {
+        expect(output).toContain("publish succeeded");
+      }
+      if (option?.startsWith("--tag=")) {
+        expect(output).toContain(`--tag ${option.slice("--tag=".length)}`);
+      }
+      expect(output).not.toContain("Unexpected");
+    },
+  );
 });

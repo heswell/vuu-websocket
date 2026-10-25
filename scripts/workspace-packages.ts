@@ -4,6 +4,26 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+export type PackageManifest = {
+  name: string;
+  version: string;
+};
+
+export const readManifest = (
+  packageName: string,
+  manifestPath: string,
+): PackageManifest => {
+  const manifest = JSON.parse(
+    fs.readFileSync(manifestPath, "utf8"),
+  ) as Partial<PackageManifest>;
+
+  if (manifest.name !== packageName || !manifest.version) {
+    throw new Error(`Invalid package manifest at ${manifestPath}.`);
+  }
+
+  return manifest as PackageManifest;
+};
+
 export const getWorkspacePackages = () => {
   const packagesRoot = path.join(ROOT, "packages");
   const packages: { name: string; directory: string }[] = [];

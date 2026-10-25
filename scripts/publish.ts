@@ -6,8 +6,8 @@
  * Validate without publishing:
  *   npm run pub -- --dry-run
  *
- * Check the version on npm:
- *   npm run pub -- --version-check
+ * Check versions separately:
+ *   npm run version-check
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -17,37 +17,15 @@ import {
   getPublishablePackage,
   PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
-import { getWorkspacePackages } from "./workspace-packages";
+import { readManifest, type PackageManifest } from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
-const PUBLISH_VERIFICATION_DELAY_MS = 10_000;
-
-type PackageManifest = {
-  name: string;
-  version: string;
-};
-
-type NpmMetadata = {
-  versions?: Record<string, unknown>;
-  "dist-tags"?: Record<string, string>;
-};
-
-type PackageVersionCheck = {
-  "npm alpha": string;
-  "npm beta": string;
-  "npm latest": string;
-  package: string;
-  "package.json": string;
-  "dist/package.json": string;
-  published: boolean;
-};
 
 type Options = {
   dryRun: boolean;
   packageName?: string;
   publishTag?: string;
-  versionCheck: boolean;
 };
 
 const printHelp = () => {
@@ -57,12 +35,11 @@ Builds and publishes ${DEFAULT_PUBLISHABLE_PACKAGE_NAME} by default.
 
 Options:
   --package <name>   Publish one of: ${PUBLISHABLE_PACKAGE_NAMES_TEXT}.
-                     For --version-check, select any workspace package.
   --tag <alpha|beta>  Publish under an npm prerelease dist-tag.
   --dry-run           Validate the npm package without publishing it.
-  --version-check     Show source/dist versions and npm dist-tags, unless
-                      filtered with --package. Does not build or publish.
-  --help              Print this help message.`);
+  --help              Print this help message.
+
+Check versions separately with npm run version-check.`);
 };
 
 const getPackage = (packageName: string) => {
@@ -75,21 +52,6 @@ const getPackage = (packageName: string) => {
     directory: `dist/${directory}`,
     sourceManifestPath: path.join(ROOT, "packages", directory, "package.json"),
   };
-};
-
-const readManifest = (
-  packageName: string,
-  manifestPath: string,
-): PackageManifest => {
-  const sourceManifest = JSON.parse(
-    fs.readFileSync(manifestPath, "utf8"),
-  ) as Partial<PackageManifest>;
-
-  if (sourceManifest.name !== packageName || !sourceManifest.version) {
-    throw new Error(`Invalid package manifest at ${manifestPath}.`);
-  }
-
-  return sourceManifest as PackageManifest;
 };
 
 const assertBuiltPackageMatchesSource = (
@@ -133,7 +95,6 @@ const getOptionValue = (args: string[], index: number, flag: string) => {
 const parseOptions = (): Options => {
   const options: Options = {
     dryRun: false,
-    versionCheck: false,
   };
   const args = process.argv.slice(2);
 
@@ -145,10 +106,6 @@ const parseOptions = (): Options => {
     }
     if (argument === "--dry-run") {
       options.dryRun = true;
-      continue;
-    }
-    if (argument === "--version-check") {
-      options.versionCheck = true;
       continue;
     }
     if (argument === "--package" || argument.startsWith("--package=")) {
@@ -171,11 +128,6 @@ const parseOptions = (): Options => {
       `Unsupported publish tag "${options.publishTag}". Use alpha or beta.`,
     );
   }
-  if (options.versionCheck && (options.dryRun || options.publishTag)) {
-    throw new Error(
-      "--version-check cannot be combined with --dry-run or --tag.",
-    );
-  }
 
   return options;
 };
@@ -193,77 +145,6 @@ const runNpm = (args: string[]) => {
   }
 };
 
-const checkPackageVersion = async (
-  packageName: string,
-  sourceManifestPath: string,
-): Promise<PackageVersionCheck> => {
-  const { name, version } = readManifest(packageName, sourceManifestPath);
-  const distManifestPath = path.join(
-    ROOT,
-    "dist",
-    path.relative(path.join(ROOT, "packages"), sourceManifestPath),
-  );
-  const distVersion = fs.existsSync(distManifestPath)
-    ? readManifest(packageName, distManifestPath).version
-    : "unavailable";
-  const response = await fetch(`${REGISTRY}/${encodeURIComponent(name)}`);
-
-  if (response.status === 404) {
-    return {
-      "npm alpha": "unavailable",
-      "npm beta": "unavailable",
-      "npm latest": "unavailable",
-      package: name,
-      "package.json": version,
-      "dist/package.json": distVersion,
-      published: false,
-    };
-  }
-  if (!response.ok) {
-    throw new Error(`npm registry returned ${response.status} for ${name}.`);
-  }
-
-  const metadata = (await response.json()) as NpmMetadata;
-  return {
-    "npm alpha": metadata["dist-tags"]?.alpha ?? "unavailable",
-    "npm beta": metadata["dist-tags"]?.beta ?? "unavailable",
-    "npm latest": metadata["dist-tags"]?.latest ?? "unavailable",
-    package: name,
-    "package.json": version,
-    "dist/package.json": distVersion,
-    published: Object.hasOwn(metadata.versions ?? {}, version),
-  };
-};
-
-const printVersionCheck = async (
-  packages: { name: string; sourceManifestPath: string }[],
-) => {
-  const results = await Promise.allSettled(
-    packages.map(({ name, sourceManifestPath }) =>
-      checkPackageVersion(name, sourceManifestPath),
-    ),
-  );
-  console.table(
-    results.map((result, index) => {
-      if (result.status === "rejected") {
-        return {
-          package: packages[index].name,
-          error:
-            result.reason instanceof Error
-              ? result.reason.message
-              : String(result.reason),
-        };
-      }
-      const { published, ...row } = result.value;
-      return row;
-    }),
-  );
-  const failures = results.filter(({ status }) => status === "rejected");
-  if (failures.length) {
-    throw new Error(`${failures.length} version check(s) failed.`);
-  }
-};
-
 const reportPublishSuccess = (packageName: string) => {
   console.table([
     {
@@ -276,48 +157,26 @@ const reportPublishSuccess = (packageName: string) => {
 
 const options = parseOptions();
 
-if (options.versionCheck) {
-  const packages = getWorkspacePackages();
-  if (
-    options.packageName &&
-    !packages.some(({ name }) => name === options.packageName)
-  ) {
-    throw new Error(`Unknown workspace package "${options.packageName}".`);
-  }
-  await printVersionCheck(
-    packages
-      .filter(({ name }) => !options.packageName || name === options.packageName)
-      .map(({ name, directory }) => ({
-        name,
-        sourceManifestPath: path.join(ROOT, "packages", directory, "package.json"),
-      })),
-  );
-} else {
-  const packageName = options.packageName ?? DEFAULT_PUBLISHABLE_PACKAGE_NAME;
-  const { directory: packageDirectory, sourceManifestPath } =
-    getPackage(packageName);
-  const sourceManifest = readManifest(packageName, sourceManifestPath);
-  runNpm(["run", "build:packages"]);
-  assertBuiltPackageMatchesSource(sourceManifest, packageDirectory);
-  runNpm(["pack", "--dry-run", `./${packageDirectory}`]);
+const packageName = options.packageName ?? DEFAULT_PUBLISHABLE_PACKAGE_NAME;
+const { directory: packageDirectory, sourceManifestPath } =
+  getPackage(packageName);
+const sourceManifest = readManifest(packageName, sourceManifestPath);
+runNpm(["run", "build:packages"]);
+assertBuiltPackageMatchesSource(sourceManifest, packageDirectory);
+runNpm(["pack", "--dry-run", `./${packageDirectory}`]);
 
-  const publishArgs = [
-    "publish",
-    `./${packageDirectory}`,
-    "--registry",
-    REGISTRY,
-    "--access",
-    "public",
-  ];
-  if (options.publishTag) publishArgs.push("--tag", options.publishTag);
-  if (options.dryRun) publishArgs.push("--dry-run");
-  runNpm(publishArgs);
+const publishArgs = [
+  "publish",
+  `./${packageDirectory}`,
+  "--registry",
+  REGISTRY,
+  "--access",
+  "public",
+];
+if (options.publishTag) publishArgs.push("--tag", options.publishTag);
+if (options.dryRun) publishArgs.push("--dry-run");
+runNpm(publishArgs);
 
-  if (!options.dryRun) {
-    reportPublishSuccess(packageName);
-    await new Promise((resolve) =>
-      setTimeout(resolve, PUBLISH_VERIFICATION_DELAY_MS),
-    );
-    await printVersionCheck([{ name: packageName, sourceManifestPath }]);
-  }
+if (!options.dryRun) {
+  reportPublishSuccess(packageName);
 }
