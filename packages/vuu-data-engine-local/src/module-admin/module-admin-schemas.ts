@@ -32,6 +32,8 @@ export const MODULE_ADMIN_TABLE_SCHEMAS: Readonly<
       { name: "navBadge", serverDataType: "string" },
       // Comma-separated.
       { name: "notificationTopics", serverDataType: "string" },
+      // JSON-encoded.
+      { name: "workspace", serverDataType: "string" },
       ...VUU_DEFAULT_COLUMNS,
     ],
     key: "id",

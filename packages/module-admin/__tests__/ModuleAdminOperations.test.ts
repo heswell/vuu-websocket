@@ -91,6 +91,51 @@ describe("module admin operations", () => {
     expect(cleared.modules[0]).not.toContainAnyKeys(["navOrder", "navBadge", "notificationTopics"]);
   });
 
+  test("creates, updates and clears workspace metadata", () => {
+    const workspace = { paletteGroup: "Trading", defaultSize: { cols: 6, rows: 4 } };
+    const created = executeModuleAdminRpc(
+      [baseModule],
+      "createModule",
+      { module: JSON.stringify({ ...toModuleConfig(baseModule), name: "beta", path: "/beta", mfScope: "beta", workspace }) },
+      () => 5,
+    );
+    expect(created.modules[1]).toMatchObject({ name: "beta", workspace });
+    expect(created.modules[0]).not.toHaveProperty("workspace");
+    expect(() =>
+      executeModuleAdminRpc([baseModule], "createModule", {
+        module: JSON.stringify({ ...toModuleConfig(baseModule), name: "beta", path: "/beta", mfScope: "beta", workspace: { paletteGroup: "" } }),
+      }),
+    ).toThrow("workspace: Workspace palette group is required");
+
+    const withWorkspace = { ...baseModule, workspace };
+    const unchanged = executeModuleAdminRpc([withWorkspace], "updateModule", {
+      id: 1,
+      changes: JSON.stringify({ workspace: { defaultSize: { rows: 4, cols: 6 }, paletteGroup: "Trading" } }),
+      expectedVersion: 1,
+    });
+    expect(unchanged.result).toEqual({ id: 1, version: 1 });
+
+    // The whole object is replaced, not merged.
+    const changed = executeModuleAdminRpc([withWorkspace], "updateModule", {
+      id: 1,
+      changes: JSON.stringify({ workspace: { paletteGroup: "Tools" } }),
+      expectedVersion: 1,
+    });
+    expect(changed.modules[0]).toMatchObject({ version: 2, workspace: { paletteGroup: "Tools" } });
+    expect(changed.modules[0].workspace).not.toHaveProperty("defaultSize");
+
+    const cleared = executeModuleAdminRpc([withWorkspace], "updateModule", { id: 1, changes: JSON.stringify({ workspace: null }), expectedVersion: 1 });
+    expect(cleared.result).toEqual({ id: 1, version: 2 });
+    expect(cleared.modules[0]).not.toHaveProperty("workspace");
+
+    // Returned modules don't share nested objects with the input.
+    changed.modules[0].workspace!.paletteGroup = "Mutated";
+    expect(withWorkspace.workspace.paletteGroup).toBe("Trading");
+    const added = executeModuleAdminRpc([withWorkspace], "updateModule", { id: 1, changes: JSON.stringify({ title: "Alpha 2" }), expectedVersion: 1 });
+    expect(added.modules[0].workspace).toEqual(workspace);
+    expect(added.modules[0].workspace).not.toBe(workspace);
+  });
+
   test("sets enabled without bumping version and validates enabled top-level access", () => {
     const disabled = executeModuleAdminRpc(
       [baseModule],

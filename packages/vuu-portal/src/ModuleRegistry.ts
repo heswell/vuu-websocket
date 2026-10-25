@@ -5,7 +5,10 @@ import type {
   TableContainer,
   VuuUser,
 } from "@heswell/vuu-server";
-import { splitNotificationTopics } from "@heswell/module-admin";
+import {
+  deserializeModuleWorkspace,
+  splitNotificationTopics,
+} from "@heswell/module-admin";
 
 /**
  * Derives a module's own client identifier from its name, e.g.
@@ -67,6 +70,7 @@ function readModules(table: DataTable): DiscoveredModuleRecord[] {
       mfUrl: stringValue(table, row, "mfUrl"),
       ...navIcon(table, row),
       ...navMetadata(table, row),
+      ...workspaceMetadata(table, row),
     };
   });
 }
@@ -104,6 +108,20 @@ function navMetadata(table: DataTable, row: unknown[]) {
     }
   }
   return metadata;
+}
+
+/**
+ * Optional workspace metadata, omitted when unset (including for tables that
+ * predate the column) or unreadable.
+ */
+function workspaceMetadata(
+  table: DataTable,
+  row: unknown[],
+): Pick<ModuleRecord, "workspace"> {
+  const workspace = deserializeModuleWorkspace(
+    optionalValue(table, row, "workspace"),
+  );
+  return workspace ? { workspace } : {};
 }
 
 function optionalValue(table: DataTable, row: unknown[], column: string) {

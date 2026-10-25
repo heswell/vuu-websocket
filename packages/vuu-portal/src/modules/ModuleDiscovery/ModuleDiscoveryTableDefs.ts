@@ -19,6 +19,8 @@ export const modulesTable = TableDef({
     { name: "navBadge", dataType: "string" },
     // Comma-separated; exposed as string[] in the module registry.
     { name: "notificationTopics", dataType: "string" },
+    // JSON-encoded; exposed as an object in the module registry.
+    { name: "workspace", dataType: "string" },
     ...VUU_DEFAULT_COLUMNS
   ],
   keyField: "id",

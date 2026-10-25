@@ -38,6 +38,11 @@ type ModuleRecord = {
   navOrder?: number;
   navBadge?: string;
   notificationTopics?: string[];
+  workspace?: {
+    paletteGroup: string;
+    iconUrl?: string;
+    defaultSize?: { cols?: number; rows?: number };
+  };
   path: string;
   mfComponent: string;
   mfScope: string;
@@ -69,6 +74,35 @@ must be non-empty and may not contain commas. In `modules.yaml` and
 `default-modules.yaml` all three are optional keys, with `notificationTopics`
 written as a YAML list. Module admin `updateModule` changes may set any of them
 to `null` to clear it.
+
+### Workspace metadata
+
+The optional `workspace` field marks a module that can be placed in a
+GridLayout workspace. The portal lists such modules in its right-hand
+**Panels** palette, grouped by `workspace.paletteGroup`. A module without
+`workspace` is not in the palette. This is independent of `navLocation`, which
+is empty both for palette-only modules and for nested modules that only work
+inside their parent (such as the table viewer); those nested modules simply
+omit `workspace`.
+
+| Field | Meaning |
+| --- | --- |
+| `paletteGroup` | Required, non-empty. Palette group heading, e.g. `Trading` |
+| `iconUrl` | Optional palette icon: an image data URL or an http(s) URL. Clients fall back to `navIconUrl` |
+| `defaultSize.cols`, `defaultSize.rows` | Optional default size in grid tracks; positive integers |
+
+Unknown keys, in `workspace` or `defaultSize`, are rejected. Validation
+errors are reported against the `workspace` field, for example
+`workspace: Workspace palette group is required` or
+`workspace: Workspace default size cols must be a positive integer`.
+
+The VUU table has no object column type, so `workspace` is stored in the
+`modules` table's `workspace` (`string`) column as JSON, `""` when unset, and
+parsed back into an object for the registry. A row whose value can't be
+parsed or is invalid is served without `workspace`. In `modules.yaml` and
+`default-modules.yaml`, `workspace` is an optional YAML mapping. Module admin
+`createModule` accepts it inside `module`; `updateModule` replaces the whole
+object (it is not merged) and `null` clears it.
 
 `mfScope` must equal the remote's module-federation name (for example
 `userAdmin`), or the UI cannot load it. `accessRole` is the

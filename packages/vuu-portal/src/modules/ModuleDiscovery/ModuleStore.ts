@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   type ManagedModule,
+  normalizeModuleWorkspace,
   validateModuleConfig,
 } from "@heswell/module-admin";
 
@@ -130,9 +131,19 @@ function cloneModules(modules: readonly ManagedModule[]) {
       Object.fromEntries(
         Object.entries(module)
           .filter(([, value]) => value !== undefined)
-          .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+          .map(([key, value]) => [key, cloneValue(value)]),
       ) as ManagedModule,
   );
+}
+
+function cloneValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cloneValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, cloneValue(item)]),
+    );
+  }
+  return value;
 }
 
 const managedModuleKeys = [
@@ -158,6 +169,7 @@ const optionalModuleKeys = [
   "navOrder",
   "navBadge",
   "notificationTopics",
+  "workspace",
 ] as const satisfies readonly (keyof ManagedModule)[];
 
 // Fields written by earlier versions; ignored on load and dropped on next save.
@@ -198,6 +210,14 @@ function parseManagedModule(value: unknown, index: number): ManagedModule {
   for (const key of optionalModuleKeys) {
     const fieldValue = value[key];
     if (fieldValue === undefined || fieldValue === null) continue;
+    if (key === "workspace") {
+      // Its fields are checked by validateModuleConfig.
+      if (!isRecord(fieldValue)) {
+        throw new Error(`Modules file entry ${index} field 'workspace' must be an object`);
+      }
+      module[key] = cloneValue(normalizeModuleWorkspace(fieldValue));
+      continue;
+    }
     const valid =
       key === "navOrder"
         ? typeof fieldValue === "number"

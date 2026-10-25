@@ -40,7 +40,42 @@ export type ModuleConfig = {
   navBadge?: string;
   /** Notification topics the module claims, e.g. `["orders", "fills"]`. */
   notificationTopics?: string[];
+  /**
+   * Workspace placement metadata. A module with it is listed in the portal's
+   * Panels palette and can be placed in a workspace; a module without it is
+   * not (e.g. a nested module that only works inside its parent).
+   */
+  workspace?: ModuleWorkspace;
 };
+
+/** Default size of a module placed in a workspace grid, in grid tracks. */
+export type ModuleWorkspaceSize = {
+  cols?: number;
+  rows?: number;
+};
+
+/** How a module is offered in the portal's Panels palette. */
+export type ModuleWorkspace = {
+  /** Palette group heading, e.g. `Trading`. */
+  paletteGroup: string;
+  /**
+   * Palette icon as a data URL (SVG) or an http(s) URL. Falls back to the
+   * module's `navIconUrl` when absent.
+   */
+  iconUrl?: string;
+  defaultSize?: ModuleWorkspaceSize;
+};
+
+export const MODULE_WORKSPACE_KEYS = [
+  "paletteGroup",
+  "iconUrl",
+  "defaultSize",
+] as const satisfies readonly (keyof ModuleWorkspace)[];
+
+export const MODULE_WORKSPACE_SIZE_KEYS = [
+  "cols",
+  "rows",
+] as const satisfies readonly (keyof ModuleWorkspaceSize)[];
 
 /** A module as held by module discovery. */
 export type ManagedModule = ModuleConfig & {
@@ -125,6 +160,7 @@ export const OPTIONAL_MODULE_CONFIG_KEYS = [
   "navOrder",
   "navBadge",
   "notificationTopics",
+  "workspace",
 ] as const satisfies readonly (keyof ModuleConfig)[];
 
 type OptionalModuleConfigKey = (typeof OPTIONAL_MODULE_CONFIG_KEYS)[number];
@@ -151,6 +187,111 @@ export const splitNotificationTopics = (value: string) =>
     .split(NOTIFICATION_TOPIC_SEPARATOR)
     .map((topic) => topic.trim())
     .filter(Boolean);
+
+/**
+ * `workspace` is stored in the `modules` VUU table as a JSON-encoded string,
+ * `""` when unset.
+ */
+export const serializeModuleWorkspace = (
+  workspace: ModuleWorkspace | undefined,
+) => (workspace ? JSON.stringify(workspace) : "");
+
+/**
+ * Reads a `workspace` column value. Returns `undefined` when it is empty or
+ * not a valid workspace, so a bad row never breaks module discovery.
+ */
+export const deserializeModuleWorkspace = (
+  value: unknown,
+): ModuleWorkspace | undefined => {
+  if (typeof value !== "string" || value === "") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  return moduleWorkspaceError(parsed) === undefined
+    ? (parsed as ModuleWorkspace)
+    : undefined;
+};
+
+/**
+ * Normalises a `workspace` value: trims strings and drops optional parts
+ * that are `null` or empty. Anything it does not recognise is left for
+ * {@link moduleWorkspaceError} to report.
+ */
+export const normalizeModuleWorkspace = (value: unknown): unknown => {
+  if (!isRecord(value)) return value;
+  const result: Record<string, unknown> = { ...value };
+  if (typeof result.paletteGroup === "string") {
+    result.paletteGroup = result.paletteGroup.trim();
+  }
+  if (typeof result.iconUrl === "string") {
+    result.iconUrl = result.iconUrl.trim();
+  }
+  if (result.iconUrl === null || result.iconUrl === "") delete result.iconUrl;
+  if (isRecord(result.defaultSize)) {
+    const size = Object.fromEntries(
+      Object.entries(result.defaultSize).filter(
+        ([, dimension]) => dimension !== null && dimension !== undefined,
+      ),
+    );
+    if (Object.keys(size).length) {
+      result.defaultSize = size;
+    } else {
+      delete result.defaultSize;
+    }
+  } else if (result.defaultSize === null) {
+    delete result.defaultSize;
+  }
+  return result;
+};
+
+const isPositiveInteger = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value > 0;
+
+/**
+ * Validates a `workspace` value. Returns an error message, or `undefined`
+ * when it is valid.
+ */
+export const moduleWorkspaceError = (value: unknown): string | undefined => {
+  if (!isRecord(value)) return "Workspace must be an object";
+  const unknownKey = Object.keys(value).find(
+    (key) => !(MODULE_WORKSPACE_KEYS as readonly string[]).includes(key),
+  );
+  if (unknownKey !== undefined) {
+    return `Workspace has unknown field "${unknownKey}"; expected ${MODULE_WORKSPACE_KEYS.join(", ")}`;
+  }
+  const { paletteGroup, iconUrl, defaultSize } = value;
+  if (typeof paletteGroup !== "string" || paletteGroup.trim() === "") {
+    return "Workspace palette group is required";
+  }
+  if (
+    iconUrl !== undefined &&
+    (typeof iconUrl !== "string" ||
+      (!iconUrl.startsWith("data:image/") &&
+        !isUrl(iconUrl, ["http:", "https:"])))
+  ) {
+    return "Workspace icon must be an image data URL or http(s) URL";
+  }
+  if (defaultSize !== undefined) {
+    if (!isRecord(defaultSize)) {
+      return "Workspace default size must be an object";
+    }
+    const unknownSizeKey = Object.keys(defaultSize).find(
+      (key) => !(MODULE_WORKSPACE_SIZE_KEYS as readonly string[]).includes(key),
+    );
+    if (unknownSizeKey !== undefined) {
+      return `Workspace default size has unknown field "${unknownSizeKey}"; expected ${MODULE_WORKSPACE_SIZE_KEYS.join(", ")}`;
+    }
+    for (const key of MODULE_WORKSPACE_SIZE_KEYS) {
+      if (defaultSize[key] !== undefined && !isPositiveInteger(defaultSize[key])) {
+        return `Workspace default size ${key} must be a positive integer`;
+      }
+    }
+  }
+  return undefined;
+};
 
 export const MODULE_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9-]*$/;
 export const MF_SCOPE_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -242,6 +383,12 @@ const parseOptionalValue = (
       return value.length
         ? value.map((topic: string) => topic.trim())
         : undefined;
+    case "workspace": {
+      const workspace = normalizeModuleWorkspace(value);
+      const error = moduleWorkspaceError(workspace);
+      if (error) throw new Error(`workspace: ${error}`);
+      return workspace as ModuleWorkspace;
+    }
   }
 };
 
@@ -409,6 +556,11 @@ export const validateModuleConfig = (
     }
   }
 
+  if (config.workspace !== undefined) {
+    const workspaceError = moduleWorkspaceError(config.workspace);
+    if (workspaceError) errors.workspace = workspaceError;
+  }
+
   return errors;
 };
 
@@ -432,6 +584,7 @@ export const managedModuleColumnValues = (
   ...(module.navOrder !== undefined ? { navOrder: module.navOrder } : {}),
   navBadge: module.navBadge ?? "",
   notificationTopics: joinNotificationTopics(module.notificationTopics),
+  workspace: serializeModuleWorkspace(module.workspace),
   vuuCreatedTimestamp: module.created,
   vuuUpdatedTimestamp: module.updated,
   vuuMsg: "",
