@@ -85,6 +85,17 @@ is empty both for palette-only modules and for nested modules that only work
 inside their parent (such as the table viewer); those nested modules simply
 omit `workspace`.
 
+A top-level module normally needs a menu `location` (`/Section/Label`) and a
+route `path`. With `workspace` metadata, both may be empty: the module is
+palette-only, with no nav entry or route. In `modules.yaml` and
+`default-modules.yaml` the keys may then be omitted (they load as `""`). It is
+still returned in `LOGIN_SUCCESS`, with its `workspace`, an empty
+`navLocation` and an empty `path`; clients skip it when building nav and
+routes. If `location` is set, `path` is still required. Without `workspace`, a
+top-level module without them is rejected (`location: Menu location is
+required`, `path: Route is required`), including by `updateModule` when
+`workspace: null` would leave a palette-only module without a nav entry.
+
 | Field | Meaning |
 | --- | --- |
 | `paletteGroup` | Required, non-empty. Palette group heading, e.g. `Trading` |

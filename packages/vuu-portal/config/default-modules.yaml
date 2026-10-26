@@ -23,7 +23,8 @@
 #     navOrder: 1
 #     navBadge: "modules.pending"
 #     notificationTopics: ["modules"]
-#     # Optional: list the module in the workspace Panels palette.
+#     # Optional: list the module in the workspace Panels palette. With it,
+#     # location and path may be "" (or omitted) for a palette-only module.
 #     workspace:
 #       paletteGroup: "Admin"
 #       iconUrl: ""            # optional; data:image/... or http(s) URL

@@ -166,6 +166,12 @@ for the field. In [`default-modules.yaml`](./default-modules.yaml):
 | `vuu-table-browser` | none | It is itself a workspace page; its tables are in the palette's Tables tab |
 | `vuu-table-viewer` | none | Nested module; it only works inside the table browser |
 
+A top-level module with a `workspace` descriptor may leave `location` and
+`path` empty (or omit them from the YAML) to be offered only in the palette,
+with no nav entry or route. It is still sent in `LOGIN_SUCCESS`, with an empty
+`navLocation` and `path`. Top-level modules without `workspace` still need
+both.
+
 The seed only applies when `modules.yaml` is first created. To change an
 existing deployment, edit `modules.yaml` or use the module admin
 (`updateModule` with `workspace`, or `workspace: null` to remove a module from

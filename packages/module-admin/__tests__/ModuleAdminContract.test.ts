@@ -37,6 +37,35 @@ describe("module administration contract", () => {
     expect(validateModuleConfig({ ...validConfig, accessRole: "" }, [])).toMatchObject({ accessRole: expect.any(String) });
   });
 
+  test("allows a top-level module with workspace metadata to omit location and path", () => {
+    const workspace = { paletteGroup: "Trading" };
+    const paletteOnly = { ...validConfig, location: "", path: "", workspace };
+    expect(validateModuleConfig(paletteOnly, [])).toEqual({});
+    // Two palette-only modules don't clash on their empty routes.
+    const existing = [{ ...paletteOnly, id: 1, version: 1, created: 1, updated: 1 }];
+    expect(validateModuleConfig({ ...paletteOnly, name: "beta", mfScope: "beta" }, existing)).toEqual({});
+
+    // Without workspace metadata both stay required.
+    expect(validateModuleConfig({ ...validConfig, location: "", path: "" }, [])).toEqual({
+      location: "Menu location is required",
+      path: "Route is required",
+    });
+    expect(validateModuleConfig({ ...validConfig, location: "" }, [])).toEqual({ location: "Menu location is required" });
+    expect(validateModuleConfig({ ...validConfig, path: "" }, [])).toEqual({ path: "Route is required" });
+
+    // A nav entry still needs a valid location and a route.
+    expect(validateModuleConfig({ ...paletteOnly, location: "/Trading/Ticket" }, [])).toEqual({ path: "Route is required" });
+    expect(validateModuleConfig({ ...paletteOnly, location: "Ticket", path: "/ticket" }, [])).toMatchObject({ location: expect.any(String) });
+    expect(validateModuleConfig({ ...paletteOnly, path: "ticket" }, [])).toEqual({ path: "Route must start with /" });
+
+    // Child modules are unchanged: no location, path optional.
+    const parent = { ...validConfig, id: 1, version: 1, created: 1, updated: 1 };
+    const child = { ...validConfig, name: "child", mfScope: "child", parentModuleId: 1, location: "", path: "" };
+    expect(validateModuleConfig(child, [parent])).toEqual({});
+    expect(validateModuleConfig({ ...child, workspace }, [parent])).toEqual({});
+    expect(validateModuleConfig({ ...child, location: "/Tools/Child", workspace }, [parent])).toEqual({ location: "Child modules have no menu location" });
+  });
+
   test("parses configs and changes strictly", () => {
     expect(parseModuleConfig(JSON.stringify({ name: " alpha ", enabled: true }))).toMatchObject({ name: "alpha", enabled: true });
     expect(() => parseModuleConfig(JSON.stringify({ unknown: true }))).toThrow("Unknown module field");

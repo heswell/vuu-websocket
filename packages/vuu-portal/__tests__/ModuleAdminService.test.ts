@@ -85,6 +85,32 @@ describe("ModuleAdminService", () => {
     expect(state.modules[0]).not.toHaveProperty("workspace");
   });
 
+  test("creates a palette-only top-level module and keeps its workspace metadata", async () => {
+    const { service, tables, state, store } = setup([baseModule]);
+    const columnValue = (column: string) =>
+      tables.modules.getRowAtKey("2")[tables.modules.columnMap[column]];
+    const workspace = { paletteGroup: "Trading", defaultSize: { cols: 4 } };
+    const paletteOnly = { ...EMPTY_MODULE_CONFIG, name: "ticket", title: "Ticket", enabled: true, mfComponent: "Ticket", mfScope: "ticket", mfUrl: "https://example.com/ticket.js", accessRole: "ticket-access" };
+
+    const rejected = await rpc(service, "createModule", { module: JSON.stringify(paletteOnly) });
+    expect(rejected).toEqual({ type: "ERROR_RESULT", errorMessage: "location: Menu location is required; path: Route is required" });
+
+    const created = await rpc(service, "createModule", { module: JSON.stringify({ ...paletteOnly, workspace }) });
+    expect(created).toEqual({ type: "SUCCESS_RESULT", data: { id: 2, version: 1 } });
+    expect([columnValue("location"), columnValue("path")]).toEqual(["", ""]);
+    expect(JSON.parse(columnValue("workspace"))).toEqual(workspace);
+    expect(store.saved.at(-1)?.[1]).toMatchObject({ location: "", path: "", workspace });
+
+    // Clearing workspace would leave it with no nav entry.
+    const cleared = await rpc(service, "updateModule", { id: 2, changes: JSON.stringify({ workspace: null }), expectedVersion: 1 });
+    expect(cleared).toEqual({ type: "ERROR_RESULT", errorMessage: "location: Menu location is required; path: Route is required" });
+
+    // An existing nav module can drop its nav entry once it has workspace metadata.
+    const updated = await rpc(service, "updateModule", { id: 1, changes: JSON.stringify({ location: "", path: "", workspace }), expectedVersion: 1 });
+    expect(updated).toEqual({ type: "SUCCESS_RESULT", data: { id: 1, version: 2 } });
+    expect(state.modules[0]).toMatchObject({ location: "", path: "", workspace });
+  });
+
   test("rejects module admin rpcs from users without the admin role", async () => {
     const { service, state, store } = setup([baseModule]);
     for (const [rpcName, params] of [

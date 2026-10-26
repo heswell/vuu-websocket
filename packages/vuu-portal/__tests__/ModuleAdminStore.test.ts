@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { YamlModuleStore } from "../src/modules/ModuleDiscovery/ModuleStore";
+import { loadDefaultModules, YamlModuleStore } from "../src/modules/ModuleDiscovery/ModuleStore";
 import { defaultModules } from "./defaultModules";
 
 const root = path.join(import.meta.dir, ".test-output", "module-store");
@@ -75,6 +75,48 @@ describe("YamlModuleStore", () => {
     const browser = saved.modules.find(({ name }) => name === "vuu-table-browser");
     expect(browser).toBeDefined();
     expect(browser).not.toHaveProperty("workspace");
+  });
+
+  test("round-trips a palette-only top-level module without location or path", () => {
+    const filePath = path.join(root, "modules.yaml");
+    const store = new YamlModuleStore(filePath, () => []);
+    const [first, ...rest] = seeded(100);
+    const modules = [
+      {
+        ...first,
+        location: "",
+        path: "",
+        workspace: { paletteGroup: "Trading" },
+      },
+      ...rest,
+    ];
+    store.save(modules);
+
+    expect(new YamlModuleStore(filePath, () => []).load()).toEqual(modules);
+  });
+
+  test("loads palette-only modules that omit location and path", () => {
+    fs.mkdirSync(root, { recursive: true });
+    const filePath = path.join(root, "default-modules.yaml");
+    const write = (overrides: Record<string, unknown>) => {
+      const { location: _location, path: _path, created: _created, updated: _updated, ...entry } = {
+        ...seeded(100)[0],
+        ...overrides,
+      };
+      fs.writeFileSync(filePath, Bun.YAML.stringify({ modules: [entry] }), "utf8");
+    };
+
+    write({ workspace: { paletteGroup: "Trading" } });
+    expect(loadDefaultModules(filePath, 5)[0]).toMatchObject({
+      location: "",
+      path: "",
+      workspace: { paletteGroup: "Trading" },
+    });
+
+    write({ workspace: null });
+    expect(() => loadDefaultModules(filePath, 5)).toThrow(
+      "location: Menu location is required; path: Route is required",
+    );
   });
 
   test("rejects invalid workspace metadata", () => {
