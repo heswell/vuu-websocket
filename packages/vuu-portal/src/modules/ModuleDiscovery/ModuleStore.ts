@@ -165,6 +165,8 @@ const managedModuleKeys = [
   "accessRole",
 ] as const satisfies readonly (keyof ManagedModule)[];
 
+const navEntryKeys: readonly string[] = ["location", "path"];
+
 const optionalModuleKeys = [
   "navOrder",
   "navBadge",
@@ -190,7 +192,9 @@ function parseManagedModule(value: unknown, index: number): ManagedModule {
   }
   const module: Record<string, unknown> = {};
   for (const key of managedModuleKeys) {
-    const fieldValue = value[key];
+    // Palette-only and nested modules have no nav entry, so these may be omitted.
+    const fieldValue =
+      value[key] === undefined && navEntryKeys.includes(key) ? "" : value[key];
     if (fieldValue === undefined) {
       throw new Error(`Modules file entry ${index} is missing '${key}'`);
     }

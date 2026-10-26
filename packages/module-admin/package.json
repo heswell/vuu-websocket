@@ -1,6 +1,6 @@
 {
   "name": "@heswell/module-admin",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Reusable VUU module-administration module",
   "type": "module",
   "main": "src/index.ts",

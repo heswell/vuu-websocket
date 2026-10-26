@@ -15,8 +15,13 @@ export type ModuleConfig = {
   title: string;
   description: string;
   enabled: boolean;
-  /** Portal menu location, e.g. `/Trading/Baskets`. Empty for child modules. */
+  /**
+   * Portal menu location, e.g. `/Trading/Baskets`. Empty for child modules.
+   * A top-level module with `workspace` metadata may leave it (and `path`)
+   * empty to be offered only in the Panels palette, with no nav entry.
+   */
   location: string;
+  /** Route, e.g. `/trading/baskets`. Required when `location` is set. */
   path: string;
   mfComponent: string;
   mfScope: string;
@@ -472,13 +477,16 @@ export const validateModuleConfig = (
   }
 
   if (config.parentModuleId === 0) {
+    // A palette-only module (one with workspace metadata) needs no nav entry,
+    // but a menu location, when given, still needs a route.
+    const paletteOnly = config.workspace !== undefined && !config.location;
     const segments = config.location.split("/").filter(Boolean);
     if (!config.location) {
-      errors.location = "Menu location is required";
+      if (!paletteOnly) errors.location = "Menu location is required";
     } else if (!config.location.startsWith("/") || segments.length < 2) {
       errors.location = "Menu location must look like /Section/Label";
     }
-    if (!config.path) errors.path = "Route is required";
+    if (!config.path && !paletteOnly) errors.path = "Route is required";
   } else if (config.location) {
     errors.location = "Child modules have no menu location";
   }

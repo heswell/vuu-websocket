@@ -27,6 +27,7 @@ const { defaultModules } = await import("./defaultModules");
 const { InMemoryModuleStore, ModuleDiscoveryModule, ModuleState } = await import(
   "../src/modules/ModuleDiscovery/ModuleDiscoveryModule"
 );
+const { createModuleRegistry } = await import("../src/ModuleRegistry");
 
 const moduleColumns = [
   "id",
@@ -152,6 +153,129 @@ describe("module discovery protocol", () => {
     });
   });
 });
+
+describe("LOGIN_SUCCESS module registry", () => {
+  let lifecycle: InstanceType<typeof LifecycleContainer> | undefined;
+  let socket: WebSocket | undefined;
+
+  afterEach(async () => {
+    socket?.close();
+    socket = undefined;
+    await lifecycle?.destroy();
+    lifecycle = undefined;
+  });
+
+  test("sends a palette-only module with its workspace metadata and no nav entry", async () => {
+    lifecycle = new LifecycleContainer();
+    const workspace = {
+      paletteGroup: "Trading",
+      defaultSize: { cols: 4, rows: 6 },
+    };
+    const modules = [
+      ...defaultModules(),
+      {
+        ...defaultModules()[0],
+        id: 6,
+        name: "order-ticket",
+        title: "Order ticket",
+        description: "Palette-only order ticket",
+        location: "",
+        path: "",
+        mfComponent: "OrderTicket",
+        mfScope: "orderTicket",
+        mfUrl: "http://localhost:5010",
+        navIconUrl: "",
+        accessRole: "order-ticket-access",
+        workspace,
+      },
+    ];
+    const loginTokenService = LoginTokenService();
+    const token = loginTokenService.getToken(
+      VuuUserWithAuthorizations("trader", [
+        "order-ticket-access",
+        "basket-trading-access",
+      ]),
+    );
+    const server = new VuuServer(
+      VuuServerConfig(
+        VuuWebSocketOptions().withWsPort(0),
+        {},
+        loginTokenService,
+        [],
+        (user, tableContainer) => ({
+          moduleRegistry: createModuleRegistry(tableContainer, user),
+        }),
+      ).withModule(
+        ModuleDiscoveryModule(
+          new ModuleState(new InMemoryModuleStore(modules), modules),
+        ),
+      ),
+      lifecycle,
+    );
+    await lifecycle.start();
+
+    const connection = await loginSuccess(server.webSocketPort as number, token);
+    socket = connection.socket;
+    const records = (
+      connection.body as {
+        moduleRegistry?: { modules: Record<string, unknown>[] };
+      }
+    ).moduleRegistry?.modules;
+
+    expect(records?.map(({ name }) => name)).toEqual([
+      "basket-trading",
+      "order-ticket",
+    ]);
+    expect(records?.[1]).toEqual({
+      clientIdentifier: "vuu-order-ticket",
+      id: 6,
+      accessRole: "order-ticket-access",
+      name: "order-ticket",
+      title: "Order ticket",
+      description: "Palette-only order ticket",
+      version: 1,
+      enabled: true,
+      navLocation: "",
+      path: "",
+      mfComponent: "OrderTicket",
+      mfScope: "orderTicket",
+      mfUrl: "http://localhost:5010",
+      workspace,
+    });
+  });
+});
+
+async function loginSuccess(
+  port: number,
+  token: string,
+): Promise<{ socket: WebSocket; body: VuuServerMessage["body"] }> {
+  const socket = new WebSocket(`ws://localhost:${port}/websocket`);
+  const body = await new Promise<VuuServerMessage["body"]>((resolve, reject) => {
+    socket.addEventListener("error", () =>
+      reject(new Error("WebSocket failed")),
+    );
+    socket.addEventListener("open", () => {
+      socket.send(
+        JSON.stringify({
+          body: { token, type: "LOGIN" },
+          module: "CORE",
+          requestId: "login",
+          sessionId: "",
+        }),
+      );
+    });
+    socket.addEventListener(
+      "message",
+      ({ data }) => {
+        const message = JSON.parse(String(data)) as VuuServerMessage;
+        if (message.body.type === "LOGIN_SUCCESS") resolve(message.body);
+        else reject(new Error(`Unexpected ${message.body.type}`));
+      },
+      { once: true },
+    );
+  });
+  return { socket, body };
+}
 
 async function login(
   port: number,

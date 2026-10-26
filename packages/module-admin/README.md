@@ -16,7 +16,12 @@ has one is listed in the portal's Panels palette and can be placed in a
 workspace. Leave it out for modules that only work inside their parent. In
 the `modules` table it is a JSON string column; use
 `serializeModuleWorkspace` and `deserializeModuleWorkspace` to convert it.
-`updateModule` replaces the whole descriptor, and `null` clears it. See
+`updateModule` replaces the whole descriptor, and `null` clears it.
+
+`validateModuleConfig` requires `location` and `path` for a top-level module
+unless it has `workspace` metadata: a top-level module with `workspace` may
+leave both empty to be palette-only (no nav entry or route). A `location`, when
+given, still needs a `path`. Child modules are unchanged. See
 [Workspace metadata](../../docs/requirements/vuu-portal-module-discovery.md#workspace-metadata).
 
 ## Publishing

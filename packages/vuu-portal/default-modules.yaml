@@ -10,6 +10,8 @@
 # stand alone in a workspace: vuu-table-browser is itself a workspace page (its
 # tables appear in the palette's Tables tab) and vuu-table-viewer only works
 # inside its parent.
+# A top-level module with workspace metadata may leave location and path empty
+# (or omit them) to appear only in the palette, with no nav entry or route.
 modules:
   - id: 1
     version: 1
