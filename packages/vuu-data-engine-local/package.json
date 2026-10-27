@@ -28,7 +28,8 @@
   "scripts": {
     "build": "rslib build && bun ./scripts/prepare-package.ts",
     "test": "bun test",
-    "bench": "vitest bench --run"
+    "bench": "vitest bench --run",
+    "bench:scale": "vitest run --config vitest.scale.config.ts"
   },
   "dependencies": {
     "@heswell/module-admin": "^2.2.0",

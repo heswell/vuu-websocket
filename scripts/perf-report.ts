@@ -28,6 +28,25 @@ export interface LocalBenchmarkResults {
   }[];
 }
 
+/** Output of the engine-only scale bench (vuu-data-engine-local bench:scale). */
+export interface LocalScaleResults {
+  meta: {
+    cpu: string;
+    node: string;
+    platform: string;
+    rows: number;
+    samples: number;
+  };
+  metrics: {
+    better: string;
+    description: string;
+    kind: string;
+    name: string;
+    unit: string;
+    value: number;
+  }[];
+}
+
 const checkValue = (name: string, value: number) => {
   if (!Number.isFinite(value) || value < 0) {
     throw Error(`invalid benchmark value for ${name}: ${value}`);
@@ -40,6 +59,7 @@ export function benchmarkEntries(
   local: LocalBenchmarkResults,
   nodeVersion: string,
   runUrl: string,
+  scale?: LocalScaleResults,
 ): BenchmarkEntry[] {
   const entries: BenchmarkEntry[] = [];
   for (const results of [services, outbound]) {
@@ -86,6 +106,25 @@ export function benchmarkEntries(
     }
   }
   if (localCount === 0) throw Error("no local engine benchmarks reported");
+
+  if (scale) {
+    if (scale.metrics.length === 0) throw Error("empty local scale results");
+    for (const metric of scale.metrics) {
+      if (metric.better !== "lower") {
+        throw Error(`expected smaller-is-better metric: ${metric.name}`);
+      }
+      entries.push({
+        name: `local-scale.${metric.name}`,
+        unit: metric.unit,
+        value: metric.value,
+        extra: [
+          metric.description,
+          `Node ${scale.meta.node}, ${scale.meta.platform}, ${scale.meta.cpu}`,
+          runUrl,
+        ].join("\n"),
+      });
+    }
+  }
   const names = new Set<string>();
   for (const entry of entries) {
     if (!entry.name || !entry.unit) throw Error("benchmark name and unit required");
@@ -160,6 +199,7 @@ if (import.meta.main) {
       services: { type: "string" },
       outbound: { type: "string" },
       local: { type: "string" },
+      "local-scale": { type: "string" },
       out: { type: "string" },
       summary: { type: "string" },
       history: { type: "string" },
@@ -179,6 +219,9 @@ if (import.meta.main) {
     JSON.parse(readFileSync(required("local"), "utf8")),
     execFileSync("node", ["--version"], { encoding: "utf8" }).trim(),
     runUrl,
+    values["local-scale"]
+      ? JSON.parse(readFileSync(values["local-scale"], "utf8"))
+      : undefined,
   );
   const previous =
     values.history && existsSync(values.history)

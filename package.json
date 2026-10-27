@@ -31,6 +31,7 @@
     "bench:1m": "bun ./packages/benchmarks/src/run.ts --rows=1000000",
     "bench:scala": "bun ./packages/benchmarks/src/scala/run.ts",
     "bench:data-engine-local": "npm run bench -w @heswell/vuu-data-engine-local",
+    "bench:data-engine-local:1m": "npm run bench:scale -w @heswell/vuu-data-engine-local",
     "test": "bun test",
     "bump:versions": "bun ./scripts/bump-versions.ts",
     "pub": "bun ./scripts/publish.ts",
