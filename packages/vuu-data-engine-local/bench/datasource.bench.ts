@@ -7,14 +7,14 @@
  * the work needed to deliver rows to the client, not just to compute them.
  * Row count can be set with BENCH_ROWS (default 100_000).
  *
+ * Group rows are opened by key, read from the row (index 6), so both
+ * implementations use their own tree key format.
+ *
  * Note: on table updates the legacy implementation does not re-sort or
  * re-filter rows, the engine does. test/LegacyParity.test.ts verifies both
  * produce the same results for the config (sort/filter/groupBy) scenarios.
  */
-import type {
-  DataSourceSubscribeCallback,
-  TableSchema,
-} from "@vuu-ui/vuu-data-types";
+import type { DataSourceSubscribeCallback } from "@vuu-ui/vuu-data-types";
 import {
   buildDataColumnMapFromSchema as buildLegacyDataMap,
   TickingArrayDataSource as LegacyDataSource,
@@ -24,6 +24,15 @@ import { Range } from "@vuu-ui/vuu-utils";
 import { bench, describe } from "vitest";
 import { ModuleDataSource } from "../src/ModuleDataSource";
 import { buildDataColumnMapFromSchema, Table } from "../src/Table";
+import {
+  AGGREGATIONS,
+  ALTERNATE_AGGREGATIONS,
+  createData as createRows,
+  createRandom,
+  createRow,
+  type Row,
+  schema,
+} from "./data";
 
 globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
   callback(0);
@@ -35,67 +44,7 @@ console.log = () => undefined;
 const ROWS = Number(process.env.BENCH_ROWS ?? 100_000);
 const VIEWPORT = 50;
 const BATCH = 1_000;
-
-const schema: TableSchema = {
-  columns: [
-    { name: "id", serverDataType: "string" },
-    { name: "ccy", serverDataType: "string" },
-    { name: "exchange", serverDataType: "string" },
-    { name: "side", serverDataType: "string" },
-    { name: "trader", serverDataType: "string" },
-    { name: "price", serverDataType: "double" },
-    { name: "qty", serverDataType: "int" },
-    { name: "filled", serverDataType: "int" },
-    { name: "created", serverDataType: "long" },
-  ],
-  key: "id",
-  table: { module: "BENCH", table: "orders" },
-};
-
-const CCY = ["USD", "EUR", "GBP", "JPY", "CHF", "AUD", "CAD", "SEK"];
-const EXCHANGE = ["XLON", "XNYS", "XPAR", "XETR", "XAMS", "XTKS"];
-const SIDE = ["BUY", "SELL"];
-const TRADER = Array.from({ length: 40 }, (_, i) => `trader${i}`);
-
-// deterministic PRNG (mulberry32) so both implementations see identical data
-const createRandom =
-  (seed = 42) =>
-  () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-
-type Row = [
-  string,
-  string,
-  string,
-  string,
-  string,
-  number,
-  number,
-  number,
-  number,
-];
-
-const createRow = (id: number, random: () => number): Row => [
-  `id-${id}`,
-  CCY[Math.floor(random() * CCY.length)],
-  EXCHANGE[Math.floor(random() * EXCHANGE.length)],
-  SIDE[Math.floor(random() * SIDE.length)],
-  TRADER[Math.floor(random() * TRADER.length)],
-  Math.round(random() * 100_000) / 100,
-  Math.floor(random() * 10_000),
-  Math.floor(random() * 10_000),
-  1_700_000_000_000 + id,
-];
-
-const createData = (count = ROWS) => {
-  const random = createRandom();
-  return Array.from({ length: count }, (_, i) => createRow(i, random));
-};
+const createData = (count = ROWS) => createRows(count);
 
 interface BenchTable {
   insert: (row: Row) => void;
@@ -107,8 +56,12 @@ interface BenchDataSource {
   sort: unknown;
   filter: unknown;
   groupBy: unknown;
+  aggregations: unknown;
   range: unknown;
   readonly size: number;
+  getRowAtIndex: (index: number) => unknown[] | undefined;
+  openTreeNode: (keyOrIndex: string | number) => void;
+  closeTreeNode: (keyOrIndex: string | number) => void;
   subscribe: (
     props: { range: ReturnType<typeof Range> },
     callback: DataSourceSubscribeCallback,
@@ -354,4 +307,51 @@ describe(`churn, ${BATCH / 2} deletes + ${BATCH / 2} inserts (${ROWS} rows)`, ()
 
 describe(`churn on sorted view, ${BATCH / 2} deletes + ${BATCH / 2} inserts (${ROWS} rows)`, () => {
   compare(churn, sortByPrice);
+});
+
+const KEY = 6;
+
+const groupByCcy = (fixture: Fixture) => {
+  fixture.dataSource.groupBy = ["ccy"];
+};
+
+// alternates between two aggregation sets: legacy throws when aggregations
+// are cleared to [] on a grouped data source
+describe(`aggregations on ccy groups, switch sets (${ROWS} rows)`, () => {
+  compare((fixture, i) => {
+    fixture.dataSource.aggregations =
+      i % 2 === 0 ? AGGREGATIONS : ALTERNATE_AGGREGATIONS;
+  }, groupByCcy);
+});
+
+describe(`groupBy ccy + exchange with aggregations, set/clear (${ROWS} rows)`, () => {
+  compare(
+    (fixture, i) => {
+      fixture.dataSource.groupBy = i % 2 === 0 ? ["ccy", "exchange"] : [];
+    },
+    (fixture) => {
+      fixture.dataSource.aggregations = AGGREGATIONS;
+    },
+  );
+});
+
+describe(`expand/collapse one ccy group (${ROWS} rows)`, () => {
+  compare((fixture, i) => {
+    if (i % 2 === 0) {
+      fixture.dataSource.openTreeNode(0);
+    } else {
+      fixture.dataSource.closeTreeNode(0);
+    }
+  }, groupByCcy);
+});
+
+describe(`ticks, ${BATCH} updates while grouped, aggregated and expanded (${ROWS} rows)`, () => {
+  compare(
+    (fixture) => tick(fixture, false),
+    (fixture) => {
+      fixture.dataSource.groupBy = ["ccy"];
+      fixture.dataSource.aggregations = AGGREGATIONS;
+      fixture.dataSource.openTreeNode(0);
+    },
+  );
 });

@@ -7,7 +7,8 @@ engine runs in the vuu-websocket (Bun) server.
 
 The package runs alongside `@vuu-ui/vuu-data-test` and has the same public API. It is
 meant to replace the `VuuModule` / `TickingArrayDataSource` core in that package. The
-two packages don't depend on each other.
+two packages don't depend on each other. To move an app across, see
+[MIGRATING.md](./MIGRATING.md).
 
 ## Peer dependencies
 
@@ -302,6 +303,10 @@ Mean time per operation, 100k rows, Node 24, Apple Silicon:
 | 1000 ticks, grouped               | 1205 ms | 0.39 ms | ~3100x   |
 | 500 deletes + 500 inserts         | 1628 ms | 0.60 ms | ~2700x   |
 | 500 deletes + 500 inserts, sorted | 2564 ms | 1.57 ms | ~1600x   |
+| switch aggregation sets, grouped  | 5.9 ms  | 5.4 ms  | 1.1x     |
+| groupBy ccy + exchange, aggregated, set/clear | 3.2 ms | 3.6 ms | 0.9x |
+| expand/collapse one group         | 1840 ms | 0.044 ms | ~42000x |
+| 1000 ticks, grouped, aggregated, expanded | 1704 ms | 0.70 ms | ~2500x |
 
 Notes:
 
@@ -311,6 +316,55 @@ Notes:
   comparisons understate the engine's advantage.
 - Scrolling: the engine uses an array-backed row key allocator (`RowKeys`) and prunes its row
   cache incrementally, so range changes cost in proportion to the rows entering or leaving the range.
+- Aggregations: switching sets and grouping with aggregations cost about the same in both, but
+  with the four-column set legacy fills in only one aggregate and leaves values from the previous
+  set behind, so it does less work. The legacy
+  bench can't clear aggregations, because `aggregations = []` throws on a grouped legacy data source.
+- Expand/collapse: legacy rebuilds the expanded rows from every open node on each change.
+  Expanding all groups was dropped from the comparison because legacy takes several
+  seconds per run even at 10k rows. The 1M-row bench below covers it for the engine.
+
+### 1M rows, engine only
+
+`bench/scale.bench-run.ts` measures the engine alone at 1M rows, with heap use. A legacy
+comparison is impractical at this size. It runs under vitest in Node with `--expose-gc`,
+using `vitest.scale.config.ts`. Each timing is the median of 5 runs after a warmup. Heap is
+V8 `heapUsed` after a full GC.
+
+```sh
+npm run bench:data-engine-local:1m
+SCALE_ROWS=200000 npm run bench:scale -w @heswell/vuu-data-engine-local
+SCALE_OUT=/tmp/scale.json npm run bench:scale -w @heswell/vuu-data-engine-local
+```
+
+The `Performance` workflow runs it at 1M rows and charts the results as `local-scale.*`.
+
+Results at 1M rows, Node 24, Apple Silicon:
+
+| Measurement                                                | Result   |
+| ---------------------------------------------------------- | -------- |
+| heap: source row arrays (context)                          | 182 MB   |
+| heap: table (rows + key index)                             | 222 MB   |
+| heap: sorted data source                                   | 0.2 MB   |
+| heap: grouped data source (2 levels, 4 aggregations, expanded) | 16 MB |
+| build table                                                | 262 ms   |
+| create + subscribe                                         | 4.4 ms   |
+| sort numeric column                                        | 223 ms   |
+| sort two columns                                           | 452 ms   |
+| filter                                                     | 15 ms    |
+| groupBy ccy                                                | 27 ms    |
+| groupBy ccy + exchange, with aggregations                  | 64 ms    |
+| switch aggregation sets                                    | 37 ms    |
+| expand/collapse one group                                  | 1.4 ms   |
+| expand all 56 groups, then collapse all                    | 329 ms   |
+| scroll, 100 range changes                                  | 0.7 ms   |
+| 1000 ticks, sorted column                                  | 8.4 ms   |
+| 1000 ticks, grouped, aggregated and expanded               | 1.4 ms   |
+| 500 deletes + 500 inserts, sorted                          | 5.8 ms   |
+
+A 1M-row table fits comfortably in a browser tab, and data sources over it are cheap. Ticks,
+churn, scrolling and expand/collapse stay in the low milliseconds. Sorting runs on the main
+thread and takes a few hundred milliseconds, long enough to be noticeable when it repeats.
 
 ## Tests
 
@@ -323,3 +377,6 @@ provides `requestAnimationFrame` and `window`, and `test/happy-dom.ts` registers
 React test only.
 
 `test/EngineDataSource.test.ts` holds the conformance tests for the engine-backed data source.
+`test/GroupedDataSource.test.ts` covers aggregations (every type, multi-level, live updates,
+sorting by an aggregate) and group expand/collapse (by key and index, nested groups, state
+across sort, updates and groupBy changes, subscriber notifications).

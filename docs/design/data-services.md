@@ -169,9 +169,11 @@ To add a metric, call the `record` function returned by `createRecorder()`
 ### CI and historical results
 
 The `Performance` workflow (`.github/workflows/performance.yml`) runs the
-WebSocket/data-service suite, the vuu-server outbound benchmark, and the local
-engine/legacy comparison sequentially on `ubuntu-24.04`, Node `24.16.0`, and
-Bun `1.3.14`. The table benchmarks use 100k rows. Each push to `main` publishes
+WebSocket/data-service suite, the vuu-server outbound benchmark, the local
+engine/legacy comparison, and the engine-only local scale bench sequentially on
+`ubuntu-24.04`, Node `24.16.0`, and Bun `1.3.14`. The table benchmarks use 100k
+rows. The scale bench uses 1M rows and also records heap (MB), charted as
+`local-scale.*`. Each push to `main` publishes
 charts at <https://heswell.github.io/vuu-websocket/dev/bench/>. Pull requests
 and manual runs on other branches only measure and report; they cannot publish.
 
@@ -189,7 +191,8 @@ dedicated suite uses `npm run perf -- --advisory-timings`. Both retain the exist
 10% count/size checks against `perf/baseline.json`. Local runs retain timing
 assertions by default. Some publisher timings are single-shot even when the
 sampling count is five; local-engine results use Vitest's mean and relative
-margin of error, while outbound timings use a median after one warmup.
+margin of error, while outbound and local scale timings use a median after one
+warmup.
 
 Enable **Settings > Pages > Build and deployment > Source: GitHub Actions**.
 The workflow initializes `gh-pages` automatically, appends results using

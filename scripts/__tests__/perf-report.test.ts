@@ -6,6 +6,7 @@ import {
   comparisonSummary,
   previousRun,
   type LocalBenchmarkResults,
+  type LocalScaleResults,
 } from "../perf-report";
 
 const metric: Metric = {
@@ -128,6 +129,70 @@ describe("performance chart entries", () => {
     expect(() =>
       benchmarkEntries(results(), outbound(), input, "node", "local"),
     ).toThrow("no samples");
+  });
+});
+
+describe("local engine scale results", () => {
+  const scale = (): LocalScaleResults => ({
+    meta: {
+      cpu: "test CPU",
+      node: "v24.16.0",
+      platform: "linux-x64",
+      rows: 1_000_000,
+      samples: 5,
+    },
+    metrics: [
+      {
+        better: "lower",
+        description: "Sort on price",
+        kind: "time",
+        name: "sort numeric column (1000000 rows)",
+        unit: "ms",
+        value: 220.5,
+      },
+      {
+        better: "lower",
+        description: "Engine table heap",
+        kind: "size",
+        name: "heap: table (1000000 rows)",
+        unit: "MB",
+        value: 222.4,
+      },
+    ],
+  });
+  const withScale = (input = scale()) =>
+    benchmarkEntries(results(), outbound(), local(), "v24.16.0", "local", input);
+
+  test("are optional", () => {
+    expect(entries()).toHaveLength(4);
+  });
+
+  test("are appended with their own prefix, unit and runtime", () => {
+    const report = withScale();
+    expect(report).toHaveLength(6);
+    expect(report[4]).toMatchObject({
+      name: "local-scale.sort numeric column (1000000 rows)",
+      unit: "ms",
+      value: 220.5,
+    });
+    expect(report[5]).toMatchObject({
+      name: "local-scale.heap: table (1000000 rows)",
+      unit: "MB",
+      value: 222.4,
+    });
+    expect(report[5].extra).toContain("Node v24.16.0, linux-x64, test CPU");
+  });
+
+  test("rejects empty results, bad values and larger-is-better metrics", () => {
+    expect(() => withScale({ ...scale(), metrics: [] })).toThrow(
+      "empty local scale results",
+    );
+    const nan = scale();
+    nan.metrics[0].value = NaN;
+    expect(() => withScale(nan)).toThrow("invalid benchmark value");
+    const higher = scale();
+    higher.metrics[0].better = "higher";
+    expect(() => withScale(higher)).toThrow("expected smaller-is-better");
   });
 });
 

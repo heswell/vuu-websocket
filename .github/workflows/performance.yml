@@ -63,12 +63,19 @@ jobs:
       - name: Local data engine and legacy comparison
         run: npm run bench -w @heswell/vuu-data-engine-local -- --outputJson="$RESULTS/local.json"
 
+      - name: Local data engine at 1M rows (timings and heap)
+        env:
+          SCALE_ROWS: "1000000"
+          SCALE_OUT: ${{ runner.temp }}/performance/local-scale.json
+        run: npm run bench:scale -w @heswell/vuu-data-engine-local
+
       - name: Prepare charts and comparison summary
         run: |
           bun scripts/perf-report.ts \
             --services "$RESULTS/services.json" \
             --outbound "$RESULTS/outbound.json" \
             --local "$RESULTS/local.json" \
+            --local-scale "$RESULTS/local-scale.json" \
             --history "$RESULTS/history.js" \
             --out "$RESULTS/benchmark.json" \
             --summary "$RESULTS/summary.md"
