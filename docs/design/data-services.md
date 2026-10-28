@@ -174,7 +174,11 @@ engine/legacy comparison, and the engine-only local scale bench sequentially on
 `ubuntu-24.04`, Node `24.16.0`, and Bun `1.3.14`. The table benchmarks use 100k
 rows. The scale bench uses 1M rows and also records heap (MB), charted as
 `local-scale.*`. Each push to `main` publishes
-charts at <https://heswell.github.io/vuu-websocket/dev/bench/>. Pull requests
+charts at <https://heswell.github.io/vuu-websocket/dev/bench/>. The local engine
+and legacy results are compared side by side, per scenario, at
+<https://heswell.github.io/vuu-websocket/dev/bench/compare.html>
+(`perf/site/compare.html`, which reads the same `data.js` history), and in a
+table at the top of each run's Actions summary. Pull requests
 and manual runs on other branches only measure and report; they cannot publish.
 
 The Actions summary compares every metric with the latest published successful

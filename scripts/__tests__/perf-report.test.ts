@@ -4,6 +4,9 @@ import {
   BENCHMARK_SUITE,
   benchmarkEntries,
   comparisonSummary,
+  formatSpeedup,
+  legacyComparisonSummary,
+  legacyComparisons,
   previousRun,
   type LocalBenchmarkResults,
   type LocalScaleResults,
@@ -246,5 +249,50 @@ describe("published history comparison", () => {
     expect(
       comparisonSummary([{ name: "one|two\nthree", unit: "ms", value: 1 }]),
     ).toContain("one\\|two three");
+  });
+});
+
+describe("local engine vs legacy comparison", () => {
+  const name = (scenario: string, impl: string) =>
+    `local.bench/datasource.bench.ts > ${scenario} (100000 rows) / ${impl}`;
+  const current = [
+    { name: name("sort", "legacy TickingArrayDataSource"), value: 80 },
+    { name: name("sort", "engine ModuleDataSource"), value: 20 },
+    { name: name("groupBy", "legacy TickingArrayDataSource"), value: 2 },
+    { name: name("groupBy", "engine ModuleDataSource"), value: 3 },
+    { name: name("legacy only", "legacy TickingArrayDataSource"), value: 1 },
+    { name: "local-scale.sort (1000000 rows)", value: 200 },
+    { name: metric.name, value: 10 },
+  ];
+  const previous = {
+    commit: { id: "abcdef0123", url: "https://github.com/heswell/vuu-websocket/commit/abcdef0123" },
+    benches: [{ name: name("sort", "engine ModuleDataSource"), unit: "ms", value: 25 }],
+  };
+
+  test("pairs legacy and engine per scenario, in bench order, skipping unpaired", () => {
+    expect(legacyComparisons(current, previous)).toEqual([
+      { scenario: "sort (100000 rows)", legacy: 80, engine: 20, engineBefore: 25 },
+      { scenario: "groupBy (100000 rows)", legacy: 2, engine: 3, engineBefore: undefined },
+    ]);
+  });
+
+  test("formats speed-ups in both directions", () => {
+    expect(formatSpeedup(80, 20)).toBe("4.00x faster");
+    expect(formatSpeedup(2, 3)).toBe("1.50x slower");
+    expect(formatSpeedup(3000, 1)).toBe("3000x faster");
+    expect(formatSpeedup(1, 0)).toBe("-");
+  });
+
+  test("renders a markdown table with the engine change against main", () => {
+    const summary = legacyComparisonSummary(current, previous);
+    expect(summary).toContain("## Local engine vs legacy");
+    expect(summary).toContain("compare.html");
+    expect(summary).toContain("| sort (100000 rows) | 80.0 ms | 20.0 ms | 4.00x faster | -20.0% |");
+    expect(summary).toContain("| groupBy (100000 rows) | 2.0 ms | 3.0 ms | 1.50x slower | - |");
+    expect(summary).not.toContain("legacy only");
+  });
+
+  test("is empty when there are no paired results", () => {
+    expect(legacyComparisonSummary([{ name: metric.name, value: 1 }])).toBe("");
   });
 });

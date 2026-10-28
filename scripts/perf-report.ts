@@ -5,6 +5,8 @@ import type { PerfResults } from "../perf/metrics";
 
 export const BENCHMARK_SUITE = "Vuu performance";
 const HISTORY_PREFIX = "window.BENCHMARK_DATA = ";
+export const COMPARE_PAGE_URL =
+  "https://heswell.github.io/vuu-websocket/dev/bench/compare.html";
 
 export interface BenchmarkEntry {
   name: string;
@@ -153,6 +155,82 @@ export function previousRun(script: string): HistoryRun | undefined {
 
 const cell = (text: string) => text.replaceAll("|", "\\|").replaceAll(/\r?\n/g, " ");
 
+export interface LegacyComparison {
+  scenario: string;
+  legacy: number;
+  engine: number;
+  /** engine result in the reference run, when there is one */
+  engineBefore?: number;
+}
+
+const LOCAL_PAIR = /^local\.(?:.*?> )?(.+) \/ (legacy|engine)\b/i;
+
+/**
+ * Pairs the local legacy and engine results for each scenario, in bench order.
+ * Scenarios missing either implementation are left out.
+ */
+export function legacyComparisons(
+  entries: Pick<BenchmarkEntry, "name" | "value">[],
+  previous?: HistoryRun,
+): LegacyComparison[] {
+  const before = new Map(previous?.benches.map((entry) => [entry.name, entry.value]));
+  const pairs = new Map<string, Partial<LegacyComparison>>();
+  for (const entry of entries) {
+    const match = LOCAL_PAIR.exec(entry.name);
+    if (!match) continue;
+    const [, scenario, impl] = match;
+    const pair = pairs.get(scenario) ?? { scenario };
+    if (impl.toLowerCase() === "legacy") {
+      pair.legacy = entry.value;
+    } else {
+      pair.engine = entry.value;
+      pair.engineBefore = before.get(entry.name);
+    }
+    pairs.set(scenario, pair);
+  }
+  return [...pairs.values()].filter(
+    (pair): pair is LegacyComparison =>
+      pair.legacy !== undefined && pair.engine !== undefined,
+  );
+}
+
+const formatMs = (value: number) =>
+  value >= 100 ? `${value.toFixed(0)} ms` : value >= 1 ? `${value.toFixed(1)} ms` : `${value.toFixed(3)} ms`;
+
+export const formatSpeedup = (legacy: number, engine: number) => {
+  if (engine === 0 || legacy === 0) return "-";
+  const ratio = legacy / engine;
+  const digits = (r: number) => (r >= 100 ? r.toFixed(0) : r >= 10 ? r.toFixed(1) : r.toFixed(2));
+  return ratio >= 1 ? `${digits(ratio)}x faster` : `${digits(1 / ratio)}x slower`;
+};
+
+/** Markdown table of engine vs legacy for each local scenario, or "" if none. */
+export function legacyComparisonSummary(
+  entries: Pick<BenchmarkEntry, "name" | "value">[],
+  previous?: HistoryRun,
+): string {
+  const comparisons = legacyComparisons(entries, previous);
+  if (comparisons.length === 0) return "";
+  const lines = [
+    "## Local engine vs legacy",
+    "",
+    `Mean time per operation. Speed-up is legacy time / engine time. History: [comparison page](${COMPARE_PAGE_URL}).`,
+    "",
+    "| Scenario | Legacy | Engine | Engine speed-up | Engine vs main |",
+    "| --- | ---: | ---: | ---: | ---: |",
+  ];
+  for (const { scenario, legacy, engine, engineBefore } of comparisons) {
+    const change =
+      engineBefore === undefined || engineBefore === 0
+        ? "-"
+        : `${engine >= engineBefore ? "+" : ""}${((engine / engineBefore - 1) * 100).toFixed(1)}%`;
+    lines.push(
+      `| ${cell(scenario)} | ${formatMs(legacy)} | ${formatMs(engine)} | ${formatSpeedup(legacy, engine)} | ${change} |`,
+    );
+  }
+  return `${lines.join("\n")}\n\n`;
+}
+
 export function comparisonSummary(
   entries: BenchmarkEntry[],
   previous?: HistoryRun,
@@ -228,5 +306,8 @@ if (import.meta.main) {
       ? previousRun(readFileSync(values.history, "utf8"))
       : undefined;
   writeFileSync(required("out"), JSON.stringify(entries, null, 2) + "\n");
-  writeFileSync(required("summary"), comparisonSummary(entries, previous));
+  writeFileSync(
+    required("summary"),
+    legacyComparisonSummary(entries, previous) + comparisonSummary(entries, previous),
+  );
 }

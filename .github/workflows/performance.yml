@@ -143,6 +143,9 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/performance-site"
           git archive gh-pages | tar -x -C "$RUNNER_TEMP/performance-site"
+          # legacy vs engine comparison page (reads dev/bench/data.js), taken from
+          # the triggering commit since the action may leave gh-pages checked out
+          git show "$GITHUB_SHA:perf/site/compare.html" > "$RUNNER_TEMP/performance-site/dev/bench/compare.html"
 
       - uses: actions/configure-pages@v5
 
