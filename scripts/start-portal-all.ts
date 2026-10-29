@@ -7,7 +7,11 @@ const servers: { name: string; script: string; env?: Record<string, string> }[] 
     {
       name: "portal",
       script: "./scripts/start-portal.ts",
-      env: { VUU_APP: "vuu-portal" },
+      env: {
+        VUU_APP: "vuu-portal",
+        VUU_WEBSOCKET_PORT: "9090",
+        VUU_HTTPS_PORT: "9443",
+      },
     },
     {
       name: "user admin",
