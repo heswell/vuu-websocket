@@ -1,0 +1,19 @@
+{
+  "$comment": "Ports for npm run start:portal:all. The launcher starts each backend server on these ports and writes the backend URLs into every built UI module's config.json, so this is the one place to change them. UI ports are compiled into the build (publicPath in each portal-examples/<module>/portal-build.json): the launcher warns when the build does not match, and changing a UI port means rebuilding. vuuUiDir is relative to this file; VUU_UI_DIR overrides it.",
+  "vuuUiDir": "../../finos/vuu/vuu-ui",
+  "backend": {
+    "portal": { "websocket": 9090, "https": 9443 },
+    "user-admin": { "websocket": 8092, "https": 8444 },
+    "basket-trading": { "websocket": 8093, "https": 8445 },
+    "equities": { "websocket": 8084 }
+  },
+  "ui": {
+    "portal-host": { "port": 5001, "backend": "portal", "host": true },
+    "module-admin": { "port": 5002, "backend": "portal" },
+    "user-admin": { "port": 5003, "backend": "user-admin" },
+    "vuu-table-browser": { "port": 5004 },
+    "vuu-table-viewer": { "port": 5005 },
+    "basket-trading": { "port": 5006, "backend": "basket-trading" },
+    "feature-simple-div": { "port": 5007 }
+  }
+}

@@ -1,82 +1,98 @@
+/**
+ * Starts the portal backend servers and serves the built portal UI from
+ * vuu-ui, all on the ports in portal.ports.json. CTRL-C stops everything.
+ *
+ *   npm run start:portal:all            backend and UI
+ *   npm run start:portal:all -- --no-ui backend only
+ */
+import net from "node:net";
+import path from "node:path";
 import type { Subprocess } from "bun";
+import {
+  hostModule,
+  loadPortalPorts,
+  portsFilePath,
+  prepareUi,
+  type UiPlan,
+} from "./portal-ports";
 
-type ServerConfig = {
-  name: string;
+type BackendServer = {
   script: string;
-  env?: Record<string, string>;
-  // Number of "listening on <url>" lines the server logs once it is up.
-  endpoints: number;
+  /** Vuu server app (packages/<app>/application.conf). Unset for plain services. */
+  app?: string;
 };
 
-// Starts every portal-related server. Services reconnect to their
-// dependencies, so start order doesn't matter.
-const servers: ServerConfig[] = [
-  {
-    name: "portal",
-    script: "./scripts/start-portal.ts",
-    env: {
-      VUU_APP: "vuu-portal",
-      VUU_WEBSOCKET_PORT: "9090",
-      VUU_HTTPS_PORT: "9443",
-    },
-    endpoints: 2,
-  },
-  {
-    name: "user admin",
-    script: "./scripts/start-user-admin.ts",
-    env: { VUU_APP: "vuu-user-admin" },
-    endpoints: 2,
-  },
-  {
-    name: "basket trading",
+// The backend servers this launcher knows how to start. Their ports come
+// from portal.ports.json; services reconnect to their dependencies, so start
+// order doesn't matter.
+const BACKEND: Record<string, BackendServer> = {
+  portal: { script: "./scripts/start-portal.ts", app: "vuu-portal" },
+  "user-admin": { script: "./scripts/start-user-admin.ts", app: "vuu-user-admin" },
+  "basket-trading": {
     script: "./scripts/start-basket-trading.ts",
-    env: { VUU_APP: "vuu-basket-trading" },
-    endpoints: 2,
+    app: "vuu-basket-trading",
   },
-  { name: "equities", script: "./scripts/start-equities.ts", endpoints: 1 },
-];
+  equities: { script: "./scripts/start-equities.ts" },
+};
 
-// How long children get to shut down before being force-killed.
-const SHUTDOWN_TIMEOUT_MS = 5000;
-// Print the table anyway if some server hasn't reported its ports by then.
+// How long children get to shut down before being force-killed. Longer than
+// portal-serve's own 5s wait for its static servers.
+const SHUTDOWN_TIMEOUT_MS = 10000;
+// Output lines not worth passing on.
+const HIDDEN_LINES = [/Use npm run portal:stop to stop them/];
+// Print the table anyway if something hasn't reported its URL by then.
 const STARTUP_TIMEOUT_MS = 30000;
 
-type RunningServer = ServerConfig & {
+const noUi = process.argv.includes("--no-ui");
+const ports = loadPortalPorts(Object.keys(BACKEND));
+
+type Child = {
+  name: string;
   proc: Subprocess<"ignore", "pipe", "pipe">;
-  websocket?: string;
-  rest?: string;
+  stopSignal?: NodeJS.Signals;
   exitCode?: number | null;
 };
 
-const running: RunningServer[] = [];
+type Row = {
+  child: Child;
+  name: string;
+  /** Number of URLs the row expects before it counts as started. */
+  expected: number;
+  websocket?: string;
+  rest?: string;
+  url?: string;
+  backend?: string;
+};
+
+const children: Child[] = [];
+const backendRows: Row[] = [];
+const uiRows: Row[] = [];
 let shuttingDown = false;
 let tablePrinted = false;
 
-const LISTENING = /listening on ((?:wss?|https?):\/\/\S+)/;
 const ANSI = /\x1b\[[0-9;]*m/g;
+const LISTENING = /listening on ((?:wss?|https?):\/\/\S+)/;
+const UI_READY = /^(\S+) ready at (https?:\/\/\S+)/;
 
 const isAlive = (proc: Subprocess) =>
   proc.exitCode === null && proc.signalCode === null;
 
-const isSettled = (server: RunningServer) =>
-  server.exitCode !== undefined ||
-  [server.websocket, server.rest].filter(Boolean).length >= server.endpoints;
+const urlCount = (row: Row) =>
+  [row.websocket, row.rest, row.url].filter(Boolean).length;
 
-const printTable = () => {
-  if (tablePrinted || shuttingDown) return;
-  tablePrinted = true;
-  clearTimeout(startupTimer);
+const isSettled = (row: Row) =>
+  row.child.exitCode !== undefined || urlCount(row) >= row.expected;
 
-  const rows = running.map((server) => {
-    const status =
-      server.exitCode !== undefined
-        ? `exited (${server.exitCode})`
-        : isSettled(server)
-          ? "running"
-          : "starting?";
-    return [server.name, status, server.websocket ?? "-", server.rest ?? "-"];
-  });
-  const header = ["Server", "Status", "WebSocket", "REST"];
+const status = (row: Row) =>
+  urlCount(row) >= row.expected
+    ? row.child.exitCode !== undefined
+      ? "stopped"
+      : "running"
+    : row.child.exitCode !== undefined
+      ? `exited (${row.child.exitCode})`
+      : "starting?";
+
+const table = (header: string[], rows: string[][]) => {
   const widths = header.map((h, i) =>
     Math.max(h.length, ...rows.map((row) => row[i].length)),
   );
@@ -85,92 +101,225 @@ const printTable = () => {
       .map((cell, i) => cell.padEnd(widths[i]))
       .join("  ")
       .trimEnd();
+  return [line(header), line(widths.map((w) => "-".repeat(w))), ...rows.map(line)];
+};
 
-  console.log(
-    [
+const printSummary = (plan: UiPlan | undefined) => {
+  if (tablePrinted || shuttingDown) return;
+  tablePrinted = true;
+  clearTimeout(startupTimer);
+
+  const lines = [
+    "",
+    ...table(
+      ["Server", "Status", "WebSocket", "REST"],
+      backendRows.map((row) => [
+        row.name,
+        status(row),
+        row.websocket ?? "-",
+        row.rest ?? "-",
+      ]),
+    ),
+  ];
+  if (uiRows.length > 0) {
+    lines.push(
       "",
-      line(header),
-      line(widths.map((w) => "-".repeat(w))),
-      ...rows.map(line),
-      "",
-    ].join("\n"),
-  );
+      ...table(
+        ["UI module", "Status", "URL", "Backend"],
+        uiRows.map((row) => [
+          row.name,
+          status(row),
+          row.url ?? "-",
+          row.backend ?? "-",
+        ]),
+      ),
+    );
+  }
+  const warnings = plan?.warnings ?? [];
+  if (warnings.length > 0) {
+    lines.push("", "Warnings:", ...warnings.map((warning) => `  - ${warning}`));
+  }
+  console.log([...lines, ""].join("\n"));
 };
 
 const checkAllStarted = () => {
-  if (running.length === servers.length && running.every(isSettled)) {
-    printTable();
-  }
+  const rows = [...backendRows, ...uiRows];
+  if (rows.length > 0 && rows.every(isSettled)) printSummary(uiPlan);
 };
 
-// Copies a child's output to ours unchanged, while watching each line for
-// the "listening on <url>" messages that tell us which ports it is using.
+// Copies a child's output to ours line by line, passing each line to onLine
+// to pick out the URLs it reports.
 const pump = async (
   stream: ReadableStream<Uint8Array>,
   out: NodeJS.WriteStream,
-  server: RunningServer,
+  onLine: (line: string) => void,
 ) => {
   const decoder = new TextDecoder();
   const reader = stream.getReader();
   let pending = "";
+  const emit = (line: string) => {
+    const text = line.replace(ANSI, "");
+    if (HIDDEN_LINES.some((hidden) => hidden.test(text))) return;
+    out.write(`${line}\n`);
+    onLine(text);
+  };
   while (true) {
     const { done, value: chunk } = await reader.read();
     if (done) break;
-    out.write(chunk);
     pending += decoder.decode(chunk, { stream: true });
     const lines = pending.split("\n");
     pending = lines.pop() ?? "";
-    for (const text of lines) {
-      const url = text.replace(ANSI, "").match(LISTENING)?.[1];
-      if (!url) continue;
-      if (url.startsWith("ws")) server.websocket ??= url;
-      else server.rest ??= url;
-      checkAllStarted();
-    }
+    lines.forEach(emit);
   }
+  if (pending) emit(pending);
 };
 
-const startupTimer = setTimeout(printTable, STARTUP_TIMEOUT_MS);
-
-for (const config of servers) {
-  const proc = Bun.spawn(["bun", config.script], {
-    env: { ...process.env, ...config.env },
+const spawn = (
+  name: string,
+  cmd: string[],
+  options: { cwd?: string; env?: Record<string, string>; stopSignal?: NodeJS.Signals },
+  onLine: (line: string) => void,
+) => {
+  const proc = Bun.spawn(cmd, {
+    cwd: options.cwd,
+    env: { ...process.env, ...options.env },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
   });
-  const server: RunningServer = { ...config, proc };
-  running.push(server);
-  console.log(`PID (${config.name}) ${proc.pid}`);
+  const child: Child = { name, proc, stopSignal: options.stopSignal };
+  children.push(child);
+  console.log(`PID (${name}) ${proc.pid}`);
 
-  pump(proc.stdout, process.stdout, server);
-  pump(proc.stderr, process.stderr, server);
+  const handleLine = (line: string) => {
+    onLine(line);
+    checkAllStarted();
+  };
+  pump(proc.stdout, process.stdout, handleLine);
+  pump(proc.stderr, process.stderr, handleLine);
 
   proc.exited.then((code) => {
-    server.exitCode = code;
+    child.exitCode = code;
     if (!shuttingDown) {
-      console.log(`${config.name} (${proc.pid}) exited with code ${code}`);
+      console.log(`${name} (${proc.pid}) exited with code ${code}`);
       checkAllStarted();
     }
   });
+  return child;
+};
+
+const startupTimer = setTimeout(() => printSummary(uiPlan), STARTUP_TIMEOUT_MS);
+
+// UI first: it rewrites the built config.json files before anything loads them.
+const uiPlan = noUi ? undefined : prepareUi(ports);
+const relativePortsFile = path.relative(process.cwd(), portsFilePath);
+console.log(
+  `Ports from ${relativePortsFile.startsWith("..") ? portsFilePath : relativePortsFile}`,
+);
+for (const name of uiPlan?.updated ?? []) {
+  console.log(`[portal ports] ${name}/config.json now points at ${ports.ui[name].backend}`);
+}
+
+// Vuu servers accept auth requests from the portal host page only.
+const hostPort = ports.ui[hostModule(ports)].port;
+const corsOrigins = `http://localhost:${hostPort},http://127.0.0.1:${hostPort}`;
+
+for (const [name, server] of Object.entries(BACKEND)) {
+  const { websocket, https } = ports.backend[name];
+  const env: Record<string, string> = server.app
+    ? {
+        VUU_APP: server.app,
+        VUU_WEBSOCKET_PORT: String(websocket),
+        ...(https !== undefined && { VUU_HTTPS_PORT: String(https) }),
+        // An origin list set in the shell wins.
+        ...(!process.env.VUU_CORS_ALLOWED_ORIGINS &&
+          !process.env.VUU_CORS_ALLOWED_ORIGIN && {
+            VUU_CORS_ALLOWED_ORIGINS: corsOrigins,
+          }),
+      }
+    : { VUU_SERVICE_PORT: String(websocket) };
+
+  const row = { name, expected: https === undefined ? 1 : 2 } as Row;
+  row.child = spawn(name, ["bun", server.script], { env }, (line) => {
+    const url = line.match(LISTENING)?.[1];
+    if (!url) return;
+    if (url.startsWith("ws")) row.websocket ??= url;
+    else row.rest ??= url;
+  });
+  backendRows.push(row);
+}
+
+const isPortInUse = (port: number) =>
+  new Promise<boolean>((resolve) => {
+    const socket = net.connect({ host: "127.0.0.1", port });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+  });
+
+// Something else (nginx, say) may already serve dist_portal. It serves the
+// updated config.json files as they are, so leave it be.
+const takenUiPorts = [];
+for (const name of uiPlan?.served ?? []) {
+  if (await isPortInUse(ports.ui[name].port)) {
+    takenUiPorts.push(`${name} (${ports.ui[name].port})`);
+  }
+}
+if (uiPlan?.serveConfigPath && takenUiPorts.length > 0) {
+  uiPlan.warnings.push(
+    `UI not started: ports already in use for ${takenUiPorts.join(", ")}. If another server (e.g. nginx) serves dist_portal, it picks up the updated config.json on the next page load.`,
+  );
+  uiPlan.serveConfigPath = undefined;
+}
+
+if (uiPlan?.serveConfigPath) {
+  const vuuUi = ports.vuuUiDir;
+  const child = spawn(
+    "ui",
+    [
+      "node",
+      path.join(vuuUi, "tools/portal-build-tool/dist/serve-cli.js"),
+      "start",
+      "--config",
+      uiPlan.serveConfigPath,
+    ],
+    {
+      cwd: vuuUi,
+      // portal-serve runs the `serve` package from vuu-ui's node_modules.
+      env: { PATH: `${path.join(vuuUi, "node_modules/.bin")}:${process.env.PATH}` },
+      // CTRL-C already sends it SIGINT; SIGTERM avoids a second SIGINT
+      // killing it before it has stopped its own servers.
+      stopSignal: "SIGTERM",
+    },
+    (line) => {
+      const [, name, url] = line.match(UI_READY) ?? [];
+      const row = uiRows.find((uiRow) => uiRow.name === name);
+      if (row) row.url ??= url;
+    },
+  );
+  for (const name of uiPlan.served) {
+    uiRows.push({ child, name, expected: 1, backend: ports.ui[name].backend });
+  }
 }
 
 const shutdown = async (signal: NodeJS.Signals) => {
   if (shuttingDown) {
     // Second CTRL-C: stop waiting and kill everything immediately.
-    for (const { proc } of running) proc.kill("SIGKILL");
+    for (const { proc } of children) proc.kill("SIGKILL");
     process.exit(1);
   }
   shuttingDown = true;
   clearTimeout(startupTimer);
   console.log(`\n${signal} received, stopping portal servers...`);
 
-  for (const { proc } of running) {
-    if (isAlive(proc)) proc.kill(signal);
+  for (const { proc, stopSignal } of children) {
+    if (isAlive(proc)) proc.kill(stopSignal ?? signal);
   }
 
   const timeout = setTimeout(() => {
-    for (const { name, proc } of running) {
+    for (const { name, proc } of children) {
       if (isAlive(proc)) {
         console.log(`${name} (${proc.pid}) did not exit, killing`);
         proc.kill("SIGKILL");
@@ -178,7 +327,7 @@ const shutdown = async (signal: NodeJS.Signals) => {
     }
   }, SHUTDOWN_TIMEOUT_MS);
 
-  await Promise.all(running.map(({ proc }) => proc.exited));
+  await Promise.all(children.map(({ proc }) => proc.exited));
   clearTimeout(timeout);
   console.log("All portal servers stopped");
   process.exit(0);
