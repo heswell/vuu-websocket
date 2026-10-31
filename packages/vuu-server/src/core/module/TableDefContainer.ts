@@ -1,5 +1,5 @@
 import { TableDefs } from "./ModuleFactory";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.module");
 

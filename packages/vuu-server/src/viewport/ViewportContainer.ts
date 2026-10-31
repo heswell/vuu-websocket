@@ -36,7 +36,7 @@ import { VuuUser } from "../core/auths/VuuUser";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import {
   ClientRequestError,
   TableNotFoundError,

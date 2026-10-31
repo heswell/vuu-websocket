@@ -6,7 +6,7 @@ import {
   DefaultMessageHandler,
   MessageHandler,
 } from "./ClientConnectionCreator";
-import { LoginTokenService } from "./auth/LoginTokenService";
+import type { LoginTokenService } from "./auth/LoginTokenService";
 import { ClientSessionContainer } from "./ClientSessionContainer";
 import { ServerApi } from "./ServerApi";
 import { Channel } from "./ws/Channel";
@@ -21,7 +21,7 @@ import {
 import { ViewPortUpdate } from "../viewport/Viewport";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { LoginSuccessOptions } from "./LoginSuccess";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { errorMessage, isClientRequestError } from "./ClientRequestError";
 import { SessionLimitError } from "./ClientSessionContainer";
 import { VuuCloseCode } from "./CloseCodes";

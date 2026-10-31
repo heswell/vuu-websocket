@@ -6,7 +6,7 @@ import {
   type RemoteResourceMessageType,
   type RemoteTableSubscriptionOptions,
   type SubscriptionMode,
-} from "@heswell/service-utils";
+} from "@heswell/service-utils/browser";
 import {
   DefaultLifecycleEnabled,
   LifecycleEnabled,

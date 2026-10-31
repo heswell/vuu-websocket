@@ -1,6 +1,6 @@
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { ClientSessionId } from "../ClientConnectionCreator";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.session");
 

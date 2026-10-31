@@ -2,7 +2,7 @@ import { Table } from "@heswell/vuu-table";
 import { VuuMenu } from "@vuu-ui/vuu-protocol-types";
 import { ProviderContainer } from "./provider/ProviderContainer";
 import { ViewPortDef } from "./api/ViewPortDef";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.service");
 

@@ -1,7 +1,7 @@
 import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { RealizedViewServerModule } from "./VsModule";
 import { ServiceMessage } from "../../Service";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.module");
 

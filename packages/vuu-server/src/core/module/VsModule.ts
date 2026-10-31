@@ -5,7 +5,7 @@ import { IService, ServiceMessage } from "../../Service";
 import { TableDef } from "../../api/TableDef";
 import { RpcHandler, RpcHandlerFunc } from "../../net/rpc/RpcHandler";
 import { ServiceFactory } from "./ModuleFactory";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.module");
 

@@ -10,5 +10,8 @@ const PACKAGE_ROOT = path.resolve(
 prepareDistPackage({
   packageRoot: PACKAGE_ROOT,
   distRoot: path.resolve(PACKAGE_ROOT, "../../dist/vuu-server"),
-  entries: [{ subpath: ".", name: "index" }],
+  entries: [
+    { subpath: ".", name: "index" },
+    { subpath: "./browser", name: "browser" },
+  ],
 });

@@ -23,7 +23,7 @@ import {
   VuuWebSocketOptions,
 } from "./VuuServerOptions";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
-import { configureLogging, getLogger } from "@heswell/service-utils";
+import { configureLogging, getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.core");
 

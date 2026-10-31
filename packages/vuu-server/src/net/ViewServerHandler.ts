@@ -4,11 +4,11 @@ import { ClientSessionContainer } from "./ClientSessionContainer";
 import { ServerApi } from "./ServerApi";
 import { VuuClientMessage } from "@vuu-ui/vuu-protocol-types";
 import { Channel } from "./ws/Channel";
-import { LoginTokenService } from "./auth/LoginTokenService";
+import type { LoginTokenService } from "./auth/LoginTokenService";
 import { FlowControllerFactory } from "./flowcontrol/FlowController";
 import type { VuuUser } from "../core/auths/VuuUser";
 import type { LoginSuccessOptions } from "./LoginSuccess";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { ErrorResponse, JsonViewServerMessage } from "./Messages";
 
 const log = getLogger("vuu.session");

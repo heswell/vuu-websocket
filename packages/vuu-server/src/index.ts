@@ -198,7 +198,7 @@ export {
   type LogLevel,
   type LogMessageLevel,
   type LogSink,
-} from "@heswell/service-utils";
+} from "@heswell/service-utils/browser";
 export { ConfigFactory } from "./util/ConfigFactory";
 export type {
   Config,
@@ -263,3 +263,11 @@ export type {
 } from "./net/LoginSuccess";
 export type { LoginSuccessProvider } from "./core/LoginSuccessProvider";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";
+export { VuuServerCore, type VuuServerCoreConfig } from "./core/VuuServerCore";
+export {
+  LocalLoginTokenService,
+  type LocalLoginTokenServiceOptions,
+} from "./net/auth/LocalLoginTokenService";
+export type { ViewServerHandler } from "./net/ViewServerHandler";
+export type { Channel } from "./net/ws/Channel";
+export * from "./local";

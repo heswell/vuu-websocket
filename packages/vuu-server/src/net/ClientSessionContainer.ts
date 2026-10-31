@@ -1,6 +1,6 @@
 import { VuuUser } from "../core/auths/VuuUser";
 import type { ClientSessionId, MessageHandler } from "./ClientConnectionCreator";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { ClientRequestError } from "./ClientRequestError";
 import { VuuCloseCode } from "./CloseCodes";
 

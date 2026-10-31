@@ -5,7 +5,7 @@ import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
 import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { TableNotFoundError } from "../../net/ClientRequestError";
 
 const log = getLogger("vuu.table");

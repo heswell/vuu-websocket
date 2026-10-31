@@ -24,8 +24,10 @@ application's own `@vuu-ui` version (any later 4.0.0 prerelease or 4.x release)
 is shared rather than duplicated. npm 7+ and bun install missing peers
 automatically.
 
-Everything is exported from the package root; there are no supported deep
-imports.
+Everything is exported from the package root. The one other entry point,
+`@heswell/vuu-server/browser`, has no Node or Bun dependencies; see
+[Running in a browser or Web Worker](#running-in-a-browser-or-web-worker).
+There are no supported deep imports.
 
 ## Starting a server
 
@@ -248,6 +250,48 @@ are exported for applications that serve their own REST endpoints, and
 `createAuthHttpHandler` takes `allowedOrigins` (and the deprecated
 `allowedOrigin`) directly.
 
+## Running in a browser or Web Worker
+
+`@heswell/vuu-server/browser` exports the server without its Bun hosting:
+`VuuServerCore` (tables, providers, modules, viewports, sessions and request
+handling), the module authoring APIs, and a MessagePort transport. Clients
+speak the normal Vuu protocol (JSON text), so a Vuu UI client stack
+(ConnectionManager, server-proxy, VuuDataSource) can run against it
+unchanged, e.g. for tests and demos without a remote server.
+
+In the server's worker:
+
+```ts
+import { createLocalVuuServer } from "@heswell/vuu-server/browser";
+
+const server = createLocalVuuServer({ modules: [MyModule()] });
+await server.start();
+server.acceptConnections(self); // each "vuu-connect" message opens a connection
+```
+
+On the client side, a stand-in for the global `WebSocket` opens a new
+MessagePort connection for each socket, so reconnects work as they would
+against a remote server:
+
+```ts
+import {
+  createLocalWebSocketClass,
+  openPortVia,
+} from "@heswell/vuu-server/browser";
+
+self.WebSocket = createLocalWebSocketClass(openPortVia(serverWorker));
+```
+
+`openPortVia` takes the server's `Worker`, or a `MessagePort` whose other end
+the server accepts connections on (to reach the server from another worker).
+To run client and server in one thread, use
+`createLocalWebSocketClass(() => server.openPort())`.
+
+Defaults suit a client in the same page: `LocalLoginTokenService` logs any
+token in as `local-user` (it does no authentication), sessions per user are
+unlimited, and heartbeats are on, as with a remote server. Never expose a
+local server over a network.
+
 ## How it fits together
 
 VuuServer makes use of a number of global singletons
@@ -268,7 +312,7 @@ VuuServer makes use of a number of global singletons
        - serviceFactory (optional, registered under the realised join
          table's name)
 
-2. VuuServer constructor
+2. VuuServer constructor (the transport-free part is `VuuServerCore`)
 
    - creates the ProviderContainer
    - registers each module from the config

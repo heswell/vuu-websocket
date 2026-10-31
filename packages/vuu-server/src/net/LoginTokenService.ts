@@ -1,7 +1,7 @@
 import { VuuLoginRequest } from "@vuu-ui/vuu-protocol-types";
 import { uuid } from "@vuu-ui/vuu-utils";
 import { VuuUser } from "../core/auths/VuuUser";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.auth");
 
