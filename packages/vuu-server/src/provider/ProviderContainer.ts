@@ -6,7 +6,7 @@ import {
   DefaultLifecycleEnabled,
   LifecycleContainer,
 } from "../toolbox/thread/LifecycleContainer";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.provider");
 

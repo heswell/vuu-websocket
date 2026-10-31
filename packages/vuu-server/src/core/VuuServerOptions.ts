@@ -1,4 +1,4 @@
-import { LoginTokenService } from "../net/auth/LoginTokenService";
+import type { LoginTokenService } from "../net/auth/LoginTokenService";
 import { ViewServerModule } from "./module/VsModule";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
 import {

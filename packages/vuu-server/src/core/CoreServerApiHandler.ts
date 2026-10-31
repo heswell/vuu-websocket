@@ -60,7 +60,7 @@ import { ViewportContainer } from "../viewport/ViewportContainer";
 import { TableContainer } from "./table/TableContainer";
 import { DataTable } from "./table/InMemDataTable";
 import { InMemSessionDataTable } from "./table/InMemSessionDataTable";
-import { getLogger, type Logger } from "@heswell/service-utils";
+import { getLogger, type Logger } from "@heswell/service-utils/browser";
 import {
   ClientRequestError,
   errorMessage,

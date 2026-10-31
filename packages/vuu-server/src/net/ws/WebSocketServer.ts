@@ -1,7 +1,7 @@
 import { sslEnabled, VuuWebSocketOptions } from "../../core/VuuServerOptions";
 import { type ViewServerHandlerFactory } from "../ViewServerHandler";
 import { BunWebSocketConnectionHandler } from "./BunWebSocketConnectionHandler";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.net");
 const STOP_TIMEOUT_MS = 250;

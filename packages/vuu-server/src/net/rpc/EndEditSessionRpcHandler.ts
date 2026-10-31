@@ -1,5 +1,5 @@
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { TableContainer } from "../../core/table/TableContainer";
 import {
   InMemSessionDataTable,

@@ -10,6 +10,17 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./browser": {
+      "types": "./src/browser.ts",
+      "import": "./src/browser.ts"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "browser": [
+        "./src/browser.ts"
+      ]
     }
   },
   "sideEffects": false,

@@ -11,7 +11,7 @@ import {
   InvalidAuthenticationRequestError,
 } from "./AuthenticationErrors";
 import { LoginTokenService } from "./LoginTokenService";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import {
   createCorsHeaders,
   isOriginAllowed,

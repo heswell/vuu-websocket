@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import { ViewServerHandler } from "../ViewServerHandler";
-import { getLogger, type WebsocketData } from "@heswell/service-utils";
+import { getLogger, type WebsocketData } from "@heswell/service-utils/browser";
 import { VuuWebSocketOptions } from "../../core/VuuServerOptions";
 
 const log = getLogger("vuu.net");

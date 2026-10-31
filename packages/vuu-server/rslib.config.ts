@@ -1,17 +1,17 @@
 import { defineConfig } from "@rslib/core";
 
+const distRoot = "../../dist/vuu-server";
+const dts = { distPath: `${distRoot}/src` };
+
 export default defineConfig({
   lib: [
     {
-      dts: {
-        distPath: "../../dist/vuu-server/src",
-      },
+      dts,
       format: "esm",
       output: {
         cleanDistPath: true,
-        distPath: {
-          root: "../../dist/vuu-server",
-        },
+        distPath: { root: distRoot },
+        target: "node",
       },
       source: {
         entry: {
@@ -19,8 +19,20 @@ export default defineConfig({
         },
       },
     },
+    {
+      // No Node or Bun dependencies: runs in a browser or Web Worker.
+      dts,
+      format: "esm",
+      output: {
+        cleanDistPath: false,
+        distPath: { root: distRoot },
+        target: "web",
+      },
+      source: {
+        entry: {
+          browser: "./src/browser.ts",
+        },
+      },
+    },
   ],
-  output: {
-    target: "node",
-  },
 });

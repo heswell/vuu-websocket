@@ -26,7 +26,7 @@ import {
   FlowController,
   SendHeartbeat,
 } from "./flowcontrol/FlowController";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 import { ClientRequestError } from "./ClientRequestError";
 import { VuuCloseCode } from "./CloseCodes";
 

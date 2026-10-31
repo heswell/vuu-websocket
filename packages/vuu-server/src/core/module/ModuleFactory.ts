@@ -14,7 +14,7 @@ import { ViewPortDef } from "../../api/ViewPortDef";
 import { TableContainer } from "../table/TableContainer";
 import { RpcHandlerFunc } from "../../net/rpc/RpcHandler";
 import { DataTable } from "../table/InMemDataTable";
-import { getLogger } from "@heswell/service-utils";
+import { getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.module");
 

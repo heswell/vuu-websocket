@@ -1,4 +1,4 @@
-import { VuuServer } from "../../core/VuuServer";
+import type { VuuServerCore } from "../../core/VuuServerCore";
 import { RpcParams } from "./Rpc";
 import {
   EmptyViewPortMenu,
@@ -8,7 +8,7 @@ import {
 } from "../../viewport/ViewPortMenu";
 import { RpcResult } from "@vuu-ui/vuu-protocol-types";
 
-export type RpcHandlerFunc = (vuuServer: VuuServer) => RpcHandler;
+export type RpcHandlerFunc = (vuuServer: VuuServerCore) => RpcHandler;
 
 export class RpcHandler {
   processRpcRequest(
