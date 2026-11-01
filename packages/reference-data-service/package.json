@@ -9,8 +9,8 @@
   "author": "heswell",
   "type": "module",
   "dependencies": {
-    "@heswell/service-utils": "1.2.2",
-    "@heswell/vuu-table": "1.0.3",
+    "@heswell/service-utils": "1.3.0",
+    "@heswell/vuu-table": "1.1.0",
     "pino": "9.6.0"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@heswell/service-utils",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Shared utilities for Vuu services: config loading, argument parsing, remote table publishing and subscription",
   "type": "module",
   "main": "src/index.ts",
@@ -34,13 +34,13 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/vuu-table": "^1.0.3"
+    "@heswell/vuu-table": "^1.1.0"
   },
   "peerDependencies": {
-    "@vuu-ui/vuu-protocol-types": "^4.0.0-alpha.26"
+    "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.26"
+    "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2"
   },
   "repository": {
     "type": "git",

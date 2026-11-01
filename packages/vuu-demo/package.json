@@ -16,11 +16,11 @@
   "license": "MIT",
   "dependencies": {
     "@heswell/vuu-module-refdata": "1.0.1",
-    "@heswell/vuu-table": "1.0.3",
-    "@vuu-ui/vuu-utils": "4.0.0-alpha.26",
+    "@heswell/vuu-table": "1.1.0",
+    "@vuu-ui/vuu-utils": "5.0.0-alpha.2",
     "pino": "9.6.0"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-data-types": "4.0.0-alpha.26"
+    "@vuu-ui/vuu-data-types": "5.0.0-alpha.2"
   }
 }

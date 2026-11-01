@@ -18,11 +18,11 @@
   "author": "heswell",
   "license": "MIT",
   "dependencies": {
-    "@heswell/vuu-server": "4.3.0",
-    "@heswell/vuu-table": "1.0.3"
+    "@heswell/vuu-server": "4.4.0",
+    "@heswell/vuu-table": "1.1.0"
   },
   "devDependencies": {
-    "@vuu-ui/vuu-protocol-types": "4.0.0-alpha.26",
+    "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
     "csv-parse": "^7.0.3"
   }
 }

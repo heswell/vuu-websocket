@@ -56,7 +56,9 @@ describe("publishable package manifests", () => {
         expect(`${dependency}@${range}`).toMatch(
           /@\^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/,
         );
-        expect(Bun.semver.satisfies("4.0.0", range)).toBe(true);
+        // The range admits the stable release of its own major version.
+        const major = /^\^(\d+)\./.exec(range)![1];
+        expect(Bun.semver.satisfies(`${major}.0.0`, range)).toBe(true);
         // The workspace build and tests use a version the range admits.
         const devRange = manifest.devDependencies?.[dependency];
         expect(devRange).toBeDefined();
