@@ -1,0 +1,17 @@
+{
+  "name": "@heswell/reference-data-service",
+  "version": "1.0.1",
+  "private": true,
+  "module": "src/index.ts",
+  "scripts": {
+    "create-data": "bun ./scripts/generate-instruments.ts",
+    "refdata-service": "bun ./src/reference-data-server/reference-data-server.ts"
+  },
+  "author": "heswell",
+  "type": "module",
+  "dependencies": {
+    "@heswell/service-utils": "1.3.0",
+    "@heswell/vuu-table": "1.1.0",
+    "pino": "9.6.0"
+  }
+}

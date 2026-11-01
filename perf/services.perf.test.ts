@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { DataService } from "../packages/service-utils/src/publisher";
-import { start as startOrders } from "../packages/orders-service/src/server";
-import { start as startPrices } from "../packages/price-service/src/server";
-import { start as startRefData } from "../packages/reference-data-service/src/server";
+import { start as startOrders } from "../services/orders-service/src/server";
+import { start as startPrices } from "../services/price-service/src/server";
+import { start as startRefData } from "../services/reference-data-service/src/server";
 import {
   createRecorder,
   elapsed,
@@ -15,7 +15,7 @@ import {
 
 /**
  * End to end metrics for the demo data services, using the real
- * instruments data set (packages/reference-data-service/data).
+ * instruments data set (services/reference-data-service/data).
  */
 
 const record = createRecorder();

@@ -8,10 +8,10 @@ import {
 } from "../src";
 
 const certPath = fileURLToPath(
-  new URL("../../vuu-demo/certs/cert.pem", import.meta.url),
+  new URL("../../../apps/vuu-demo/certs/cert.pem", import.meta.url),
 );
 const keyPath = fileURLToPath(
-  new URL("../../vuu-demo/certs/key.pem", import.meta.url),
+  new URL("../../../apps/vuu-demo/certs/key.pem", import.meta.url),
 );
 
 describe("RestServer transport", () => {

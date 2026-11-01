@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "workspaces": [
-    "packages/**"
+    "packages/**",
+    "vuu-modules/**",
+    "services/**",
+    "apps/**",
+    "tools/**"
   ],
   "scripts": {
     "build:packages": "bun ./scripts/build-packages.ts",
@@ -28,9 +32,9 @@
     "start:refdata": "bun ./scripts/start-refdata.ts",
     "start:equities": "bun ./scripts/start-equities.ts",
     "debug": "bun --inspect ./start.ts",
-    "bench": "bun ./packages/benchmarks/src/run.ts",
-    "bench:1m": "bun ./packages/benchmarks/src/run.ts --rows=1000000",
-    "bench:scala": "bun ./packages/benchmarks/src/scala/run.ts",
+    "bench": "bun ./tools/benchmarks/src/run.ts",
+    "bench:1m": "bun ./tools/benchmarks/src/run.ts --rows=1000000",
+    "bench:scala": "bun ./tools/benchmarks/src/scala/run.ts",
     "bench:data-engine-local": "npm run bench -w @heswell/vuu-data-engine-local",
     "bench:data-engine-local:1m": "npm run bench:scale -w @heswell/vuu-data-engine-local",
     "test": "bun test",

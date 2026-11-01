@@ -26,7 +26,7 @@ import {
   type Manifest,
   type ReleaseCandidate,
 } from "./vuu-ui-release-plan";
-import { getWorkspacePackages } from "./workspace-packages";
+import { distDirectory, getWorkspacePackages } from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
@@ -128,7 +128,7 @@ const fetchPublishedManifest = async (name: string, version: string) => {
 const assertPublishOrder = () => {
   const names = PUBLISHABLE_PACKAGES.map(({ name }) => name as string);
   PUBLISHABLE_PACKAGES.forEach(({ name, directory }, index) => {
-    const manifest = readJson(path.join(ROOT, "packages", directory, "package.json"));
+    const manifest = readJson(path.join(ROOT, directory, "package.json"));
     for (const section of ["dependencies", "peerDependencies"] as const) {
       for (const dependency of Object.keys(manifest[section] ?? {})) {
         if (names.indexOf(dependency) > index) {
@@ -152,7 +152,7 @@ assertPublishOrder();
 
 const candidates: ReleaseCandidate[] = await Promise.all(
   PUBLISHABLE_PACKAGES.map(async ({ name, directory }) => {
-    const local = readJson(path.join(ROOT, "packages", directory, "package.json"));
+    const local = readJson(path.join(ROOT, directory, "package.json"));
     return { name, local, published: await fetchPublishedManifest(name, local.version) };
   }),
 );
@@ -194,7 +194,7 @@ if (!options.yes && !confirm(options.skipPublish ? "Apply these bumps?" : "Bump 
 const manifestPaths = [
   path.join(ROOT, "package.json"),
   ...getWorkspacePackages().map(({ directory }) =>
-    path.join(ROOT, "packages", directory, "package.json"),
+    path.join(ROOT, directory, "package.json"),
   ),
 ];
 const bumps = releases.filter(({ action }) => action === "bump-and-publish");
@@ -226,15 +226,15 @@ const published: string[] = [];
 try {
   for (const { name, nextVersion } of releases) {
     const { directory } = PUBLISHABLE_PACKAGES.find((p) => p.name === name)!;
-    const distDirectory = `./dist/${directory}`;
-    const dist = readJson(path.join(ROOT, distDirectory, "package.json"));
+    const distPath = `./${distDirectory(directory)}`;
+    const dist = readJson(path.join(ROOT, distPath, "package.json"));
     if (dist.version !== nextVersion) {
-      throw new Error(`${distDirectory} is at ${dist.version}, expected ${nextVersion}.`);
+      throw new Error(`${distPath} is at ${dist.version}, expected ${nextVersion}.`);
     }
     run([
       "npm",
       "publish",
-      distDirectory,
+      distPath,
       "--registry",
       REGISTRY,
       "--access",

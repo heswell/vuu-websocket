@@ -7,7 +7,7 @@ import {
   updateDependencies,
 } from "../publishable-packages";
 
-const PACKAGES_ROOT = path.resolve(import.meta.dir, "../../packages");
+const ROOT = path.resolve(import.meta.dir, "../..");
 const SECTIONS = ["dependencies", "peerDependencies"] as const;
 
 type Manifest = { version?: string } & Partial<
@@ -16,7 +16,7 @@ type Manifest = { version?: string } & Partial<
 
 const readManifest = (directory: string): Manifest =>
   JSON.parse(
-    fs.readFileSync(path.join(PACKAGES_ROOT, directory, "package.json"), "utf8"),
+    fs.readFileSync(path.join(ROOT, directory, "package.json"), "utf8"),
   );
 
 describe("publishable package manifests", () => {
@@ -68,7 +68,7 @@ describe("publishable package manifests", () => {
   }
 
   test("vuu-portal shares the consumer's vuu-server and vuu-table", () => {
-    const manifest = readManifest("vuu-portal");
+    const manifest = readManifest("apps/vuu-portal");
     for (const dependency of ["@heswell/vuu-server", "@heswell/vuu-table"]) {
       expect(manifest.dependencies?.[dependency]).toBeUndefined();
       const peerRange = manifest.peerDependencies?.[dependency];
@@ -77,7 +77,7 @@ describe("publishable package manifests", () => {
       expect(devRange).toBeDefined();
       // The workspace copy used for local builds must satisfy both ranges.
       const { version } = readManifest(
-        dependency.replace("@heswell/", ""),
+        dependency.replace("@heswell/", "packages/"),
       ) as { version: string };
       expect(Bun.semver.satisfies(version, peerRange!)).toBe(true);
       expect(Bun.semver.satisfies(version, devRange!)).toBe(true);

@@ -1,0 +1,30 @@
+{
+  "name": "@heswell/vuu-basket-trading",
+  "version": "1.0.1",
+  "private": true,
+  "description": "VUU basket trading server",
+  "type": "module",
+  "main": "dist/src/BasketTradingMain.js",
+  "module": "src/BasketTradingMain.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "etsc",
+    "build:vuu": "node ../../scripts/build.mjs",
+    "test": "bun test",
+    "generate:basket-data": "bun scripts/generate-basket-data.ts"
+  },
+  "author": "heswell",
+  "license": "MIT",
+  "dependencies": {
+    "@heswell/vuu-server": "4.4.0",
+    "@heswell/vuu-table": "1.1.0"
+  },
+  "devDependencies": {
+    "@heswell/service-utils": "1.3.0",
+    "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
+    "csv-parse": "^7.0.3"
+  }
+}

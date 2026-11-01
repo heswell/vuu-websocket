@@ -10,7 +10,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getWorkspacePackages, readManifest } from "./workspace-packages";
+import {
+  distDirectory,
+  getWorkspacePackages,
+  readManifest,
+} from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
@@ -57,9 +61,9 @@ npm alpha, npm beta, npm latest.
 const checkPackageVersion = async (packageName: string, directory: string) => {
   const { name, version } = readManifest(
     packageName,
-    path.join(ROOT, "packages", directory, "package.json"),
+    path.join(ROOT, directory, "package.json"),
   );
-  const distManifestPath = path.join(ROOT, "dist", directory, "package.json");
+  const distManifestPath = path.join(ROOT, distDirectory(directory), "package.json");
   const distVersion = fs.existsSync(distManifestPath)
     ? readManifest(packageName, distManifestPath).version
     : "-";

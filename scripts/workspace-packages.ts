@@ -4,6 +4,19 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+// Top-level folders that hold workspace packages, by role.
+export const WORKSPACE_FOLDERS = [
+  "packages", // engine and server libraries
+  "vuu-modules", // Vuu modules that hosts plug in
+  "services", // standalone data services
+  "apps", // Vuu servers you start
+  "tools", // dev-only tooling
+] as const;
+
+// Build output is flat: <group>/<name> builds to dist/<name>.
+export const distDirectory = (directory: string) =>
+  path.posix.join("dist", ...directory.split("/").slice(1));
+
 export type PackageManifest = {
   name: string;
   version: string;
@@ -24,8 +37,8 @@ export const readManifest = (
   return manifest as PackageManifest;
 };
 
+/** Every workspace package, with its directory relative to the repo root. */
 export const getWorkspacePackages = () => {
-  const packagesRoot = path.join(ROOT, "packages");
   const packages: { name: string; directory: string }[] = [];
 
   const visit = (directory: string) => {
@@ -37,7 +50,7 @@ export const getWorkspacePackages = () => {
       }
       packages.push({
         name: manifest.name,
-        directory: path.relative(packagesRoot, directory),
+        directory: path.relative(ROOT, directory).split(path.sep).join("/"),
       });
     }
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -52,6 +65,9 @@ export const getWorkspacePackages = () => {
     }
   };
 
-  visit(packagesRoot);
+  for (const folder of WORKSPACE_FOLDERS) {
+    const folderPath = path.join(ROOT, folder);
+    if (fs.existsSync(folderPath)) visit(folderPath);
+  }
   return packages.sort((a, b) => a.directory.localeCompare(b.directory));
 };

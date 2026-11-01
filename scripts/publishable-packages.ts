@@ -1,40 +1,41 @@
+// directory is relative to the repo root.
 export const PUBLISHABLE_PACKAGES = [
   {
     name: "@heswell/user-admin",
-    directory: "user-admin",
+    directory: "vuu-modules/user-admin",
   },
   {
     name: "@heswell/module-admin",
-    directory: "module-admin",
+    directory: "vuu-modules/module-admin",
   },
   // vuu-table must precede vuu-viewport, which depends on it.
   {
     name: "@heswell/vuu-table",
-    directory: "vuu-table",
+    directory: "packages/vuu-table",
   },
   {
     name: "@heswell/vuu-viewport",
-    directory: "vuu-viewport",
+    directory: "packages/vuu-viewport",
   },
   // Depends on all of the above.
   {
     name: "@heswell/vuu-data-engine-local",
-    directory: "vuu-data-engine-local",
+    directory: "packages/vuu-data-engine-local",
   },
   // Server packages, in dependency order. service-utils depends on
   // vuu-table; vuu-server on service-utils, vuu-table and vuu-viewport;
   // vuu-portal on vuu-server and module-admin.
   {
     name: "@heswell/service-utils",
-    directory: "service-utils",
+    directory: "packages/service-utils",
   },
   {
     name: "@heswell/vuu-server",
-    directory: "vuu-server",
+    directory: "packages/vuu-server",
   },
   {
     name: "@heswell/vuu-portal",
-    directory: "vuu-portal",
+    directory: "apps/vuu-portal",
   },
 ] as const;
 

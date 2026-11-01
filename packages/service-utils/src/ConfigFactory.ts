@@ -2,6 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Folders, relative to the working directory, that hold one directory per
+// app with its application.conf. "packages" is the layout before the repo was
+// split into apps/ and services/, kept so existing setups still resolve.
+const APP_FOLDERS = ["apps", "services", "packages"];
+
 export type ConfigValue = string | number | boolean;
 
 export type ConfigEnvironment = Record<string, string | undefined>;
@@ -224,7 +229,7 @@ function resolveConfigPath(explicitPath?: string): string {
       return appConfigPath;
     }
     throw new Error(
-      `Unable to locate application.conf for VUU_APP='${appName}'. Expected '${path.join("packages", appName, "application.conf")}' from '${process.cwd()}', or set VUU_CONFIG_FILE explicitly.`,
+      `Unable to locate application.conf for VUU_APP='${appName}'. Expected '${APP_FOLDERS.map((folder) => path.join(folder, appName, "application.conf")).join("' or '")}' from '${process.cwd()}', or set VUU_CONFIG_FILE explicitly.`,
     );
   }
 
@@ -247,24 +252,26 @@ function findApplicationConfForApp(
   rootDir: string,
   appName: string,
 ): string | undefined {
-  const candidate = path.join(rootDir, "packages", appName, "application.conf");
-  return fs.existsSync(candidate) ? candidate : undefined;
+  return APP_FOLDERS.map((folder) =>
+    path.join(rootDir, folder, appName, "application.conf"),
+  ).find((candidate) => fs.existsSync(candidate));
 }
 
 function findSingleApplicationConf(rootDir: string): string | undefined {
-  const packagesDir = path.join(rootDir, "packages");
-  if (!fs.existsSync(packagesDir)) {
-    return undefined;
-  }
-
   const matches: string[] = [];
-  for (const dirent of fs.readdirSync(packagesDir, { withFileTypes: true })) {
-    if (!dirent.isDirectory()) {
+  for (const folder of APP_FOLDERS) {
+    const folderPath = path.join(rootDir, folder);
+    if (!fs.existsSync(folderPath)) {
       continue;
     }
-    const candidate = path.join(packagesDir, dirent.name, "application.conf");
-    if (fs.existsSync(candidate)) {
-      matches.push(candidate);
+    for (const dirent of fs.readdirSync(folderPath, { withFileTypes: true })) {
+      if (!dirent.isDirectory()) {
+        continue;
+      }
+      const candidate = path.join(folderPath, dirent.name, "application.conf");
+      if (fs.existsSync(candidate)) {
+        matches.push(candidate);
+      }
     }
   }
 

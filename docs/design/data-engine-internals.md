@@ -74,6 +74,7 @@ packages/
   vuu-server/         hosts both packages
     src/core/table/   DataTable / JoinTable subclasses (TableDef, providers)
     src/viewport/Viewport.ts  protocol wrapper, flush scheduler, visual links
+tools/
   benchmarks/         performance scenarios, per engine adapter
 ```
 
@@ -928,7 +929,7 @@ columnar engine):
    approach in [§15](#15-producing-client-updates).
 5. Register it with `setDefaultDataEngine(engine)` on the server, or pass it
    to the `Viewport` constructor for a single table.
-6. Add an adapter in `packages/benchmarks/src/adapters/` (implement
+6. Add an adapter in `tools/benchmarks/src/adapters/` (implement
    `EngineAdapter`), register it in `src/run.ts` and run `bun run bench` to
    compare it with the in-memory engine across the same scenarios.
 7. Run the `InMemoryViewport` test suite against it. The randomized
@@ -954,10 +955,10 @@ columnar engine):
 - `packages/vuu-server/__tests__/{Viewport,CoreServerApiHandler}.test.ts`:
   protocol-level tests through the server `Viewport` and request handler
   (including `CHANGE_VP_SUCCESS` and visual links).
-- `packages/benchmarks`: `bun run bench` (100k rows) and `bun run bench:1m`
+- `tools/benchmarks`: `bun run bench` (100k rows) and `bun run bench:1m`
   run the scenarios against each engine adapter. Baselines are committed in
-  `packages/benchmarks/results/`; see [data-engine.md](./data-engine.md#benchmarks).
-- `packages/benchmarks/src/scala`: `bun run bench:scala` ports the finos/vuu
+  `tools/benchmarks/results/`; see [data-engine.md](./data-engine.md#benchmarks).
+- `tools/benchmarks/src/scala`: `bun run bench:scala` ports the finos/vuu
   JMH benchmarks and, given a built finos/vuu checkout (`--vuu`), compares
   them side by side; see
   [data-engine.md](./data-engine.md#comparison-with-the-scala-vuu-engine).

@@ -8,7 +8,6 @@ import {
 import { getWorkspacePackages } from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PACKAGES_ROOT = path.join(ROOT, "packages");
 const VERSION_PATTERN =
   /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta)\.(\d+))?$/;
 
@@ -102,13 +101,13 @@ const getOptions = () => {
 
 const { packageName: targetPackageName, version: requestedVersion } = getOptions();
 const packageFiles = getWorkspacePackages().map(({ directory }) =>
-  path.join(PACKAGES_ROOT, directory, "package.json"),
+  path.join(ROOT, directory, "package.json"),
 );
 const targetPackageFile = packageFiles.find(
   (filePath) => readJson(filePath).name === targetPackageName,
 );
 if (!targetPackageFile) {
-  throw new Error(`Could not find ${targetPackageName} in ${PACKAGES_ROOT}.`);
+  throw new Error(`Could not find ${targetPackageName} in the workspace.`);
 }
 
 const targetPackage = readJson(targetPackageFile);

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { start as startPrices } from "../packages/price-service/src/server";
-import { start as startRefData } from "../packages/reference-data-service/src/server";
+import { start as startPrices } from "../services/price-service/src/server";
+import { start as startRefData } from "../services/reference-data-service/src/server";
 import {
   createRecorder,
   quiet,

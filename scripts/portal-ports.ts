@@ -234,7 +234,7 @@ function checkModuleCatalogue(
   scopes: Map<string, string>,
   warn: (message: string) => void,
 ) {
-  const portalDir = path.join(repoRoot, "packages", "vuu-portal");
+  const portalDir = path.join(repoRoot, "apps", "vuu-portal");
   const file = ["modules.yaml", "default-modules.yaml"]
     .map((name) => path.join(portalDir, name))
     .find((candidate) => fs.existsSync(candidate));

@@ -198,25 +198,25 @@ runs the viewport under plain Node ESM. CI runs it, after the build and an
 
 ## Benchmarks
 
-`packages/benchmarks` runs a fixed set of scenarios (view creation, sort,
+`tools/benchmarks` runs a fixed set of scenarios (view creation, sort,
 filter, scroll, ticks, inserts, deletes and grouping) against every registered
 engine adapter. Run them from the repo root:
 
 ```sh
 bun run bench                       # 100k rows
 bun run bench:1m                    # 1M rows
-bun packages/benchmarks/src/run.ts --rows=250000 --iterations=5 \
+bun tools/benchmarks/src/run.ts --rows=250000 --iterations=5 \
   --engine=vuu-viewport --filter=sort --out=results.md
 ```
 
-Baseline results are committed in `packages/benchmarks/results/` (`100k.md`,
+Baseline results are committed in `tools/benchmarks/results/` (`100k.md`,
 `1m.md`). Rerun them after changes to the engine and compare. To evaluate an
 alternative engine, add an `EngineAdapter` in `src/adapters/` and register it
 in `src/run.ts`; with two engines the runner adds a speedup column.
 
 ### Comparison with the Scala Vuu engine
 
-`packages/benchmarks/src/scala` ports the JMH benchmarks in finos/vuu
+`tools/benchmarks/src/scala` ports the JMH benchmarks in finos/vuu
 (`benchmark/src/main/java/org/finos/vuu/benchmark`) to `vuu-table` and
 `vuu-viewport`. The tables, data, sizes and setup levels are the same, and the
 timing follows JMH SampleTime: fixed-duration warmup and measurement
@@ -245,7 +245,7 @@ Other options:
   The default is 3 x 1 s warmup and 5 x 1 s measurement.
 
 The latest results are in
-[`packages/benchmarks/results/scala-comparison.md`](../../packages/benchmarks/results/scala-comparison.md).
+[`tools/benchmarks/results/scala-comparison.md`](../../tools/benchmarks/results/scala-comparison.md).
 In summary, at the time of writing (default settings, Apple M2):
 
 - Table writes are 5 to 13 times faster (inserts and updates), and deletes are

@@ -45,11 +45,11 @@ beforeEach(() => {
     version: "1.0.0",
     dependencies: { "@heswell/vuu-demo": "^3.0.0" },
   });
-  writeJson("packages/user-admin/package.json", {
+  writeJson("vuu-modules/user-admin/package.json", {
     name: "@heswell/user-admin",
     version: "1.0.0",
   });
-  writeJson("packages/vuu-demo/package.json", {
+  writeJson("apps/vuu-demo/package.json", {
     name: "@heswell/vuu-demo",
     version: "3.0.0",
   });
@@ -66,7 +66,7 @@ beforeEach(() => {
     lockfileVersion: 3,
     packages: {
       "": readJson("package.json"),
-      "packages/vuu-demo": readJson("packages/vuu-demo/package.json"),
+      "apps/vuu-demo": readJson("apps/vuu-demo/package.json"),
       "packages/nested/consumer": readJson("packages/nested/consumer/package.json"),
       "node_modules/@external/pkg": {
         version: "1.0.0",
@@ -98,8 +98,8 @@ describe("bump:versions", () => {
   test("bumps a non-publishable workspace and updates root, nested dependants and lockfile", () => {
     const result = run("bump-versions", "--package", "@heswell/vuu-demo");
     expect(result.code).toBe(0);
-    expect(readJson("packages/vuu-demo/package.json").version).toBe("3.0.1");
-    expect(readJson("packages/user-admin/package.json").version).toBe("1.0.0");
+    expect(readJson("apps/vuu-demo/package.json").version).toBe("3.0.1");
+    expect(readJson("vuu-modules/user-admin/package.json").version).toBe("1.0.0");
     expect(readJson("package.json").dependencies["@heswell/vuu-demo"]).toBe("^3.0.1");
     const consumer = readJson("packages/nested/consumer/package.json");
     expect(consumer.dependencies["@heswell/vuu-demo"]).toBe("~3.0.1");
@@ -107,7 +107,7 @@ describe("bump:versions", () => {
     expect(consumer.peerDependencies["@heswell/vuu-demo"]).toBe("^3.0.0");
     expect(consumer.optionalDependencies["@heswell/vuu-demo"]).toBe("^3.0.1");
     const lock = readJson("package-lock.json").packages;
-    expect(lock["packages/vuu-demo"].version).toBe("3.0.1");
+    expect(lock["apps/vuu-demo"].version).toBe("3.0.1");
     expect(lock[""].dependencies["@heswell/vuu-demo"]).toBe("^3.0.1");
     expect(lock["packages/nested/consumer"].dependencies["@heswell/vuu-demo"]).toBe("~3.0.1");
     expect(lock["node_modules/@external/pkg"].dependencies["@heswell/vuu-demo"]).toBe("1.1.0");
@@ -117,13 +117,13 @@ describe("bump:versions", () => {
     expect(run("bump-versions", "--package=@heswell/consumer").code).toBe(0);
     expect(readJson("packages/nested/consumer/package.json").version).toBe("1.0.0-beta.3");
     expect(run("bump-versions", "--package=@heswell/vuu-demo", "--version", "4.0.0-alpha.1").code).toBe(0);
-    expect(readJson("packages/vuu-demo/package.json").version).toBe("4.0.0-alpha.1");
+    expect(readJson("apps/vuu-demo/package.json").version).toBe("4.0.0-alpha.1");
   });
 
   test("retains the default package", () => {
     expect(run("bump-versions").code).toBe(0);
-    expect(readJson("packages/user-admin/package.json").version).toBe("1.0.1");
-    expect(readJson("packages/vuu-demo/package.json").version).toBe("3.0.0");
+    expect(readJson("vuu-modules/user-admin/package.json").version).toBe("1.0.1");
+    expect(readJson("apps/vuu-demo/package.json").version).toBe("3.0.0");
   });
 
   test("rejects invalid options without modifying manifests", () => {
@@ -136,7 +136,7 @@ describe("bump:versions", () => {
     ]) {
       expect(run("bump-versions", ...args).code).not.toBe(0);
     }
-    expect(readJson("packages/user-admin/package.json").version).toBe("1.0.0");
+    expect(readJson("vuu-modules/user-admin/package.json").version).toBe("1.0.0");
   });
 });
 

@@ -26,56 +26,60 @@
         "typescript": "^5.5.3",
       },
     },
-    "packages/benchmarks": {
-      "name": "@heswell/benchmarks",
-      "version": "0.0.1",
-      "dependencies": {
-        "@heswell/vuu-table": "1.0.3",
-        "@heswell/vuu-viewport": "1.1.6",
-      },
-    },
-    "packages/equity-refdata-service": {
-      "name": "@heswell/equity-refdata-service",
+    "apps/vuu-basket-trading": {
+      "name": "@heswell/vuu-basket-trading",
       "version": "1.0.1",
       "dependencies": {
-        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-server": "4.4.0",
         "@heswell/vuu-table": "1.1.0",
       },
       "devDependencies": {
-        "@vuu-ui/vuu-data-types": "5.0.0-alpha.2",
+        "@heswell/service-utils": "1.3.0",
+        "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
+        "csv-parse": "^7.0.3",
       },
     },
-    "packages/module-admin": {
-      "name": "@heswell/module-admin",
-      "version": "2.3.0",
-    },
-    "packages/orders-service": {
-      "name": "@heswell/orders-service",
-      "version": "1.0.1",
+    "apps/vuu-demo": {
+      "name": "@heswell/vuu-demo",
+      "version": "3.0.1",
       "dependencies": {
-        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-module-refdata": "1.0.1",
+        "@heswell/vuu-server": "4.4.0",
         "@heswell/vuu-table": "1.1.0",
+        "@vuu-ui/vuu-utils": "5.0.0-alpha.2",
         "pino": "9.6.0",
       },
       "devDependencies": {
         "@vuu-ui/vuu-data-types": "5.0.0-alpha.2",
       },
     },
-    "packages/price-service": {
-      "name": "@heswell/price-service",
-      "version": "1.0.1",
+    "apps/vuu-portal": {
+      "name": "@heswell/vuu-portal",
+      "version": "2.4.0",
+      "bin": {
+        "vuu-portal": "./src/bin.ts",
+      },
       "dependencies": {
-        "@heswell/service-utils": "1.3.0",
-        "@heswell/vuu-table": "1.1.0",
+        "@heswell/module-admin": "^2.3.0",
+      },
+      "devDependencies": {
+        "@heswell/vuu-server": "^4.4.0",
+        "@heswell/vuu-table": "^1.1.0",
+        "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
+      },
+      "peerDependencies": {
+        "@heswell/vuu-server": "^3.1.0 || ^4.0.0",
+        "@heswell/vuu-table": "^1.0.1",
+        "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2",
       },
     },
-    "packages/reference-data-service": {
-      "name": "@heswell/reference-data-service",
+    "apps/vuu-user-admin": {
+      "name": "@heswell/vuu-user-admin",
       "version": "1.0.1",
       "dependencies": {
-        "@heswell/service-utils": "1.3.0",
+        "@heswell/user-admin": "1.0.2",
+        "@heswell/vuu-server": "4.4.0",
         "@heswell/vuu-table": "1.1.0",
-        "pino": "9.6.0",
       },
     },
     "packages/service-utils": {
@@ -91,31 +95,14 @@
         "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2",
       },
     },
-    "packages/user-admin": {
-      "name": "@heswell/user-admin",
-      "version": "1.0.2",
-    },
-    "packages/vuu-basket-trading": {
-      "name": "@heswell/vuu-basket-trading",
-      "version": "1.0.1",
-      "dependencies": {
-        "@heswell/vuu-server": "4.4.0",
-        "@heswell/vuu-table": "1.1.0",
-      },
-      "devDependencies": {
-        "@heswell/service-utils": "1.3.0",
-        "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
-        "csv-parse": "^7.0.3",
-      },
-    },
     "packages/vuu-data-engine-local": {
       "name": "@heswell/vuu-data-engine-local",
       "version": "4.3.0",
       "dependencies": {
         "@heswell/module-admin": "^2.2.0",
         "@heswell/user-admin": "^1.0.2",
-        "@heswell/vuu-table": "^1.0.3",
-        "@heswell/vuu-viewport": "^1.1.6",
+        "@heswell/vuu-table": "^1.1.0",
+        "@heswell/vuu-viewport": "^1.2.0",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "20.14.5",
@@ -142,51 +129,6 @@
         "@vuu-ui/vuu-table-types": "^5.0.0-alpha.2",
         "@vuu-ui/vuu-utils": "^5.0.0-alpha.2",
         "react": "^19.2.3",
-      },
-    },
-    "packages/vuu-demo": {
-      "name": "@heswell/vuu-demo",
-      "version": "3.0.1",
-      "dependencies": {
-        "@heswell/vuu-module-refdata": "1.0.1",
-        "@heswell/vuu-server": "4.4.0",
-        "@heswell/vuu-table": "1.1.0",
-        "@vuu-ui/vuu-utils": "5.0.0-alpha.2",
-        "pino": "9.6.0",
-      },
-      "devDependencies": {
-        "@vuu-ui/vuu-data-types": "5.0.0-alpha.2",
-      },
-    },
-    "packages/vuu-module-refdata": {
-      "name": "@heswell/vuu-module-refdata",
-      "version": "1.0.1",
-      "dependencies": {
-        "@heswell/equity-refdata-service": "1.0.1",
-      },
-      "peerDependencies": {
-        "@heswell/vuu-server": "^4.0.0",
-        "@heswell/vuu-table": "^1.0.1",
-      },
-    },
-    "packages/vuu-portal": {
-      "name": "@heswell/vuu-portal",
-      "version": "2.4.0",
-      "bin": {
-        "vuu-portal": "./src/bin.ts",
-      },
-      "dependencies": {
-        "@heswell/module-admin": "^2.3.0",
-      },
-      "devDependencies": {
-        "@heswell/vuu-server": "^4.4.0",
-        "@heswell/vuu-table": "^1.1.0",
-        "@vuu-ui/vuu-protocol-types": "5.0.0-alpha.2",
-      },
-      "peerDependencies": {
-        "@heswell/vuu-server": "^3.1.0 || ^4.0.0",
-        "@heswell/vuu-table": "^1.0.1",
-        "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2",
       },
     },
     "packages/vuu-server": {
@@ -224,15 +166,6 @@
         "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2",
       },
     },
-    "packages/vuu-user-admin": {
-      "name": "@heswell/vuu-user-admin",
-      "version": "1.0.1",
-      "dependencies": {
-        "@heswell/user-admin": "1.0.2",
-        "@heswell/vuu-server": "4.4.0",
-        "@heswell/vuu-table": "1.1.0",
-      },
-    },
     "packages/vuu-viewport": {
       "name": "@heswell/vuu-viewport",
       "version": "1.2.0",
@@ -250,6 +183,73 @@
         "@vuu-ui/vuu-filter-parser": "^5.0.0-alpha.2",
         "@vuu-ui/vuu-filter-types": "^5.0.0-alpha.2",
         "@vuu-ui/vuu-protocol-types": "^5.0.0-alpha.2",
+      },
+    },
+    "services/equity-refdata-service": {
+      "name": "@heswell/equity-refdata-service",
+      "version": "1.0.1",
+      "dependencies": {
+        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-table": "1.1.0",
+      },
+      "devDependencies": {
+        "@vuu-ui/vuu-data-types": "5.0.0-alpha.2",
+      },
+    },
+    "services/orders-service": {
+      "name": "@heswell/orders-service",
+      "version": "1.0.1",
+      "dependencies": {
+        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-table": "1.1.0",
+        "pino": "9.6.0",
+      },
+      "devDependencies": {
+        "@vuu-ui/vuu-data-types": "5.0.0-alpha.2",
+      },
+    },
+    "services/price-service": {
+      "name": "@heswell/price-service",
+      "version": "1.0.1",
+      "dependencies": {
+        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-table": "1.1.0",
+      },
+    },
+    "services/reference-data-service": {
+      "name": "@heswell/reference-data-service",
+      "version": "1.0.1",
+      "dependencies": {
+        "@heswell/service-utils": "1.3.0",
+        "@heswell/vuu-table": "1.1.0",
+        "pino": "9.6.0",
+      },
+    },
+    "tools/benchmarks": {
+      "name": "@heswell/benchmarks",
+      "version": "0.0.1",
+      "dependencies": {
+        "@heswell/vuu-table": "1.1.0",
+        "@heswell/vuu-viewport": "1.2.0",
+      },
+    },
+    "vuu-modules/module-admin": {
+      "name": "@heswell/module-admin",
+      "version": "2.3.0",
+    },
+    "vuu-modules/user-admin": {
+      "name": "@heswell/user-admin",
+      "version": "1.0.2",
+    },
+    "vuu-modules/vuu-module-refdata": {
+      "name": "@heswell/vuu-module-refdata",
+      "version": "1.0.1",
+      "dependencies": {
+        "@heswell/equity-refdata-service": "1.0.1",
+      },
+      "peerDependencies": {
+        "@heswell/vuu-server": "^4.0.0",
+        "@heswell/vuu-table": "^1.0.1",
       },
     },
   },
@@ -356,37 +356,37 @@
 
     "@happy-dom/global-registrator": ["@happy-dom/global-registrator@20.14.5", "", { "dependencies": { "@types/node": ">=20.0.0", "happy-dom": "^20.14.5" } }, "sha512-B05ID9DhSwLs6mlm1fzlkAtTIvB3duCvjJjfr19LBrlTK7VZtRjDqoTRIVv13GuYuNdhByu8LSZgThwV3Rkj7g=="],
 
-    "@heswell/benchmarks": ["@heswell/benchmarks@workspace:packages/benchmarks"],
+    "@heswell/benchmarks": ["@heswell/benchmarks@workspace:tools/benchmarks"],
 
-    "@heswell/equity-refdata-service": ["@heswell/equity-refdata-service@workspace:packages/equity-refdata-service"],
+    "@heswell/equity-refdata-service": ["@heswell/equity-refdata-service@workspace:services/equity-refdata-service"],
 
-    "@heswell/module-admin": ["@heswell/module-admin@workspace:packages/module-admin"],
+    "@heswell/module-admin": ["@heswell/module-admin@workspace:vuu-modules/module-admin"],
 
-    "@heswell/orders-service": ["@heswell/orders-service@workspace:packages/orders-service"],
+    "@heswell/orders-service": ["@heswell/orders-service@workspace:services/orders-service"],
 
-    "@heswell/price-service": ["@heswell/price-service@workspace:packages/price-service"],
+    "@heswell/price-service": ["@heswell/price-service@workspace:services/price-service"],
 
-    "@heswell/reference-data-service": ["@heswell/reference-data-service@workspace:packages/reference-data-service"],
+    "@heswell/reference-data-service": ["@heswell/reference-data-service@workspace:services/reference-data-service"],
 
     "@heswell/service-utils": ["@heswell/service-utils@workspace:packages/service-utils"],
 
-    "@heswell/user-admin": ["@heswell/user-admin@workspace:packages/user-admin"],
+    "@heswell/user-admin": ["@heswell/user-admin@workspace:vuu-modules/user-admin"],
 
-    "@heswell/vuu-basket-trading": ["@heswell/vuu-basket-trading@workspace:packages/vuu-basket-trading"],
+    "@heswell/vuu-basket-trading": ["@heswell/vuu-basket-trading@workspace:apps/vuu-basket-trading"],
 
     "@heswell/vuu-data-engine-local": ["@heswell/vuu-data-engine-local@workspace:packages/vuu-data-engine-local"],
 
-    "@heswell/vuu-demo": ["@heswell/vuu-demo@workspace:packages/vuu-demo"],
+    "@heswell/vuu-demo": ["@heswell/vuu-demo@workspace:apps/vuu-demo"],
 
-    "@heswell/vuu-module-refdata": ["@heswell/vuu-module-refdata@workspace:packages/vuu-module-refdata"],
+    "@heswell/vuu-module-refdata": ["@heswell/vuu-module-refdata@workspace:vuu-modules/vuu-module-refdata"],
 
-    "@heswell/vuu-portal": ["@heswell/vuu-portal@workspace:packages/vuu-portal"],
+    "@heswell/vuu-portal": ["@heswell/vuu-portal@workspace:apps/vuu-portal"],
 
     "@heswell/vuu-server": ["@heswell/vuu-server@workspace:packages/vuu-server"],
 
     "@heswell/vuu-table": ["@heswell/vuu-table@workspace:packages/vuu-table"],
 
-    "@heswell/vuu-user-admin": ["@heswell/vuu-user-admin@workspace:packages/vuu-user-admin"],
+    "@heswell/vuu-user-admin": ["@heswell/vuu-user-admin@workspace:apps/vuu-user-admin"],
 
     "@heswell/vuu-viewport": ["@heswell/vuu-viewport@workspace:packages/vuu-viewport"],
 

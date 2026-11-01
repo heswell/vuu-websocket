@@ -28,9 +28,10 @@ services that use them under [Bun](https://bun.sh).
 
 1. the `path` argument, or `$VUU_CONFIG_FILE`. Relative paths resolve against
    the current working directory.
-2. `packages/$VUU_APP/application.conf`, when `$VUU_APP` is set.
+2. `apps/$VUU_APP/application.conf`, `services/$VUU_APP/application.conf` or
+   `packages/$VUU_APP/application.conf` (first found), when `$VUU_APP` is set.
 3. `./application.conf`.
-4. the only `packages/*/application.conf`, when there is exactly one.
+4. the only `{apps,services,packages}/*/application.conf`, when there is exactly one.
 
 Later calls to `load()` return the cached config. Calling it again with a
 different `path` or different `overrides` throws, because those arguments

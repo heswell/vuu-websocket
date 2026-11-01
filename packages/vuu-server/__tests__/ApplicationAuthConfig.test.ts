@@ -64,7 +64,7 @@ describe("application authentication configuration", () => {
     "%s allows its host on both localhost and 127.0.0.1",
     (app) => {
       const config = ConfigFactory.fromFile(
-        path.resolve(import.meta.dir, `../../${app}/application.conf`),
+        path.resolve(import.meta.dir, `../../../apps/${app}/application.conf`),
         { env: {} },
       );
       expect(getConfiguredAllowedOrigins(config, "keycloak")).toEqual([
@@ -78,6 +78,6 @@ describe("application authentication configuration", () => {
 function loadApplicationConfig(app: string) {
   ConfigFactory.reset();
   return ConfigFactory.load(
-    path.resolve(import.meta.dir, `../../${app}/application.conf`),
+    path.resolve(import.meta.dir, `../../../apps/${app}/application.conf`),
   );
 }

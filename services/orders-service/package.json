@@ -1,0 +1,22 @@
+{
+  "name": "@heswell/orders-service",
+  "version": "1.0.1",
+  "private": true,
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "order-client": "bun ./src/mock-client/mock-refdata-client.ts",
+    "order-service": "bun ./src/orders-server/server.ts",
+    "test": "bun --watch ./test.ts"
+  },
+  "author": "heswell",
+  "type": "module",
+  "devDependencies": {
+    "@vuu-ui/vuu-data-types": "5.0.0-alpha.2"
+  },
+  "dependencies": {
+    "@heswell/service-utils": "1.3.0",
+    "@heswell/vuu-table": "1.1.0",
+    "pino": "9.6.0"
+  }
+}

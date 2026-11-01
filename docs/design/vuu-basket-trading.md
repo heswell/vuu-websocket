@@ -12,7 +12,7 @@ its price table. It does not depend on `SIMUL` or another application module.
 The implementation is located at:
 
 ```text
-packages/vuu-basket-trading
+apps/vuu-basket-trading
 ```
 
 It is started from the repository root with:
@@ -34,7 +34,7 @@ The application exposes:
 ## Package Structure
 
 ```text
-packages/vuu-basket-trading/
+apps/vuu-basket-trading/
   __tests__/
     BasketModule.test.ts
     BasketRuntime.test.ts
@@ -462,7 +462,7 @@ membership, range expansion, and live insertion outside the grid.
 Run the basket tests with:
 
 ```sh
-bun test packages/vuu-basket-trading/__tests__
+bun test apps/vuu-basket-trading/__tests__
 ```
 
 ## Current Limitations

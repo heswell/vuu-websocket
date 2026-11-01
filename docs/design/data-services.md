@@ -283,7 +283,7 @@ To make the table reusable across applications, package it as a module, see
 
 ## Equity reference data
 
-`packages/equity-refdata-service` publishes about 18k EU shares and
+`services/equity-refdata-service` publishes about 18k EU shares and
 depositary receipts (resource `equities`, table `REFDATA.equities`, key
 `ric`), loaded from the committed `data/equities.ndjson` snapshot.
 

@@ -17,7 +17,11 @@ import {
   getPublishablePackage,
   PUBLISHABLE_PACKAGE_NAMES_TEXT,
 } from "./publishable-packages";
-import { readManifest, type PackageManifest } from "./workspace-packages";
+import {
+  distDirectory,
+  readManifest,
+  type PackageManifest,
+} from "./workspace-packages";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REGISTRY = "https://registry.npmjs.org";
@@ -49,8 +53,8 @@ const getPackage = (packageName: string) => {
   }
   const { directory } = selectedPackage;
   return {
-    directory: `dist/${directory}`,
-    sourceManifestPath: path.join(ROOT, "packages", directory, "package.json"),
+    directory: distDirectory(directory),
+    sourceManifestPath: path.join(ROOT, directory, "package.json"),
   };
 };
 

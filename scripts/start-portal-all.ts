@@ -18,7 +18,7 @@ import {
 
 type BackendServer = {
   script: string;
-  /** Vuu server app (packages/<app>/application.conf). Unset for plain services. */
+  /** Vuu server app (apps/<app>/application.conf). Unset for plain services. */
   app?: string;
 };
 
