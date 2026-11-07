@@ -154,6 +154,21 @@
         "@types/bun",
       ],
     },
+    "packages/vuu-server-node": {
+      "name": "@heswell/vuu-server-node",
+      "version": "1.0.0",
+      "dependencies": {
+        "ws": "^8.18.0",
+        "yaml": "^2.8.0",
+      },
+      "devDependencies": {
+        "@heswell/vuu-server": "^4.4.0",
+        "@types/ws": "^8.18.0",
+      },
+      "peerDependencies": {
+        "@heswell/vuu-server": "^4.5.0",
+      },
+    },
     "packages/vuu-table": {
       "name": "@heswell/vuu-table",
       "version": "1.1.0",
@@ -383,6 +398,8 @@
     "@heswell/vuu-portal": ["@heswell/vuu-portal@workspace:apps/vuu-portal"],
 
     "@heswell/vuu-server": ["@heswell/vuu-server@workspace:packages/vuu-server"],
+
+    "@heswell/vuu-server-node": ["@heswell/vuu-server-node@workspace:packages/vuu-server-node"],
 
     "@heswell/vuu-table": ["@heswell/vuu-table@workspace:packages/vuu-table"],
 
@@ -869,6 +886,8 @@
     "why-is-node-running": ["why-is-node-running@2.3.0", "", { "dependencies": { "siginfo": "^2.0.0", "stackback": "0.0.2" }, "bin": { "why-is-node-running": "cli.js" } }, "sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w=="],
 
     "ws": ["ws@8.22.1", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g=="],
+
+    "yaml": ["yaml@2.9.1", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw=="],
 
     "@microsoft/tsdoc-config/@microsoft/tsdoc": ["@microsoft/tsdoc@0.17.1", "", {}, "sha512-VHyYyyoH63jFoO3shpw9Zfijk5v/9p/VrClW35z0/q6ooK7sSmxpzOkS4iZPxs3vO4XtBW4H38HRAKkAMIK7DA=="],
 

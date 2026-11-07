@@ -270,4 +270,19 @@ export {
 } from "./net/auth/LocalLoginTokenService";
 export type { ViewServerHandler } from "./net/ViewServerHandler";
 export type { Channel } from "./net/ws/Channel";
+export type {
+  RunningServer,
+  ServeHttpOptions,
+  ServerRuntime,
+  ServeWebSocketOptions,
+  TlsFiles,
+  YamlCodec,
+} from "./runtime/ServerRuntime";
+export { bunRuntime } from "./runtime/bunRuntime";
+export {
+  getServerRuntime,
+  loadServerRuntime,
+  NODE_RUNTIME_PACKAGE,
+  setServerRuntime,
+} from "./runtime/selectRuntime";
 export * from "./local";

@@ -5,15 +5,11 @@ import {
   normalizeModuleWorkspace,
   validateModuleConfig,
 } from "@heswell/module-admin";
+import { getServerRuntime, type YamlCodec } from "@heswell/vuu-server";
 
-// Bun's built-in YAML support is read lazily so that the package can be
-// imported (e.g. for its types and module factories) outside of Bun.
-const yaml = () => {
-  if (typeof Bun === "undefined" || !Bun.YAML) {
-    throw new Error("@heswell/vuu-portal module files require the Bun runtime");
-  }
-  return Bun.YAML;
-};
+// Without an explicit codec, the runtime's (Bun.YAML under Bun) is looked up
+// when a file is read or written, so the package can be imported anywhere.
+const runtimeYaml = (): YamlCodec => getServerRuntime().yaml;
 
 export interface ModuleStore {
   load(): ManagedModule[];
@@ -57,6 +53,7 @@ export class YamlModuleStore implements ModuleStore {
   constructor(
     private readonly filePath: string,
     private readonly seedModules: () => readonly ManagedModule[],
+    private readonly yaml?: YamlCodec,
   ) { }
 
   load() {
@@ -67,7 +64,7 @@ export class YamlModuleStore implements ModuleStore {
       return seeded;
     }
 
-    const modules = readModulesFile(this.filePath).map((value, index) =>
+    const modules = readModulesFile(this.filePath, this.yaml ?? runtimeYaml()).map((value, index) =>
       parseManagedModule(value, index),
     );
     assertValidManagedModules(modules, this.filePath);
@@ -81,7 +78,7 @@ export class YamlModuleStore implements ModuleStore {
       directory,
       `.${path.basename(this.filePath)}.${process.pid}.${Date.now()}.tmp`,
     );
-    const contents = yaml().stringify({ modules: cloneModules(modules) }, null, 2);
+    const contents = (this.yaml ?? runtimeYaml()).stringify({ modules: cloneModules(modules) });
     try {
       fs.writeFileSync(tempPath, contents, "utf8");
       fs.renameSync(tempPath, this.filePath);
@@ -105,8 +102,12 @@ export function createModuleState(store: ModuleStore) {
  * the same fields as `modules.yaml`, except `created` and `updated`, which are
  * set to `timestamp`.
  */
-export function loadDefaultModules(filePath: string, timestamp: number) {
-  const modules = readModulesFile(filePath).map((value, index) =>
+export function loadDefaultModules(
+  filePath: string,
+  timestamp: number,
+  yaml?: YamlCodec,
+) {
+  const modules = readModulesFile(filePath, yaml ?? runtimeYaml()).map((value, index) =>
     parseManagedModule(
       isRecord(value) ? { ...value, created: timestamp, updated: timestamp } : value,
       index,
@@ -116,8 +117,8 @@ export function loadDefaultModules(filePath: string, timestamp: number) {
   return modules;
 }
 
-function readModulesFile(filePath: string): unknown[] {
-  const parsed = yaml().parse(fs.readFileSync(filePath, "utf8")) as unknown;
+function readModulesFile(filePath: string, yaml: YamlCodec): unknown[] {
+  const parsed = yaml.parse(fs.readFileSync(filePath, "utf8")) as unknown;
   if (!isRecord(parsed) || !Array.isArray(parsed.modules)) {
     throw new Error(`Modules file '${filePath}' must contain a 'modules' list`);
   }

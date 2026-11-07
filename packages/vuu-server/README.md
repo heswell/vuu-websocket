@@ -10,10 +10,17 @@ npm install @heswell/vuu-server
 
 ## Runtime
 
-The server runs under [Bun](https://bun.sh) (it uses `Bun.serve`,
-`Bun.file` and Bun websockets). The package is ESM only and has no
-import-time side effects, so its types, tables and helpers can be imported
-anywhere; Bun is only needed when a server is started.
+The server runs under [Bun](https://bun.sh) by default. The package is ESM
+only and has no import-time side effects, so its types, tables and helpers can
+be imported anywhere; a runtime is only needed when a server is started.
+
+The HTTP and websocket listeners (and YAML, used by the portal) come from a
+`ServerRuntime`. `bunRuntime` (`Bun.serve`, `Bun.YAML`) is built in and used
+under Bun. To run on Node.js, install
+[`@heswell/vuu-server-node`](../vuu-server-node): outside Bun the server loads
+it automatically when it is installed. To choose explicitly, pass `runtime` to
+`createVuuServerApplication` (or `new VuuServer(config, lifecycle, runtime)`),
+or call `setServerRuntime(runtime)` once.
 
 Some declarations reference Bun types (for example `ServerWebSocket`), so
 TypeScript consumers should install `@types/bun`. It is an optional peer

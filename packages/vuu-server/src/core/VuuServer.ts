@@ -3,10 +3,13 @@ import { VuuServerCore } from "./VuuServerCore";
 import { WebSocketServer } from "../net/ws/WebSocketServer";
 import { RestServer } from "../net/http/RestServer";
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
+import type { ServerRuntime } from "../runtime/ServerRuntime";
+import { loadServerRuntime } from "../runtime/selectRuntime";
 
 /**
- * The Vuu server hosted on Bun: VuuServerCore plus a WebSocket server and,
- * when configured with a request handler, a REST server.
+ * VuuServerCore plus a WebSocket server and, when configured with a request
+ * handler, a REST server. They run on the given runtime, else the one from
+ * loadServerRuntime (Bun by default).
  */
 export class VuuServer extends VuuServerCore {
   readonly #webSocketServer: WebSocketServer;
@@ -35,6 +38,7 @@ export class VuuServer extends VuuServerCore {
       webSocketOptions,
     }: VuuServerConfig,
     lifecycle: LifecycleContainer,
+    runtime?: ServerRuntime,
   ) {
     super(
       {
@@ -47,19 +51,21 @@ export class VuuServer extends VuuServerCore {
       lifecycle,
     );
 
+    const getRuntime = async () => runtime ?? loadServerRuntime();
     this.#webSocketServer = new WebSocketServer(
       webSocketOptions,
       this.handlerFactory,
+      getRuntime,
     );
     this.#restServer = httpServerOptions.requestHandler
-      ? new RestServer(webSocketOptions, httpServerOptions)
+      ? new RestServer(webSocketOptions, httpServerOptions, getRuntime)
       : undefined;
   }
 
   async doStart() {
     await super.doStart();
-    this.#webSocketServer.start();
-    this.#restServer?.start();
+    await this.#webSocketServer.start();
+    await this.#restServer?.start();
   }
 
   async doStop() {

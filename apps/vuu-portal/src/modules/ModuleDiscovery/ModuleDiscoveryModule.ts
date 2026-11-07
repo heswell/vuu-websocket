@@ -3,7 +3,7 @@ import {
   ModuleFactory,
   ViewPortDef,
 } from "@heswell/vuu-server";
-import type { Config, TableContainer } from "@heswell/vuu-server";
+import type { Config, TableContainer, YamlCodec } from "@heswell/vuu-server";
 import {
   managedModuleColumnValues,
   managedModulePermissionValues,
@@ -30,15 +30,20 @@ export {
   loadDefaultModules,
 } from "./ModuleStore";
 
-export function loadModuleState(config: Pick<Config, "getPath">) {
+export function loadModuleState(
+  config: Pick<Config, "getPath">,
+  yaml?: YamlCodec,
+) {
   const filePath = config.getPath("vuu.portal.modulesFile", "modules.yaml");
   const defaultsPath = config.getPath(
     "vuu.portal.defaultModulesFile",
     "default-modules.yaml",
   );
   return createModuleState(
-    new YamlModuleStore(filePath, () =>
-      loadDefaultModules(defaultsPath, Date.now()),
+    new YamlModuleStore(
+      filePath,
+      () => loadDefaultModules(defaultsPath, Date.now(), yaml),
+      yaml,
     ),
   );
 }
