@@ -11,6 +11,7 @@ import {
   planManagedIdChanges,
   planManagedRoleScopeChanges,
   RETIRED_GROUP_NAMES,
+  RETIRED_GROUP_PATHS,
   RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
   type ClientId,
@@ -432,16 +433,22 @@ async function ensureGroupPath(
 
 async function removeRetiredGroups(headers: Record<string, string>) {
   const groups = await listAllGroups(headers);
-  const retiredNames = new Set(RETIRED_GROUP_NAMES);
+  const retiredNames = new Set<string>(RETIRED_GROUP_NAMES);
+  const retiredPaths = new Set<string>(RETIRED_GROUP_PATHS);
   for (const group of groups) {
-    if (!retiredNames.has(group.name)) {
+    const path = group.path ?? "";
+    // Deleting a retired parent already deletes the groups under it.
+    if ([...retiredPaths].some((retired) => path.startsWith(`${retired}/`))) {
+      continue;
+    }
+    if (!retiredNames.has(group.name) && !retiredPaths.has(path)) {
       continue;
     }
     await requestJson(
       `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}`,
       { method: "DELETE", headers },
     );
-    console.log(`[keycloak] retired group '${group.name}' removed`);
+    console.log(`[keycloak] retired group '${group.path ?? group.name}' removed`);
   }
 }
 

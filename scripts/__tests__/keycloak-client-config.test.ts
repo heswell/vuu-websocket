@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  APPLICATION_CLIENT_NAMES,
+  applicationClientRepresentation,
   clientConfigurationsEqual,
   KEYCLOAK_CLIENT_SECRET_ENV,
   reconcilePortalClientConfiguration,
@@ -17,6 +19,23 @@ describe("Keycloak client configuration", () => {
       "vuu-user-admin",
       "vuu-basket-trading",
     ]);
+  });
+
+  test("creates role-only clients for applications without a server", () => {
+    expect(APPLICATION_CLIENT_NAMES).toEqual([
+      "vuu-module-admin",
+      "vuu-table-browser",
+      "vuu-table-viewer",
+    ]);
+    expect(applicationClientRepresentation("vuu-module-admin")).toMatchObject({
+      clientId: "vuu-module-admin",
+      publicClient: false,
+      standardFlowEnabled: false,
+      implicitFlowEnabled: false,
+      directAccessGrantsEnabled: false,
+      serviceAccountsEnabled: false,
+      fullScopeAllowed: false,
+    });
   });
 
   test("configures the public portal and preserves custom mappers", () => {

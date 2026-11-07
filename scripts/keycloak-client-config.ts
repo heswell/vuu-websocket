@@ -38,6 +38,33 @@ export function resolveKeycloakClientSecret(
   return (envName ? environment[envName] : undefined) ?? configuredSecret;
 }
 
+/**
+ * Clients for applications that have no server of their own. They only hold
+ * the application's roles, so they allow no sign-in or token flows.
+ */
+export const APPLICATION_CLIENT_NAMES = [
+  "vuu-module-admin",
+  "vuu-table-browser",
+  "vuu-table-viewer",
+] as const;
+
+export function applicationClientRepresentation(clientId: string) {
+  return {
+    clientId,
+    name: clientId,
+    enabled: true,
+    protocol: "openid-connect",
+    publicClient: false,
+    bearerOnly: false,
+    standardFlowEnabled: false,
+    implicitFlowEnabled: false,
+    directAccessGrantsEnabled: false,
+    serviceAccountsEnabled: false,
+    fullScopeAllowed: false,
+    frontchannelLogout: false,
+  };
+}
+
 export const RETIRED_SERVER_CLIENT_NAMES = [
   "vuu-module-discovery-server",
   "vuu-module-admin-server",
