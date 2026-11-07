@@ -24,7 +24,8 @@ export const PUBLISHABLE_PACKAGES = [
   },
   // Server packages, in dependency order. service-utils depends on
   // vuu-table; vuu-server on service-utils, vuu-table and vuu-viewport;
-  // vuu-portal on vuu-server and module-admin.
+  // vuu-server-node and vuu-portal on vuu-server (vuu-portal also on
+  // module-admin).
   {
     name: "@heswell/service-utils",
     directory: "packages/service-utils",
@@ -32,6 +33,11 @@ export const PUBLISHABLE_PACKAGES = [
   {
     name: "@heswell/vuu-server",
     directory: "packages/vuu-server",
+  },
+  // Optional Node.js runtime for vuu-server.
+  {
+    name: "@heswell/vuu-server-node",
+    directory: "packages/vuu-server-node",
   },
   {
     name: "@heswell/vuu-portal",

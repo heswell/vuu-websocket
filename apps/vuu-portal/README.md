@@ -2,8 +2,12 @@
 
 Vuu portal server: a [`@heswell/vuu-server`](../../packages/vuu-server) application that
 hosts the `MODULE_DISCOVERY` and `NOTIFICATIONS` modules and returns each user's module registry in
-the login response. Requires the [Bun](https://bun.sh) runtime to run the
-server. The library exports can be imported under Node.js too.
+the login response. Runs on [Bun](https://bun.sh). To run it on Node.js
+instead, also install
+[`@heswell/vuu-server-node`](../../packages/vuu-server-node): `main()` and
+the bin pick it up automatically when not running under Bun
+(`node node_modules/@heswell/vuu-portal/bin.js`), or pass
+`runtime: nodeRuntime` to `main` / `createPortalApplication`.
 
 ```sh
 npm install @heswell/vuu-portal @heswell/vuu-server @heswell/vuu-table

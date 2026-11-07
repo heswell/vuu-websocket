@@ -4,6 +4,7 @@ import {
   VuuWebSocketOptions,
 } from "../../core/VuuServerOptions";
 import { getLogger } from "@heswell/service-utils/browser";
+import type { RunningServer, ServerRuntime } from "../../runtime/ServerRuntime";
 
 const log = getLogger("vuu.net");
 
@@ -13,12 +14,13 @@ export const PLAIN_HTTP_REST_REQUIRES_PERMISSIVE_AUTH =
   'REST auth over plain HTTP is only allowed with vuu.auth.mode="permissive"; set vuu.ssl=true with vuu.certPath/vuu.keyPath';
 
 export class RestServer {
-  #server: Bun.Server<unknown> | undefined;
+  #server: RunningServer | undefined;
   #scheme: "http" | "https" = "https";
 
   constructor(
     private readonly webSocketOptions: VuuWebSocketOptions,
     private readonly httpServerOptions: HttpServerOptions,
+    private readonly runtime: () => Promise<ServerRuntime>,
   ) {}
 
   get port() {
@@ -32,7 +34,7 @@ export class RestServer {
       : undefined;
   }
 
-  start() {
+  async start() {
     if (this.#server) {
       return;
     }
@@ -46,12 +48,7 @@ export class RestServer {
       return;
     }
 
-    const tls = sslEnabled(sslOptions)
-      ? {
-          cert: Bun.file(sslOptions.certPath),
-          key: Bun.file(sslOptions.keyPath),
-        }
-      : undefined;
+    const tls = sslEnabled(sslOptions) ? sslOptions : undefined;
 
     if (!tls) {
       if (authMode?.toLowerCase() !== "permissive") {
@@ -63,18 +60,11 @@ export class RestServer {
     }
 
     this.#scheme = tls ? "https" : "http";
-    this.#server = Bun.serve({
+    const runtime = await this.runtime();
+    this.#server = await runtime.serveHttp({
       port: httpsPort,
       tls,
-      async fetch(req) {
-        const url = new URL(req.url);
-        const response = await requestHandler(req, url);
-        if (response) {
-          return response;
-        }
-
-        return new Response("Not found", { status: 404 });
-      },
+      fetch: (req) => requestHandler(req, new URL(req.url)),
     });
 
     log.info(`REST listening on ${this.url}`);
@@ -86,6 +76,6 @@ export class RestServer {
       return;
     }
     this.#server = undefined;
-    await server.stop(true);
+    await server.stop();
   }
 }

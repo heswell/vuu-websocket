@@ -13,17 +13,27 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // The built packages are copied, so vuu-viewport resolves the dist
-// vuu-table rather than the workspace source. Peers are symlinked so their
-// own dependencies resolve from the repo node_modules.
+// vuu-table rather than the workspace source. Peers are symlinked to the
+// installed copies so their own dependencies resolve too.
 const COPIES: Record<string, string> = {
   "@heswell/vuu-table": "dist/vuu-table",
   "@heswell/vuu-viewport": "dist/vuu-viewport",
 };
-const LINKS: Record<string, string> = {
-  "@vuu-ui/vuu-data-types": "node_modules/@vuu-ui/vuu-data-types",
-  "@vuu-ui/vuu-filter-parser": "node_modules/@vuu-ui/vuu-filter-parser",
-  "@vuu-ui/vuu-filter-types": "node_modules/@vuu-ui/vuu-filter-types",
-  "@vuu-ui/vuu-protocol-types": "node_modules/@vuu-ui/vuu-protocol-types",
+const LINKS = [
+  "@vuu-ui/vuu-data-types",
+  "@vuu-ui/vuu-filter-parser",
+  "@vuu-ui/vuu-filter-types",
+  "@vuu-ui/vuu-protocol-types",
+];
+// bun install links each package's dependencies into its own node_modules
+// (only the root's own are in the root node_modules), so look there too.
+const LINK_SEARCH = ["packages/vuu-viewport", "packages/vuu-table", "."];
+const findInstalled = (name: string) => {
+  const found = LINK_SEARCH.map((dir) =>
+    path.join(ROOT, dir, "node_modules", name),
+  ).find((candidate) => fs.existsSync(path.join(candidate, "package.json")));
+  if (!found) throw Error(`${name} is not installed, run bun install first`);
+  return fs.realpathSync(found);
 };
 
 const CONSUMER = `import { Table, JoinTable } from "@heswell/vuu-table";
@@ -77,7 +87,12 @@ try {
     }
   };
   install(COPIES, true);
-  install(LINKS, false);
+  install(
+    Object.fromEntries(
+      LINKS.map((name) => [name, path.relative(ROOT, findInstalled(name))]),
+    ),
+    false,
+  );
   fs.writeFileSync(
     path.join(consumerDir, "package.json"),
     JSON.stringify({ name: "smoke", private: true, type: "module" }),

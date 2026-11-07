@@ -23,6 +23,7 @@ import {
   VuuWebSocketOptions,
 } from "./VuuServerOptions";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
+import type { ServerRuntime } from "../runtime/ServerRuntime";
 import { configureLogging, getLogger } from "@heswell/service-utils/browser";
 
 const log = getLogger("vuu.core");
@@ -59,6 +60,11 @@ export type VuuServerApplicationOptions = {
   defaultWebSocketPort: number;
   loginSuccessProvider?: LoginSuccessProvider;
   modules: ViewServerModule[];
+  /**
+   * Runtime for the HTTP and websocket servers. Defaults to the one set with
+   * setServerRuntime, else Bun, else @heswell/vuu-server-node if installed.
+   */
+  runtime?: ServerRuntime;
   additionalHttpHandlers?: (
     context: VuuServerApplicationContext,
   ) => HttpRequestHandler[];
@@ -94,6 +100,7 @@ export function createVuuServerApplication({
   defaultWebSocketPort,
   loginSuccessProvider,
   modules,
+  runtime,
   unhandledRejectionGuard,
 }: VuuServerApplicationOptions): VuuServerApplication {
   configureLogging(config);
@@ -153,7 +160,7 @@ export function createVuuServerApplication({
     ),
   );
 
-  server = new VuuServer(serverConfig, lifecycle);
+  server = new VuuServer(serverConfig, lifecycle, runtime);
 
   return {
     ...context,

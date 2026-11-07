@@ -1,6 +1,8 @@
 import {
   type Config,
   ConfigFactory,
+  getServerRuntime,
+  type ServerRuntime,
   createConfiguredAuthProviders,
   createVuuServerApplication,
   getLogger,
@@ -36,6 +38,12 @@ export type PortalApplicationOptions = {
    * conf bundled with the package (see resolvePortalConfig).
    */
   configFile?: string;
+  /**
+   * Runtime for the servers and the module catalogue YAML. Defaults to the
+   * one set with setServerRuntime, else Bun. main() also falls back to
+   * @heswell/vuu-server-node when it is installed.
+   */
+  runtime?: ServerRuntime;
 };
 
 /**
@@ -47,14 +55,17 @@ export type PortalApplicationOptions = {
 export function createPortalApplication({
   config,
   configFile,
+  runtime = getServerRuntime(),
 }: PortalApplicationOptions = {}): VuuServerApplication {
   const portalConfig = config ?? loadPortalConfig(configFile);
+  log.debug(`server runtime: ${runtime.name}`);
   return createVuuServerApplication({
     authProviders: createConfiguredAuthProviders(portalConfig),
     config: portalConfig,
     defaultHttpsPort: PORTAL_DEFAULT_HTTPS_PORT,
     defaultWebSocketPath: PORTAL_DEFAULT_WEBSOCKET_PATH,
     defaultWebSocketPort: PORTAL_DEFAULT_WEBSOCKET_PORT,
+    runtime,
     loginSuccessProvider: (user, tableContainer) => ({
       moduleRegistry: createModuleRegistry(tableContainer, user),
     }),
@@ -65,7 +76,7 @@ export function createPortalApplication({
           PermissionFilter("audience", new Set(["all", viewport.user.name])),
         (table) => ViewPortDef.default(table.tableDef.columns),
       ),
-      ModuleDiscoveryModule(loadModuleState(portalConfig), {
+      ModuleDiscoveryModule(loadModuleState(portalConfig, runtime.yaml), {
         adminRole: loadModuleAdminRole(portalConfig),
       }),
     ],

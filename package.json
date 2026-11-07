@@ -13,6 +13,7 @@
   "scripts": {
     "build:packages": "bun ./scripts/build-packages.ts",
     "test:engine-packages": "bun ./scripts/smoke-test-engine-packages.ts",
+    "test:node-runtime": "bun ./scripts/smoke-test-node-runtime.ts",
     "perf": "bun ./scripts/perf.ts",
     "keycloak:realm": "bun ./scripts/keycloak-realm-client.ts",
     "keycloak:users": "bun ./scripts/keycloak-users.ts",
@@ -43,7 +44,7 @@
     "release:vuu-ui": "bun ./scripts/release-vuu-ui.ts",
     "version-check": "bun ./scripts/version-check.ts",
     "typecheck": "tsc --noEmit --project tsconfig-typecheck.json",
-    "typecheck:packages": "npm run typecheck -w @heswell/service-utils -w @heswell/vuu-server -w @heswell/vuu-portal"
+    "typecheck:packages": "npm run typecheck -w @heswell/service-utils -w @heswell/vuu-server -w @heswell/vuu-server-node -w @heswell/vuu-portal"
   },
   "keywords": [],
   "author": "",
