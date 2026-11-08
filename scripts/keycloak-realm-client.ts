@@ -5,6 +5,8 @@
 // user/group provisioning script; it authenticates through the master realm.
 
 import {
+  APPLICATION_CLIENT_NAMES,
+  applicationClientRepresentation,
   clientConfigurationsEqual,
   reconcileServerClientConfiguration,
   reconcilePortalClientConfiguration,
@@ -173,6 +175,12 @@ async function main() {
     }
     console.log("✅ Confidential server clients and self audiences ready\n");
 
+    console.log("4️⃣b Creating application clients...");
+    for (const clientId of APPLICATION_CLIENT_NAMES) {
+      await ensureApplicationClient(token, clientId);
+    }
+    console.log("✅ Application clients ready\n");
+
     // Configure audiences after the target clients exist and remove retired remotes.
     console.log(
       `4️⃣a Reconciling server audiences on '${CLIENT_NAME}' tokens...`
@@ -185,6 +193,7 @@ async function main() {
     console.log(`Realm: ${REALM_NAME}`);
     console.log(`Client: ${CLIENT_NAME}`);
     console.log(`Server Clients: ${SERVER_CLIENT_NAMES.join(", ")}`);
+    console.log(`Application Clients: ${APPLICATION_CLIENT_NAMES.join(", ")}`);
     console.log(`Portal URL: ${CLIENT_URL}`);
     console.log(
       `\nAccess admin console at: ${KEYCLOAK_URL}/admin/`
@@ -449,6 +458,33 @@ async function ensureServerClient(
   );
 
   console.log(`   • '${serverClientName}' configuration reconciled`);
+}
+
+async function ensureApplicationClient(token: string, clientId: string) {
+  if (await lookupClientByClientId(token, clientId)) {
+    console.log(`   • '${clientId}' already exists`);
+    return;
+  }
+  const response = await keycloakFetch(
+    `${KEYCLOAK_URL}/admin/realms/${REALM_NAME}/clients`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(applicationClientRepresentation(clientId)),
+    },
+  );
+  if (response.status === 409) {
+    console.log(`   • '${clientId}' already exists`);
+  } else if (response.ok) {
+    console.log(`   • '${clientId}' created`);
+  } else {
+    throw new Error(
+      `Failed to create application client '${clientId}': ${response.status} ${await response.text()}`,
+    );
+  }
 }
 
 async function fetchClientSecret(

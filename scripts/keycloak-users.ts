@@ -11,8 +11,10 @@ import {
   planManagedIdChanges,
   planManagedRoleScopeChanges,
   RETIRED_GROUP_NAMES,
+  RETIRED_GROUP_PATHS,
   RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
+  type SeededUser,
   type ClientId,
 } from "./keycloak-user-config";
 
@@ -42,6 +44,8 @@ type UserRepresentation = {
   email?: string;
   enabled?: boolean;
   emailVerified?: boolean;
+  firstName?: string;
+  lastName?: string;
 };
 
 const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "https://localhost:8080").replace(
@@ -115,11 +119,7 @@ async function main() {
   await removeRetiredGroups(headers);
 
   for (const user of SEEDED_USERS) {
-    const { user: createdUser, created } = await upsertUser(
-      user.username,
-      user.email,
-      headers,
-    );
+    const { user: createdUser, created } = await upsertUser(user, headers);
     if (created) {
       await setUserPassword(createdUser.id, userPassword, headers);
     }
@@ -432,16 +432,22 @@ async function ensureGroupPath(
 
 async function removeRetiredGroups(headers: Record<string, string>) {
   const groups = await listAllGroups(headers);
-  const retiredNames = new Set(RETIRED_GROUP_NAMES);
+  const retiredNames = new Set<string>(RETIRED_GROUP_NAMES);
+  const retiredPaths = new Set<string>(RETIRED_GROUP_PATHS);
   for (const group of groups) {
-    if (!retiredNames.has(group.name)) {
+    const path = group.path ?? "";
+    // Deleting a retired parent already deletes the groups under it.
+    if ([...retiredPaths].some((retired) => path.startsWith(`${retired}/`))) {
+      continue;
+    }
+    if (!retiredNames.has(group.name) && !retiredPaths.has(path)) {
       continue;
     }
     await requestJson(
       `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/groups/${encodeURIComponent(group.id)}`,
       { method: "DELETE", headers },
     );
-    console.log(`[keycloak] retired group '${group.name}' removed`);
+    console.log(`[keycloak] retired group '${group.path ?? group.name}' removed`);
   }
 }
 
@@ -510,8 +516,7 @@ async function reconcileGroupClientRoles(
 }
 
 async function upsertUser(
-  username: string,
-  email: string,
+  { email, firstName, lastName, username }: SeededUser,
   headers: Record<string, string>,
 ) {
   const existingUsers = await requestJson<UserRepresentation[]>(
@@ -525,6 +530,9 @@ async function upsertUser(
     email,
     enabled: true,
     emailVerified: true,
+    // Names are only managed when seeded, so hand-edited ones are kept.
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
   };
 
   if (!existing) {
@@ -554,7 +562,9 @@ async function upsertUser(
     existing.username !== payload.username ||
     existing.email !== payload.email ||
     existing.enabled !== payload.enabled ||
-    existing.emailVerified !== payload.emailVerified
+    existing.emailVerified !== payload.emailVerified ||
+    (firstName !== undefined && existing.firstName !== firstName) ||
+    (lastName !== undefined && existing.lastName !== lastName)
   ) {
     await requestJson(
       `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`,

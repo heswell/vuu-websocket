@@ -62,10 +62,15 @@ configuration. Query parameters and request bodies cannot override them.
 
 `npm run keycloak:bootstrap` sets `fullScopeAllowed=false` on `vuu-portal` and
 each confidential VUU client. It gives each client scope mappings for only its
-owned roles: the portal gets the three navigation roles, module admin gets
-`module-admin-view/edit`, user admin gets `user-admin-view/edit`, basket trading
-gets `basket-trading-view/trade`, and the portal server currently has no service
-roles. Known legacy roles and managed cross-client mappings are removed.
+owned roles: the portal gets the `<app>-access` navigation roles, user admin gets
+`read/admin`, basket trading gets `read/trade`, and the portal server currently
+has no service roles. Applications without a server of their own
+(`vuu-module-admin`, `vuu-table-browser`, `vuu-table-viewer`) get role-only
+clients; module admin's `module-admin-read/admin` roles live on
+`vuu-module-admin`. Groups are named `/vuu/<app>-<suffix>`, for example
+`/vuu/basket-trading-trade`, following the User Admin naming conventions, and
+the earlier `/vuu/<app>/<suffix>` groups are deleted. Known legacy roles and
+managed cross-client mappings are removed.
 The migration also deletes the retired `vuu-module-discovery-server` client,
 its portal audience mapper, and the former `modules.*`, `users.*`, and
 `basket.*` realm roles. These retired identifiers remain only in bootstrap's

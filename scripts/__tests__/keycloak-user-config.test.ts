@@ -6,9 +6,20 @@ import {
   planManagedIdChanges,
   planManagedRoleScopeChanges,
   RETIRED_CLIENT_ROLES,
+  RETIRED_GROUP_PATHS,
   RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
 } from "../keycloak-user-config";
+import { APPLICATION_CLIENT_NAMES } from "../keycloak-client-config";
+
+/** Each application's access role and its own client, as the portal derives them. */
+const APPLICATIONS = [
+  { accessRole: "module-admin-access", client: "vuu-module-admin" },
+  { accessRole: "user-admin-access", client: "vuu-user-admin" },
+  { accessRole: "basket-trading-access", client: "vuu-basket-trading" },
+  { accessRole: "vuu-table-browser-access", client: "vuu-table-browser" },
+  { accessRole: "vuu-table-viewer-access", client: "vuu-table-viewer" },
+];
 
 describe("Keycloak user and role configuration", () => {
   test("assigns roles to the requested owning clients", () => {
@@ -20,46 +31,109 @@ describe("Keycloak user and role configuration", () => {
         "vuu-table-browser-access",
         "vuu-table-viewer-access",
       ],
-      "vuu-portal-server": ["module-admin-read", "module-admin-admin"],
+      "vuu-portal-server": [],
+      "vuu-module-admin": ["module-admin-read", "module-admin-admin"],
       "vuu-user-admin": ["read", "admin"],
       "vuu-basket-trading": ["read", "trade"],
+      "vuu-table-browser": [],
+      "vuu-table-viewer": [],
     });
   });
 
-  test("maps the requested hierarchical groups to client roles", () => {
+  test("maps each group to its application's roles", () => {
     expect(GROUP_ROLES).toEqual({
-      "/vuu/user-admin/users": [
+      "/vuu/user-admin-read": [
         { clientId: "vuu-portal", roleName: "user-admin-access" },
         { clientId: "vuu-user-admin", roleName: "read" },
       ],
-      "/vuu/user-admin/administrators": [
+      "/vuu/user-admin-admin": [
         { clientId: "vuu-portal", roleName: "user-admin-access" },
         { clientId: "vuu-user-admin", roleName: "read" },
         { clientId: "vuu-user-admin", roleName: "admin" },
       ],
-      "/vuu/basket-trading/users": [
+      "/vuu/basket-trading-read": [
         { clientId: "vuu-portal", roleName: "basket-trading-access" },
         { clientId: "vuu-basket-trading", roleName: "read" },
       ],
-      "/vuu/basket-trading/traders": [
+      "/vuu/basket-trading-trade": [
         { clientId: "vuu-portal", roleName: "basket-trading-access" },
         { clientId: "vuu-basket-trading", roleName: "read" },
         { clientId: "vuu-basket-trading", roleName: "trade" },
       ],
-      "/vuu/module-admin/users": [
+      "/vuu/module-admin-read": [
         { clientId: "vuu-portal", roleName: "module-admin-access" },
-        { clientId: "vuu-portal-server", roleName: "module-admin-read" },
+        { clientId: "vuu-module-admin", roleName: "module-admin-read" },
       ],
-      "/vuu/module-admin/administrators": [
+      "/vuu/module-admin-admin": [
         { clientId: "vuu-portal", roleName: "module-admin-access" },
-        { clientId: "vuu-portal-server", roleName: "module-admin-read" },
-        { clientId: "vuu-portal-server", roleName: "module-admin-admin" },
+        { clientId: "vuu-module-admin", roleName: "module-admin-read" },
+        { clientId: "vuu-module-admin", roleName: "module-admin-admin" },
       ],
-      "/vuu/table-browser/users": [
+      "/vuu/vuu-table-browser-read": [
         { clientId: "vuu-portal", roleName: "vuu-table-browser-access" },
+      ],
+      "/vuu/vuu-table-viewer-read": [
         { clientId: "vuu-portal", roleName: "vuu-table-viewer-access" },
       ],
     });
+  });
+
+  test("follows the User Admin naming conventions", () => {
+    for (const { accessRole, client } of APPLICATIONS) {
+      expect(CLIENT_ROLES["vuu-portal"]).toContain(accessRole);
+      expect(CLIENT_ROLES).toHaveProperty(client);
+    }
+    expect(Object.keys(CLIENT_ROLES).every((id) => id.startsWith("vuu-"))).toBe(
+      true,
+    );
+    for (const clientId of APPLICATION_CLIENT_NAMES) {
+      expect(CLIENT_ROLES).toHaveProperty(clientId);
+    }
+
+    for (const [path, roles] of Object.entries(GROUP_ROLES)) {
+      const name = path.split("/").at(-1)!;
+      const accessRoles = roles.filter(({ clientId }) => clientId === "vuu-portal");
+      // Exactly one application per group: its access role, named by prefix.
+      expect(accessRoles).toHaveLength(1);
+      const application = APPLICATIONS.find(
+        ({ accessRole }) => accessRole === accessRoles[0].roleName,
+      )!;
+      const prefix = application.accessRole.replace(/-access$/, "-");
+      expect(name.startsWith(prefix) && name.length > prefix.length).toBe(true);
+      expect(name).not.toMatch(/[\s/]/);
+      // Any other roles come from the application's own client.
+      for (const { clientId } of roles) {
+        expect([ "vuu-portal", application.client ]).toContain(clientId);
+      }
+    }
+
+    // Every application role is granted by some group.
+    for (const { client } of APPLICATIONS) {
+      const roleNames = (CLIENT_ROLES as Record<string, readonly string[]>)[client];
+      for (const roleName of roleNames) {
+        expect(
+          Object.values(GROUP_ROLES).some((roles) =>
+            roles.some((role) => role.clientId === client && role.roleName === roleName),
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
+  test("retires the earlier nested group layout", () => {
+    expect(RETIRED_GROUP_PATHS).toEqual([
+      "/vuu/user-admin",
+      "/vuu/basket-trading",
+      "/vuu/module-admin",
+      "/vuu/table-browser",
+    ]);
+    for (const path of Object.keys(GROUP_ROLES)) {
+      expect(
+        RETIRED_GROUP_PATHS.some(
+          (retired) => path === retired || path.startsWith(`${retired}/`),
+        ),
+      ).toBe(false);
+    }
   });
 
   test("tracks managed roles for cleanup", () => {
@@ -108,27 +182,41 @@ describe("Keycloak user and role configuration", () => {
   });
 
   test("keeps seeded users and assigns them only to groups", () => {
-    expect(SEEDED_USERS).toEqual([
+    expect(SEEDED_USERS.slice(0, 3)).toEqual([
       {
         username: "trader1",
         email: "trader1@vuu.com",
-        groups: ["/vuu/basket-trading/traders"],
+        groups: ["/vuu/basket-trading-trade"],
       },
       {
         username: "trader2",
         email: "trader2@vuu.com",
-        groups: ["/vuu/basket-trading/traders"],
+        groups: ["/vuu/basket-trading-trade"],
       },
       {
         username: "admin",
         email: "admin@vuu.com",
         groups: [
-          "/vuu/module-admin/administrators",
-          "/vuu/user-admin/administrators",
-          "/vuu/basket-trading/traders",
-          "/vuu/table-browser/users",
+          "/vuu/module-admin-admin",
+          "/vuu/user-admin-admin",
+          "/vuu/basket-trading-trade",
+          "/vuu/vuu-table-browser-read",
+          "/vuu/vuu-table-viewer-read",
         ],
       },
     ]);
+  });
+
+  test("seeds sample users into existing groups only", () => {
+    const usernames = SEEDED_USERS.map(({ username }) => username);
+    expect(new Set(usernames).size).toBe(usernames.length);
+    expect(SEEDED_USERS.length).toBeGreaterThan(10);
+    for (const user of SEEDED_USERS) {
+      expect(user.email).toBe(`${user.username}@vuu.com`);
+      for (const group of user.groups) {
+        expect(Object.keys(GROUP_ROLES)).toContain(group);
+      }
+    }
+    expect(SEEDED_USERS.some(({ groups }) => groups.length === 0)).toBe(true);
   });
 });

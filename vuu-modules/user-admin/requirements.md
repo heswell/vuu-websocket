@@ -25,7 +25,7 @@ neither entry point imports the VUU server feature.
 - Keycloak's nested group tree is recursively flattened into the `groups` read
   model, but the `groups` table currently exposes only leaf groups. Each row
   retains its Keycloak group ID, full path, and parent group ID, so a group such
-  as `/vuu/basket-trading/users` is independently addressable without exposing
+  as `/vuu/basket-trading-read` is independently addressable without exposing
   a separate `group_name` column. The full hierarchy remains in the snapshot for
   relationship reads and future nested-group views.
 - Client and client-role reads are limited to client identifiers beginning
