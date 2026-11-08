@@ -108,6 +108,32 @@ Websocket close codes (`VuuCloseCode`):
 | 4004 | `LoginFailed` | invalid or expired token |
 | 4005 | `HeartbeatTimeout` | the client stopped responding |
 
+## Session and send-cycle stats
+
+Queued row updates are sent to every session once per send cycle (60 ms).
+`VuuServerCore` (and so `VuuServer` / `application.server`) reports what the
+cycle does, for a metrics source to poll:
+
+```ts
+server.sessionCount; // sessions logged in now
+server.getSessionStats(); // SessionStats[], one per session
+const remove = server.onSendCycle((cycle) => {
+  // cycle: { startTime, durationMs, sessions, rowsSent, messagesSent, charsSent }
+});
+```
+
+`SessionStats` has the session id, channel id, user and `connectedAt`, the
+current `queueLength`, and cumulative counters since login: `rowsQueued`,
+`rowsCoalesced` (merged into an update already waiting for the same viewport
+row, so never sent on their own), `rowsSent`, `rowsDropped` (the row had left
+the viewport's range by send time), `messagesSent`, `charsSent` (JSON length)
+and `heartbeatsSent`. Take differences between reads for rates; the share of
+updates coalesced is `rowsCoalesced / rowsQueued`.
+
+The counters are plain integer increments on the send path. A send cycle is
+only timed while an `onSendCycle` listener is registered; a listener that
+throws is logged once and does not affect sending.
+
 ## Error handling
 
 A failing request never stops the server or closes the websocket. Every

@@ -3,6 +3,7 @@ import type { ClientSessionId, MessageHandler } from "./ClientConnectionCreator"
 import { getLogger } from "@heswell/service-utils/browser";
 import { ClientRequestError } from "./ClientRequestError";
 import { VuuCloseCode } from "./CloseCodes";
+import type { SendCycleTotals, SessionStats } from "./SessionStats";
 
 const log = getLogger("vuu.session");
 
@@ -31,6 +32,9 @@ export interface ClientSessionContainer {
    */
   getHandler: (sessionId: ClientSessionId) => MessageHandler | undefined;
   getSessions: () => ClientSessionId[];
+  /** Outbound counters of every session whose handler reports them. */
+  getSessionStats: () => SessionStats[];
+  readonly sessionCount: number;
   register: (
     vuuUser: VuuUser,
     sessionId: ClientSessionId,
@@ -42,7 +46,8 @@ export interface ClientSessionContainer {
    * closes.
    */
   removeChannel: (channelId: string) => void;
-  runOnce: () => void;
+  /** Sends each session's queued updates, adding them to `totals` if given. */
+  runOnce: (totals?: SendCycleTotals) => void;
 }
 
 type SessionEntry = {
@@ -88,6 +93,19 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
   };
 
   getSessions = () => Array.from(this.sessions.values(), ({ id }) => id);
+
+  getSessionStats = () => {
+    const stats: SessionStats[] = [];
+    for (const { handler } of this.sessions.values()) {
+      const sessionStats = handler.stats?.();
+      if (sessionStats) stats.push(sessionStats);
+    }
+    return stats;
+  };
+
+  get sessionCount() {
+    return this.sessions.size;
+  }
 
   remove = (vuuUser: VuuUser, { sessionId }: ClientSessionId) => {
     const userKey = vuuUser.name;
@@ -159,9 +177,9 @@ class ClientSessionContainerImpl implements ClientSessionContainer {
     }
   }
 
-  runOnce() {
+  runOnce(totals?: SendCycleTotals) {
     this.sessions.forEach(({ handler }) => {
-      handler.sendUpdates();
+      handler.sendUpdates(totals);
     });
   }
 }
