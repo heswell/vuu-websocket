@@ -20,6 +20,7 @@ export class UserAdminGroupsProvider extends Provider {
       group.parentId ?? "",
       groupUserCount(snapshot, group.id),
       groupRoleCount(snapshot, group.id),
+      group.description ?? "",
       snapshot.timestamp,
       snapshot.timestamp,
       "",

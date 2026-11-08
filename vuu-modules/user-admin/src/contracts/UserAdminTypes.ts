@@ -19,6 +19,7 @@ export type UserAdminUser = {
 export type UserAdminGroup = {
   id: string;
   name: string;
+  description?: string;
   groupDisplayName?: string;
   path?: string;
   parentId?: string;
@@ -120,8 +121,11 @@ export type UserAdminOperations = {
   deleteUser: (userId: string) => Promise<void>;
   findUserByUsername: (username: string) => Promise<UserAdminUser | undefined>;
   syncUserGroups: (userId: string, groupIds: string[]) => Promise<void>;
-  addGroup: (params: { name: string }) => Promise<void>;
-  updateGroup: (groupId: string, params: { name: string }) => Promise<void>;
+  addGroup: (params: { name: string; description?: string }) => Promise<void>;
+  updateGroup: (
+    groupId: string,
+    params: { name: string; description?: string },
+  ) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   addClient: (params: {
     clientId: string;

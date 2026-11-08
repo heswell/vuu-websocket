@@ -171,6 +171,27 @@ describe("InMemoryUserAdminStore", () => {
     ]);
   });
 
+  test("stores and updates a group's description", async () => {
+    const store = new InMemoryUserAdminStore(fixtureSnapshot());
+    await store.addGroup({
+      name: "basket-trading-audit",
+      description: "Audit basket activity",
+    });
+    const group = (await store.snapshot()).groups.find(
+      ({ name }) => name === "basket-trading-audit",
+    );
+    expect(group?.description).toBe("Audit basket activity");
+
+    await store.updateGroup(group!.id, {
+      name: "basket-trading-audit",
+      description: "",
+    });
+    expect(
+      (await store.snapshot()).groups.find(({ id }) => id === group!.id)
+        ?.description,
+    ).toBe("");
+  });
+
   test("rejects duplicate or ineligible assignments", async () => {
     const store = new InMemoryUserAdminStore(fixtureSnapshot());
 

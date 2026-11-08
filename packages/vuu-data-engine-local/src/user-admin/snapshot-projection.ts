@@ -117,6 +117,7 @@ export const projectUserAdminSnapshot = (
     groups: snapshot.groups.map((group) =>
       toRow(tables.groups, {
         ...system,
+        description: group.description ?? "",
         group_display_name: groupDisplayName(group),
         group_id: group.id,
         group_path: group.path ?? `/${group.name}`,

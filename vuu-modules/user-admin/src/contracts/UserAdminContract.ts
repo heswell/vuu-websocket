@@ -139,8 +139,8 @@ export const USER_ADMIN_RPC_CONTRACT = {
   addUser: ["username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
   updateUser: ["userId", "username", "email", "firstName", "lastName", "enabled", "emailVerified", "temporary_password", "group_ids"],
   deleteUser: ["userId"],
-  addGroup: ["name"],
-  updateGroup: ["groupId", "name"],
+  addGroup: ["name", "description"],
+  updateGroup: ["groupId", "name", "description"],
   deleteGroup: ["groupId"],
   addClient: ["clientId", "name", "description", "enabled"],
   updateClient: ["clientId", "name", "description", "enabled"],
@@ -166,7 +166,7 @@ export const USER_ADMIN_TABLE_CONTRACT = {
   ],
   groups: [
     "group_id", "group_display_name", "group_path", "parent_group_id", "user_count",
-    "role_count",
+    "role_count", "description",
   ],
   roles: [
     "role_id", "role_name", "role_display_name", "client_id", "client_identifier", "client_name",
