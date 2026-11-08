@@ -163,7 +163,30 @@ export const RETIRED_GROUP_NAMES = [
   "BASKET_TRADE",
 ] as const;
 
-export const SEEDED_USERS = [
+export interface SeededUser {
+  username: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  groups: readonly string[];
+}
+
+const sampleUser = (
+  firstName: string,
+  lastName: string,
+  groups: readonly string[] = [],
+): SeededUser => {
+  const username = `${firstName[0]}${lastName}`.toLowerCase();
+  return {
+    username,
+    email: `${username}@vuu.com`,
+    firstName,
+    lastName,
+    groups,
+  };
+};
+
+export const SEEDED_USERS: readonly SeededUser[] = [
   {
     username: "trader1",
     email: "trader1@vuu.com",
@@ -185,4 +208,23 @@ export const SEEDED_USERS = [
       "/vuu/vuu-table-viewer-read",
     ],
   },
-] as const;
+  // Sample users for trying out User Admin: a mix of access, and none.
+  sampleUser("Oliver", "Bennett", ["/vuu/basket-trading-read"]),
+  sampleUser("Amelia", "Hughes", [
+    "/vuu/basket-trading-read",
+    "/vuu/vuu-table-browser-read",
+  ]),
+  sampleUser("Harry", "Clarke", ["/vuu/basket-trading-trade"]),
+  sampleUser("Isla", "Turner"),
+  sampleUser("George", "Fletcher"),
+  sampleUser("Poppy", "Hargreaves", ["/vuu/user-admin-read"]),
+  sampleUser("Alfie", "Dawson"),
+  sampleUser("Freya", "Whitaker", ["/vuu/vuu-table-viewer-read"]),
+  sampleUser("Jack", "Pemberton"),
+  sampleUser("Matilda", "Ashworth", [
+    "/vuu/basket-trading-read",
+    "/vuu/module-admin-read",
+  ]),
+  sampleUser("Thomas", "Holloway"),
+  sampleUser("Lucy", "Carrington", ["/vuu/vuu-table-browser-read"]),
+];

@@ -14,6 +14,7 @@ import {
   RETIRED_GROUP_PATHS,
   RETIRED_REALM_ROLE_NAMES,
   SEEDED_USERS,
+  type SeededUser,
   type ClientId,
 } from "./keycloak-user-config";
 
@@ -43,6 +44,8 @@ type UserRepresentation = {
   email?: string;
   enabled?: boolean;
   emailVerified?: boolean;
+  firstName?: string;
+  lastName?: string;
 };
 
 const keycloakBaseUrl = (process.env.KEYCLOAK_URL ?? "https://localhost:8080").replace(
@@ -116,11 +119,7 @@ async function main() {
   await removeRetiredGroups(headers);
 
   for (const user of SEEDED_USERS) {
-    const { user: createdUser, created } = await upsertUser(
-      user.username,
-      user.email,
-      headers,
-    );
+    const { user: createdUser, created } = await upsertUser(user, headers);
     if (created) {
       await setUserPassword(createdUser.id, userPassword, headers);
     }
@@ -517,8 +516,7 @@ async function reconcileGroupClientRoles(
 }
 
 async function upsertUser(
-  username: string,
-  email: string,
+  { email, firstName, lastName, username }: SeededUser,
   headers: Record<string, string>,
 ) {
   const existingUsers = await requestJson<UserRepresentation[]>(
@@ -532,6 +530,9 @@ async function upsertUser(
     email,
     enabled: true,
     emailVerified: true,
+    // Names are only managed when seeded, so hand-edited ones are kept.
+    ...(firstName ? { firstName } : {}),
+    ...(lastName ? { lastName } : {}),
   };
 
   if (!existing) {
@@ -561,7 +562,9 @@ async function upsertUser(
     existing.username !== payload.username ||
     existing.email !== payload.email ||
     existing.enabled !== payload.enabled ||
-    existing.emailVerified !== payload.emailVerified
+    existing.emailVerified !== payload.emailVerified ||
+    (firstName !== undefined && existing.firstName !== firstName) ||
+    (lastName !== undefined && existing.lastName !== lastName)
   ) {
     await requestJson(
       `${keycloakBaseUrl}/admin/realms/${encodeURIComponent(realm)}/users/${encodeURIComponent(existing.id)}`,

@@ -182,7 +182,7 @@ describe("Keycloak user and role configuration", () => {
   });
 
   test("keeps seeded users and assigns them only to groups", () => {
-    expect(SEEDED_USERS).toEqual([
+    expect(SEEDED_USERS.slice(0, 3)).toEqual([
       {
         username: "trader1",
         email: "trader1@vuu.com",
@@ -205,5 +205,18 @@ describe("Keycloak user and role configuration", () => {
         ],
       },
     ]);
+  });
+
+  test("seeds sample users into existing groups only", () => {
+    const usernames = SEEDED_USERS.map(({ username }) => username);
+    expect(new Set(usernames).size).toBe(usernames.length);
+    expect(SEEDED_USERS.length).toBeGreaterThan(10);
+    for (const user of SEEDED_USERS) {
+      expect(user.email).toBe(`${user.username}@vuu.com`);
+      for (const group of user.groups) {
+        expect(Object.keys(GROUP_ROLES)).toContain(group);
+      }
+    }
+    expect(SEEDED_USERS.some(({ groups }) => groups.length === 0)).toBe(true);
   });
 });
