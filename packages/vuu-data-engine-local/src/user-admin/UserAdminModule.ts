@@ -88,6 +88,11 @@ const optionalBoolean = (params: NamedParams, name: string) => {
   return value;
 };
 
+const optionalDescription = (params: NamedParams) => {
+  const description = optionalString(params, "description");
+  return description === undefined ? {} : { description };
+};
+
 const optionalStringArray = (params: NamedParams, name: string) => {
   const value = params[name];
   if (
@@ -661,12 +666,16 @@ export class UserAdminModule extends VuuModule<UserAdminTableName> {
   );
 
   private addGroup = this.mutation("addGroup", (params) =>
-    this.store.addGroup({ name: requiredString(params, "name") }),
+    this.store.addGroup({
+      name: requiredString(params, "name"),
+      ...optionalDescription(params),
+    }),
   );
 
   private updateGroup = this.mutation("updateGroup", (params) =>
     this.store.updateGroup(requiredString(params, "groupId"), {
       name: requiredString(params, "name"),
+      ...optionalDescription(params),
     }),
   );
 

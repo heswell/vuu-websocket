@@ -268,7 +268,11 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
   private readonly addGroup = async ({ namedParams }: RpcParams<Params>) => {
     try {
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
-      await (await this.createOperations()).addGroup({ name });
+      const description = getOptionalNonEmptyString(namedParams.description, "description");
+      await (await this.createOperations()).addGroup({
+        name,
+        ...(description ? { description } : {}),
+      });
       await this.refreshAfterMutation("rpc:addGroup");
       return success();
     } catch (error) {
@@ -280,7 +284,12 @@ export class UserAdminService extends CreateSessionTableRpcHandler {
     try {
       const groupId = ensureRequiredNonEmptyString(namedParams.groupId, "groupId");
       const name = ensureRequiredNonEmptyString(namedParams.name, "name");
-      await (await this.createOperations()).updateGroup(groupId, { name });
+      const description =
+        typeof namedParams.description === "string" ? namedParams.description.trim() : undefined;
+      await (await this.createOperations()).updateGroup(groupId, {
+        name,
+        ...(description !== undefined ? { description } : {}),
+      });
       await this.refreshAfterMutation("rpc:updateGroup");
       return success();
     } catch (error) {

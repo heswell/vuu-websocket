@@ -159,7 +159,14 @@ describe("Keycloak admin backend", () => {
       }
       if (url.includes("/groups/basket/children?")) {
         return new Response(
-          JSON.stringify([{ id: "users", name: "users", path: "/vuu/basket-trading/users" }]),
+          JSON.stringify([
+            {
+              id: "users",
+              name: "users",
+              path: "/vuu/basket-trading/users",
+              description: "Read only view of baskets data",
+            },
+          ]),
           { status: 200 },
         );
       }
@@ -213,6 +220,7 @@ describe("Keycloak admin backend", () => {
         "basket",
         0,
         0,
+        "Read only view of baskets data",
         123,
         123,
         "",

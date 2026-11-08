@@ -27,6 +27,7 @@ export type KeycloakUser = {
 export type KeycloakGroup = {
   id: string;
   name: string;
+  description?: string;
   path?: string;
   parentId?: string;
   createdTimestamp?: number;
@@ -125,7 +126,7 @@ type UpdateUserParams = Partial<
   Pick<KeycloakUser, "username" | "email" | "firstName" | "lastName" | "enabled" | "emailVerified">
 > & { userId: string; temporary_password?: string };
 type AddRoleParams = { name: string; description?: string };
-type AddGroupParams = { name: string };
+type AddGroupParams = { name: string; description?: string };
 type AddClientParams = {
   clientId: string;
   name?: string;
@@ -598,15 +599,15 @@ export class KeycloakAdminClient {
     });
   }
 
-  async addGroup({ name }: AddGroupParams) {
+  async addGroup({ name, description }: AddGroupParams) {
     await this.requestNoContent(this.realmUrl("/groups"), {
       method: "POST",
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, ...(description ? { description } : {}) }),
       expectedStatuses: [201, 204],
     });
   }
 
-  async updateGroup(groupId: string, changes: Pick<AddGroupParams, "name">) {
+  async updateGroup(groupId: string, changes: AddGroupParams) {
     const group = await this.requestJson<KeycloakGroup>(
       this.realmUrl(`/groups/${encodeURIComponent(groupId)}`),
     );

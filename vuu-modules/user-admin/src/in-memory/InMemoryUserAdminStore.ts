@@ -76,15 +76,24 @@ export class InMemoryUserAdminStore implements UserAdminOperations {
     this.touch();
   }
 
-  async addGroup({ name }: { name: string }) {
+  async addGroup({ name, description }: { name: string; description?: string }) {
     const id = this.id("group");
-    this.#snapshot.groups.push({ id, name, path: `/${name}` });
+    this.#snapshot.groups.push({
+      id,
+      name,
+      path: `/${name}`,
+      ...(description ? { description } : {}),
+    });
     this.touch();
   }
 
-  async updateGroup(groupId: string, { name }: { name: string }) {
+  async updateGroup(
+    groupId: string,
+    { name, description }: { name: string; description?: string },
+  ) {
     const group = this.group(groupId);
     group.name = name;
+    if (description !== undefined) group.description = description;
     this.touch();
   }
 
