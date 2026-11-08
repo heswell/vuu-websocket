@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794136318986,
+  "lastUpdate": 1794139642571,
   "repoUrl": "https://github.com/heswell/vuu-websocket",
   "entries": {
     "Vuu performance": [
@@ -13148,6 +13148,708 @@ window.BENCHMARK_DATA = {
             "value": 7.251600999999937,
             "unit": "ms",
             "extra": "Delete random rows and insert new ones, on a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V45 96-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42474272919"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "steve@heswell.com",
+            "name": "heswell",
+            "username": "heswell"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a5a4d7e10fc995e2d1b878ee3ee8636e3ed3e64e",
+          "message": "Merge pull request #113 from heswell/feat/group-description\n\nUser admin: expose and edit group descriptions",
+          "timestamp": "2026-11-08T12:00:00Z",
+          "tree_id": "55b80956f85837277ec1da33b921538673fd9966",
+          "url": "https://github.com/heswell/vuu-websocket/commit/a5a4d7e10fc995e2d1b878ee3ee8636e3ed3e64e"
+        },
+        "date": 1794139641894,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "compressed.refdata.snapshot.time",
+            "value": 608.5,
+            "unit": "ms",
+            "extra": "time to receive the compressed instruments snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "compressed.refdata.snapshot.wireBytesPerRow",
+            "value": 14.1,
+            "unit": "B",
+            "extra": "compressed instruments snapshot wire bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "compressed.prices.snapshot.wireBytesPerRow",
+            "value": 18.7,
+            "unit": "B",
+            "extra": "compressed prices snapshot wire bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "compressed.prices.flush.time",
+            "value": 22.6,
+            "unit": "ms",
+            "extra": "flush 10000 price updates with compression\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "compressed.prices.updates.wireBytesPerRow",
+            "value": 20.7,
+            "unit": "B",
+            "extra": "compressed live price update wire bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "refdata.load.time",
+            "value": 488,
+            "unit": "ms",
+            "extra": "load 228488 instruments from ndjson\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "refdata.snapshot.time",
+            "value": 215.7,
+            "unit": "ms",
+            "extra": "time to receive the instruments snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "refdata.snapshot.messages",
+            "value": 230,
+            "unit": "msgs",
+            "extra": "websocket messages for the instruments snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "refdata.snapshot.bytesPerRow",
+            "value": 98,
+            "unit": "B",
+            "extra": "instruments snapshot bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "prices.startToSnapshot.time",
+            "value": 526.7,
+            "unit": "ms",
+            "extra": "price service start to subscriber holding the full prices snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "prices.snapshot.bytesPerRow",
+            "value": 69.7,
+            "unit": "B",
+            "extra": "prices snapshot bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "prices.generate.time",
+            "value": 75.9,
+            "unit": "ms",
+            "extra": "generate 100000 price updates\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "prices.flush.time",
+            "value": 53.5,
+            "unit": "ms",
+            "extra": "flush after 100000 price updates\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "prices.updates.bytesPerRow",
+            "value": 70.6,
+            "unit": "B",
+            "extra": "live price update bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "orders.startToSnapshot.time",
+            "value": 240.5,
+            "unit": "ms",
+            "extra": "orders service start to subscriber holding 10000 orders\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "orders.snapshot.bytesPerRow",
+            "value": 173.4,
+            "unit": "B",
+            "extra": "orders snapshot bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "orders.create.time",
+            "value": 8.8,
+            "unit": "ms",
+            "extra": "create 10000 orders\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.snapshot.time",
+            "value": 131.4,
+            "unit": "ms",
+            "extra": "time to receive a 200000 row snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.snapshot.messages",
+            "value": 201,
+            "unit": "msgs",
+            "extra": "websocket messages for the snapshot\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.snapshot.bytesPerRow",
+            "value": 64.4,
+            "unit": "B",
+            "extra": "snapshot bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "subscription.replicate.time",
+            "value": 244.3,
+            "unit": "ms",
+            "extra": "time to replicate 200000 rows into a local table\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.ingest.timePer100k",
+            "value": 32.1,
+            "unit": "ms",
+            "extra": "table mutation cost with a live subscriber\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.flush.time",
+            "value": 4.3,
+            "unit": "ms",
+            "extra": "flush (serialize + send) after 200000 updates\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.updates.rowsSent",
+            "value": 20000,
+            "unit": "rows",
+            "extra": "rows sent for 200000 updates to 20000 rows\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.updates.bytesPerRow",
+            "value": 73.6,
+            "unit": "B",
+            "extra": "live update bytes per row\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.fanout.flushTime",
+            "value": 5.2,
+            "unit": "ms",
+            "extra": "flush 20000 updated rows to 50 subscribers\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.fanout.serializations",
+            "value": 4,
+            "unit": "msgs",
+            "extra": "distinct messages serialized for the fan out\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.idle.ingestTimePer100k",
+            "value": 15.1,
+            "unit": "ms",
+            "extra": "table mutation cost with no subscribers\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "publisher.idle.backlogRows",
+            "value": 0,
+            "unit": "rows",
+            "extra": "update rows replayed to a late subscriber\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).time",
+            "value": 7.3812599999999975,
+            "unit": "ms",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).messages",
+            "value": 100,
+            "unit": "msgs",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).rows",
+            "value": 10000,
+            "unit": "rows",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).bytes",
+            "value": 2831316,
+            "unit": "B",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).time",
+            "value": 1.9573500000000195,
+            "unit": "ms",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).messages",
+            "value": 10,
+            "unit": "msgs",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).rows",
+            "value": 1000,
+            "unit": "rows",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).bytes",
+            "value": 283009,
+            "unit": "B",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).time",
+            "value": 24.485656999999946,
+            "unit": "ms",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).messages",
+            "value": 400,
+            "unit": "msgs",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).rows",
+            "value": 7620,
+            "unit": "rows",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).bytes",
+            "value": 2210854,
+            "unit": "B",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).time",
+            "value": 36.57998099999986,
+            "unit": "ms",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).messages",
+            "value": 19,
+            "unit": "msgs",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).rows",
+            "value": 1059,
+            "unit": "rows",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).bytes",
+            "value": 302278,
+            "unit": "B",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).time",
+            "value": 6.791261999999961,
+            "unit": "ms",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).messages",
+            "value": 0,
+            "unit": "msgs",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).rows",
+            "value": 0,
+            "unit": "rows",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).bytes",
+            "value": 0,
+            "unit": "B",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.time",
+            "value": 8.910871000000043,
+            "unit": "ms",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.messages",
+            "value": 100,
+            "unit": "msgs",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.rows",
+            "value": 10000,
+            "unit": "rows",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.bytes",
+            "value": 2869381,
+            "unit": "B",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, AMD EPYC 9V74 80-Core Processor\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > create + subscribe (100000 rows) / legacy TickingArrayDataSource",
+            "value": 52.63585039999989,
+            "range": "28.04% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > create + subscribe (100000 rows) / engine ModuleDataSource",
+            "value": 17.610703241379394,
+            "range": "6.63% RME",
+            "unit": "ms",
+            "extra": "Mean of 29 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort numeric column, toggle asc/desc (100000 rows) / legacy TickingArrayDataSource",
+            "value": 99.07513639999979,
+            "range": "14.24% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort numeric column, toggle asc/desc (100000 rows) / engine ModuleDataSource",
+            "value": 23.91295571428565,
+            "range": "5.73% RME",
+            "unit": "ms",
+            "extra": "Mean of 21 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort two columns (100000 rows) / legacy TickingArrayDataSource",
+            "value": 79.57680580000014,
+            "range": "6.64% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort two columns (100000 rows) / engine ModuleDataSource",
+            "value": 35.2962834666665,
+            "range": "8.46% RME",
+            "unit": "ms",
+            "extra": "Mean of 15 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > filter, alternating (100000 rows) / legacy TickingArrayDataSource",
+            "value": 9.202215018181926,
+            "range": "15.00% RME",
+            "unit": "ms",
+            "extra": "Mean of 55 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > filter, alternating (100000 rows) / engine ModuleDataSource",
+            "value": 1.6430278098360327,
+            "range": "1.77% RME",
+            "unit": "ms",
+            "extra": "Mean of 305 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1.3936318384401547,
+            "range": "11.46% RME",
+            "unit": "ms",
+            "extra": "Mean of 359 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 2.0793638755186064,
+            "range": "13.16% RME",
+            "unit": "ms",
+            "extra": "Mean of 241 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2.59861693782383,
+            "range": "15.24% RME",
+            "unit": "ms",
+            "extra": "Mean of 193 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 2.9963414371257735,
+            "range": "15.53% RME",
+            "unit": "ms",
+            "extra": "Mean of 167 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > scroll, 100 range changes (100000 rows) / legacy TickingArrayDataSource",
+            "value": 0.9341703917910329,
+            "range": "3.60% RME",
+            "unit": "ms",
+            "extra": "Mean of 536 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > scroll, 100 range changes (100000 rows) / engine ModuleDataSource",
+            "value": 0.6412264410256424,
+            "range": "2.73% RME",
+            "unit": "ms",
+            "extra": "Mean of 780 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to random rows (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2121.7022341,
+            "range": "12.55% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to random rows (100000 rows) / engine ModuleDataSource",
+            "value": 0.5277255116032139,
+            "range": "7.66% RME",
+            "unit": "ms",
+            "extra": "Mean of 948 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to rows in viewport (100000 rows) / legacy TickingArrayDataSource",
+            "value": 0.893880230357185,
+            "range": "11.21% RME",
+            "unit": "ms",
+            "extra": "Mean of 560 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to rows in viewport (100000 rows) / engine ModuleDataSource",
+            "value": 0.1011264893832518,
+            "range": "2.43% RME",
+            "unit": "ms",
+            "extra": "Mean of 4945 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on sorted column (100000 rows) / legacy TickingArrayDataSource",
+            "value": 4905.343984500003,
+            "range": "8.07% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on sorted column (100000 rows) / engine ModuleDataSource",
+            "value": 4.181996066666155,
+            "range": "5.79% RME",
+            "unit": "ms",
+            "extra": "Mean of 120 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on filtered column (100000 rows) / legacy TickingArrayDataSource",
+            "value": 3263.1518289,
+            "range": "12.58% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on filtered column (100000 rows) / engine ModuleDataSource",
+            "value": 1.0507779264697383,
+            "range": "6.46% RME",
+            "unit": "ms",
+            "extra": "Mean of 476 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1997.315353000001,
+            "range": "16.99% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped (100000 rows) / engine ModuleDataSource",
+            "value": 0.8111865316051895,
+            "range": "11.76% RME",
+            "unit": "ms",
+            "extra": "Mean of 617 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn, 500 deletes + 500 inserts (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2086.832116600001,
+            "range": "4.54% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn, 500 deletes + 500 inserts (100000 rows) / engine ModuleDataSource",
+            "value": 0.9364199269662589,
+            "range": "3.94% RME",
+            "unit": "ms",
+            "extra": "Mean of 534 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn on sorted view, 500 deletes + 500 inserts (100000 rows) / legacy TickingArrayDataSource",
+            "value": 3514.3058374000075,
+            "range": "4.99% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn on sorted view, 500 deletes + 500 inserts (100000 rows) / engine ModuleDataSource",
+            "value": 2.930964058477837,
+            "range": "7.65% RME",
+            "unit": "ms",
+            "extra": "Mean of 171 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > aggregations on ccy groups, switch sets (100000 rows) / legacy TickingArrayDataSource",
+            "value": 10.48747462499523,
+            "range": "30.62% RME",
+            "unit": "ms",
+            "extra": "Mean of 48 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > aggregations on ccy groups, switch sets (100000 rows) / engine ModuleDataSource",
+            "value": 5.416602290322459,
+            "range": "3.83% RME",
+            "unit": "ms",
+            "extra": "Mean of 93 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange with aggregations, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2.447373419514823,
+            "range": "14.53% RME",
+            "unit": "ms",
+            "extra": "Mean of 205 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange with aggregations, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 4.092088512195619,
+            "range": "17.95% RME",
+            "unit": "ms",
+            "extra": "Mean of 123 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > expand/collapse one ccy group (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1661.4883161999983,
+            "range": "75.40% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > expand/collapse one ccy group (100000 rows) / engine ModuleDataSource",
+            "value": 0.03515632918480483,
+            "range": "2.57% RME",
+            "unit": "ms",
+            "extra": "Mean of 14223 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped, aggregated and expanded (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1882.8351475000031,
+            "range": "8.31% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped, aggregated and expanded (100000 rows) / engine ModuleDataSource",
+            "value": 0.778243043546856,
+            "range": "10.86% RME",
+            "unit": "ms",
+            "extra": "Mean of 643 samples, Node v24.16.0\nlinux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.heap: source row arrays (1000000 rows)",
+            "value": 182.1812973022461,
+            "unit": "MB",
+            "extra": "The generated row arrays alone, before any table is built (context for the table figure)\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.heap: table (1000000 rows)",
+            "value": 222.47396850585938,
+            "unit": "MB",
+            "extra": "An engine Table holding every row, with its key index (the source array released)\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.heap: sorted data source (1000000 rows)",
+            "value": 0.18476104736328125,
+            "unit": "MB",
+            "extra": "A subscribed data source sorted on price, over the shared table\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.heap: grouped data source (1000000 rows)",
+            "value": 16.066009521484375,
+            "unit": "MB",
+            "extra": "A subscribed data source grouped by ccy + exchange, with four aggregations and every ccy group expanded\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.build table (1000000 rows)",
+            "value": 354.54995800000006,
+            "unit": "ms",
+            "extra": "Create an engine Table from pre-generated row arrays. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.create + subscribe (1000000 rows)",
+            "value": 8.047355000000607,
+            "unit": "ms",
+            "extra": "Create a ModuleDataSource over the table and subscribe a 50 row viewport. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.sort numeric column, toggle asc/desc (1000000 rows)",
+            "value": 328.3014119999998,
+            "unit": "ms",
+            "extra": "Sort on price, alternating ascending and descending. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.sort two columns (1000000 rows)",
+            "value": 551.5925080000015,
+            "unit": "ms",
+            "extra": "Sort on ccy then qty, alternating the qty direction. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.filter, alternating (1000000 rows)",
+            "value": 15.84047499999906,
+            "unit": "ms",
+            "extra": "Alternate between two filters. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.groupBy ccy (1000000 rows)",
+            "value": 42.81246900000042,
+            "unit": "ms",
+            "extra": "Group by ccy (cleared, untimed, before each run). Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.groupBy ccy + exchange with aggregations (1000000 rows)",
+            "value": 75.33135000000038,
+            "unit": "ms",
+            "extra": "Group by ccy and exchange with four aggregations set (cleared, untimed, before each run). Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.aggregations on ccy groups, switch sets (1000000 rows)",
+            "value": 58.53925600000002,
+            "unit": "ms",
+            "extra": "Switch between two aggregation sets on a data source grouped by ccy. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.expand/collapse one ccy group (1000000 rows)",
+            "value": 2.8998050000009243,
+            "unit": "ms",
+            "extra": "Open the first ccy group, then close it. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.expand all ccy + exchange groups, then collapse all (1000000 rows)",
+            "value": 826.684448,
+            "unit": "ms",
+            "extra": "Open all 8 ccy groups and the 48 exchange groups within them, then close them all. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.scroll, 100 range changes (1000000 rows)",
+            "value": 1.140226999999868,
+            "unit": "ms",
+            "extra": "Move a 50 row viewport through the table in 100 steps. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.ticks, 1000 updates on sorted column (1000000 rows)",
+            "value": 10.814503000001423,
+            "unit": "ms",
+            "extra": "1000 price updates to random rows of a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.ticks, 1000 updates while grouped, aggregated and expanded (1000000 rows)",
+            "value": 2.312419999998383,
+            "unit": "ms",
+            "extra": "1000 price updates to random rows of a view grouped by ccy with aggregations and one group expanded. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
+          },
+          {
+            "name": "local-scale.churn on sorted view, 500 deletes + 500 inserts (1000000 rows)",
+            "value": 8.145037000002048,
+            "unit": "ms",
+            "extra": "Delete random rows and insert new ones, on a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, AMD EPYC 9V74 80-Core Processor\nhttps://github.com/heswell/vuu-websocket/actions/runs/42478175255"
           }
         ]
       }
