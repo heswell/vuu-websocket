@@ -8,6 +8,7 @@ import {
   openPortVia,
 } from "../src/browser";
 import { VuuCloseCode } from "../src/net/CloseCodes";
+import type { SendCycleStats } from "../src/net/SessionStats";
 import {
   createInstrumentsVp,
   instrumentsModule,
@@ -266,5 +267,63 @@ describe("LocalVuuServer", () => {
       ["BBB.L", "BBB"],
       ["CCC.L", "CCC"],
     ]);
+  });
+});
+
+describe("session stats and send cycles (trader upstream issue 91)", () => {
+  test("getSessionStats reports each session's outbound counters", async () => {
+    const server = await startServer();
+    const core = server.server;
+    const cycles: SendCycleStats[] = [];
+    const removeListener = core.onSendCycle((cycle) => cycles.push(cycle));
+    expect(core.sessionCount).toBe(0);
+    expect(core.getSessionStats()).toEqual([]);
+
+    const client = await connect(() => server.openPort());
+    await loadInstruments(client);
+    const { sessionId } = client.received[0];
+    expect(core.sessionCount).toBe(1);
+
+    const [stats] = core.getSessionStats();
+    const tableRows = client.received.filter(
+      ({ body }) => body.type === "TABLE_ROW",
+    );
+    expect(stats).toMatchObject({
+      sessionId,
+      queueLength: 0,
+      rowsDropped: 0,
+      messagesSent: tableRows.length,
+    });
+    // 3 rows and the viewport size
+    expect(stats.rowsSent).toBeGreaterThanOrEqual(4);
+    expect(stats.rowsQueued).toBe(stats.rowsSent + stats.rowsCoalesced);
+    expect(stats.charsSent).toBeGreaterThan(0);
+
+    // every send happened in a cycle the listener saw
+    const sum = (key: "rowsSent" | "messagesSent" | "charsSent") =>
+      cycles.reduce((total, cycle) => total + cycle[key], 0);
+    expect(sum("rowsSent")).toBe(stats.rowsSent);
+    expect(sum("messagesSent")).toBe(stats.messagesSent);
+    expect(sum("charsSent")).toBe(stats.charsSent);
+    expect(cycles.at(-1)?.sessions).toBe(1);
+    expect(cycles.every(({ durationMs }) => durationMs >= 0)).toBe(true);
+
+    removeListener();
+    const seen = cycles.length;
+    await Bun.sleep(150);
+    expect(cycles.length).toBe(seen);
+  });
+
+  test("a failing send cycle listener does not stop the others or the runner", async () => {
+    const server = await startServer();
+    let calls = 0;
+    server.server.onSendCycle(() => {
+      throw Error("boom");
+    });
+    server.server.onSendCycle(() => {
+      calls += 1;
+    });
+    await Bun.sleep(150);
+    expect(calls).toBeGreaterThanOrEqual(2);
   });
 });

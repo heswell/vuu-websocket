@@ -3,7 +3,10 @@ import { OutboundRowPublishQueue } from "../src/util/PublishQueue";
 import { ViewPortUpdate, type Viewport } from "../src/viewport/Viewport";
 import { DefaultMessageHandler } from "../src/net/ClientConnectionCreator";
 import type { Channel } from "../src/net/ws/Channel";
-import type { FlowController } from "../src/net/flowcontrol/FlowController";
+import {
+  type FlowController,
+  SendHeartbeat,
+} from "../src/net/flowcontrol/FlowController";
 import { VuuUser } from "../src/core/auths/VuuUser";
 
 const vp = (id: string) => ({ id, requestId: "req-1" }) as unknown as Viewport;
@@ -160,5 +163,91 @@ describe("DefaultMessageHandler outbound formatting", () => {
       ["U", 5, 10],
       ["SIZE", -1, 10],
     ]);
+  });
+});
+
+describe("outbound counters (trader upstream issue 91)", () => {
+  test("the queue counts entries pushed and merged into a waiting one", () => {
+    const queue = new OutboundRowPublishQueue();
+    const vp1 = vp("vp1");
+    queue.push(rowUpdate(vp1, 0, 1));
+    queue.push(rowUpdate(vp1, 0, 2));
+    queue.pushHighPriority(rowUpdate(vp1, 1, 1));
+    queue.push(sizeUpdate(vp1, 10));
+    queue.push(sizeUpdate(vp1, 11));
+    expect(queue.pushed).toBe(5);
+    expect(queue.merged).toBe(2);
+    expect(queue.length).toBe(3);
+    queue.popUpTo(10);
+    // a popped row is no longer waiting, so a new update is not merged
+    queue.push(rowUpdate(vp1, 0, 3));
+    expect(queue.pushed).toBe(6);
+    expect(queue.merged).toBe(2);
+  });
+
+  test("the session handler counts rows sent and dropped, messages, characters and heartbeats", () => {
+    const sent: string[] = [];
+    const channel = {
+      send: (msg: string) => sent.push(msg),
+    } as unknown as Channel;
+    let op: unknown = { type: "BATCHSIZE", size: 300 };
+    const flowController = {
+      process() {},
+      shouldSend: () => op,
+    } as unknown as FlowController;
+    const queue = new OutboundRowPublishQueue();
+    const handler = DefaultMessageHandler(
+      channel,
+      queue,
+      VuuUser("test"),
+      { sessionId: "s1", channelId: "c1" } as never,
+      {} as never,
+      flowController,
+      {} as never,
+      {} as never,
+    );
+    const viewport = {
+      id: "vp1",
+      requestId: "req-1",
+      size: 20,
+      range: { from: 0, to: 10 },
+    } as unknown as Viewport;
+    queue.push(rowUpdate(viewport, 1, 1));
+    queue.push(rowUpdate(viewport, 1, 2));
+    queue.push(rowUpdate(viewport, 2, 1));
+    queue.push(rowUpdate(viewport, 15, 1)); // outside the range: dropped
+    const totals = {
+      sessions: 0,
+      rowsSent: 0,
+      messagesSent: 0,
+      charsSent: 0,
+    };
+    handler.sendUpdates(totals);
+    handler.sendUpdates(totals); // nothing queued, nothing sent
+
+    op = SendHeartbeat;
+    handler.sendUpdates(totals);
+
+    const stats = handler.stats?.();
+    expect(stats).toMatchObject({
+      sessionId: "s1",
+      channelId: "c1",
+      user: "test",
+      queueLength: 0,
+      rowsQueued: 4,
+      rowsCoalesced: 1,
+      rowsSent: 2,
+      rowsDropped: 1,
+      messagesSent: 1,
+      charsSent: sent[0].length,
+      heartbeatsSent: 1,
+    });
+    expect(stats?.connectedAt).toBeLessThanOrEqual(Date.now());
+    expect(totals).toEqual({
+      sessions: 3,
+      rowsSent: 2,
+      messagesSent: 1,
+      charsSent: sent[0].length,
+    });
   });
 });

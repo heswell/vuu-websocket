@@ -29,6 +29,7 @@ import {
 import { getLogger } from "@heswell/service-utils/browser";
 import { ClientRequestError } from "./ClientRequestError";
 import { VuuCloseCode } from "./CloseCodes";
+import type { SendCycleTotals, SessionStats } from "./SessionStats";
 
 const log = getLogger("vuu.session");
 
@@ -40,7 +41,11 @@ interface InboundMessageHandler {
 }
 
 interface OutboundMessageHandler {
-  sendUpdates: () => void;
+  /**
+   * Sends the session's queued updates, adding what was sent to `totals`
+   * when given.
+   */
+  sendUpdates: (totals?: SendCycleTotals) => void;
 }
 
 export interface MessageHandler
@@ -50,6 +55,8 @@ export interface MessageHandler
    * closes its channel (with code and reason, if given). Idempotent.
    */
   close?: (code?: number, reason?: string) => void;
+  /** The session's outbound counters, see `VuuServerCore.getSessionStats`. */
+  stats?: () => SessionStats;
 }
 
 class DefaultMessageHandlerImpl implements MessageHandler {
@@ -65,6 +72,27 @@ class DefaultMessageHandlerImpl implements MessageHandler {
   ) {}
 
   #closed = false;
+  readonly #connectedAt = Date.now();
+  #rowsSent = 0;
+  #rowsDropped = 0;
+  #messagesSent = 0;
+  #charsSent = 0;
+  #heartbeatsSent = 0;
+
+  stats = (): SessionStats => ({
+    sessionId: this.session.sessionId,
+    channelId: this.session.channelId,
+    user: this.user.name,
+    connectedAt: this.#connectedAt,
+    queueLength: this.outboundQueue.length,
+    rowsQueued: this.outboundQueue.pushed,
+    rowsCoalesced: this.outboundQueue.merged,
+    rowsSent: this.#rowsSent,
+    rowsDropped: this.#rowsDropped,
+    messagesSent: this.#messagesSent,
+    charsSent: this.#charsSent,
+    heartbeatsSent: this.#heartbeatsSent,
+  });
 
   handle = async (msg: VuuClientMessage) => {
     if (this.#closed) {
@@ -108,19 +136,29 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     this.channel.close(code, reason);
   };
 
-  private sendUpdatesInternal(updates: ViewPortUpdate[], highPriority = false) {
+  private sendUpdatesInternal(
+    updates: ViewPortUpdate[],
+    totals?: SendCycleTotals,
+  ) {
     if (updates.length) {
-      // console.log(`ASYNC-SVR-OUT: Sending ${updates.length} updates`);
-
       const formatted = this.formatDataOutbound(updates);
 
       const json = JSON.stringify(
         JsonViewServerMessage("", this.session.sessionId, formatted),
       );
 
-      // console.log(`ASYNC-SVR-OUT: ${json}`);
-
       this.channel.send(json);
+
+      const rowsSent = formatted.rows.length;
+      this.#rowsSent += rowsSent;
+      this.#rowsDropped += updates.length - rowsSent;
+      this.#messagesSent += 1;
+      this.#charsSent += json.length;
+      if (totals) {
+        totals.rowsSent += rowsSent;
+        totals.messagesSent += 1;
+        totals.charsSent += json.length;
+      }
     }
   }
 
@@ -188,7 +226,8 @@ class DefaultMessageHandlerImpl implements MessageHandler {
     }
   }
 
-  sendUpdates = () => {
+  sendUpdates = (totals?: SendCycleTotals) => {
+    if (totals) totals.sessions += 1;
     const flowControllerOp = this.flowController.shouldSend();
     if (flowControllerOp === SendHeartbeat) {
       // console.log(
@@ -202,11 +241,12 @@ class DefaultMessageHandlerImpl implements MessageHandler {
         ),
       );
       this.channel.send(json);
+      this.#heartbeatsSent += 1;
     } else if (flowControllerOp === Disconnect) {
       return this.disconnect();
     } else if (flowControllerOp.type === "BATCHSIZE") {
       const updates = this.outboundQueue.popUpTo(flowControllerOp.size);
-      this.sendUpdatesInternal(updates);
+      this.sendUpdatesInternal(updates, totals);
     }
   };
 

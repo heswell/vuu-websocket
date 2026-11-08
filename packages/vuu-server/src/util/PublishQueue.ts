@@ -10,6 +10,10 @@ export abstract class PublishQueue<T> {
   abstract popUpTo(i: number): T[];
   abstract isEmpty(): boolean;
   public length = 0;
+  /** Entries pushed since the queue was created. */
+  public pushed = 0;
+  /** Pushed entries merged into one already waiting (included in pushed). */
+  public merged = 0;
 }
 
 /**
@@ -24,6 +28,7 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
   private readonly pending = new Map<object, Map<number, ViewPortUpdate>>();
 
   push(entry: ViewPortUpdate): void {
+    this.pushed += 1;
     if (!this.merge(entry)) {
       this.queue.push(entry);
       this.length += 1;
@@ -31,6 +36,7 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
   }
 
   pushHighPriority(entry: ViewPortUpdate): void {
+    this.pushed += 1;
     if (!this.merge(entry)) {
       this.highPriorityQueue.push(entry);
       this.length += 1;
@@ -55,6 +61,7 @@ export class OutboundRowPublishQueue extends PublishQueue<ViewPortUpdate> {
     existing.rowKey = entry.rowKey;
     existing.sel = entry.sel;
     existing.data = entry.data;
+    this.merged += 1;
     return true;
   }
 

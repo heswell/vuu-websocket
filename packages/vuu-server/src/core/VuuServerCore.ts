@@ -28,6 +28,11 @@ import {
 import { FlowControllerFactory } from "../net/flowcontrol/FlowController";
 import type { LoginTokenService } from "../net/auth/LoginTokenService";
 import type { LoginSuccessProvider } from "./LoginSuccessProvider";
+import {
+  type SendCycleListener,
+  SendCycleTotals,
+  type SessionStats,
+} from "../net/SessionStats";
 
 const log = getLogger("vuu.core");
 
@@ -67,6 +72,9 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
 
   protected readonly vuuServerId = crypto.randomUUID();
   protected readonly handlerFactory: ViewServerHandlerFactory;
+  readonly #sessionContainer: ClientSessionContainer;
+  readonly #sendCycleListeners = new Set<SendCycleListener>();
+  readonly #failedListeners = new WeakSet<SendCycleListener>();
 
   get providers() {
     return this.providerContainer;
@@ -90,6 +98,7 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
       maxSessionsPerUser,
       sessionLimitPolicy,
     );
+    this.#sessionContainer = sessionContainer;
 
     this.joinProvider = new JoinTableProvider();
 
@@ -132,11 +141,64 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
 
     const handlerRunner = new LifeCycleRunner(
       "sessionRunner",
-      () => sessionContainer.runOnce(),
+      this.#runSendCycle,
       SESSION_RUNNER_INTERVAL_MS,
     );
     lifecycle.apply(handlerRunner).dependsOn(this);
   }
+
+  /** Client sessions logged in now. */
+  get sessionCount() {
+    return this.#sessionContainer.sessionCount;
+  }
+
+  /**
+   * Outbound counters for every client session: queue depth, rows queued,
+   * coalesced, sent and dropped, messages and characters sent. Cheap enough
+   * to read every second; counters are cumulative, take differences for
+   * rates.
+   */
+  getSessionStats(): SessionStats[] {
+    return this.#sessionContainer.getSessionStats();
+  }
+
+  /**
+   * Calls `listener` after every session send cycle (every 60 ms) with its
+   * duration and what it sent. Cycles are only timed while a listener is
+   * registered. Returns a function that removes the listener.
+   */
+  onSendCycle(listener: SendCycleListener) {
+    this.#sendCycleListeners.add(listener);
+    return () => {
+      this.#sendCycleListeners.delete(listener);
+    };
+  }
+
+  #runSendCycle = () => {
+    if (this.#sendCycleListeners.size === 0) {
+      this.#sessionContainer.runOnce();
+      return;
+    }
+    const totals = SendCycleTotals();
+    const startTime = performance.now();
+    this.#sessionContainer.runOnce(totals);
+    const cycle = {
+      ...totals,
+      startTime,
+      durationMs: performance.now() - startTime,
+    };
+    for (const listener of this.#sendCycleListeners) {
+      try {
+        listener(cycle);
+      } catch (error) {
+        // logged once, a broken listener would otherwise log every cycle
+        if (!this.#failedListeners.has(listener)) {
+          this.#failedListeners.add(listener);
+          log.error("send cycle listener failed", error);
+        }
+      }
+    }
+  };
 
   /**
    * A handler that a transport passes client messages and channel closes to.

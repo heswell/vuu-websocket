@@ -264,6 +264,11 @@ export type {
 export type { LoginSuccessProvider } from "./core/LoginSuccessProvider";
 export { VuuUser, VuuUserWithAuthorizations } from "./core/auths/VuuUser";
 export { VuuServerCore, type VuuServerCoreConfig } from "./core/VuuServerCore";
+export type {
+  SendCycleListener,
+  SendCycleStats,
+  SessionStats,
+} from "./net/SessionStats";
 export {
   LocalLoginTokenService,
   type LocalLoginTokenServiceOptions,
