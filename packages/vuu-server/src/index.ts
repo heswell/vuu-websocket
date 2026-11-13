@@ -291,3 +291,14 @@ export {
   setServerRuntime,
 } from "./runtime/selectRuntime";
 export * from "./local";
+export {
+  EXPORT_VIEWPORT_RPC,
+  ViewportExports,
+  type ExportStats,
+  type ExportTicket,
+  type ViewportExportOptions,
+} from "./viewport/export/ViewportExports";
+export {
+  createViewportExportHttpHandler,
+  type ViewportExportHttpHandlerOptions,
+} from "./viewport/export/ViewportExportHttpHandler";

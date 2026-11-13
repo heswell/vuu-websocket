@@ -9,6 +9,7 @@ import {
   AdminRoute,
   createAdminHttpHandler,
 } from "../net/http/admin/AdminHttpHandler";
+import { createViewportExportHttpHandler } from "../viewport/export/ViewportExportHttpHandler";
 import { createNotificationAdminRoutes } from "../net/http/admin/NotificationAdminRoutes";
 import { LifecycleContainer } from "../toolbox/thread/LifecycleContainer";
 import { ViewServerModule } from "./module/VsModule";
@@ -34,6 +35,10 @@ const ConfigKeys = {
   adminPath: "vuu.admin.path",
   authPath: "vuu.auth.path",
   certPath: "vuu.certPath",
+  exportChunkRows: "vuu.export.chunkRows",
+  exportEnabled: "vuu.export.enabled",
+  exportMaxRows: "vuu.export.maxRows",
+  exportPath: "vuu.export.path",
   httpsPort: "vuu.https.port",
   keyPath: "vuu.keyPath",
   maxSessionsPerUser: "vuu.server.maxSessionsPerUser",
@@ -133,8 +138,18 @@ export function createVuuServerApplication({
       profiles: additionalAuthProfiles,
     },
   );
+  const exportPath = config.getString(ConfigKeys.exportPath, "/api/export");
+  const exportHandlers = config.getBoolean(ConfigKeys.exportEnabled, true)
+    ? [
+        createViewportExportHttpHandler(() => getServer().viewportExports, {
+          allowedOrigins,
+          path: exportPath,
+        }),
+      ]
+    : [];
   const handlers = [
     authHandler,
+    ...exportHandlers,
     ...createAdminHttpHandlers(context, additionalAdminRoutes),
     ...(additionalHttpHandlers?.(context) ?? []),
   ];
@@ -161,6 +176,13 @@ export function createVuuServerApplication({
   );
 
   server = new VuuServer(serverConfig, lifecycle, runtime);
+  const vuuServer = server;
+  vuuServer.viewportExports.configure({
+    path: exportPath,
+    baseUrl: () => vuuServer.restUrl,
+    chunkRows: config.getNumber(ConfigKeys.exportChunkRows, 2_000),
+    maxRows: config.getNumber(ConfigKeys.exportMaxRows, 2_000_000),
+  });
 
   return {
     ...context,
