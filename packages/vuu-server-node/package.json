@@ -33,7 +33,7 @@
     "@heswell/vuu-server": "^4.5.0"
   },
   "devDependencies": {
-    "@heswell/vuu-server": "^4.4.0",
+    "@heswell/vuu-server": "^4.6.0",
     "@types/ws": "^8.18.0"
   },
   "repository": {
