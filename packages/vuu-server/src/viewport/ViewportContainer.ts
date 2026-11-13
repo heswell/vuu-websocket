@@ -38,6 +38,11 @@ import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
 import { getLogger } from "@heswell/service-utils/browser";
 import {
+  EXPORT_VIEWPORT_RPC,
+  ViewportExports,
+} from "./export/ViewportExports";
+import {
+  isClientRequestError,
   ClientRequestError,
   TableNotFoundError,
   ViewportNotFoundError,
@@ -74,6 +79,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   constructor(
     private tableContainer: TableContainer,
     private providerContainer: ProviderContainer,
+    private viewportExports?: ViewportExports,
   ) {
     super();
     log.debug("create ViewportContainer");
@@ -384,6 +390,19 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     ctx: RequestContext,
   ): RpcResult | Promise<RpcResult> {
     const viewport = this.getViewportForSession(viewPortId, ctx.session);
+    if (rpcName === EXPORT_VIEWPORT_RPC && this.viewportExports) {
+      try {
+        return {
+          type: "SUCCESS_RESULT",
+          data: this.viewportExports.create(viewport, params.columns),
+        };
+      } catch (error) {
+        if (isClientRequestError(error)) {
+          return { type: "ERROR_RESULT", errorMessage: error.reason };
+        }
+        throw error;
+      }
+    }
     return viewport.viewPortDef.service.processRpcRequest(
       rpcName,
       RpcParams(params, viewport, ctx),

@@ -1,3 +1,4 @@
+import { ViewportExports } from "../viewport/export/ViewportExports";
 import { Table } from "@heswell/vuu-table";
 import { getLogger } from "@heswell/service-utils/browser";
 import { isJoinTableDef, JoinTableDef, TableDef } from "../api/TableDef";
@@ -69,6 +70,8 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
   public serverApi: CoreServerApiHandler;
   public viewPortContainer: ViewportContainer;
   public moduleContainer: ModuleContainer;
+  /** Viewport snapshots for export over HTTP (EXPORT_VIEWPORT rpc) */
+  readonly viewportExports = new ViewportExports();
 
   protected readonly vuuServerId = crypto.randomUUID();
   protected readonly handlerFactory: ViewServerHandlerFactory;
@@ -113,6 +116,7 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
     this.viewPortContainer = new ViewportContainer(
       this.tableContainer,
       this.providerContainer,
+      this.viewportExports,
     );
 
     this.moduleContainer = new ModuleContainer();
@@ -213,6 +217,7 @@ export class VuuServerCore extends DefaultLifecycleEnabled {
   }
 
   async doStop() {
+    this.viewportExports.clear();
     await this.moduleContainer.stop();
   }
 
