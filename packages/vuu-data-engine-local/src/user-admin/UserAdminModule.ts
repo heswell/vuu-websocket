@@ -10,6 +10,7 @@ import {
 import { InMemoryUserAdminStore } from "@heswell/user-admin/in-memory";
 import type { TableSchema } from "@vuu-ui/vuu-data-types";
 import {
+  type SessionTableDef,
   VuuModule,
   type RpcService,
   type ServiceHandler,
@@ -232,6 +233,7 @@ export class UserAdminModule extends VuuModule<UserAdminTableName> {
     this.store = new InMemoryUserAdminStore(snapshot);
     this.#tables = createTables();
     reconcileUserAdminTables(snapshot, this.#tables);
+    this.sessionTableDefs = this.#createSessionTableDefs();
   }
 
   get schemas(): Record<UserAdminTableName, Readonly<TableSchema>> {
@@ -300,46 +302,44 @@ export class UserAdminModule extends VuuModule<UserAdminTableName> {
     reconcileUserAdminTables(await this.store.snapshot(), this.#tables);
   }
 
-  protected override createSessionTable(
-    sourceTable: Table,
-    sessionTableName: string,
-    editSessionMode:
-      | import("@vuu-ui/vuu-data-types").EditSessionMode
-      | import("@vuu-ui/vuu-data-types").CopyOption,
-    dataSource: import("../ModuleDataSource").ModuleDataSource,
-    sessionType?: import("@vuu-ui/vuu-data-types").SessionType,
-  ) {
-    const sessionTable = super.createSessionTable(
-      sourceTable,
-      sessionTableName,
-      editSessionMode,
-      dataSource,
-      sessionType,
-    );
-    const extraColumns =
-      sourceTable.name === "users"
-        ? [{ name: "permissions", serverDataType: "string" as const }]
-        : sourceTable.name === "groups"
-          ? [
-              { name: "group_name", serverDataType: "string" as const },
-              { name: "role_assignments", serverDataType: "string" as const },
-            ]
-          : [];
-    const columnsToAdd = extraColumns.filter(
-      ({ name }) =>
-        !sessionTable.schema.columns.some((column) => column.name === name),
-    );
-    if (columnsToAdd.length === 0) return sessionTable;
+  protected editableTables: readonly UserAdminTableName[] = [
+    "clients",
+    "groups",
+    "roles",
+    "users",
+  ];
 
-    const sessionSchema = {
-      ...sessionTable.schema,
-      columns: sessionTable.schema.columns.concat(columnsToAdd),
+  /**
+   * Edit session blueprints, `edit-<table>`: the table's columns plus the
+   * session-only columns the user admin UI edits (users: permissions,
+   * groups: group_name and role_assignments). Set in the constructor.
+   */
+  protected sessionTableDefs: Record<string, SessionTableDef> = {};
+
+  #createSessionTableDefs(): Record<string, SessionTableDef> {
+    const services = this.services.users;
+    const sessionColumns: Partial<
+      Record<UserAdminTableName, TableSchema["columns"]>
+    > = {
+      users: [{ name: "permissions", serverDataType: "string" }],
+      groups: [
+        { name: "group_name", serverDataType: "string" },
+        { name: "role_assignments", serverDataType: "string" },
+      ],
     };
-    return new Table(
-      sessionSchema,
-      sessionTable.data.map((row) => row.concat(columnsToAdd.map(() => ""))),
-      buildDataColumnMapFromSchema(sessionSchema),
-    );
+    const sessionTableDefs: Record<string, SessionTableDef> = {};
+    for (const tableName of this.editableTables) {
+      const { columns, key } = schema[tableName];
+      const extraColumns = (sessionColumns[tableName] ?? []).filter(
+        ({ name }) => !columns.some((column) => column.name === name),
+      );
+      sessionTableDefs[`edit-${tableName}`] = {
+        columns: [...columns, ...extraColumns],
+        key,
+        services,
+      };
+    }
+    return sessionTableDefs;
   }
 
   protected override async beforeSessionSave(

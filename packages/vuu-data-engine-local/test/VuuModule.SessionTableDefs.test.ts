@@ -335,3 +335,87 @@ describe("VuuModule session table blueprints", () => {
     expect(blueprintCalls).toEqual(["validate:edit-items", "endEditSession"]);
   });
 });
+
+describe("VuuModule beginEditSession backward compatibility", () => {
+  const beginEditSession = (
+    ds: TickingArrayDataSource,
+    params: Record<string, unknown> = {},
+  ) =>
+    ds.rpcRequest({
+      type: "RPC_REQUEST",
+      rpcName: "beginEditSession",
+      params: { editSessionMode: "all-rows", ...params },
+    } as never) as Promise<RpcResult>;
+
+  it("works without a blueprint or editableTables, using the source table's services and hooks", async () => {
+    const calls: string[] = [];
+    class Legacy extends BlueprintModule {
+      protected services: Record<"items", RpcService[] | undefined> = {
+        items: [
+          {
+            rpcName: "endEditSession",
+            service: async () => {
+              calls.push("source endEditSession");
+              return { type: "SUCCESS_RESULT", data: undefined };
+            },
+          },
+        ],
+      };
+      protected editHooks = {
+        items: {
+          validateCellEdit: () => {
+            calls.push("source validateCellEdit");
+          },
+        },
+      };
+    }
+    const module = new Legacy({ editable: false, sessionTableDefs: {} });
+    const result = await beginEditSession(sourceDataSource(module));
+    expect(result).toMatchObject({
+      type: "SUCCESS_RESULT",
+      data: { renderComponent: "inline-form" },
+    });
+    const name = sessionTableName(result);
+    const sessionTable = module.session(name);
+    expect(sessionTable.data.map((row) => row.slice(0, 3))).toEqual([
+      ["A", "Alpha", 1.5],
+      ["B", "Beta", 2.5],
+    ]);
+
+    const session = module.createDataSource(name as "items", name, {
+      columns: ["id", "name"],
+    } as DataSourceConfig) as TickingArrayDataSource;
+    await session.editCell("A", "name", "edited");
+    await session.undoRowChange?.("A");
+    expect(sessionTable.findByKey("A")?.[1]).toBe("Alpha");
+    await session.endEditSession?.(true);
+    expect(calls).toEqual(["source validateCellEdit", "source endEditSession"]);
+  });
+
+  it("saves a legacy session to the source table", async () => {
+    const module = new BlueprintModule({ editable: false, sessionTableDefs: {} });
+    const name = sessionTableName(
+      await beginEditSession(sourceDataSource(module)),
+    );
+    const session = module.createDataSource(name as "items", name, {
+      columns: ["id", "name"],
+    } as DataSourceConfig) as TickingArrayDataSource;
+    await session.editCell("A", "name", "Alpha edited");
+    await session.endEditSession?.(true);
+    expect(module.items.findByKey("A")?.slice(0, 3)).toEqual([
+      "A",
+      "Alpha edited",
+      1.5,
+    ]);
+  });
+
+  it("with a sessionTableName it uses that blueprint", async () => {
+    const module = new BlueprintModule({ editable: true });
+    const ds = sourceDataSource(module);
+    expect(
+      await beginEditSession(ds, { sessionTableName: "missing" }),
+    ).toEqual(error("session table missing is not defined"));
+    const result = await beginEditSession(ds, { sessionTableName: "edit-items" });
+    expect(result).toMatchObject({ type: "SUCCESS_RESULT" });
+  });
+});
