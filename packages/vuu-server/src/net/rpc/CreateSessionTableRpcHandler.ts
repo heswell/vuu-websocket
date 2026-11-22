@@ -89,12 +89,11 @@ class CreateSessionTableError extends Error {}
  * Viewports on the session table use the blueprint's ServiceFactory, so the
  * blueprint's RpcHandler serves the edit RPCs and endEditSession.
  *
- * Also registers beginEditSession, the legacy UI API. For backward
- * compatibility, without a `sessionTableName` it works as it always has: the
- * session table is derived from the source table's definition (no blueprint
- * and no `editable` flag are needed) and viewports on it use the source
- * table's service. With a `sessionTableName` it is createSessionTable with
- * sessionType "edit".
+ * Also registers beginEditSession, the legacy UI API, kept only for backward
+ * compatibility. It works as it always has: the session table is derived
+ * from the source table's definition (no blueprint and no `editable` flag are
+ * needed) and viewports on it use the source table's service. It does not
+ * support session table blueprints, use createSessionTable for those.
  */
 export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
   /** Maximum number of rows copied into a session table. */
@@ -117,25 +116,13 @@ export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
     viewport,
     ctx,
   }: RpcParams): RpcResult => {
-    const {
-      editSessionMode = "inline-all-rows",
-      sessionTableName,
-      columnsToCopy,
-    } = namedParams as {
+    const { editSessionMode = "inline-all-rows" } = namedParams as {
       editSessionMode?: EditSessionMode;
-    } & Pick<CreateSessionTableParams, "columnsToCopy" | "sessionTableName">;
+    };
     const copyOption = editSessionModeToCopyOption(editSessionMode);
     if (copyOption === undefined) {
       return errorResult(
         `createSessionTable: invalid copyOption ${editSessionMode}`,
-      );
-    }
-    if (typeof sessionTableName === "string" && sessionTableName !== "") {
-      return this.createSessionTableResult(
-        viewport,
-        "edit",
-        { copyOption, sessionTableName, columnsToCopy },
-        ctx,
       );
     }
     try {
@@ -148,8 +135,8 @@ export class CreateSessionTableRpcHandler extends EndEditSessionRpcHandler {
   };
 
   /**
-   * Columns added to a session table created by the legacy beginEditSession
-   * (without a sessionTableName). Default none.
+   * Columns added to a session table created by the legacy beginEditSession.
+   * Default none.
    * @deprecated define the columns on a session table blueprint instead.
    */
   protected getSessionTableCustomColumns(_sourceTable: DataTable): Column[] {

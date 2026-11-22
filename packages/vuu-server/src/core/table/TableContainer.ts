@@ -87,7 +87,7 @@ export class TableContainer {
 
   /**
    * Create a session table from the source table's own definition, as the
-   * legacy beginEditSession (without a sessionTableName) does. No blueprint
+   * legacy beginEditSession does. No blueprint
    * is needed.
    */
   createLegacySessionTable(

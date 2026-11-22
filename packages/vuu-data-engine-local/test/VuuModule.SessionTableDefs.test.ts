@@ -409,13 +409,16 @@ describe("VuuModule beginEditSession backward compatibility", () => {
     ]);
   });
 
-  it("with a sessionTableName it uses that blueprint", async () => {
+  it("ignores sessionTableName, blueprints are not used", async () => {
     const module = new BlueprintModule({ editable: true });
-    const ds = sourceDataSource(module);
-    expect(
-      await beginEditSession(ds, { sessionTableName: "missing" }),
-    ).toEqual(error("session table missing is not defined"));
-    const result = await beginEditSession(ds, { sessionTableName: "edit-items" });
+    const result = await beginEditSession(sourceDataSource(module), {
+      sessionTableName: "missing",
+    });
     expect(result).toMatchObject({ type: "SUCCESS_RESULT" });
+    const name = sessionTableName(result);
+    expect(module.session(name).data.map((row) => row.slice(0, 3))).toEqual([
+      ["A", "Alpha", 1.5],
+      ["B", "Beta", 2.5],
+    ]);
   });
 });

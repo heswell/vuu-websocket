@@ -120,11 +120,11 @@ class OrdersModule extends VuuModule<"orders"> {
 - **Services and hooks.** A viewport on the session table uses the blueprint's `services`,
   `menuServices`, `menu` and `editHooks`, not those of the source table.
   `EditContext.sessionTableDefName` names the blueprint.
-- **`beginEditSession` is backward compatible.** Without a `sessionTableName` it works as it
-  always has: the session table is created from the source table's schema by the protected
+- **`beginEditSession` is kept only for backward compatibility.** It works as it always has:
+  the session table is created from the source table's schema by the protected
   `createSessionTable` method (deprecated), no blueprint or `editableTables` entry is needed,
-  and the source table's services and edit hooks apply to it. With a `sessionTableName` it is
-  `createSessionTable` with `sessionType: "edit"`.
+  and the source table's services and edit hooks apply to it. It does not support blueprints;
+  use `createSessionTable` for those.
 
 ### Edit sessions: hooks and service overrides
 

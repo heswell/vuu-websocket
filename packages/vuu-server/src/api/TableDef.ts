@@ -136,8 +136,8 @@ export const toSessionTableInstanceDef = (
 };
 
 /**
- * Definition of a session table created by the legacy beginEditSession
- * (without a sessionTableName): the source table's definition, keeping its
+ * Definition of a session table created by the legacy beginEditSession:
+ * the source table's definition, keeping its
  * name, plus customColumns, the session message column (vuuMsg) and
  * vuuAction. Viewports on such a session table use the source table's
  * ServiceFactory.

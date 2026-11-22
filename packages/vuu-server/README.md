@@ -559,12 +559,12 @@ ModuleFactory.withNameSpace("ORDERS")
   `editCell`, `addRow`, `endEditSession` and the other hooks below are served
   by the blueprint's handler. The session table keeps a reference to its
   `sourceTable`, and saves go there.
-- `beginEditSession` (the legacy UI API) is backward compatible. Without a
-  `sessionTableName` it works as it always has: the session table is derived
+- `beginEditSession` (the legacy UI API) is kept only for backward
+  compatibility and works as it always has: the session table is derived
   from the source table's definition (plus any `getSessionTableCustomColumns`),
   no blueprint or `editable` flag is needed, and viewports on it use the
-  source table's service. With a `sessionTableName` it is `createSessionTable`
-  with `sessionType: "edit"` (`editSessionMode` maps to a `copyOption`).
+  source table's service. It does not support blueprints; use
+  `createSessionTable` for those.
 
 ### Secure defaults
 

@@ -639,7 +639,7 @@ describe("beginEditSession backward compatibility", () => {
     );
   });
 
-  test("with a sessionTableName it uses that blueprint", () => {
+  test("ignores sessionTableName, blueprints are not used", () => {
     const { addBlueprint, baseTable, handler, tableContainer } = testContext();
     addBlueprint(
       "notes-items",
@@ -652,15 +652,10 @@ describe("beginEditSession backward compatibility", () => {
         sessionTableName: "notes-items",
       }),
     );
-    expect(sessionTable.name).toContain("/simple-notes-items_");
-    expect(
-      call(handler, "beginEditSession", baseTable, {
-        sessionTableName: "missing",
-      }),
-    ).toEqual({
-      type: "ERROR_RESULT",
-      errorMessage: "session table missing is not defined",
-    });
+    expect(sessionTable.name).toContain("/simple-items_");
+    expect(sessionTable.schema.columns.map(({ name }) => name)).not.toContain(
+      "note",
+    );
   });
 });
 

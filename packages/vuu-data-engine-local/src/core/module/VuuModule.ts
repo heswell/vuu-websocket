@@ -203,21 +203,6 @@ const isSessionType = (value: unknown): value is SessionType =>
 const isCopyOption = (value: unknown): value is CopyOption =>
   COPY_OPTIONS.includes(value as CopyOption);
 
-const editSessionModeToCopyOption = (
-  editSessionMode: EditSessionMode | string,
-): CopyOption | undefined => {
-  switch (editSessionMode) {
-    case "inline-all-rows":
-    case "all-rows":
-      return "All";
-    case "selected-rows":
-      return "Selected";
-    case "empty-session-table":
-    case "no-rows":
-      return "Empty";
-  }
-};
-
 export type VuuModuleOptions = {
   /** Column written by session services (deleteRow, endEditSession) to report row-level status.
    *  Defaults to `"vuuMsg"` which matches the column added by `sessionTableSchema`. */
@@ -1233,45 +1218,18 @@ export abstract class VuuModule<
   };
 
   /**
-   * The legacy UI API. For backward compatibility, without a
-   * `sessionTableName` it works as it always has: the session table is
-   * created from the source table's schema (see createSessionTable), no
-   * blueprint or editableTables entry is needed, and the source table's
-   * services and edit hooks apply to it. With a `sessionTableName` it is
-   * createSessionTable with sessionType "edit".
+   * The legacy UI API, kept only for backward compatibility. It works as it
+   * always has: the session table is created from the source table's schema
+   * (see createSessionTable), no blueprint or editableTables entry is
+   * needed, and the source table's services and edit hooks apply to it. It
+   * does not support session table blueprints, use createSessionTable.
    */
   private beginEditSession: ServiceHandler = async (rpcRequest) => {
     if (isBeginEditSessionRpcRequest(rpcRequest)) {
       const { viewPortId } = rpcRequest.context;
-      const {
-        editSessionMode = "inline-all-rows",
-        sessionTableName,
-        columnsToCopy,
-      } = rpcRequest.params as {
+      const { editSessionMode = "inline-all-rows" } = rpcRequest.params as {
         editSessionMode?: EditSessionMode;
-      } & Pick<CreateSessionTableParams, "columnsToCopy" | "sessionTableName">;
-
-      if (typeof sessionTableName === "string" && sessionTableName !== "") {
-        const copyOption = editSessionModeToCopyOption(editSessionMode);
-        if (copyOption === undefined) {
-          return errorResult(
-            `beginEditSession: invalid editSessionMode ${editSessionMode}`,
-          );
-        }
-        try {
-          const table = this.#createSession(viewPortId, "edit", {
-            copyOption,
-            sessionTableName,
-            columnsToCopy,
-          });
-          return {
-            data: { renderComponent: "inline-form", table },
-            type: "SUCCESS_RESULT",
-          };
-        } catch (e) {
-          return errorResult((e as Error).message);
-        }
-      }
+      };
 
       const subscription = this.getSubscriptionByViewport(viewPortId);
       const { dataSource } = subscription;
