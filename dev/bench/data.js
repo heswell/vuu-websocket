@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795358823442,
+  "lastUpdate": 1795366183208,
   "repoUrl": "https://github.com/heswell/vuu-websocket",
   "entries": {
     "Vuu performance": [
@@ -17360,6 +17360,708 @@ window.BENCHMARK_DATA = {
             "value": 11.055285999998887,
             "unit": "ms",
             "extra": "Delete random rows and insert new ones, on a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) 6975P-C\nhttps://github.com/heswell/vuu-websocket/actions/runs/45034178086"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "steve@heswell.com",
+            "name": "heswell",
+            "username": "heswell"
+          },
+          "committer": {
+            "email": "steve@heswell.com",
+            "name": "heswell",
+            "username": "heswell"
+          },
+          "distinct": true,
+          "id": "6c40f1e067c98df2645463909ba8c5c05faf922c",
+          "message": "Fix demo start scripts: use VUU_WEBSOCKET_PORT and set VUU_APP\n\nThe demo config reads vuu.websocket.port from VUU_WEBSOCKET_PORT, but the\nstart:demo, start:demo:2, debug:demo and start scripts set WEBSOCKET_PORT,\nwhich nothing reads. start also called \"npm start:all\" instead of\n\"npm run start:all\".\n\nstart-all.ts spawned start-demo.ts without VUU_APP, so ConfigFactory could\nnot choose among the application.conf files under the repo root. It now\npasses VUU_APP=vuu-demo to the demo process unless VUU_APP is already set.",
+          "timestamp": "2026-11-22T16:41:04Z",
+          "tree_id": "77cc63d842c99585da08f22328d3e8c241ca3353",
+          "url": "https://github.com/heswell/vuu-websocket/commit/6c40f1e067c98df2645463909ba8c5c05faf922c"
+        },
+        "date": 1795366182501,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "refdata.load.time",
+            "value": 554.9,
+            "unit": "ms",
+            "extra": "load 228488 instruments from ndjson\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "refdata.snapshot.time",
+            "value": 250.6,
+            "unit": "ms",
+            "extra": "time to receive the instruments snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "refdata.snapshot.messages",
+            "value": 230,
+            "unit": "msgs",
+            "extra": "websocket messages for the instruments snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "refdata.snapshot.bytesPerRow",
+            "value": 98,
+            "unit": "B",
+            "extra": "instruments snapshot bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "prices.startToSnapshot.time",
+            "value": 688.2,
+            "unit": "ms",
+            "extra": "price service start to subscriber holding the full prices snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "prices.snapshot.bytesPerRow",
+            "value": 69.7,
+            "unit": "B",
+            "extra": "prices snapshot bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "prices.generate.time",
+            "value": 63.7,
+            "unit": "ms",
+            "extra": "generate 100000 price updates\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "prices.flush.time",
+            "value": 47.9,
+            "unit": "ms",
+            "extra": "flush after 100000 price updates\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "prices.updates.bytesPerRow",
+            "value": 70.6,
+            "unit": "B",
+            "extra": "live price update bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "orders.startToSnapshot.time",
+            "value": 258.6,
+            "unit": "ms",
+            "extra": "orders service start to subscriber holding 10000 orders\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "orders.snapshot.bytesPerRow",
+            "value": 173.5,
+            "unit": "B",
+            "extra": "orders snapshot bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "orders.create.time",
+            "value": 18.5,
+            "unit": "ms",
+            "extra": "create 10000 orders\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.snapshot.time",
+            "value": 176.3,
+            "unit": "ms",
+            "extra": "time to receive a 200000 row snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.snapshot.messages",
+            "value": 201,
+            "unit": "msgs",
+            "extra": "websocket messages for the snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.snapshot.bytesPerRow",
+            "value": 64.4,
+            "unit": "B",
+            "extra": "snapshot bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "subscription.replicate.time",
+            "value": 303.9,
+            "unit": "ms",
+            "extra": "time to replicate 200000 rows into a local table\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.ingest.timePer100k",
+            "value": 36.5,
+            "unit": "ms",
+            "extra": "table mutation cost with a live subscriber\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.flush.time",
+            "value": 5.4,
+            "unit": "ms",
+            "extra": "flush (serialize + send) after 200000 updates\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.updates.rowsSent",
+            "value": 20000,
+            "unit": "rows",
+            "extra": "rows sent for 200000 updates to 20000 rows\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.updates.bytesPerRow",
+            "value": 73.6,
+            "unit": "B",
+            "extra": "live update bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.fanout.flushTime",
+            "value": 5.8,
+            "unit": "ms",
+            "extra": "flush 20000 updated rows to 50 subscribers\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.fanout.serializations",
+            "value": 4,
+            "unit": "msgs",
+            "extra": "distinct messages serialized for the fan out\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.idle.ingestTimePer100k",
+            "value": 29.9,
+            "unit": "ms",
+            "extra": "table mutation cost with no subscribers\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "publisher.idle.backlogRows",
+            "value": 0,
+            "unit": "rows",
+            "extra": "update rows replayed to a late subscriber\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "compressed.refdata.snapshot.time",
+            "value": 684.7,
+            "unit": "ms",
+            "extra": "time to receive the compressed instruments snapshot\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "compressed.refdata.snapshot.wireBytesPerRow",
+            "value": 14.1,
+            "unit": "B",
+            "extra": "compressed instruments snapshot wire bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "compressed.prices.snapshot.wireBytesPerRow",
+            "value": 18.7,
+            "unit": "B",
+            "extra": "compressed prices snapshot wire bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "compressed.prices.flush.time",
+            "value": 22.9,
+            "unit": "ms",
+            "extra": "flush 10000 price updates with compression\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "compressed.prices.updates.wireBytesPerRow",
+            "value": 20.7,
+            "unit": "B",
+            "extra": "compressed live price update wire bytes per row\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).time",
+            "value": 9.100617999999997,
+            "unit": "ms",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).messages",
+            "value": 100,
+            "unit": "msgs",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).rows",
+            "value": 10000,
+            "unit": "rows",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 1 flush per send (x100).bytes",
+            "value": 2831716,
+            "unit": "B",
+            "extra": "tick 100 in-viewport rows, 1 flush per send (x100), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).time",
+            "value": 2.485916999999972,
+            "unit": "ms",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).messages",
+            "value": 10,
+            "unit": "msgs",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).rows",
+            "value": 1000,
+            "unit": "rows",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.tick 100 in-viewport rows, 10 flushes per send (x10).bytes",
+            "value": 283209,
+            "unit": "B",
+            "extra": "tick 100 in-viewport rows, 10 flushes per send (x10), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).time",
+            "value": 30.91916600000002,
+            "unit": "ms",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).messages",
+            "value": 400,
+            "unit": "msgs",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).rows",
+            "value": 7620,
+            "unit": "rows",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.20 sessions, tick 1000 random + 20 visible rows (x20).bytes",
+            "value": 2210989,
+            "unit": "B",
+            "extra": "20 sessions, tick 1000 random + 20 visible rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).time",
+            "value": 43.06623000000013,
+            "unit": "ms",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).messages",
+            "value": 19,
+            "unit": "msgs",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).rows",
+            "value": 1059,
+            "unit": "rows",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.sorted by price, tick 1000 random rows (x20).bytes",
+            "value": 302363,
+            "unit": "B",
+            "extra": "sorted by price, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).time",
+            "value": 7.301218000000063,
+            "unit": "ms",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).messages",
+            "value": 0,
+            "unit": "msgs",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).rows",
+            "value": 0,
+            "unit": "rows",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.grouped by ccy,trader, tick 1000 random rows (x20).bytes",
+            "value": 0,
+            "unit": "B",
+            "extra": "grouped by ccy,trader, tick 1000 random rows (x20), 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.time",
+            "value": 11.628034999999954,
+            "unit": "ms",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.messages",
+            "value": 100,
+            "unit": "msgs",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.rows",
+            "value": 10000,
+            "unit": "rows",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "outbound.100000.scroll 100-row window x100.bytes",
+            "value": 2868681,
+            "unit": "B",
+            "extra": "scroll 100-row window x100, 100000 table rows, 5 iterations (+1 warmup)\nBun 1.3.14, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nTiming samples: 5 where supported\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > create + subscribe (100000 rows) / legacy TickingArrayDataSource",
+            "value": 54.940978799999996,
+            "range": "24.14% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > create + subscribe (100000 rows) / engine ModuleDataSource",
+            "value": 20.681285000000024,
+            "range": "5.93% RME",
+            "unit": "ms",
+            "extra": "Mean of 25 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort numeric column, toggle asc/desc (100000 rows) / legacy TickingArrayDataSource",
+            "value": 124.75558320000009,
+            "range": "8.07% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort numeric column, toggle asc/desc (100000 rows) / engine ModuleDataSource",
+            "value": 24.117200857142702,
+            "range": "5.88% RME",
+            "unit": "ms",
+            "extra": "Mean of 21 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort two columns (100000 rows) / legacy TickingArrayDataSource",
+            "value": 103.93483149999993,
+            "range": "16.03% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > sort two columns (100000 rows) / engine ModuleDataSource",
+            "value": 30.620956294117658,
+            "range": "7.86% RME",
+            "unit": "ms",
+            "extra": "Mean of 17 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > filter, alternating (100000 rows) / legacy TickingArrayDataSource",
+            "value": 9.386424648148157,
+            "range": "11.49% RME",
+            "unit": "ms",
+            "extra": "Mean of 54 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > filter, alternating (100000 rows) / engine ModuleDataSource",
+            "value": 1.925132423076964,
+            "range": "0.83% RME",
+            "unit": "ms",
+            "extra": "Mean of 260 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2.425722835748797,
+            "range": "14.28% RME",
+            "unit": "ms",
+            "extra": "Mean of 207 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 2.000006517928341,
+            "range": "13.21% RME",
+            "unit": "ms",
+            "extra": "Mean of 251 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 4.15497466942143,
+            "range": "18.81% RME",
+            "unit": "ms",
+            "extra": "Mean of 121 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 3.8056465187968627,
+            "range": "19.02% RME",
+            "unit": "ms",
+            "extra": "Mean of 133 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > scroll, 100 range changes (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1.3038231458332916,
+            "range": "6.72% RME",
+            "unit": "ms",
+            "extra": "Mean of 384 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > scroll, 100 range changes (100000 rows) / engine ModuleDataSource",
+            "value": 0.803890483922824,
+            "range": "3.62% RME",
+            "unit": "ms",
+            "extra": "Mean of 622 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to random rows (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2540.7256614000007,
+            "range": "5.68% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to random rows (100000 rows) / engine ModuleDataSource",
+            "value": 0.5807720348431027,
+            "range": "10.40% RME",
+            "unit": "ms",
+            "extra": "Mean of 861 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to rows in viewport (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1.1344210068025264,
+            "range": "12.76% RME",
+            "unit": "ms",
+            "extra": "Mean of 441 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates to rows in viewport (100000 rows) / engine ModuleDataSource",
+            "value": 0.13954022070310707,
+            "range": "3.52% RME",
+            "unit": "ms",
+            "extra": "Mean of 3584 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on sorted column (100000 rows) / legacy TickingArrayDataSource",
+            "value": 6824.285638299999,
+            "range": "7.48% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on sorted column (100000 rows) / engine ModuleDataSource",
+            "value": 3.54386636619698,
+            "range": "7.13% RME",
+            "unit": "ms",
+            "extra": "Mean of 142 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on filtered column (100000 rows) / legacy TickingArrayDataSource",
+            "value": 3738.6814446000035,
+            "range": "10.11% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates on filtered column (100000 rows) / engine ModuleDataSource",
+            "value": 0.9017018360355323,
+            "range": "8.52% RME",
+            "unit": "ms",
+            "extra": "Mean of 555 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2345.2377857000074,
+            "range": "10.79% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped (100000 rows) / engine ModuleDataSource",
+            "value": 0.6897105048275713,
+            "range": "9.64% RME",
+            "unit": "ms",
+            "extra": "Mean of 725 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn, 500 deletes + 500 inserts (100000 rows) / legacy TickingArrayDataSource",
+            "value": 3015.2203582000016,
+            "range": "7.45% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn, 500 deletes + 500 inserts (100000 rows) / engine ModuleDataSource",
+            "value": 1.1402777403193698,
+            "range": "8.35% RME",
+            "unit": "ms",
+            "extra": "Mean of 439 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn on sorted view, 500 deletes + 500 inserts (100000 rows) / legacy TickingArrayDataSource",
+            "value": 4314.557710200007,
+            "range": "3.60% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > churn on sorted view, 500 deletes + 500 inserts (100000 rows) / engine ModuleDataSource",
+            "value": 2.9421266666661174,
+            "range": "9.29% RME",
+            "unit": "ms",
+            "extra": "Mean of 171 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > aggregations on ccy groups, switch sets (100000 rows) / legacy TickingArrayDataSource",
+            "value": 3.6350195144912214,
+            "range": "20.35% RME",
+            "unit": "ms",
+            "extra": "Mean of 138 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > aggregations on ccy groups, switch sets (100000 rows) / engine ModuleDataSource",
+            "value": 5.884097581394937,
+            "range": "8.15% RME",
+            "unit": "ms",
+            "extra": "Mean of 86 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange with aggregations, set/clear (100000 rows) / legacy TickingArrayDataSource",
+            "value": 4.235262310928705,
+            "range": "18.45% RME",
+            "unit": "ms",
+            "extra": "Mean of 119 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > groupBy ccy + exchange with aggregations, set/clear (100000 rows) / engine ModuleDataSource",
+            "value": 5.055275848479894,
+            "range": "20.48% RME",
+            "unit": "ms",
+            "extra": "Mean of 99 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > expand/collapse one ccy group (100000 rows) / legacy TickingArrayDataSource",
+            "value": 1803.9196024999897,
+            "range": "75.39% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > expand/collapse one ccy group (100000 rows) / engine ModuleDataSource",
+            "value": 0.043559109242829526,
+            "range": "4.43% RME",
+            "unit": "ms",
+            "extra": "Mean of 11479 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped, aggregated and expanded (100000 rows) / legacy TickingArrayDataSource",
+            "value": 2600.8611757000035,
+            "range": "11.24% RME",
+            "unit": "ms",
+            "extra": "Mean of 10 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local.bench/datasource.bench.ts > ticks, 1000 updates while grouped, aggregated and expanded (100000 rows) / engine ModuleDataSource",
+            "value": 0.935894022430685,
+            "range": "10.89% RME",
+            "unit": "ms",
+            "extra": "Mean of 535 samples, Node v24.16.0\nlinux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.heap: source row arrays (1000000 rows)",
+            "value": 182.1812973022461,
+            "unit": "MB",
+            "extra": "The generated row arrays alone, before any table is built (context for the table figure)\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.heap: table (1000000 rows)",
+            "value": 222.47396850585938,
+            "unit": "MB",
+            "extra": "An engine Table holding every row, with its key index (the source array released)\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.heap: sorted data source (1000000 rows)",
+            "value": 0.1847381591796875,
+            "unit": "MB",
+            "extra": "A subscribed data source sorted on price, over the shared table\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.heap: grouped data source (1000000 rows)",
+            "value": 16.067306518554688,
+            "unit": "MB",
+            "extra": "A subscribed data source grouped by ccy + exchange, with four aggregations and every ccy group expanded\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.build table (1000000 rows)",
+            "value": 387.56665500000054,
+            "unit": "ms",
+            "extra": "Create an engine Table from pre-generated row arrays. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.create + subscribe (1000000 rows)",
+            "value": 7.571705999999722,
+            "unit": "ms",
+            "extra": "Create a ModuleDataSource over the table and subscribe a 50 row viewport. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.sort numeric column, toggle asc/desc (1000000 rows)",
+            "value": 339.05413099999987,
+            "unit": "ms",
+            "extra": "Sort on price, alternating ascending and descending. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.sort two columns (1000000 rows)",
+            "value": 646.5418030000001,
+            "unit": "ms",
+            "extra": "Sort on ccy then qty, alternating the qty direction. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.filter, alternating (1000000 rows)",
+            "value": 24.400494000001345,
+            "unit": "ms",
+            "extra": "Alternate between two filters. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.groupBy ccy (1000000 rows)",
+            "value": 54.45190300000104,
+            "unit": "ms",
+            "extra": "Group by ccy (cleared, untimed, before each run). Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.groupBy ccy + exchange with aggregations (1000000 rows)",
+            "value": 101.51515499999914,
+            "unit": "ms",
+            "extra": "Group by ccy and exchange with four aggregations set (cleared, untimed, before each run). Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.aggregations on ccy groups, switch sets (1000000 rows)",
+            "value": 71.91856199999893,
+            "unit": "ms",
+            "extra": "Switch between two aggregation sets on a data source grouped by ccy. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.expand/collapse one ccy group (1000000 rows)",
+            "value": 7.3940700000002835,
+            "unit": "ms",
+            "extra": "Open the first ccy group, then close it. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.expand all ccy + exchange groups, then collapse all (1000000 rows)",
+            "value": 832.4472830000013,
+            "unit": "ms",
+            "extra": "Open all 8 ccy groups and the 48 exchange groups within them, then close them all. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.scroll, 100 range changes (1000000 rows)",
+            "value": 1.1654080000007525,
+            "unit": "ms",
+            "extra": "Move a 50 row viewport through the table in 100 steps. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.ticks, 1000 updates on sorted column (1000000 rows)",
+            "value": 15.739170999997441,
+            "unit": "ms",
+            "extra": "1000 price updates to random rows of a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.ticks, 1000 updates while grouped, aggregated and expanded (1000000 rows)",
+            "value": 2.3923180000019784,
+            "unit": "ms",
+            "extra": "1000 price updates to random rows of a view grouped by ccy with aggregations and one group expanded. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
+          },
+          {
+            "name": "local-scale.churn on sorted view, 500 deletes + 500 inserts (1000000 rows)",
+            "value": 13.604722000000038,
+            "unit": "ms",
+            "extra": "Delete random rows and insert new ones, on a view sorted on price. Median of 5 runs.\nNode v24.16.0, linux-x64, Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz\nhttps://github.com/heswell/vuu-websocket/actions/runs/45045226756"
           }
         ]
       }
