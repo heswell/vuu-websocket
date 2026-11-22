@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Table } from "@heswell/vuu-table";
 import { RemoteTableSubscription } from "../../service-utils/src/publisher";
 import { TestRemoteResourceSocket } from "../../service-utils/__tests__/TestRemoteResourceSocket";
-import { TableDef } from "../src/api/TableDef";
+import { SessionTableDef, TableDef } from "../src/api/TableDef";
 import { VuuServer } from "../src/core/VuuServer";
 import {
   VuuServerConfig,
@@ -23,6 +23,13 @@ const tableDef = (name: string) =>
   TableDef({
     columns: [{ name: "id", dataType: "string" }],
     joinFields: "id",
+    keyField: "id",
+    name,
+  });
+
+const sessionTableDef = (name: string) =>
+  SessionTableDef({
+    columns: [{ name: "id", dataType: "string" }],
     keyField: "id",
     name,
   });
@@ -114,8 +121,8 @@ describe("VuuServer lifecycle", () => {
   test("creates independent null providers for session tables", () => {
     const lifecycle = new LifecycleContainer();
     const module = ModuleFactory.withNameSpace("NULL_PROVIDER_IDENTITY")
-      .addSessionTable(tableDef("session-one"))
-      .addSessionTable(tableDef("session-two"))
+      .addSessionTable(sessionTableDef("session-one"))
+      .addSessionTable(sessionTableDef("session-two"))
       .asModule();
     const server = new VuuServer(serverConfig(module), lifecycle);
 

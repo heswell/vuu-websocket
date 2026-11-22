@@ -510,6 +510,62 @@ as the `action` of `VIEW_PORT_MENU_RESP`:
 owned by the requesting client session. Edits are made to the session table
 and applied to the source table when the session is saved.
 
+### Session table blueprints
+
+As in Scala Vuu, a session table is an instance of a session table
+*blueprint* that a module registers with `addSessionTable`. There is no
+fallback: if no blueprint is registered under the requested name,
+`createSessionTable` fails. A module can register any number of blueprints,
+and each one can have its own columns, key and `ServiceFactory`.
+
+```ts
+ModuleFactory.withNameSpace("ORDERS")
+  .addTable(
+    TableDef({ name: "orders", keyField: "id", columns, editable: true }),
+    (table) => new OrdersProvider(table),
+    (table) => ViewPortDef(table.tableDef.columns, new OrdersService()),
+  )
+  .addSessionTable(
+    SessionTableDef({ name: "edit-orders", keyField: "id", columns }),
+    undefined,
+    (table) => ViewPortDef(table.tableDef.columns, new OrderEditService()),
+  )
+  .asModule();
+```
+
+`createSessionTable` takes these named params:
+
+| param | meaning |
+| --- | --- |
+| `sessionType` | Required: `"edit"`, `"import"` or `"export"`. Anything else fails with `"Session type undefined"`. |
+| `sessionTableName` | The blueprint to use. Default `<sessionType>-<sourceTable>`, e.g. `edit-orders`. |
+| `copyOption` | `"All"`, `"Selected"` or `"Empty"`. Required for edit and export; import always copies no rows. |
+| `columnsToCopy` | Comma separated source column names, or `"*"`. Default: the source columns except `vuuCreatedTimestamp`, `vuuUpdatedTimestamp` and `vuuMsg`. Unknown columns fail. |
+
+- **Edit and import need an editable source table.** Set `editable: true` on
+  the source `TableDef` (default `false`), otherwise the RPC fails with
+  `"Table not editable"`. `isCreateSessionTableAllowed(sessionType, ctx)` can
+  also refuse edit and import. Export is not checked.
+- **Rows are copied by column name.** Columns the blueprint does not define
+  are dropped, and blueprint columns that were not copied are left blank. The
+  session row key is the source row key, even if the blueprint's key column
+  has a different name. `vuuMsg` and `vuuAction` are added to the instance if
+  the blueprint does not define them.
+- **At most `maxSessionTableSize` rows (default 10,000) are copied.**
+  `customiseRowData(viewport, data, sourceRow)` can change each copied row,
+  and also applies when `undoRowChange` restores a row.
+- **The blueprint's service handles the session.** A viewport on a session
+  table gets the blueprint's `ServiceFactory`, not the source table's. So
+  `editCell`, `addRow`, `endEditSession` and the other hooks below are served
+  by the blueprint's handler. The session table keeps a reference to its
+  `sourceTable`, and saves go there.
+- `beginEditSession` (the legacy UI API) is kept only for backward
+  compatibility and works as it always has: the session table is derived
+  from the source table's definition (plus any `getSessionTableCustomColumns`),
+  no blueprint or `editable` flag is needed, and viewports on it use the
+  source table's service. It does not support blueprints; use
+  `createSessionTable` for those.
+
 ### Secure defaults
 
 - **Session tables only.** Every edit RPC targets a session table. `editCell`
@@ -566,6 +622,9 @@ therefore depend on the user and their roles.
 
 | Hook (protected) | Default | Purpose |
 | --- | --- | --- |
+| `isCreateSessionTableAllowed(sessionType, ctx)` | `true` | Allow `createSessionTable` for `"edit"` or `"import"`. |
+| `getSessionTableCustomColumns(sourceTable)` | none | Deprecated. Columns added to a legacy `beginEditSession` session table. |
+| `customiseRowData(viewport, data, sourceRow)` | unchanged | Change a row as it is copied into a session table, or restored by `undoRowChange`. `data` is keyed by column name. |
 | `canEditSource(viewport, column, ctx)` | `false` | Allow `editCell` to write directly to a non-session (shared) table. Edits are still column, type and permission checked, and `vuuUpdatedTimestamp` is bumped. |
 | `isEditableColumn(table, column, viewport, ctx)` | `true` unless key or system column | Restrict which columns `editCell` accepts. `vuuAction` is never editable. |
 | `validateCellEdit(edit: CellEdit)` | no error | Business validation, after the type and permission checks. Return an error message to refuse the edit. |

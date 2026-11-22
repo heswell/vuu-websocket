@@ -5,7 +5,7 @@ import {
   type LogEntry,
   type LogSink,
 } from "@heswell/service-utils";
-import { TableDef } from "../src/api/TableDef";
+import { SessionTableDef, TableDef } from "../src/api/TableDef";
 import { VuuServer } from "../src/core/VuuServer";
 import {
   VuuServerConfig,
@@ -63,6 +63,16 @@ const instruments = () =>
         name: "instruments",
       }),
       (table) => new InstrumentProvider(table),
+    )
+    .addSessionTable(
+      SessionTableDef({
+        columns: [
+          { name: "ric", dataType: "string" },
+          { name: "description", dataType: "string" },
+        ],
+        keyField: "ric",
+        name: "edit-instruments",
+      }),
     )
     .asModule();
 
@@ -283,8 +293,9 @@ describe("a failing request does not stop the server (trader upstream issue 71)"
     const a = await login();
     const b = await login();
     const sessionTable = server.tableContainer.createSimpleSessionTable(
-      server.tableContainer.getTable<DataTable>("instruments"),
+      server.tableContainer.getSessionTableBlueprint("edit-instruments"),
       ClientSessionId(a.sessionId, "irrelevant"),
+      server.tableContainer.getTable<DataTable>("instruments"),
     );
     const table = { module: "TEST", table: sessionTable.name };
 
@@ -448,8 +459,9 @@ describe("maxSessionsPerUser (trader upstream issue 72)", () => {
     );
     expect(created.body.type).toBe("CREATE_VP_SUCCESS");
     const sessionTable = server.tableContainer.createSimpleSessionTable(
-      server.tableContainer.getTable<DataTable>("instruments"),
+      server.tableContainer.getSessionTableBlueprint("edit-instruments"),
       ClientSessionId(first.sessionId, "irrelevant"),
+      server.tableContainer.getTable<DataTable>("instruments"),
     );
     const sessionVp = await first.client.request(
       "vp-2",
@@ -524,8 +536,9 @@ describe("maxSessionsPerUser (trader upstream issue 72)", () => {
     const first = await login();
     await first.client.request("vp-1", createVp(), first.sessionId);
     const sessionTable = server.tableContainer.createSimpleSessionTable(
-      server.tableContainer.getTable<DataTable>("instruments"),
+      server.tableContainer.getSessionTableBlueprint("edit-instruments"),
       ClientSessionId(first.sessionId, "irrelevant"),
+      server.tableContainer.getTable<DataTable>("instruments"),
     );
     expect(server.viewPortContainer.viewportCount).toBe(1);
 

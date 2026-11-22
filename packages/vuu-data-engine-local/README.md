@@ -84,16 +84,60 @@ const { simulModule } = registerDemoModules(createLocalEngine());
 | `registerDemoModules(engine?)`                                        | Creates the SIMUL, BASKET and TEST demo modules and registers them with `engine` (default: the default engine).                                            |
 | `getDefaultEngine()` / `resetDefaultEngine()`                         | The shared engine behind the deprecated globals below.                                                                                                     |
 
+### Session table blueprints
+
+As in Scala Vuu and vuu-server, `createSessionTable` creates a session table only from a
+blueprint the module defines in `sessionTableDefs`. There is no fallback: if no blueprint has
+the requested name, the RPC fails.
+
+```ts
+class OrdersModule extends VuuModule<"orders"> {
+  protected editableTables = ["orders"] as const;
+  protected sessionTableDefs = {
+    "edit-orders": {
+      columns: ordersSchema.columns,
+      key: "id",
+      editHooks: { validateCellEdit, applySessionSave }, // optional
+      services: [/* ... */], // optional, also menuServices and menu
+    },
+  };
+}
+```
+
+- **Params.** `sessionType` is required (`"edit"`, `"import"` or `"export"`).
+  `sessionTableName` picks the blueprint; it defaults to `<sessionType>-<sourceTable>`.
+  `copyOption` is required for edit and export; import always copies no rows.
+  `columnsToCopy` is a comma separated list or `"*"`; the default is the source columns except
+  `vuuCreatedTimestamp`, `vuuUpdatedTimestamp` and `vuuMsg`.
+- **Editable tables.** Edit and import need the source table in `editableTables` (default
+  none). Export doesn't. `isCreateSessionTableAllowed(sessionType, ctx)` can also refuse
+  edit and import.
+- **Copying.** Rows the user is permitted to see are copied by column name, at most
+  `maxSessionTableSize` (10,000) of them. The blueprint can define its own columns and a
+  differently named key. `customiseRowData(data, sourceRow, ctx)` can change each row, and
+  also applies when a change is undone. The session message column and `vuuAction` are added
+  if the blueprint doesn't define them.
+- **Services and hooks.** A viewport on the session table uses the blueprint's `services`,
+  `menuServices`, `menu` and `editHooks`, not those of the source table.
+  `EditContext.sessionTableDefName` names the blueprint.
+- **`beginEditSession` is kept only for backward compatibility.** It works as it always has:
+  the session table is created from the source table's schema by the protected
+  `createSessionTable` method (deprecated), no blueprint or `editableTables` entry is needed,
+  and the source table's services and edit hooks apply to it. It does not support blueprints;
+  use `createSessionTable` for those.
+
 ### Edit sessions: hooks and service overrides
 
 The built-in edit-session RPC services (`createSessionTable`, `editCell`, `addRow`, `deleteRow`,
 `undoRowChange`, `endEditSession`, …) can be overridden by `rpcName`, per module with
 `moduleServices` or per table with `services`. Precedence: table services, then module
-services, then the built-ins. Services registered for a source table also apply to its
-session tables.
+services, then the built-ins. A session table created from a blueprint uses the blueprint's
+services in place of table services. A legacy `beginEditSession` session table uses its
+source table's services.
 
 Most customisation needs only edit hooks, which mirror vuu-server's. Implement them per
-table with `editHooks` (these win), or for every table as protected methods of the module.
+table with `editHooks` or per blueprint in `sessionTableDefs` (these win), or for every table
+as protected methods of the module.
 
 | Hook                                              | Default                                                                                                                                                                      |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

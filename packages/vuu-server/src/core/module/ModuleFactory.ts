@@ -4,7 +4,7 @@ import {
   Provider,
   ProviderFactory,
 } from "../../provider/Provider";
-import { TableDef } from "../../api/TableDef";
+import { SessionTableDef, TableDef } from "../../api/TableDef";
 import { TableJoinFactory } from "../../TableJoinProvider";
 import { ViewServerModule } from "./VsModule";
 import { TableDefContainer } from "./TableDefContainer";
@@ -142,8 +142,13 @@ function ModuleFactoryNode(
         joinServiceFactories,
       );
     },
+    /**
+     * Register a session table blueprint. createSessionTable creates
+     * per-session instances of it, selected by name, and viewports on those
+     * instances use serviceFactory.
+     */
     addSessionTable: (
-      tableDef: TableDef,
+      tableDef: SessionTableDef,
       providerFactory: ProviderFactory = (table) => new NullProvider(table),
       serviceFactory?: ServiceFactory,
     ) => {

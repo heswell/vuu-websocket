@@ -1,7 +1,18 @@
 import { afterAll, describe, expect, it } from "bun:test";
+import type { SessionTableDef } from "../src/core/module/VuuModule";
 import { SimulModule } from "../src/simul/SimulModule";
 
-const simulModule = new SimulModule();
+// an export session table blueprint for instruments
+class SimulModuleWithExport extends SimulModule {
+  protected sessionTableDefs: Record<string, SessionTableDef> = {
+    "export-instruments": {
+      columns: this.getTableSchema("instruments").columns,
+      key: this.getTableSchema("instruments").key,
+    },
+  };
+}
+
+const simulModule = new SimulModuleWithExport();
 afterAll(() => simulModule.dispose());
 
 // TickingArrayDataSource (the local/test datasource) ignores column

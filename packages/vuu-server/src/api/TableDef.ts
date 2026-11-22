@@ -56,6 +56,11 @@ export function VisualLinks(...links: Link[]): VisualLinks {
 
 export interface TableDefConfig {
   columns: Column[];
+  /**
+   * The table may be edited through a session table (createSessionTable with
+   * sessionType "edit" or "import"). Default false, as in Scala Vuu.
+   */
+  editable?: boolean;
   joinFields?: string | string[];
   keyField: string;
   name: string;
@@ -73,31 +78,94 @@ export interface TableDef extends TableDefConfig {
   schema: TableSchema;
   asVuuTable: VuuTable;
 }
-export interface SessionTableDef extends TableDef { }
 
-export const schemaToSessionTableDef = (
+/**
+ * Definition of a session table "blueprint", registered with
+ * `ModuleFactory.addSessionTable`. createSessionTable creates per-session
+ * instances of a blueprint, chosen by name (`sessionTableName`, default
+ * `<sessionType>-<sourceTable>`).
+ */
+export interface SessionTableDef extends TableDef {
+  readonly isSessionTableDef: true;
+}
+
+export const isSessionTableDef = (
+  tableDef: TableDef | undefined,
+): tableDef is SessionTableDef =>
+  (tableDef as Partial<SessionTableDef> | undefined)?.isSessionTableDef ===
+  true;
+
+/**
+ * Columns every session table instance carries. Added to the blueprint's
+ * columns when the blueprint does not define them.
+ */
+const SESSION_TABLE_COLUMNS: Column[] = [
+  { name: "vuuMsg", dataType: "string" },
+  { name: "vuuAction", dataType: "string" },
+];
+
+/**
+ * The definition of a session table instance, the blueprint's definition
+ * plus any of the session columns (vuuMsg, vuuAction) it does not define.
+ */
+export const toSessionTableInstanceDef = (
+  tableDef: SessionTableDef,
+): SessionTableDef => {
+  const extraColumns = SESSION_TABLE_COLUMNS.filter(
+    ({ name }) => !tableDef.columns.some((column) => column.name === name),
+  );
+  const { schema } = tableDef;
+  return {
+    ...tableDef,
+    isSessionTableDef: true,
+    getModule: () => tableDef.getModule(),
+    setModule: (module: ViewServerModule) => tableDef.setModule(module),
+    asVuuTable: schema.table,
+    columns: [...tableDef.columns, ...extraColumns],
+    schema: {
+      ...schema,
+      columns: [
+        ...schema.columns,
+        ...extraColumns.map(({ name, dataType }) => ({
+          name,
+          serverDataType: dataType,
+        })),
+      ],
+    },
+  };
+};
+
+/**
+ * Definition of a session table created by the legacy beginEditSession:
+ * the source table's definition, keeping its
+ * name, plus customColumns, the session message column (vuuMsg) and
+ * vuuAction. Viewports on such a session table use the source table's
+ * ServiceFactory.
+ */
+export const legacySessionTableDef = (
   tableDef: TableDef,
   customColumns: Column[] = [],
 ): SessionTableDef => {
   const extraColumns = [
     ...customColumns,
-    ...(tableDef.columns.some(({ name }) => name === "vuuMsg")
-      ? []
-      : [{ name: "vuuMsg", dataType: "string" as const }]),
-    { name: "vuuAction", dataType: "string" as const },
+    ...SESSION_TABLE_COLUMNS.filter(
+      ({ name }) =>
+        !tableDef.columns.some((column) => column.name === name) &&
+        !customColumns.some((column) => column.name === name),
+    ),
   ];
-  const sessionColumns: Column[] = [
-    ...tableDef.columns,
-    ...extraColumns,
-  ];
-
+  const { schema } = tableDef;
   return {
     ...tableDef,
-    columns: sessionColumns,
+    isSessionTableDef: true,
+    getModule: () => tableDef.getModule(),
+    setModule: (module: ViewServerModule) => tableDef.setModule(module),
+    asVuuTable: schema.table,
+    columns: [...tableDef.columns, ...extraColumns],
     schema: {
-      ...tableDef.schema,
+      ...schema,
       columns: [
-        ...tableDef.schema.columns,
+        ...schema.columns,
         ...extraColumns.map(({ name, dataType }) => ({
           name,
           serverDataType: dataType,
@@ -113,14 +181,23 @@ class TableDefImpl implements TableDef {
   keyField: string;
   links: VisualLinks;
   name: string;
+  editable: boolean;
   permissionFunction?: PermissionFunction;
 
   #module: ViewServerModule | null = null;
 
   constructor(options: TableDefConfig) {
-    const { columns, joinFields, keyField, name, links, permissionFunction } =
-      options;
+    const {
+      columns,
+      editable = false,
+      joinFields,
+      keyField,
+      name,
+      links,
+      permissionFunction,
+    } = options;
     this.columns = columns;
+    this.editable = editable;
     this.joinFields = joinFields;
     this.keyField = keyField;
     this.links = links;
@@ -161,6 +238,10 @@ class TableDefImpl implements TableDef {
   }
 }
 
+class SessionTableDefImpl extends TableDefImpl implements SessionTableDef {
+  readonly isSessionTableDef = true as const;
+}
+
 export const TableDef = (
   options: Omit<TableDefConfig, "links"> & {
     links?: VisualLinks;
@@ -176,7 +257,7 @@ export const SessionTableDef = (
   },
 ): SessionTableDef => {
   const { links = VisualLinks(), ...rest } = options;
-  return new TableDefImpl({ ...rest, links });
+  return new SessionTableDefImpl({ ...rest, links });
 };
 
 export type JoinType = "LeftOuterJoin" | "InnerJoin";

@@ -43,6 +43,8 @@ export interface EditContext {
   /** The session table, when the request targets an edit session. */
   sessionTable?: Table;
   sessionTableName?: string;
+  /** The blueprint the session table was created from, see VuuModule.sessionTableDefs. */
+  sessionTableDefName?: string;
 }
 
 export type SessionTableAction = "addRow" | "editCell" | "deleteRow";

@@ -2,7 +2,10 @@ import type { DataSourceConfig, TableSchema } from "@vuu-ui/vuu-data-types";
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { buildDataColumnMapFromSchema, Table } from "../src/Table";
 import type { TickingArrayDataSource } from "../src/ModuleDataSource";
-import { VuuModule } from "../src/core/module/VuuModule";
+import {
+  type SessionTableDef,
+  VuuModule,
+} from "../src/core/module/VuuModule";
 import {
   defaultApplySessionSave,
   type EditHooks,
@@ -24,11 +27,16 @@ class EditingModule extends VuuModule<"items"> {
   protected tables: Record<"items", Table>;
   protected visualLinks = undefined;
   protected editHooks: Partial<Record<"items", EditHooks>>;
+  protected editableTables = ["items"] as const;
+  protected sessionTableDefs: Record<string, SessionTableDef>;
 
   constructor(table: Table, hooks?: EditHooks) {
     super("EDIT_TEST");
     this.tables = { items: table };
     this.editHooks = hooks ? { items: hooks } : {};
+    this.sessionTableDefs = {
+      "edit-items": { columns: schema.columns, key: "id", editHooks: hooks },
+    };
   }
 
   createSourceDataSource() {
