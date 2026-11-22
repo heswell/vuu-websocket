@@ -43,8 +43,9 @@
       "name": "@heswell/vuu-demo",
       "version": "3.0.1",
       "dependencies": {
+        "@heswell/vuu-module-limits": "1.0.0",
         "@heswell/vuu-module-refdata": "1.0.1",
-        "@heswell/vuu-server": "4.4.0",
+        "@heswell/vuu-server": "4.6.0",
         "@heswell/vuu-table": "1.1.0",
         "@vuu-ui/vuu-utils": "5.0.0-alpha.2",
         "pino": "9.6.0",
@@ -256,6 +257,14 @@
       "name": "@heswell/user-admin",
       "version": "1.0.2",
     },
+    "vuu-modules/vuu-module-limits": {
+      "name": "@heswell/vuu-module-limits",
+      "version": "1.0.0",
+      "peerDependencies": {
+        "@heswell/vuu-server": "^4.6.0",
+        "@heswell/vuu-table": "^1.1.0",
+      },
+    },
     "vuu-modules/vuu-module-refdata": {
       "name": "@heswell/vuu-module-refdata",
       "version": "1.0.1",
@@ -392,6 +401,8 @@
     "@heswell/vuu-data-engine-local": ["@heswell/vuu-data-engine-local@workspace:packages/vuu-data-engine-local"],
 
     "@heswell/vuu-demo": ["@heswell/vuu-demo@workspace:apps/vuu-demo"],
+
+    "@heswell/vuu-module-limits": ["@heswell/vuu-module-limits@workspace:vuu-modules/vuu-module-limits"],
 
     "@heswell/vuu-module-refdata": ["@heswell/vuu-module-refdata@workspace:vuu-modules/vuu-module-refdata"],
 
