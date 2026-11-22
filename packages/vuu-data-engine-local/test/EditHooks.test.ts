@@ -10,7 +10,11 @@ import {
   SAVE_NOT_PERMITTED,
   STALE_UPDATE,
 } from "../src/core/module/edit-hooks";
-import { type RpcService, VuuModule } from "../src/core/module/VuuModule";
+import {
+  type RpcService,
+  type SessionTableDef,
+  VuuModule,
+} from "../src/core/module/VuuModule";
 import type { TickingArrayDataSource } from "../src/ModuleDataSource";
 import { buildDataColumnMapFromSchema, Table } from "../src/Table";
 
@@ -52,13 +56,24 @@ class OrdersModule extends VuuModule<TableName> {
   protected menuServices = undefined;
   protected visualLinks = undefined;
   protected editHooks: Partial<Record<TableName, EditHooks>>;
+  protected editableTables: readonly TableName[] = [
+    "parentOrders",
+    "childOrders",
+  ];
+  protected sessionTableDefs: Record<string, SessionTableDef>;
 
   constructor(parentOrderHooks: EditHooks, childOrderServices?: RpcService[]) {
     super("ORDERS");
     this.editHooks = { parentOrders: parentOrderHooks };
     this.services = {
       parentOrders: undefined,
-      childOrders: childOrderServices,
+      childOrders: undefined,
+    };
+    // session edits are served by the session table blueprints
+    const { columns, key } = createSchema("parentOrders");
+    this.sessionTableDefs = {
+      "edit-parentOrders": { columns, key, editHooks: parentOrderHooks },
+      "edit-childOrders": { columns, key, services: childOrderServices },
     };
   }
 

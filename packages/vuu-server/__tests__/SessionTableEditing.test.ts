@@ -5,14 +5,20 @@ import {
   EditSessionRpcHandler,
   type DataTable,
 } from "@heswell/vuu-server";
-import { TableDef } from "../src/api/TableDef";
+import { SessionTableDef, TableDef } from "../src/api/TableDef";
 import { InMemDataTable } from "../src/core/table/InMemDataTable";
 import { InMemSessionDataTable } from "../src/core/table/InMemSessionDataTable";
 import { TableContainer } from "../src/core/table/TableContainer";
 import { JoinTableProvider } from "../src/provider/JoinTableProvider";
 import type { RpcParams } from "../src/net/rpc/Rpc";
 import type { ViewServerModule } from "../src/core/module/VsModule";
-import type { VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import type {
+  VuuDataRow,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
+import { ViewPortDef } from "../src/api/ViewPortDef";
+import { ViewportContainer } from "../src/viewport/ViewportContainer";
+import type { ProviderContainer } from "../src/provider/ProviderContainer";
 
 describe("session table editing", () => {
   test("creates session tables for new and legacy copy options", () => {
@@ -20,6 +26,7 @@ describe("session table editing", () => {
 
     const allResult = call(handler, "createSessionTable", baseTable, {
       copyOption: "All",
+      sessionType: "edit",
     });
     const allTable = sessionTableFromResult(tableContainer, allResult);
     const allTableName = allTable.name;
@@ -37,7 +44,7 @@ describe("session table editing", () => {
       handler,
       "createSessionTable",
       baseTable,
-      { copyOption: "Selected" },
+      { copyOption: "Selected", sessionType: "edit" },
       new Set(["B"]),
     );
     const selectedTable = sessionTableFromResult(
@@ -51,9 +58,7 @@ describe("session table editing", () => {
       editSessionMode: "empty-session-table",
     });
     expect(sessionTableFromResult(tableContainer, emptyResult).rows).toEqual([]);
-    expect(tableContainer.getDefinedTables()).toEqual([
-      { module: "TEST", table: "items" },
-    ]);
+    expect(tableContainer.getDefinedTables()).toEqual(DEFINED_TABLES);
 
     tableContainer.removeSessionTables({
       sessionId: "test-session",
@@ -62,9 +67,7 @@ describe("session table editing", () => {
     expect(() => tableContainer.getTable(allTableName)).toThrow(
       `[TableContainer] no table ${allTableName}`,
     );
-    expect(tableContainer.getDefinedTables()).toEqual([
-      { module: "TEST", table: "items" },
-    ]);
+    expect(tableContainer.getDefinedTables()).toEqual(DEFINED_TABLES);
   });
 
   test("adds, deletes, and undoes session rows", () => {
@@ -118,7 +121,10 @@ describe("session table editing", () => {
     const { baseTable, handler, tableContainer } = testContext();
     const emptyTable = sessionTableFromResult(
       tableContainer,
-      call(handler, "createSessionTable", baseTable, { copyOption: "Empty" }),
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "Empty",
+        sessionType: "edit",
+      }),
     );
 
     expect(
@@ -277,19 +283,414 @@ describe("session table editing", () => {
   });
 });
 
-function testContext() {
+describe("session table blueprints", () => {
+  const error = (errorMessage: string) => ({
+    type: "ERROR_RESULT",
+    errorMessage,
+  });
+
+  test("sessionType is required", () => {
+    const { baseTable, handler } = testContext();
+    expect(
+      call(handler, "createSessionTable", baseTable, { copyOption: "All" }),
+    ).toEqual(error("Session type undefined"));
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "update",
+      }),
+    ).toEqual(error("Session type undefined"));
+  });
+
+  test("fails when no blueprint is registered, there is no fallback", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "export",
+      }),
+    ).toEqual(error("session table export-items is not defined"));
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "edit",
+        sessionTableName: "missing",
+      }),
+    ).toEqual(error("session table missing is not defined"));
+    // a regular table cannot be used as a blueprint
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "edit",
+        sessionTableName: "items",
+      }),
+    ).toEqual(error("session table items is not defined"));
+    expect(
+      tableContainer
+        .getDefinedTables()
+        .filter(({ table }) => table.startsWith("session:")),
+    ).toEqual([]);
+  });
+
+  test("a session table instance cannot be used as a blueprint", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    const sessionTable = createSessionTable(handler, tableContainer, baseTable);
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "edit",
+        sessionTableName: sessionTable.name,
+      }),
+    ).toEqual(error(`session table ${sessionTable.name} is not defined`));
+  });
+
+  test("edit and import require an editable source table, export does not", () => {
+    const { addBlueprint, baseTable, handler, tableContainer } = testContext({
+      editable: false,
+    });
+    addBlueprint("export-items");
+    for (const sessionType of ["edit", "import"]) {
+      expect(
+        call(handler, "createSessionTable", baseTable, {
+          copyOption: "All",
+          sessionType,
+        }),
+      ).toEqual(error("Table not editable"));
+    }
+    const exportTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "export",
+      }),
+    );
+    expect(exportTable.name).toContain("/simple-export-items_");
+    expect(exportTable.rows).toHaveLength(2);
+  });
+
+  test("edit and export require a copyOption, import is always empty", () => {
+    const { addBlueprint, baseTable, handler, tableContainer } = testContext();
+    addBlueprint("import-items");
+    expect(
+      call(handler, "createSessionTable", baseTable, { sessionType: "edit" }),
+    ).toEqual(error("Missing or invalid copy option."));
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "Some",
+        sessionType: "edit",
+      }),
+    ).toEqual(error("Missing or invalid copy option."));
+    const importTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "import",
+      }),
+    );
+    expect(importTable.name).toContain("/simple-import-items_");
+    expect(importTable.rows).toEqual([]);
+  });
+
+  test("isCreateSessionTableAllowed can refuse edit and import", () => {
+    class NoEdit extends CreateSessionTableRpcHandler {
+      protected isCreateSessionTableAllowed() {
+        return false;
+      }
+    }
+    const { baseTable, handler } = testContext({ Handler: NoEdit });
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        copyOption: "All",
+        sessionType: "edit",
+      }),
+    ).toEqual(error("No permission to create session table for edit."));
+  });
+
+  test("sessionTableName selects a blueprint with its own columns and key", () => {
+    const { addBlueprint, baseTable, handler, tableContainer } = testContext();
+    addBlueprint(
+      "rename-items",
+      Columns.fromNames("itemId:string", "name:string", "note:string"),
+      "itemId",
+      "OTHER",
+    );
+    const result = call(handler, "createSessionTable", baseTable, {
+      columnsToCopy: "id,name",
+      copyOption: "All",
+      sessionTableName: "rename-items",
+      sessionType: "edit",
+    });
+    const sessionTable = sessionTableFromResult(tableContainer, result);
+    expect((result.data as { module: string }).module).toBe("OTHER");
+    expect(sessionTable.name).toContain("/simple-rename-items_");
+    expect(sessionTable.sourceTable).toBe(baseTable);
+    expect(sessionTable.schema.columns.map(({ name }) => name)).toEqual([
+      "itemId",
+      "name",
+      "note",
+      "vuuMsg",
+      "vuuAction",
+    ]);
+    expect(sessionTable.getRowAtKey("A")).toEqual(["A", "Alpha", "", "", ""]);
+
+    call(handler, "editCell", sessionTable, {
+      column: "name",
+      data: "Alpha edited",
+      key: "A",
+    });
+    call(handler, "editCell", sessionTable, {
+      column: "note",
+      data: "session only",
+      key: "B",
+    });
+    call(handler, "addRow", sessionTable, {
+      key: "C",
+      data: { name: "Gamma", note: "added" },
+    });
+    expect(
+      call(handler, "endEditSession", sessionTable, { save: true }),
+    ).toEqual({ type: "SUCCESS_RESULT", data: undefined });
+    expect(baseTable.getRowAtKey("A")[1]).toBe("Alpha edited");
+    expect(baseTable.getRowAtKey("B")[1]).toBe("Beta");
+    expect(baseTable.getRowAtKey("C").slice(0, 2)).toEqual(["C", "Gamma"]);
+  });
+
+  test("columnsToCopy limits the copied columns and must name source columns", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    const sessionTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "createSessionTable", baseTable, {
+        columnsToCopy: "id",
+        copyOption: "All",
+        sessionType: "edit",
+      }),
+    );
+    expect(sessionTable.getRowAtKey("A")[sessionTable.columnMap.name]).toBe("");
+
+    expect(
+      call(handler, "createSessionTable", baseTable, {
+        columnsToCopy: "id,nope",
+        copyOption: "All",
+        sessionType: "edit",
+      }),
+    ).toEqual(error("Column(s) not found in source table."));
+  });
+
+  test("by default the vuu default columns are not copied", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    const sessionTable = createSessionTable(handler, tableContainer, baseTable);
+    const row = sessionTable.getRowAtKey("A");
+    expect(row[sessionTable.columnMap.name]).toBe("Alpha");
+    // the session table maintains its own timestamps
+    expect(row[sessionTable.columnMap.vuuUpdatedTimestamp]).not.toBe(100);
+  });
+
+  test("customiseRowData applies when rows are copied and undone", () => {
+    class Upper extends CreateSessionTableRpcHandler {
+      protected customiseRowData(
+        _viewport: unknown,
+        data: Record<string, VuuRowDataItemType>,
+      ) {
+        return { ...data, name: String(data.name).toUpperCase() };
+      }
+    }
+    const { baseTable, handler, tableContainer } = testContext({
+      Handler: Upper,
+    });
+    const sessionTable = createSessionTable(handler, tableContainer, baseTable);
+    expect(sessionTable.getRowAtKey("A")[1]).toBe("ALPHA");
+    call(handler, "editCell", sessionTable, {
+      column: "name",
+      data: "edited",
+      key: "A",
+    });
+    call(handler, "undoRowChange", sessionTable, { key: "A" });
+    expect(sessionTable.getRowAtKey("A")[1]).toBe("ALPHA");
+  });
+
+  test("maxSessionTableSize caps the copied rows", () => {
+    class One extends CreateSessionTableRpcHandler {
+      protected maxSessionTableSize = 1;
+    }
+    const { baseTable, handler, tableContainer } = testContext({
+      Handler: One,
+    });
+    expect(
+      createSessionTable(handler, tableContainer, baseTable).rows,
+    ).toHaveLength(1);
+  });
+
+  test("viewports on a session table use the blueprint's service", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    const blueprintService = new CreateSessionTableRpcHandler(tableContainer);
+    const sourceService = new CreateSessionTableRpcHandler(tableContainer);
+    const viewportContainer = new ViewportContainer(
+      tableContainer,
+      {} as ProviderContainer,
+    );
+    viewportContainer.addViewPortDefinition("items", (table) =>
+      ViewPortDef(table.tableDef.columns, sourceService),
+    );
+    viewportContainer.addViewPortDefinition("edit-items", (table) =>
+      ViewPortDef(table.tableDef.columns, blueprintService),
+    );
+    const sessionTable = createSessionTable(handler, tableContainer, baseTable);
+    expect(viewportContainer.getViewPortDefinition(sessionTable).service).toBe(
+      blueprintService,
+    );
+    expect(viewportContainer.getViewPortDefinition(baseTable).service).toBe(
+      sourceService,
+    );
+  });
+});
+
+describe("beginEditSession backward compatibility", () => {
+  test("works without a blueprint or the editable flag", () => {
+    const { baseTable, tableContainer } = testContext({ editable: false });
+    tableContainer.removeSessionTable("edit-items");
+    const handler = new CreateSessionTableRpcHandler(tableContainer);
+    const sessionTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "beginEditSession", baseTable, {
+        editSessionMode: "all-rows",
+      }),
+    );
+    expect(sessionTable.name).toContain("/simple-items_");
+    expect(sessionTable.sourceTable).toBe(baseTable);
+    expect(sessionTable.schema.columns.map(({ name }) => name)).toEqual([
+      "id",
+      "name",
+      "vuuCreatedTimestamp",
+      "vuuUpdatedTimestamp",
+      "vuuMsg",
+      "vuuAction",
+    ]);
+    expect(sessionTable.rows.map((row) => row.slice(0, 2))).toEqual([
+      ["A", "Alpha"],
+      ["B", "Beta"],
+    ]);
+
+    call(handler, "editCell", sessionTable, {
+      column: "name",
+      data: "Alpha edited",
+      key: "A",
+    });
+    expect(
+      call(handler, "endEditSession", sessionTable, { save: true }),
+    ).toEqual({ type: "SUCCESS_RESULT", data: undefined });
+    expect(baseTable.getRowAtKey("A")[1]).toBe("Alpha edited");
+  });
+
+  test("selected-rows and empty-session-table modes still work", () => {
+    const { baseTable, handler, tableContainer } = testContext({
+      editable: false,
+    });
+    const selected = sessionTableFromResult(
+      tableContainer,
+      call(
+        handler,
+        "beginEditSession",
+        baseTable,
+        { editSessionMode: "selected-rows" },
+        new Set(["B"]),
+      ),
+    );
+    expect(selected.rows.map((row) => row[0])).toEqual(["B"]);
+    expect(
+      call(handler, "beginEditSession", baseTable, { editSessionMode: "bad" }),
+    ).toEqual({
+      type: "ERROR_RESULT",
+      errorMessage: "createSessionTable: invalid copyOption bad",
+    });
+  });
+
+  test("getSessionTableCustomColumns still adds columns", () => {
+    class WithNote extends CreateSessionTableRpcHandler {
+      protected getSessionTableCustomColumns() {
+        return [{ name: "note", dataType: "string" as const }];
+      }
+    }
+    const { baseTable, tableContainer } = testContext({ Handler: WithNote });
+    const handler = new WithNote(tableContainer);
+    const sessionTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "beginEditSession", baseTable, {}),
+    );
+    expect(sessionTable.columnMap.note).toBe(5);
+    expect(sessionTable.columnMap.vuuAction).toBe(6);
+  });
+
+  test("viewports on a legacy session table use the source table's service", () => {
+    const { baseTable, handler, tableContainer } = testContext();
+    const sourceService = new CreateSessionTableRpcHandler(tableContainer);
+    const viewportContainer = new ViewportContainer(
+      tableContainer,
+      {} as ProviderContainer,
+    );
+    viewportContainer.addViewPortDefinition("items", (table) =>
+      ViewPortDef(table.tableDef.columns, sourceService),
+    );
+    const sessionTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "beginEditSession", baseTable, {}),
+    );
+    expect(viewportContainer.getViewPortDefinition(sessionTable).service).toBe(
+      sourceService,
+    );
+  });
+
+  test("with a sessionTableName it uses that blueprint", () => {
+    const { addBlueprint, baseTable, handler, tableContainer } = testContext();
+    addBlueprint(
+      "notes-items",
+      Columns.fromNames("id:string", "name:string", "note:string"),
+    );
+    const sessionTable = sessionTableFromResult(
+      tableContainer,
+      call(handler, "beginEditSession", baseTable, {
+        editSessionMode: "all-rows",
+        sessionTableName: "notes-items",
+      }),
+    );
+    expect(sessionTable.name).toContain("/simple-notes-items_");
+    expect(
+      call(handler, "beginEditSession", baseTable, {
+        sessionTableName: "missing",
+      }),
+    ).toEqual({
+      type: "ERROR_RESULT",
+      errorMessage: "session table missing is not defined",
+    });
+  });
+});
+
+const DEFINED_TABLES = [
+  { module: "TEST", table: "items" },
+  { module: "TEST", table: "edit-items" },
+];
+
+const ITEM_COLUMNS = Columns.fromNames(
+  "id:string",
+  "name:string",
+  "vuuCreatedTimestamp:epochtimestamp",
+  "vuuUpdatedTimestamp:epochtimestamp",
+  "vuuMsg:string",
+);
+
+function testContext({
+  editable = true,
+  Handler = CreateSessionTableRpcHandler,
+}: {
+  editable?: boolean;
+  Handler?: typeof CreateSessionTableRpcHandler;
+} = {}) {
   const joinProvider = new JoinTableProvider();
   const tableContainer = new TableContainer(joinProvider);
   const tableDef = TableDef({
     name: "items",
     keyField: "id",
-    columns: Columns.fromNames(
-      "id:string",
-      "name:string",
-      "vuuCreatedTimestamp:epochtimestamp",
-      "vuuUpdatedTimestamp:epochtimestamp",
-      "vuuMsg:string",
-    ),
+    columns: ITEM_COLUMNS,
+    editable,
   });
   tableDef.setModule({ name: "TEST" } as ViewServerModule);
   const baseTable = new InMemDataTable(tableDef, joinProvider);
@@ -297,9 +698,22 @@ function testContext() {
   baseTable.insert(sourceRow("B", "Beta", 200));
   tableContainer.addTable(baseTable);
 
+  const addBlueprint = (
+    name: string,
+    columns = ITEM_COLUMNS,
+    keyField = "id",
+    module = "TEST",
+  ) => {
+    const blueprintDef = SessionTableDef({ name, keyField, columns });
+    blueprintDef.setModule({ name: module } as ViewServerModule);
+    tableContainer.addTable(new InMemDataTable(blueprintDef, joinProvider));
+  };
+  addBlueprint("edit-items");
+
   return {
+    addBlueprint,
     baseTable,
-    handler: new CreateSessionTableRpcHandler(tableContainer),
+    handler: new Handler(tableContainer),
     tableContainer,
   };
 }
@@ -315,7 +729,10 @@ function createSessionTable(
 ) {
   return sessionTableFromResult(
     tableContainer,
-    call(handler, "createSessionTable", baseTable, { copyOption: "All" }),
+    call(handler, "createSessionTable", baseTable, {
+      copyOption: "All",
+      sessionType: "edit",
+    }),
   );
 }
 

@@ -33,10 +33,38 @@ export class InMemSessionDataTable extends InMemDataTable {
    * when the session is edited and saved.
    */
   sourcePermissionFilter: PermissionFilter | undefined;
+  /**
+   * Names of the source columns copied into this session table (the
+   * createSessionTable `columnsToCopy`).
+   */
+  copiedColumns: readonly string[] = [];
+  /**
+   * Builds session row values, by column name, from a source row. Used when
+   * rows are copied into the session and when a row change is undone. The
+   * default copies {@link copiedColumns}; createSessionTable replaces it to
+   * apply its customiseRowData hook.
+   */
+  sourceRowData: (sourceRow: VuuDataRow) => Record<string, VuuRowDataItemType> =
+    (sourceRow) => {
+      const { columnMap } = this.sourceTable;
+      const data: Record<string, VuuRowDataItemType> = {};
+      for (const column of this.copiedColumns) {
+        data[column] = sourceRow[columnMap[column]];
+      }
+      return data;
+    };
+
+  /**
+   * @param tableDef definition of this instance, derived from the session
+   * table blueprint (see toSessionTableInstanceDef)
+   * @param sourceTable the table the session was created from, edits are
+   * saved to it
+   */
   constructor(
     private sessionId: string,
     tableDef: SessionTableDef,
     joinProvider: JoinTableProvider,
+    readonly sourceTable: DataTable,
   ) {
     super(tableDef, joinProvider);
   }
@@ -73,13 +101,35 @@ export class InMemSessionDataTable extends InMemDataTable {
     return super.update(rowIdx, row);
   }
 
-  insertSourceRow(row: VuuDataRow) {
-    this.#sourceSnapshots.set(row[this.indexOfKeyField] as string, row.slice());
-    const sessionRow = new Array(this.schema.columns.length).fill("");
-    row.forEach((value, index) => {
-      sessionRow[index] = value;
-    });
-    super.insert(sessionRow, false);
+  /**
+   * Insert a row copied from the source table.
+   * @param key the source row key, also the session row key
+   * @param sourceRow the source row, kept as a snapshot for stale detection
+   * @param data session row values by column name, default
+   * {@link sourceRowData}. Columns this table does not define are ignored.
+   */
+  insertSourceRow(
+    key: string,
+    sourceRow: VuuDataRow,
+    data: Record<string, VuuRowDataItemType> = this.sourceRowData(sourceRow),
+  ) {
+    this.#sourceSnapshots.set(key, sourceRow.slice());
+    super.insert(this.toSessionRow(key, data), false);
+  }
+
+  private toSessionRow(
+    key: string,
+    data: Record<string, VuuRowDataItemType>,
+  ): VuuDataRow {
+    const { columnMap } = this;
+    const row = new Array(this.schema.columns.length).fill("");
+    for (const [column, value] of Object.entries(data)) {
+      const columnIndex = columnMap[column];
+      if (columnIndex !== undefined) row[columnIndex] = value;
+    }
+    row[this.indexOfKeyField] = key;
+    row[columnMap.vuuAction] = "";
+    return row;
   }
 
   addSessionRow(
@@ -135,7 +185,11 @@ export class InMemSessionDataTable extends InMemDataTable {
     super.update(this.rowIndexAtKey(key), newRow);
   }
 
-  undoRowChange(key: string, sourceTable: DataTable) {
+  /**
+   * Discard the change to a row. A row added in the session is removed,
+   * any other row is restored from its current source row.
+   */
+  undoRowChange(key: string) {
     const row = this.getRowAtKey(key, false);
     if (!row) {
       throw Error(`undoRowChange: row ${key} not found`);
@@ -148,17 +202,16 @@ export class InMemSessionDataTable extends InMemDataTable {
       return;
     }
 
-    const sourceRow = sourceTable.getRowAtKey(key, false);
+    const sourceRow = this.sourceTable.getRowAtKey(key, false);
     if (!sourceRow) {
       throw Error(`undoRowChange: source row ${key} not found`);
     }
-    const restoredRow = new Array(this.schema.columns.length).fill("");
-    sourceRow.forEach((value, index) => {
-      restoredRow[index] = value;
-    });
     this.#changes.delete(key);
     this.#sourceSnapshots.set(key, sourceRow.slice());
-    super.update(this.rowIndexAtKey(key), restoredRow);
+    super.update(
+      this.rowIndexAtKey(key),
+      this.toSessionRow(key, this.sourceRowData(sourceRow)),
+    );
   }
 
   getSessionChanges(): SessionRowChange[] {

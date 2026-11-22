@@ -4,7 +4,12 @@ import { VuuTable } from "@vuu-ui/vuu-protocol-types";
 import { DataTable } from "./InMemDataTable";
 import { InMemSessionDataTable } from "./InMemSessionDataTable";
 import { ClientSessionId } from "../../net/ClientConnectionCreator";
-import { schemaToSessionTableDef, type Column } from "../../api/TableDef";
+import {
+  isSessionTableDef,
+  legacySessionTableDef,
+  toSessionTableInstanceDef,
+  type Column,
+} from "../../api/TableDef";
 import { getLogger } from "@heswell/service-utils/browser";
 import { TableNotFoundError } from "../../net/ClientRequestError";
 
@@ -39,15 +44,62 @@ export class TableContainer {
     }
   }
 
+  /**
+   * The session table blueprint registered (with ModuleFactory.addSessionTable)
+   * under tableName. Throws if there is none.
+   */
+  getSessionTableBlueprint(tableName: string): DataTable {
+    const table = this.#tables.get(tableName) as DataTable | undefined;
+    if (
+      table === undefined ||
+      table instanceof InMemSessionDataTable ||
+      !isSessionTableDef(table.tableDef)
+    ) {
+      throw Error(`session table ${tableName} is not defined`);
+    }
+    return table;
+  }
+
+  /**
+   * Create an instance of a session table blueprint, owned by clientSession.
+   * @param blueprint a table whose definition was registered with
+   * ModuleFactory.addSessionTable, see getSessionTableBlueprint
+   * @param sourceTable the table the session is created from
+   */
   createSimpleSessionTable(
-    baseTable: DataTable,
+    blueprint: DataTable,
+    clientSession: ClientSessionId,
+    sourceTable: DataTable,
+  ) {
+    const { tableDef } = blueprint;
+    if (!isSessionTableDef(tableDef)) {
+      throw Error(`${tableDef.name} is not a session table definition`);
+    }
+    const table = new InMemSessionDataTable(
+      clientSession.sessionId,
+      toSessionTableInstanceDef(tableDef),
+      this.joinProvider,
+      sourceTable,
+    );
+    this.#tables.set(table.name, table);
+    return table;
+  }
+
+  /**
+   * Create a session table from the source table's own definition, as the
+   * legacy beginEditSession (without a sessionTableName) does. No blueprint
+   * is needed.
+   */
+  createLegacySessionTable(
+    sourceTable: DataTable,
     clientSession: ClientSessionId,
     customColumns: Column[] = [],
   ) {
     const table = new InMemSessionDataTable(
       clientSession.sessionId,
-      schemaToSessionTableDef(baseTable.tableDef, customColumns),
+      legacySessionTableDef(sourceTable.tableDef, customColumns),
       this.joinProvider,
+      sourceTable,
     );
     this.#tables.set(table.name, table);
     return table;

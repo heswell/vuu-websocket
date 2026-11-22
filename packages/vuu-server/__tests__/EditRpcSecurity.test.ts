@@ -4,6 +4,7 @@ import {
   Columns,
   CreateSessionTableRpcHandler,
   PermissionFilter,
+  SessionTableDef,
   TableDef,
   VuuUser,
   coerceCellValue,
@@ -51,29 +52,37 @@ const setup = (
   const withoutTimestamps = (row: VuuDataRow) =>
     timestamps ? row : row.filter((_, index) => index !== 5 && index !== 6);
   const joinProvider = new JoinTableProvider();
+  const columns = Columns.fromNames(
+    ...[
+      "id:string",
+      "trader:string",
+      "price:double",
+      "qty:int",
+      "active:boolean",
+      "vuuCreatedTimestamp:epochtimestamp",
+      "vuuUpdatedTimestamp:epochtimestamp",
+      "vuuMsg:string",
+    ].filter(
+      (column) =>
+        timestamps ||
+        (!column.startsWith("vuuC") && !column.startsWith("vuuU")),
+    ),
+  );
   const tableDef = TableDef({
     name: "orders",
     keyField: "id",
-    columns: Columns.fromNames(
-      ...[
-        "id:string",
-        "trader:string",
-        "price:double",
-        "qty:int",
-        "active:boolean",
-        "vuuCreatedTimestamp:epochtimestamp",
-        "vuuUpdatedTimestamp:epochtimestamp",
-        "vuuMsg:string",
-      ].filter(
-        (column) =>
-          timestamps ||
-          (!column.startsWith("vuuC") && !column.startsWith("vuuU")),
-      ),
-    ),
+    columns,
+    editable: true,
     permissionFunction: (viewport) =>
       PermissionFilter("trader", new Set([viewport.user.name])),
   });
   tableDef.setModule({ name: "TEST" } as ViewServerModule);
+  const blueprintDef = SessionTableDef({
+    name: "edit-orders",
+    keyField: "id",
+    columns,
+  });
+  blueprintDef.setModule({ name: "TEST" } as ViewServerModule);
   const orders = new InMemDataTable(tableDef, joinProvider);
   orders.insert(withoutTimestamps(order("o1", "steve", 10, 100)));
   orders.insert(withoutTimestamps(order("o2", "alice", 20, 200)));
@@ -81,6 +90,7 @@ const setup = (
 
   const tableContainer = new TableContainer(joinProvider);
   tableContainer.addTable(orders);
+  tableContainer.addTable(new InMemDataTable(blueprintDef, joinProvider));
   const viewportContainer = new ViewportContainer(
     tableContainer,
     {} as ProviderContainer,
@@ -354,6 +364,7 @@ describe("row permissions", () => {
     const { call, createViewport, orders, tableContainer } = setup();
     const result = call("createSessionTable", createViewport(orders), {
       copyOption: "All",
+      sessionType: "edit",
     });
     const { table } = (result as { data: { table: { table: string } } }).data;
     expect(keys(tableContainer.getTable(table.table))).toEqual(["o1", "o3"]);
@@ -367,7 +378,10 @@ describe("row permissions", () => {
     vp.selectRow("nope", true);
     expect([...vp.selectedKeys]).toEqual(["o3"]);
 
-    const result = call("createSessionTable", vp, { copyOption: "Selected" });
+    const result = call("createSessionTable", vp, {
+      copyOption: "Selected",
+      sessionType: "edit",
+    });
     const { table } = (result as { data: { table: { table: string } } }).data;
     expect(keys(tableContainer.getTable(table.table))).toEqual(["o3"]);
   });
@@ -384,7 +398,7 @@ describe("row permissions", () => {
     const { beginSession, call, createViewport, orders } = setup();
     const { sessionTable, sessionVp } = beginSession(createViewport(orders));
     // smuggle a hidden source row into the session table
-    sessionTable.insertSourceRow(orders.getRowAtKey("o2"));
+    sessionTable.insertSourceRow("o2", orders.getRowAtKey("o2"));
 
     expect(
       call("editCell", sessionVp, { key: "o2", column: "price", data: 1 }),
@@ -401,7 +415,7 @@ describe("row permissions", () => {
   test("deleteSelectedRows refuses hidden keys", () => {
     const { beginSession, call, createViewport, orders } = setup();
     const { sessionTable } = beginSession(createViewport(orders));
-    sessionTable.insertSourceRow(orders.getRowAtKey("o2"));
+    sessionTable.insertSourceRow("o2", orders.getRowAtKey("o2"));
     const fakeVp = {
       dataTable: sessionTable,
       selectedKeys: new Set(["o1", "o2"]),

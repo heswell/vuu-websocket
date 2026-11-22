@@ -202,9 +202,7 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     force?: boolean,
     _ctx?: RequestContext,
   ): PreparedSessionSave | RpcResult {
-    const sourceTable = this.tableContainer.getTable<DataTable>(
-      sessionTable.tableDef.name,
-    );
+    const { sourceTable } = sessionTable;
     const { columnMap } = sourceTable;
     const isPermitted = permissionPredicate(
       sessionTable.sourcePermissionFilter,
@@ -405,9 +403,13 @@ export class EndEditSessionRpcHandler extends EditTableRpcHandler {
     sourceTable: DataTable,
     sessionRow: VuuDataRow,
   ): VuuDataRow {
-    return sourceTable.schema.columns.map(
-      ({ name }) => sessionRow[sessionTable.columnMap[name]],
-    );
+    // the session key column may have a different name to the source key
+    const key = sessionRow[sessionTable.indexOfKeyField];
+    return sourceTable.schema.columns.map(({ name }) => {
+      if (name === sourceTable.schema.key) return key;
+      const index = sessionTable.columnMap[name];
+      return index === undefined ? "" : sessionRow[index];
+    });
   }
 
   private applyCellUpdates(

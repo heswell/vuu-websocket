@@ -310,15 +310,15 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
       if (!this.isRowAccessible(viewport, key)) {
         throw Error(`undoRowChange: row ${key} not found`);
       }
-      sessionTable.undoRowChange(key, this.getSourceTable(sessionTable));
+      sessionTable.undoRowChange(key);
       return { type: "SUCCESS_RESULT", data: undefined };
     } catch (error) {
       return this.errorResult(error);
     }
   };
 
-  protected getSourceTable(sessionTable: InMemSessionDataTable) {
-    return this.tableContainer.getTable<DataTable>(sessionTable.tableDef.name);
+  protected getSourceTable(sessionTable: InMemSessionDataTable): DataTable {
+    return sessionTable.sourceTable;
   }
 
   /**
