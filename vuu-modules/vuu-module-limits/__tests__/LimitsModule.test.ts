@@ -176,7 +176,7 @@ describe("LimitsModule", () => {
       changed_by: USER,
       entity_type: "Desk",
       metric_family: "Sensitivity",
-      status: "Pending",
+      active: false,
     });
     expect(Number(row("LIM-0001")?.effective_from)).toBeGreaterThan(0);
   });
@@ -201,7 +201,7 @@ describe("LimitsModule", () => {
     const { activate, addLimits, row } = await setup();
     await addLimits(vega);
     await activate();
-    expect(row("LIM-0001")).toMatchObject({ change: "", status: "Active" });
+    expect(row("LIM-0001")).toMatchObject({ change: "", active: true });
   });
 
   test("a change to an Active limit is held until the next business day", async () => {
@@ -221,14 +221,14 @@ describe("LimitsModule", () => {
       change: "hard changes to 150",
       changed_by: USER,
       hard: 100,
-      status: "Pending",
+      active: true,
     });
 
     await activate();
     expect(row("LIM-0001")).toMatchObject({
       change: "",
       hard: 150,
-      status: "Active",
+      active: true,
     });
   });
 
@@ -276,7 +276,7 @@ describe("LimitsModule", () => {
       change: "soft changes to 95, hard changes to 150",
       hard: 100,
       soft: 90,
-      status: "Pending",
+      active: true,
     });
 
     await activate();
@@ -284,7 +284,7 @@ describe("LimitsModule", () => {
       change: "",
       hard: 150,
       soft: 95,
-      status: "Active",
+      active: true,
     });
   });
 
@@ -301,7 +301,7 @@ describe("LimitsModule", () => {
     expect(row("LIM-0001")).toMatchObject({
       change: "New limit",
       hard: 150,
-      status: "Pending",
+      active: false,
     });
   });
 
@@ -319,7 +319,7 @@ describe("LimitsModule", () => {
     expect(row("LIM-0002")).toBeUndefined();
     expect(row("LIM-0001")).toMatchObject({
       change: "Set to delete",
-      status: "Pending",
+      active: true,
     });
 
     await activate();
@@ -385,8 +385,8 @@ describe("business day", () => {
       USER,
     );
     store.activateOnNewBusinessDay(saturday);
-    expect(row("LIM-0009")).toMatchObject({ status: "Pending" });
+    expect(row("LIM-0009")).toMatchObject({ active: false });
     store.activateOnNewBusinessDay(monday);
-    expect(row("LIM-0009")).toMatchObject({ status: "Active" });
+    expect(row("LIM-0009")).toMatchObject({ active: true });
   });
 });

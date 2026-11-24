@@ -43,14 +43,16 @@ Options:
 - **Saving** is all or nothing. If any limit is not valid, nothing is
   saved, each invalid limit has its `vuuMsg` set, and the save fails with a
   message naming them, by `limit_key`, or by line for an import.
-- **Next business day.** A new limit is saved as `Pending`. A change to, or
-  deletion of, an `Active` limit is held, and the limit is `Pending`.
-  `change` is set to the limit's `editChange` from the session. When a new business day begins (Saturday and Sunday
-  belong to the Friday before), Pending limits become `Active` with their
-  held changes applied. `changed_by` is the user who saved the change.
-- **`activatePendingLimits`** RPC, on a `limitDefinitions` viewport,
-  activates Pending limits at once, as at the start of the next business
-  day. For demos and tests.
+- **Next business day.** A new limit is saved with `active` false. A change
+  to, or deletion of, an active limit is held, and the limit stays
+  `active`. `change` is set to the limit's `editChange` from the session, so
+  a limit with a `change` is pending. When a new business day begins
+  (Saturday and Sunday belong to the Friday before), pending changes take
+  effect: new limits become `active`, held changes are applied and deleted
+  limits are removed. `changed_by` is the user who saved the change.
+- **`activatePendingLimits`** RPC, on a `limitDefinitions` viewport, applies
+  pending changes at once, as at the start of the next business day. For
+  demos and tests.
 
 Limits are held in memory, and the server starts with none.
 
