@@ -4,7 +4,6 @@ import { LIMIT_ENTITIES, LIMIT_METRICS } from "./referenceData";
 import { LIMIT_DEFINITION_COLUMNS, LIMIT_TIMESTAMP_COLUMNS } from "./tableDefs";
 import { isBlank, type LimitValues } from "./validation";
 
-export type LimitStatus = "Pending" | "Active";
 
 /**
  * A saved change to one limit, from an edit or import session. editChange
@@ -70,11 +69,12 @@ const describeChanges = (values: LimitValues) =>
 /**
  * Limit definitions and the changes waiting for the next business day:
  *
- * - a saved change never alters an Active limit. A new limit is Pending.
- *   A change to, or deletion of, an Active limit is held, described in
- *   `change`, and the limit is Pending.
- * - when the business day changes, Pending limits become Active, with their
- *   held changes applied, see {@link activatePendingLimits}.
+ * - a saved change never alters an Active limit. A new limit is not
+ *   `active`. A change to, or deletion of, an Active limit is held and
+ *   described in `change`, the limit stays `active`.
+ * - when the business day changes, limits with a `change` take effect: new
+ *   limits become `active`, held changes are applied and pending deletes
+ *   are removed, see {@link activatePendingLimits}.
  */
 export class LimitsStore {
   /** Keys of the limits that have been Active, whose changes are held. */
@@ -109,7 +109,7 @@ export class LimitsStore {
 
   /**
    * Describes the change saving a session row will make, with the changes
-   * already held: "New limit", "Delete", or each changed value. `action` is
+   * already held: "New limit", "Set to delete", or each changed value. `action` is
    * the row's vuuAction.
    */
   describeEdit(key: string, action: VuuRowDataItemType, values: LimitValues) {
@@ -117,7 +117,7 @@ export class LimitsStore {
     if (action === "addRow" || current === undefined) {
       return "New limit";
     } else if (action === "deleteRow") {
-      return "Delete";
+      return "Set to delete";
     } else if (!this.#activeKeys.has(key)) {
       return "New limit";
     }
@@ -130,7 +130,7 @@ export class LimitsStore {
       Object.keys(amended).length === 0 &&
       this.#pendingChanges.get(key)?.type === "delete"
     ) {
-      return "Delete";
+      return "Set to delete";
     }
     return describeChanges(amended);
   }
@@ -150,13 +150,14 @@ export class LimitsStore {
   }
 
   /**
-   * The start of the next business day: Pending limits become Active, with
-   * their held changes applied, and pending deletes take effect.
+   * The start of the next business day: limits with a change take effect.
+   * New limits become active, held changes are applied and pending deletes
+   * remove their limit.
    */
   activatePendingLimits() {
     const { columnMap } = this.#table;
     const pendingKeys = this.#table.rows
-      .filter((row) => row[columnMap.status] === "Pending")
+      .filter((row) => row[columnMap.change] !== "")
       .map((row) => String(row[columnMap.limit_key]));
     for (const key of pendingKeys) {
       const pending = this.#pendingChanges.get(key);
@@ -168,8 +169,8 @@ export class LimitsStore {
         this.#activeKeys.add(key);
         this.#update(key, {
           ...(pending?.type === "amend" ? pending.values : {}),
+          active: true,
           change: "",
-          status: "Active",
         });
       }
     }
@@ -210,7 +211,7 @@ export class LimitsStore {
           ?.entity_type ?? "",
       limit_key: key,
       metric_family: LIMIT_METRICS[String(metric)].family,
-      status: "Pending",
+      active: false,
       vuuCreatedTimestamp: now,
       vuuMsg: "",
       vuuUpdatedTimestamp: now,
@@ -245,13 +246,12 @@ export class LimitsStore {
       const amended = this.#amendedValues(key, current, values);
       if (Object.keys(amended).length === 0) {
         this.#pendingChanges.delete(key);
-        this.#update(key, { change: "", changed_by: "", status: "Active" });
+        this.#update(key, { change: "", changed_by: "" });
       } else {
         this.#pendingChanges.set(key, { type: "amend", values: amended });
         this.#update(key, {
           change: editChange ?? describeChanges(amended),
           changed_by: user,
-          status: "Pending",
         });
       }
     } else {
@@ -260,7 +260,6 @@ export class LimitsStore {
         ...(values as Record<string, VuuRowDataItemType>),
         change: "New limit",
         changed_by: user,
-        status: "Pending",
       });
     }
   }
@@ -268,7 +267,7 @@ export class LimitsStore {
   #deleteLimit(key: string, user: string) {
     if (this.#activeKeys.has(key)) {
       this.#pendingChanges.set(key, { type: "delete" });
-      this.#update(key, { change: "Delete", changed_by: user, status: "Pending" });
+      this.#update(key, { change: "Set to delete", changed_by: user });
     } else {
       this.#table.delete(key);
     }
