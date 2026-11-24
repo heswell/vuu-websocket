@@ -109,7 +109,7 @@ export class LimitsStore {
 
   /**
    * Describes the change saving a session row will make, with the changes
-   * already held: "New limit", "Delete", or each changed value. `action` is
+   * already held: "New limit", "Set to delete", or each changed value. `action` is
    * the row's vuuAction.
    */
   describeEdit(key: string, action: VuuRowDataItemType, values: LimitValues) {
@@ -117,7 +117,7 @@ export class LimitsStore {
     if (action === "addRow" || current === undefined) {
       return "New limit";
     } else if (action === "deleteRow") {
-      return "Delete";
+      return "Set to delete";
     } else if (!this.#activeKeys.has(key)) {
       return "New limit";
     }
@@ -130,7 +130,7 @@ export class LimitsStore {
       Object.keys(amended).length === 0 &&
       this.#pendingChanges.get(key)?.type === "delete"
     ) {
-      return "Delete";
+      return "Set to delete";
     }
     return describeChanges(amended);
   }
@@ -268,7 +268,7 @@ export class LimitsStore {
   #deleteLimit(key: string, user: string) {
     if (this.#activeKeys.has(key)) {
       this.#pendingChanges.set(key, { type: "delete" });
-      this.#update(key, { change: "Delete", changed_by: user, status: "Pending" });
+      this.#update(key, { change: "Set to delete", changed_by: user, status: "Pending" });
     } else {
       this.#table.delete(key);
     }

@@ -38,7 +38,7 @@ Options:
   is added. Values are checked as they are entered.
 - **`editChange`**, in an edit session, is maintained by the server and
   cannot be edited. It describes the change saving each limit will make,
-  including changes already held: `New limit`, `Delete`, or each changed
+  including changes already held: `New limit`, `Set to delete`, or each changed
   value in column order, e.g. `soft changes to 95, hard changes to 150`.
 - **Saving** is all or nothing. If any limit is not valid, nothing is
   saved, each invalid limit has its `vuuMsg` set, and the save fails with a

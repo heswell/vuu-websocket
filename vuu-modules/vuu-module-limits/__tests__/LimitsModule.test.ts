@@ -246,7 +246,7 @@ describe("LimitsModule", () => {
     await call(session, "addRow", { data: { ...vega, entity_id: "DESK-RATES" } });
     expect(editChanges(session)).toEqual({
       "LIM-0001": "soft changes to 95, hard changes to 150",
-      "LIM-0002": "Delete",
+      "LIM-0002": "Set to delete",
       "LIM-0003": "New limit",
     });
     expect(
@@ -318,7 +318,7 @@ describe("LimitsModule", () => {
     expect(await save(session)).toMatchObject({ type: "SUCCESS_RESULT" });
     expect(row("LIM-0002")).toBeUndefined();
     expect(row("LIM-0001")).toMatchObject({
-      change: "Delete",
+      change: "Set to delete",
       status: "Pending",
     });
 
