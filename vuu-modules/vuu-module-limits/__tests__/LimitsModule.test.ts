@@ -120,7 +120,25 @@ const setup = async () => {
 
   const activate = () => call(limits, "activatePendingLimits");
 
-  return { activate, addLimits, call, createSession, limits, row, save };
+  /** The editChange of each row of a session, by key. */
+  const editChanges = (session: InMemSessionDataTable) =>
+    Object.fromEntries(
+      session.rows.map((row) => [
+        row[session.columnMap.limit_key],
+        row[session.columnMap.editChange],
+      ]),
+    );
+
+  return {
+    activate,
+    addLimits,
+    call,
+    createSession,
+    editChanges,
+    limits,
+    row,
+    save,
+  };
 };
 
 describe("validation", () => {
@@ -200,7 +218,7 @@ describe("LimitsModule", () => {
     });
     expect(await save(session)).toMatchObject({ type: "SUCCESS_RESULT" });
     expect(row("LIM-0001")).toMatchObject({
-      change: "hard 100 → 150",
+      change: "hard changes to 150",
       changed_by: USER,
       hard: 100,
       status: "Pending",
@@ -210,6 +228,62 @@ describe("LimitsModule", () => {
     expect(row("LIM-0001")).toMatchObject({
       change: "",
       hard: 150,
+      status: "Active",
+    });
+  });
+
+  test("editChange describes the change saving each row will make", async () => {
+    const { activate, addLimits, call, createSession, editChanges } =
+      await setup();
+    await addLimits(vega, { ...vega, entity_id: "DESK-CASH" });
+    await activate();
+
+    const session = await createSession("edit");
+    expect(editChanges(session)).toEqual({ "LIM-0001": "", "LIM-0002": "" });
+    await call(session, "editCell", { column: "hard", data: 150, key: "LIM-0001" });
+    await call(session, "editCell", { column: "soft", data: 95, key: "LIM-0001" });
+    await call(session, "deleteRow", { key: "LIM-0002" });
+    await call(session, "addRow", { data: { ...vega, entity_id: "DESK-RATES" } });
+    expect(editChanges(session)).toEqual({
+      "LIM-0001": "soft changes to 95, hard changes to 150",
+      "LIM-0002": "Delete",
+      "LIM-0003": "New limit",
+    });
+    expect(
+      await call(session, "editCell", {
+        column: "editChange",
+        data: "nope",
+        key: "LIM-0001",
+      }),
+    ).toMatchObject({ type: "ERROR_RESULT" });
+  });
+
+  test("saving sets change to editChange, which includes changes already held", async () => {
+    const { activate, addLimits, call, createSession, editChanges, row, save } =
+      await setup();
+    await addLimits(vega);
+    await activate();
+
+    const first = await createSession("edit");
+    await call(first, "editCell", { column: "hard", data: 150, key: "LIM-0001" });
+    await save(first);
+
+    const second = await createSession("edit");
+    expect(editChanges(second)).toEqual({ "LIM-0001": "hard changes to 150" });
+    await call(second, "editCell", { column: "soft", data: 95, key: "LIM-0001" });
+    expect(await save(second)).toMatchObject({ type: "SUCCESS_RESULT" });
+    expect(row("LIM-0001")).toMatchObject({
+      change: "soft changes to 95, hard changes to 150",
+      hard: 100,
+      soft: 90,
+      status: "Pending",
+    });
+
+    await activate();
+    expect(row("LIM-0001")).toMatchObject({
+      change: "",
+      hard: 150,
+      soft: 95,
       status: "Active",
     });
   });

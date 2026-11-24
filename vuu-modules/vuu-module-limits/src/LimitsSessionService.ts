@@ -23,6 +23,15 @@ import {
 
 type SessionChange = LimitChange & { error?: string; rowName: string };
 
+/** The requests that change the rows of a session. */
+const SESSION_CHANGES: readonly string[] = [
+  RpcNames.AddRowRpc,
+  RpcNames.DeleteRowRpc,
+  RpcNames.DeleteSelectedRowsRpc,
+  RpcNames.EditCellRpc,
+  RpcNames.UndoRowChangeRpc,
+];
+
 /**
  * Service of viewports on the edit and import session tables. Values are
  * checked as they are entered. Saving is all or nothing: if any limit is
@@ -38,24 +47,37 @@ export class LimitsSessionService extends CreateSessionTableRpcHandler {
     this.#store = store;
   }
 
-  /** A row added without a key is given the next limit_id. */
-  processRpcRequest(
+  /**
+   * A row added without a key is given the next limit_key. editChange is
+   * updated after each change to the session.
+   */
+  async processRpcRequest(
     rpcName: string,
     rpcParams: RpcParams,
-  ): RpcResult | Promise<RpcResult> {
-    if (rpcName === RpcNames.AddRowRpc && rpcParams.namedParams.key == null) {
-      return super.processRpcRequest(rpcName, {
-        ...rpcParams,
-        namedParams: {
-          ...rpcParams.namedParams,
-          key: this.#store.nextLimitId(),
-        },
-      });
+  ): Promise<RpcResult> {
+    const params =
+      rpcName === RpcNames.AddRowRpc && rpcParams.namedParams.key == null
+        ? {
+            ...rpcParams,
+            namedParams: {
+              ...rpcParams.namedParams,
+              key: this.#store.nextLimitKey(),
+            },
+          }
+        : rpcParams;
+    const result = await super.processRpcRequest(rpcName, params);
+    if (SESSION_CHANGES.includes(rpcName)) {
+      this.#updateEditChange(
+        rpcParams.viewport.dataTable as InMemSessionDataTable,
+      );
     }
-    return super.processRpcRequest(rpcName, rpcParams);
+    return result;
   }
 
   protected validateCellEdit({ column, row, table, value }: CellEdit) {
+    if (column === "editChange") {
+      return "editChange is maintained by the server";
+    }
     const isAddedRow = row[table.columnMap.vuuAction] === "addRow";
     if (LIMIT_INSERT_ONLY_COLUMNS.includes(column) && !isAddedRow) {
       return `${column} can only be set when a limit is added`;
@@ -117,6 +139,10 @@ export class LimitsSessionService extends CreateSessionTableRpcHandler {
       );
       return {
         action: action === "addRow" ? "addRow" : "editCell",
+        editChange:
+          columnMap.editChange === undefined
+            ? undefined
+            : String(row[columnMap.editChange]),
         error: validateLimitDefinition({
           ...this.#store.values(key),
           ...values,
@@ -126,6 +152,34 @@ export class LimitsSessionService extends CreateSessionTableRpcHandler {
         values,
       };
     });
+  }
+
+  /** editChange describes, for each row, the change saving will make. */
+  #updateEditChange(sessionTable: InMemSessionDataTable) {
+    const { columnMap } = sessionTable;
+    if (columnMap.editChange === undefined) return;
+    // an edited row has no action of its own
+    const actions = new Map(
+      sessionTable
+        .getSessionChanges()
+        .map(({ action, key }) => [key, action === "" ? "editCell" : action]),
+    );
+    for (const row of sessionTable.rows) {
+      const key = String(row[columnMap.limit_key]);
+      const values: LimitValues = Object.fromEntries(
+        LIMIT_DEFINITION_COLUMNS.map((name) => [name, row[columnMap[name]]]),
+      );
+      const editChange = this.#store.describeEdit(
+        key,
+        actions.get(key) ?? "",
+        values,
+      );
+      if (row[columnMap.editChange] !== editChange) {
+        const updated = row.slice();
+        updated[columnMap.editChange] = editChange;
+        sessionTable.update(sessionTable.rowIndexAtKey(key), updated);
+      }
+    }
   }
 
   #setMessage(sessionTable: InMemSessionDataTable, key: string, message: string) {
