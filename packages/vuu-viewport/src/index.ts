@@ -8,4 +8,5 @@ export {
   AggregationType,
   ROOT_KEY,
 } from "./GroupTree.ts";
+export { ParentTree } from "./ParentTree.ts";
 export { InMemoryViewport, inMemoryDataEngine } from "./InMemoryViewport.ts";

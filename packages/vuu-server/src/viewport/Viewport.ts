@@ -17,6 +17,7 @@ import {
   type ViewportEngine,
 } from "@heswell/vuu-viewport";
 import { ViewPortDef } from "../api/ViewPortDef";
+import { validateTree, type WithTree } from "./ViewportTree";
 import { Column } from "../api/TableDef";
 import { DataTable, isDataTable } from "../core/table/InMemDataTable";
 import { ClientSessionId } from "../net/ClientConnectionCreator";
@@ -280,6 +281,12 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     this.#outboundQ = outboundQ;
     this.#viewPortDef = viewPortDef;
     this.#table = table;
+    validateTree(
+      config.tree,
+      table.schema,
+      config.groupBy,
+      config.aggregations,
+    );
     const engineTable = table as unknown as Table;
     this.#engine = dataEngine.createViewport(engineTable, {
       id,
@@ -288,6 +295,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
       filterSpec: config.filterSpec,
       groupBy: config.groupBy,
       sort: config.sort,
+      tree: config.tree,
       range: config.range ?? range,
       onPendingChanges: () => markDirty(this),
       rowWriter: {
@@ -462,13 +470,19 @@ export class Viewport extends EventEmitter<ViewportEvents> {
     return this.post(this.#engine.setRange(range));
   }
 
+  /**
+   * A change request carries the whole config, so a request without tree
+   * makes the viewport flat.
+   */
   changeViewport({
     aggregations,
     columns,
     filterSpec,
     groupBy,
     sort,
-  }: Partial<Omit<VuuViewportChangeRequest, "viewPortId" | "type">>) {
+    tree,
+  }: WithTree<Partial<Omit<VuuViewportChangeRequest, "viewPortId" | "type">>>) {
+    validateTree(tree, this.#table.schema, groupBy, aggregations);
     const batch = this.post(
       this.#engine.setConfig({
         aggregations,
@@ -476,6 +490,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
         filterSpec,
         groupBy,
         sort,
+        tree,
       }),
     );
     return batch;
@@ -582,10 +597,7 @@ export class Viewport extends EventEmitter<ViewportEvents> {
   }
 
   /** rows in the batch are ViewPortUpdates, created by the rowWriter */
-  private post(
-    batch: ViewportBatch<ViewPortUpdate>,
-    forceSizeMessage = false,
-  ) {
+  private post(batch: ViewportBatch<ViewPortUpdate>, forceSizeMessage = false) {
     if (!this.#enabled) {
       return batch;
     }
@@ -594,7 +606,15 @@ export class Viewport extends EventEmitter<ViewportEvents> {
 
     if (sizeChanged || forceSizeMessage) {
       outboundQ.pushHighPriority(
-        ViewPortUpdate(this.#requestId, this, null, NO_SIZE, "SIZE", size, "SIZE"),
+        ViewPortUpdate(
+          this.#requestId,
+          this,
+          null,
+          NO_SIZE,
+          "SIZE",
+          size,
+          "SIZE",
+        ),
       );
     }
 

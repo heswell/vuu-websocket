@@ -9,6 +9,7 @@ import type {
 import { filterNarrows, parseAndCompileFilter } from "./filter.ts";
 import { toProtocolValue, withIntegerAliases } from "./values.ts";
 import { aggValue, GroupTree, type GroupNode } from "./GroupTree.ts";
+import { ParentTree } from "./ParentTree.ts";
 import {
   createComparator,
   NO_SORT,
@@ -29,6 +30,7 @@ import {
   type ViewportEngine,
   type ViewportOptions,
   type ViewportRow,
+  type VuuTree,
 } from "./types.ts";
 
 const EMPTY_SORT: VuuSort = { sortDefs: [] };
@@ -38,6 +40,26 @@ const TREE_COLUMN_COUNT = 6;
 
 const sameJSON = (o1: unknown, o2: unknown) =>
   JSON.stringify(o1) === JSON.stringify(o2);
+
+const assertTreeConfig = (
+  tree: VuuTree | undefined,
+  groupBy: string[],
+  aggregations: unknown[],
+) => {
+  if (tree && groupBy.length > 0) {
+    throw Error("[InMemoryViewport] tree cannot be combined with groupBy");
+  }
+  if (tree && aggregations.length > 0) {
+    throw Error("[InMemoryViewport] tree cannot be combined with aggregations");
+  }
+};
+
+/**
+ * Tree state of a parent-key tree row, compared with what was last sent so a
+ * row is re-sent when it opens, closes or gains or loses children.
+ */
+const treeRowState = (depth: number, isExpanded: boolean, childCount: number) =>
+  (childCount * 1024 + depth) * 2 + (isExpanded ? 1 : 0);
 
 const shallowEqual = (a1: unknown[], a2: unknown[]) => {
   if (a1.length !== a2.length) return false;
@@ -121,8 +143,9 @@ export class InMemoryViewport<R = ViewportRow>
   #pendingList: number[] = [];
   #forceDirty = new Set<number>();
 
-  // grouping
+  // grouping (#tree) or parent-key tree (#parentTree), never both
   #tree: GroupTree | undefined;
+  #parentTree: ParentTree | undefined;
   #treeDirty = false;
   #flattenDirty = false;
 
@@ -137,6 +160,8 @@ export class InMemoryViewport<R = ViewportRow>
   #sentKey: (string | undefined)[] = [];
   #sentRef: unknown[] = [];
   #sentSel: number[] = [];
+  /** treeRowState of parent-key tree rows */
+  #sentTreeState: number[] = [];
   #sentSize = -1;
 
   // output
@@ -163,6 +188,7 @@ export class InMemoryViewport<R = ViewportRow>
       filterSpec = { filter: "" },
       groupBy = [],
       aggregations = [],
+      tree,
       range = NULL_RANGE,
       permissionFilter,
       baseFilterSpec = EMPTY_FILTER,
@@ -170,12 +196,12 @@ export class InMemoryViewport<R = ViewportRow>
       rowWriter,
     }: ViewportOptions<R>,
   ) {
-    this.#writer =
-      rowWriter ?? (viewportRowWriter as unknown as RowWriter<R>);
+    this.#writer = rowWriter ?? (viewportRowWriter as unknown as RowWriter<R>);
     this.id = id;
     this.table = table;
     this.#tsCol = table.columnMap.vuuUpdatedTimestamp ?? -1;
-    this.#config = { columns, sort, filterSpec, groupBy, aggregations };
+    assertTreeConfig(tree, groupBy, aggregations);
+    this.#config = { columns, sort, filterSpec, groupBy, aggregations, tree };
     this.#range = range;
     this.#onPendingChanges = onPendingChanges;
     this.#permissionFilter = permissionFilter;
@@ -190,6 +216,10 @@ export class InMemoryViewport<R = ViewportRow>
     );
     this.#sortSpec = toSortSpec(sort.sortDefs, table.columnMap);
     this.#compare = createComparator(table, this.#sortSpec);
+    if (tree) {
+      this.#parentTree = new ParentTree(table, tree);
+      this.#treeDirty = true;
+    }
     this.composePredicate();
     if (groupBy.length > 0) {
       this.#tree = new GroupTree(table, groupBy, aggregations);
@@ -216,7 +246,8 @@ export class InMemoryViewport<R = ViewportRow>
   }
 
   get size() {
-    return this.#tree ? this.#tree.visible.length : this.#indexLen;
+    const tree = this.#tree ?? this.#parentTree;
+    return tree ? tree.visible.length : this.#indexLen;
   }
 
   get selectedKeys(): ReadonlySet<string> {
@@ -236,7 +267,7 @@ export class InMemoryViewport<R = ViewportRow>
     this.applyPending();
     const deselected = this.#deselected;
     if (deselected.size === 0) return this.size;
-    if (this.#tree) {
+    if (this.#tree || this.#parentTree) {
       let count = 0;
       for (let pos = 0; pos < this.size; pos++) {
         if (!deselected.has(this.keyAt(pos))) count += 1;
@@ -256,6 +287,10 @@ export class InMemoryViewport<R = ViewportRow>
 
   get isGrouped() {
     return this.#tree !== undefined;
+  }
+
+  get isTree() {
+    return this.#parentTree !== undefined;
   }
 
   get hasPendingChanges() {
@@ -281,7 +316,7 @@ export class InMemoryViewport<R = ViewportRow>
         this.ensureIndexCapacity(this.#indexLen + 1);
         this.#posOf[rowIdx] = this.#indexLen;
         this.#index[this.#indexLen++] = rowIdx;
-        if (this.#tree) this.#treeDirty = true;
+        if (this.#tree || this.#parentTree) this.#treeDirty = true;
         this.notify();
       }
     } else {
@@ -323,6 +358,24 @@ export class InMemoryViewport<R = ViewportRow>
     }
 
     if (!inIndex) {
+      return;
+    }
+
+    const parentTree = this.#parentTree;
+    if (parentTree) {
+      if (!this.#treeDirty) {
+        const { parentCol } = parentTree;
+        const match = this.#clientFilter?.predicate;
+        if (
+          inPlace ||
+          row[parentCol] !== previous[parentCol] ||
+          (match !== undefined && match(row) !== match(previous))
+        ) {
+          this.#treeDirty = true;
+        }
+      }
+      if (inPlace) this.#forceDirty.add(rowIdx);
+      this.notify();
       return;
     }
 
@@ -404,7 +457,7 @@ export class InMemoryViewport<R = ViewportRow>
     this.#pendingFlag.fill(0);
     this.#pendingList.length = 0;
     this.#forceDirty.clear();
-    if (this.#tree) this.#treeDirty = true;
+    if (this.#tree || this.#parentTree) this.#treeDirty = true;
     this.#deselected.clear();
     if (this.#selected.size > 0 || this.#selectAll) {
       this.#selected.clear();
@@ -436,16 +489,19 @@ export class InMemoryViewport<R = ViewportRow>
       const sentKey = new Array<string | undefined>(len);
       const sentRef = new Array<unknown>(len);
       const sentSel = new Array<number>(len).fill(-1);
+      const sentTreeState = new Array<number>(len).fill(-1);
       const overlapFrom = Math.max(from, range.from);
       const overlapTo = Math.min(to, range.to);
       for (let pos = overlapFrom; pos < overlapTo; pos++) {
         sentKey[pos - range.from] = this.#sentKey[pos - from];
         sentRef[pos - range.from] = this.#sentRef[pos - from];
         sentSel[pos - range.from] = this.#sentSel[pos - from];
+        sentTreeState[pos - range.from] = this.#sentTreeState[pos - from];
       }
       this.#sentKey = sentKey;
       this.#sentRef = sentRef;
       this.#sentSel = sentSel;
+      this.#sentTreeState = sentTreeState;
       this.#range = { from: range.from, to: range.to };
     }
     return this.collect();
@@ -457,10 +513,11 @@ export class InMemoryViewport<R = ViewportRow>
     const next: ViewportConfig = { ...current };
     for (const key in config) {
       const value = config[key as keyof ViewportConfig];
-      if (value !== undefined) {
+      if (value !== undefined || key === "tree") {
         (next as unknown as Record<string, unknown>)[key] = value;
       }
     }
+    assertTreeConfig(next.tree, next.groupBy, next.aggregations);
     const { columnMap } = this.table;
 
     const columnsChanged = !sameJSON(current.columns, next.columns);
@@ -471,6 +528,12 @@ export class InMemoryViewport<R = ViewportRow>
       current.aggregations,
       next.aggregations,
     );
+    const treeChanged =
+      current.tree?.parentColumn !== next.tree?.parentColumn ||
+      (current.tree?.openDepth ?? 0) !== (next.tree?.openDepth ?? 0);
+    const parentTree = treeChanged
+      ? next.tree && new ParentTree(this.table, next.tree)
+      : this.#parentTree;
 
     this.#config = next;
 
@@ -479,14 +542,25 @@ export class InMemoryViewport<R = ViewportRow>
       this.#compare = createComparator(this.table, this.#sortSpec);
     }
 
+    if (treeChanged) {
+      this.#parentTree = parentTree;
+      this.#treeDirty = parentTree !== undefined;
+    }
+
     if (filterChanged) {
       const previousFilter = this.#clientFilter?.filter;
       this.#clientFilter = parseAndCompileFilter(
         next.filterSpec.filter,
         columnMap,
       );
+      this.#parentTree?.clearFilterState();
       this.composePredicate();
-      if (
+      if (treeChanged) {
+        this.rebuildIndex();
+      } else if (this.#parentTree) {
+        // the client filter selects rows of the tree, not rows of the index
+        if (sortChanged) this.resortIndex();
+      } else if (
         !sortChanged &&
         filterNarrows(this.#clientFilter?.filter, previousFilter)
       ) {
@@ -494,6 +568,9 @@ export class InMemoryViewport<R = ViewportRow>
       } else {
         this.rebuildIndex();
       }
+    } else if (treeChanged) {
+      this.composePredicate();
+      this.rebuildIndex();
     } else if (sortChanged) {
       this.resortIndex();
     }
@@ -513,7 +590,10 @@ export class InMemoryViewport<R = ViewportRow>
         );
         this.#treeDirty = true;
       }
-    } else if (this.#tree && (sortChanged || filterChanged)) {
+    } else if (
+      (this.#tree || this.#parentTree) &&
+      (sortChanged || filterChanged)
+    ) {
       this.#treeDirty = true;
     }
 
@@ -526,7 +606,8 @@ export class InMemoryViewport<R = ViewportRow>
       filterChanged ||
       sortChanged ||
       groupByChanged ||
-      aggregationsChanged;
+      aggregationsChanged ||
+      treeChanged;
 
     this.applyPending();
     if (structural) {
@@ -568,7 +649,7 @@ export class InMemoryViewport<R = ViewportRow>
       this.applyPending();
       this.composePredicate();
       this.narrowIndex();
-      if (this.#tree) this.#treeDirty = true;
+      if (this.#tree || this.#parentTree) this.#treeDirty = true;
       this.applyPending();
       return this.collect();
     }
@@ -576,6 +657,11 @@ export class InMemoryViewport<R = ViewportRow>
   }
 
   openTreeNode(treeKey: string) {
+    const parentTree = this.#parentTree;
+    if (parentTree) {
+      if (parentTree.open(treeKey)) this.#flattenDirty = true;
+      return this.flush();
+    }
     const tree = this.#tree;
     if (tree && !tree.expanded.has(treeKey)) {
       tree.expanded.add(treeKey);
@@ -585,6 +671,13 @@ export class InMemoryViewport<R = ViewportRow>
   }
 
   closeTreeNode(treeKey: string) {
+    const parentTree = this.#parentTree;
+    if (parentTree) {
+      // close collapses descendants, so the tree must be current
+      this.applyPending();
+      if (parentTree.close(treeKey)) this.#flattenDirty = true;
+      return this.flush();
+    }
     const tree = this.#tree;
     if (tree && tree.expanded.has(treeKey)) {
       tree.expanded.delete(treeKey);
@@ -716,8 +809,11 @@ export class InMemoryViewport<R = ViewportRow>
     const tree = this.#tree;
     if (tree === undefined) {
       const index = this.#index;
+      const parentTree = this.#parentTree;
       for (let pos = 0; pos < this.#indexLen; pos++) {
-        const key = String(rows[index[pos]][indexOfKeyField]);
+        const rowIdx = index[pos];
+        if (parentTree && !parentTree.includes(rowIdx)) continue;
+        const key = String(rows[rowIdx][indexOfKeyField]);
         if (!deselected.has(key)) keys.push(key);
       }
       return keys;
@@ -769,6 +865,9 @@ export class InMemoryViewport<R = ViewportRow>
   }
 
   rowIndexAt(position: number) {
+    if (this.#parentTree) {
+      return this.#parentTree.visible[position] ?? -1;
+    }
     if (this.#tree) {
       const entry = this.#tree.visible[position];
       return typeof entry === "number" ? entry : -1;
@@ -834,7 +933,10 @@ export class InMemoryViewport<R = ViewportRow>
       );
     }
     if (this.#baseFilter) predicates.push(this.#baseFilter.predicate);
-    if (this.#clientFilter) predicates.push(this.#clientFilter.predicate);
+    // a parent-key tree applies the client filter itself, keeping ancestors
+    if (this.#clientFilter && this.#parentTree === undefined) {
+      predicates.push(this.#clientFilter.predicate);
+    }
 
     if (predicates.length === 0) {
       this.#predicate = undefined;
@@ -856,7 +958,7 @@ export class InMemoryViewport<R = ViewportRow>
     this.applyPending();
     this.composePredicate();
     this.rebuildIndex();
-    if (this.#tree) this.#treeDirty = true;
+    if (this.#tree || this.#parentTree) this.#treeDirty = true;
     this.applyPending();
     return this.collect();
   }
@@ -1096,7 +1198,24 @@ export class InMemoryViewport<R = ViewportRow>
     this.#notified = false;
     if (this.#pendingList.length > 0 || this.#tombstones > 0) {
       this.mergePending();
-      if (this.#tree) this.#treeDirty = true;
+      if (this.#tree || this.#parentTree) this.#treeDirty = true;
+    }
+    const parentTree = this.#parentTree;
+    if (parentTree) {
+      if (this.#treeDirty) {
+        parentTree.build(
+          this.#index,
+          this.#indexLen,
+          this.#clientFilter?.predicate,
+        );
+        parentTree.flatten();
+        this.#treeDirty = false;
+        this.#flattenDirty = false;
+      } else if (this.#flattenDirty) {
+        parentTree.flatten();
+        this.#flattenDirty = false;
+      }
+      return;
     }
     const tree = this.#tree;
     if (tree) {
@@ -1118,10 +1237,15 @@ export class InMemoryViewport<R = ViewportRow>
     this.#sentKey = new Array(len);
     this.#sentRef = new Array(len);
     this.#sentSel = new Array(len).fill(-1);
+    this.#sentTreeState = new Array(len).fill(-1);
     this.#sentSize = -1;
   }
 
   private positionOfKey(key: string) {
+    if (this.#parentTree) {
+      const rowIdx = this.table.rowIndexAtKey(key);
+      return rowIdx === -1 ? -1 : this.#parentTree.visible.indexOf(rowIdx);
+    }
     if (this.#tree) {
       const visible = this.#tree.visible;
       for (let pos = 0; pos < visible.length; pos++) {
@@ -1135,6 +1259,9 @@ export class InMemoryViewport<R = ViewportRow>
 
   private keyAt(pos: number): string {
     const { rows, indexOfKeyField } = this.table;
+    if (this.#parentTree) {
+      return String(rows[this.#parentTree.visible[pos]][indexOfKeyField]);
+    }
     const tree = this.#tree;
     if (tree) {
       const entry = tree.visible[pos];
@@ -1220,12 +1347,57 @@ export class InMemoryViewport<R = ViewportRow>
     const sentKey = this.#sentKey;
     const sentRef = this.#sentRef;
     const sentSel = this.#sentSel;
+    const sentTreeState = this.#sentTreeState;
     const forceDirty = this.#forceDirty;
     const tree = this.#tree;
+    const parentTree = this.#parentTree;
 
     for (let pos = from; pos < end; pos++) {
       const slot = pos - from;
-      if (tree === undefined) {
+      if (parentTree) {
+        const rowIdx = parentTree.visible[pos];
+        const row = tableRows[rowIdx];
+        const key = String(row[keyIdx]);
+        const sel = selected.has(key) ? selIfMember : selIfNotMember;
+        const depth = parentTree.visibleDepth[pos];
+        const isExpanded = parentTree.visibleExpanded[pos];
+        const childCount = parentTree.visibleChildCount[pos];
+        const treeState = treeRowState(depth, isExpanded, childCount);
+        if (
+          key !== sentKey[slot] ||
+          row !== sentRef[slot] ||
+          sel !== sentSel[slot] ||
+          treeState !== sentTreeState[slot] ||
+          forceDirty.has(rowIdx)
+        ) {
+          sentKey[slot] = key;
+          sentRef[slot] = row;
+          sentSel[slot] = sel;
+          sentTreeState[slot] = treeState;
+          header.rowIndex = pos;
+          header.rowKey = key;
+          header.sel = sel;
+          header.ts = this.rowTs(row);
+          header.depth = depth;
+          header.isExpanded = isExpanded;
+          header.treeKey = key;
+          header.isLeaf = childCount === 0;
+          header.label = key;
+          header.childCount = childCount;
+          const out = writer.create(header, treeColumnCount + columnCount);
+          const values = writer.values(out);
+          if (treeColumnCount !== 0) {
+            values[dataOffset] = depth;
+            values[dataOffset + 1] = isExpanded;
+            values[dataOffset + 2] = key;
+            values[dataOffset + 3] = childCount === 0;
+            values[dataOffset + 4] = key;
+            values[dataOffset + 5] = childCount;
+          }
+          this.projectInto(row, values, dataOffset + treeColumnCount);
+          rows.push(out);
+        }
+      } else if (tree === undefined) {
         const rowIdx = this.#index[pos];
         const row = tableRows[rowIdx];
         const key = String(row[keyIdx]);
@@ -1327,6 +1499,7 @@ export class InMemoryViewport<R = ViewportRow>
       sentKey[slot] = undefined;
       sentRef[slot] = undefined;
       sentSel[slot] = -1;
+      sentTreeState[slot] = -1;
     }
     forceDirty.clear();
     return { size, sizeChanged, rows };

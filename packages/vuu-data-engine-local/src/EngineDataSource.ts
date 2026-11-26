@@ -7,6 +7,7 @@ import {
   type RowWriter,
   type ViewportBatch,
   type ViewportEngine,
+  type VuuTree,
 } from "@heswell/vuu-viewport";
 import type {
   DataSourceBase,
@@ -68,7 +69,20 @@ import { RowKeys } from "./RowKeys";
 export type EngineDataSourceSubscribeProps = Omit<
   DataSourceSubscribeProps,
   "range"
-> & { range?: Range | VuuRange };
+> & { range?: Range | VuuRange; tree?: VuuTree };
+
+/**
+ * The parent-key tree of a dataSource config. The published DataSourceConfig
+ * type doesn't have it yet.
+ */
+type WithTree<T> = T & { tree?: VuuTree };
+
+const treeOf = (config: object): VuuTree | undefined =>
+  (config as WithTree<object>).tree;
+
+const isTreeChanged = (t1?: VuuTree, t2?: VuuTree) =>
+  t1?.parentColumn !== t2?.parentColumn ||
+  (t1?.openDepth ?? 0) !== (t2?.openDepth ?? 0);
 
 export const toRange = (range: VuuRange | Range): Range =>
   typeof (range as Range).equals === "function" &&
@@ -109,6 +123,8 @@ export interface EngineDataSourceConstructorProps extends Omit<
   /** number of rows to fetch either side of the visible range */
   renderBufferSize?: number;
   table?: Table;
+  /** shows the rows as a tree, from a column holding each row's parent key */
+  tree?: VuuTree;
 }
 
 /**
@@ -175,6 +191,7 @@ export class EngineDataSource
     sort,
     table,
     title,
+    tree,
     viewport,
   }: EngineDataSourceConstructorProps) {
     super();
@@ -207,7 +224,8 @@ export class EngineDataSource
       filterSpec: filterSpec || this._config.filterSpec,
       groupBy: groupBy || this._config.groupBy,
       sort: sort || this._config.sort,
-    });
+      tree,
+    } as WithTree<DataSourceConfig>);
 
     this.#engine = this.#createEngine();
   }
@@ -229,6 +247,7 @@ export class EngineDataSource
       permissionFilter: this.#permissionFilter,
       range: this.#bufferedRange,
       sort,
+      tree: treeOf(this._config),
     });
     if (this.#linkFilter) {
       engine.setLinkFilter(this.#linkFilter);
@@ -253,6 +272,11 @@ export class EngineDataSource
 
   get #isGrouped() {
     return this._config.groupBy.length > 0;
+  }
+
+  /** grouped, or a parent-key tree: rows carry tree metadata */
+  get #hasTreeRows() {
+    return this.#isGrouped || treeOf(this._config) !== undefined;
   }
 
   get #isLive() {
@@ -303,7 +327,7 @@ export class EngineDataSource
    * The engine builds client rows directly: header fields first, then column
    * values written by the engine from CLIENT_DATA_OFFSET. Values are already
    * in protocol form (bigints converted). _config is updated before the
-   * engine is called, so #isGrouped is current here.
+   * engine is called, so #hasTreeRows is current here.
    */
   #rowWriter: RowWriter<DataSourceRowWithBigint> = {
     dataOffset: CLIENT_DATA_OFFSET,
@@ -313,7 +337,7 @@ export class EngineDataSource
       const clientRow = new Array(CLIENT_DATA_OFFSET + valueCount) as unknown[];
       clientRow[0] = rowIndex;
       clientRow[1] = this.#keys.keyFor(rowIndex);
-      if (this.#isGrouped) {
+      if (this.#hasTreeRows) {
         clientRow[2] = header.isLeaf;
         clientRow[3] = header.isExpanded;
         clientRow[4] = header.depth;
@@ -427,6 +451,7 @@ export class EngineDataSource
       sort,
       groupBy,
       filterSpec,
+      tree,
     }: EngineDataSourceSubscribeProps,
     callback: DataSourceSubscribeCallback,
   ) {
@@ -441,7 +466,7 @@ export class EngineDataSource
 
     let config = this._config;
     const hasConfigProps =
-      aggregations || columns || filterSpec || groupBy || sort;
+      aggregations || columns || filterSpec || groupBy || sort || tree;
     if (hasConfigProps) {
       config = {
         ...config,
@@ -451,7 +476,8 @@ export class EngineDataSource
         filterSpec: filterSpec || config.filterSpec,
         groupBy: groupBy || config.groupBy,
         sort: sort || config.sort,
-      };
+        tree: tree || treeOf(config),
+      } as WithTree<typeof config>;
     }
 
     const subscribedMessage: DataSourceSubscribedMessage = {
@@ -604,7 +630,8 @@ export class EngineDataSource
   #normaliseConfig(
     config: WithBaseFilter<DataSourceConfig>,
   ): WithBaseFilter<WithFullConfig> {
-    return withConfigDefaults(
+    const tree = treeOf(config);
+    const fullConfig = withConfigDefaults(
       config?.filterSpec?.filter && config.filterSpec.filterStruct === undefined
         ? {
             ...config,
@@ -615,6 +642,8 @@ export class EngineDataSource
           }
         : config,
     );
+    // withConfigDefaults doesn't carry tree
+    return tree ? ({ ...fullConfig, tree } as typeof fullConfig) : fullConfig;
   }
 
   get config() {
@@ -622,13 +651,12 @@ export class EngineDataSource
   }
 
   set config(config: WithBaseFilter<WithFullConfig>) {
-    const { noChanges, ...configChanges } = isConfigChanged(
-      this._config,
-      config,
-    );
-    if (noChanges === true) {
+    const { noChanges, ...changes } = isConfigChanged(this._config, config);
+    const treeChanged = isTreeChanged(treeOf(this._config), treeOf(config));
+    if (noChanges === true && !treeChanged) {
       return;
     }
+    const configChanges = { ...changes, treeChanged };
     const { visualLink } = this._config;
     this._config = { ...this.#normaliseConfig(config), visualLink };
     this.#applyConfigToEngine(configChanges);
@@ -636,7 +664,8 @@ export class EngineDataSource
     if (
       configChanges.filterChanged ||
       configChanges.baseFilterChanged ||
-      configChanges.groupByChanged
+      configChanges.groupByChanged ||
+      configChanges.treeChanged
     ) {
       nextFrame(() => {
         this.emit("resize", this.size);
@@ -672,6 +701,7 @@ export class EngineDataSource
       filterSpec: { filter: filterSpec.filter },
       groupBy,
       sort,
+      tree: treeOf(this._config),
     });
     // rows will be resent to client in full on next frame, but the cache is
     // populated now, so rows are immediately available via getRowAtIndex
@@ -926,7 +956,7 @@ export class EngineDataSource
   getRowAtIndex(rowIndex: number): DataSourceRowWithBigint | undefined {
     this.#flushIfPending();
     const row = this.#rows.get(rowIndex);
-    if (row === undefined && !this.#isGrouped && rowIndex < this.#size) {
+    if (row === undefined && !this.#hasTreeRows && rowIndex < this.#size) {
       return this.#buildLeafRow(rowIndex);
     }
     return row;
@@ -939,7 +969,7 @@ export class EngineDataSource
         return row;
       }
     }
-    if (!this.#isGrouped) {
+    if (!this.#hasTreeRows) {
       const engineTable = this.#table.engineTable;
       const keyIdx = engineTable.indexOfKeyField;
       const size = this.#size;
