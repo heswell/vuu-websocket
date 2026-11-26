@@ -71,7 +71,7 @@ const isBlank = (value: unknown) =>
 /** An own value: blank, or a number greater than zero. */
 export const validateEntityLimitValue = (
   column: string,
-  value: VuuRowDataItemType | undefined,
+  value: VuuRowDataItemType | null | undefined,
 ): string | undefined => {
   if (isBlank(value) || !ENTITY_LIMIT_OWN_COLUMNS.includes(column)) {
     return undefined;

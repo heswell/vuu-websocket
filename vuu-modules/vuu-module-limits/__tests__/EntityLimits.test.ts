@@ -88,7 +88,7 @@ const setup = async () => {
     const { table } = result.data as { table: { table: string } };
     const session = tableContainer.getTable<InMemSessionDataTable>(table.table);
     return {
-      editCell: (key: string, column: string, value: number) =>
+      editCell: (key: string, column: string, value: number | null) =>
         call(session, "editCell", { column, data: value, key }),
       save: () => call(session, "endEditSession", { save: true }),
       sessionRow: (key: string) => valuesOf(session, key),
@@ -166,6 +166,25 @@ describe("entities and entityLimits", () => {
     expect(await save()).toMatchObject({ type: "SUCCESS_RESULT" });
     expect(row("LE-UK").orders_per_sec).toBe(300);
     expect(row("BOOK-CASH-01").orders_per_sec_eff).toBe(300);
+  });
+
+  test("clearing an own value inherits the parent's again", async () => {
+    const { editSession, row } = await setup();
+    const { editCell, save, sessionRow } = await editSession();
+    expect(await editCell("DESK-EQD", "max_order_qty", null)).toMatchObject({
+      type: "SUCCESS_RESULT",
+    });
+    expect(sessionRow("DESK-EQD")).toMatchObject({
+      max_order_qty: null,
+      max_order_qty_eff: 1_000_000,
+    });
+    expect(sessionRow("BOOK-EQD-01").max_order_qty_eff).toBe(1_000_000);
+    // a book that sets its own keeps it
+    expect(sessionRow("BOOK-EQD-02").max_order_qty_eff).toBe(50_000);
+
+    expect(await save()).toMatchObject({ type: "SUCCESS_RESULT" });
+    expect(row("DESK-EQD").max_order_qty).toBe(null);
+    expect(row("BOOK-EQD-01").max_order_qty_eff).toBe(1_000_000);
   });
 
   test("a broken cap is named in vuuMsg, and nothing is saved until it is fixed", async () => {
