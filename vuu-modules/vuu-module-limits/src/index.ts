@@ -1,3 +1,4 @@
+export * from "./entityLimits";
 export * from "./LimitsModule";
 export * from "./LimitsService";
 export * from "./LimitsStore";

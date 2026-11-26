@@ -1,34 +1,86 @@
 export type LimitEntityType =
-  | "Firm"
-  | "Legal entity"
-  | "Desk"
-  | "Book"
-  | "Trader";
+  "Firm" | "Legal entity" | "Desk" | "Book" | "Trader";
 
 export interface LimitEntity {
   entity_id: string;
   entity_type: LimitEntityType;
   name: string;
+  /** The entity above this one, blank for the Firm. */
+  parent_id: string;
 }
 
-/** The entities limits attach to. A hierarchy table will replace this. */
+/**
+ * The entities limits attach to, as a hierarchy: legal entities under the
+ * Firm, desks under legal entities, books and traders under desks.
+ */
 export const LIMIT_ENTITIES: readonly LimitEntity[] = [
-  { entity_id: "FIRM", entity_type: "Firm", name: "Firm" },
-  { entity_id: "LE-UK", entity_type: "Legal entity", name: "UK Ltd" },
-  { entity_id: "LE-US", entity_type: "Legal entity", name: "US Inc" },
-  { entity_id: "DESK-EQD", entity_type: "Desk", name: "Equity derivatives" },
-  { entity_id: "DESK-CASH", entity_type: "Desk", name: "Cash equities" },
-  { entity_id: "DESK-RATES", entity_type: "Desk", name: "Rates" },
-  { entity_id: "BOOK-EQD-01", entity_type: "Book", name: "Index options" },
+  { entity_id: "FIRM", entity_type: "Firm", name: "Firm", parent_id: "" },
+  {
+    entity_id: "LE-UK",
+    entity_type: "Legal entity",
+    name: "UK Ltd",
+    parent_id: "FIRM",
+  },
+  {
+    entity_id: "LE-US",
+    entity_type: "Legal entity",
+    name: "US Inc",
+    parent_id: "FIRM",
+  },
+  {
+    entity_id: "DESK-EQD",
+    entity_type: "Desk",
+    name: "Equity derivatives",
+    parent_id: "LE-UK",
+  },
+  {
+    entity_id: "DESK-CASH",
+    entity_type: "Desk",
+    name: "Cash equities",
+    parent_id: "LE-UK",
+  },
+  {
+    entity_id: "DESK-RATES",
+    entity_type: "Desk",
+    name: "Rates",
+    parent_id: "LE-US",
+  },
+  {
+    entity_id: "BOOK-EQD-01",
+    entity_type: "Book",
+    name: "Index options",
+    parent_id: "DESK-EQD",
+  },
   {
     entity_id: "BOOK-EQD-02",
     entity_type: "Book",
     name: "Single stock options",
+    parent_id: "DESK-EQD",
   },
-  { entity_id: "BOOK-CASH-01", entity_type: "Book", name: "UK cash" },
-  { entity_id: "BOOK-RATES-01", entity_type: "Book", name: "Govt bonds" },
-  { entity_id: "TRD-JSMITH", entity_type: "Trader", name: "J Smith" },
-  { entity_id: "TRD-AKHAN", entity_type: "Trader", name: "A Khan" },
+  {
+    entity_id: "BOOK-CASH-01",
+    entity_type: "Book",
+    name: "UK cash",
+    parent_id: "DESK-CASH",
+  },
+  {
+    entity_id: "BOOK-RATES-01",
+    entity_type: "Book",
+    name: "Govt bonds",
+    parent_id: "DESK-RATES",
+  },
+  {
+    entity_id: "TRD-JSMITH",
+    entity_type: "Trader",
+    name: "J Smith",
+    parent_id: "DESK-EQD",
+  },
+  {
+    entity_id: "TRD-AKHAN",
+    entity_type: "Trader",
+    name: "A Khan",
+    parent_id: "DESK-CASH",
+  },
 ];
 
 export type LimitPeriod =
