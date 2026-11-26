@@ -31,6 +31,7 @@ import type {
   VuuViewportRangeResponse,
   VuuViewportVisualLinksResponse,
 } from "@vuu-ui/vuu-protocol-types";
+import type { WithTree } from "../viewport/ViewportTree";
 import { RowUpdate } from "./row/RowUpdate";
 import type { LoginSuccessOptions } from "./LoginSuccess";
 
@@ -123,8 +124,8 @@ export const GetTableListResponse = (
 export const CreateViewPortSuccess = (
   viewPortId: string,
   table: string,
-  msg: VuuViewportCreateRequest,
-): VuuViewportCreateSuccessResponse => ({
+  msg: WithTree<VuuViewportCreateRequest>,
+): WithTree<VuuViewportCreateSuccessResponse> => ({
   aggregations: msg.aggregations,
   columns: msg.columns,
   filterSpec: msg.filterSpec,
@@ -132,19 +133,21 @@ export const CreateViewPortSuccess = (
   range: msg.range,
   sort: msg.sort,
   table,
+  ...(msg.tree && { tree: msg.tree }),
   type: "CREATE_VP_SUCCESS",
   viewPortId,
 });
 
 export const ChangeViewPortSuccess = (
   viewPortId: string,
-  msg: Omit<VuuViewportChangeRequest, "type" | "viewPortId">,
-): VuuViewportChangeResponse => ({
+  msg: WithTree<Omit<VuuViewportChangeRequest, "type" | "viewPortId">>,
+): WithTree<VuuViewportChangeResponse> => ({
   aggregations: msg.aggregations,
   columns: msg.columns,
   filterSpec: msg.filterSpec,
   groupBy: msg.groupBy,
   sort: msg.sort,
+  ...(msg.tree && { tree: msg.tree }),
   type: "CHANGE_VP_SUCCESS",
   viewPortId,
 });

@@ -9,16 +9,37 @@ import type {
 
 export type RowPredicate = (row: VuuDataRow) => boolean;
 
+/**
+ * Shows a viewport's rows as a tree built from a column holding the key of
+ * each row's parent. The same shape as VuuTree in @vuu-ui/vuu-protocol-types.
+ */
+export interface VuuTree {
+  /** The column that holds the key of the row's parent. */
+  parentColumn: string;
+  /**
+   * Rows at this depth and above start expanded. Roots are depth 1, so 1
+   * expands the roots. Default 0: everything collapsed.
+   */
+  openDepth?: number;
+}
+
 export interface ViewportConfig {
   columns: string[];
   sort: VuuSort;
   filterSpec: VuuFilter;
   groupBy: string[];
   aggregations: VuuAggregation[];
+  /**
+   * Parent-key tree, exclusive with groupBy and aggregations. In
+   * setConfig, an undefined value for any other field leaves it unchanged;
+   * tree present with the value undefined removes the tree.
+   */
+  tree?: VuuTree;
 }
 
-export interface ViewportOptions<R = ViewportRow>
-  extends Partial<ViewportConfig> {
+export interface ViewportOptions<
+  R = ViewportRow,
+> extends Partial<ViewportConfig> {
   id: string;
   range?: VuuRange;
   permissionFilter?: RowPredicate;
@@ -53,8 +74,9 @@ export interface ViewportRow {
    */
   ts: number;
   /**
-   * Projected column values. For grouped viewports, data is prefixed by the
-   * six tree columns [depth, isExpanded, treeKey, isLeaf, label, childCount].
+   * Projected column values. For grouped and tree viewports, data is
+   * prefixed by the six tree columns
+   * [depth, isExpanded, treeKey, isLeaf, label, childCount].
    */
   data: VuuRowDataItemType[];
 }
@@ -69,7 +91,8 @@ export interface RowHeader {
   sel: 0 | 1;
   /** see ViewportRow.ts */
   ts: number;
-  // tree columns, meaningful only for grouped viewports
+  // tree columns, meaningful only for grouped and tree viewports. For a
+  // parent-key tree, rowKey, treeKey and label are all the table key.
   depth: number;
   isExpanded: boolean;
   treeKey: string;
@@ -87,7 +110,7 @@ export interface RowWriter<R> {
   /** index in values(row) at which the first value is written */
   readonly dataOffset: number;
   /**
-   * When true, values for grouped viewports are prefixed by the six tree
+   * When true, values for grouped and tree viewports are prefixed by the six tree
    * columns [depth, isExpanded, treeKey, isLeaf, label, childCount], as in
    * ViewportRow.data. When false only column values are written; tree
    * columns are available from the header.
@@ -137,7 +160,8 @@ export interface ViewportEngine<R = ViewportRow> {
   readonly range: VuuRange;
   readonly size: number;
   /**
-   * Keys (tree keys when grouped) of selected rows in the viewport. Built on
+   * Keys (tree keys when grouped, table keys for a parent-key tree) of
+   * selected rows in the viewport. Built on
    * demand, O(size), while select-all is active.
    */
   readonly selectedKeys: ReadonlySet<string>;
@@ -161,10 +185,14 @@ export interface ViewportEngine<R = ViewportRow> {
   setBaseFilter(filterSpec: VuuFilter | undefined): ViewportBatch<R>;
   readonly baseFilterSpec: VuuFilter;
 
+  /** treeKey is the table key when the viewport is a parent-key tree */
   openTreeNode(treeKey: string): ViewportBatch<R>;
   closeTreeNode(treeKey: string): ViewportBatch<R>;
 
-  selectRow(rowKey: string, preserveExistingSelection: boolean): ViewportBatch<R>;
+  selectRow(
+    rowKey: string,
+    preserveExistingSelection: boolean,
+  ): ViewportBatch<R>;
   deselectRow(
     rowKey: string,
     preserveExistingSelection: boolean,
@@ -192,7 +220,10 @@ export interface ViewportEngine<R = ViewportRow> {
     limit?: number,
   ): string[];
 
-  /** table row index at position, -1 if position is a group row or empty */
+  /**
+   * table row index at position, -1 if position is a group row or empty.
+   * Every row of a parent-key tree is a table row.
+   */
   rowIndexAt(position: number): number;
 
   destroy(): void;

@@ -37,16 +37,14 @@ import { ClientSessionId } from "../net/ClientConnectionCreator";
 import { PublishQueue } from "../util/PublishQueue";
 import { ViewPortId } from "../client/messages/ClientMessage";
 import { getLogger } from "@heswell/service-utils/browser";
-import {
-  EXPORT_VIEWPORT_RPC,
-  ViewportExports,
-} from "./export/ViewportExports";
+import { EXPORT_VIEWPORT_RPC, ViewportExports } from "./export/ViewportExports";
 import {
   isClientRequestError,
   ClientRequestError,
   TableNotFoundError,
   ViewportNotFoundError,
 } from "../net/ClientRequestError";
+import type { WithTree } from "./ViewportTree";
 
 const log = getLogger("vuu.viewport");
 
@@ -102,9 +100,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   getViewPortDefinition(table: DataTable) {
     const viewPortDefFunc = this.getViewPortDefinitionCreator(table);
     if (viewPortDefFunc) {
-      log.debug(
-        `getViewPortDefinition ${table.name}, instantiate ViewPortDef`,
-      );
+      log.debug(`getViewPortDefinition ${table.name}, instantiate ViewPortDef`);
       return viewPortDefFunc(
         table,
         table.provider,
@@ -148,7 +144,8 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       groupBy,
       range,
       sort,
-    }: VuuViewportCreateRequest,
+      tree,
+    }: WithTree<VuuViewportCreateRequest>,
   ) {
     const { sessionId } = clientSessionId;
     if (
@@ -169,7 +166,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
       { columns, filterSpec, groupBy, sort },
       range,
       table,
-      { aggregations, columns, filterSpec, groupBy, range, sort },
+      { aggregations, columns, filterSpec, groupBy, range, sort, tree },
       viewPortDef,
     );
 
@@ -226,10 +223,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
    * As getViewportById, but only returns viewports owned by the client
    * session. Viewports of other sessions are reported as not found.
    */
-  getViewportForSession(
-    viewportId: string,
-    clientSessionId: SessionRef,
-  ) {
+  getViewportForSession(viewportId: string, clientSessionId: SessionRef) {
     const viewport = this.#viewports.get(viewportId);
     if (viewport && viewport.sessionId === clientSessionId.sessionId) {
       return viewport;
@@ -280,9 +274,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   }
 
   removeForSession(clientSessionId: ClientSessionId) {
-    log.debug(
-      `close all viewports for session ${clientSessionId}`,
-    );
+    log.debug(`close all viewports for session ${clientSessionId}`);
     for (const viewPort of this.listViewportsForSession(
       clientSessionId.sessionId,
     )) {
@@ -296,9 +288,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (viewport.enabled) {
       viewport.enabled = false;
     } else {
-      log.warn(
-        `disableViewport, viewport ${viewportId} is already disabled`,
-      );
+      log.warn(`disableViewport, viewport ${viewportId} is already disabled`);
     }
   }
   enableViewport(viewportId: string, clientSessionId: ClientSessionId) {
@@ -307,9 +297,7 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
     if (!viewport.enabled) {
       viewport.enabled = true;
     } else {
-      log.warn(
-        `enableViewport, viewport ${viewportId} is already enabled`,
-      );
+      log.warn(`enableViewport, viewport ${viewportId} is already enabled`);
     }
   }
 
@@ -327,7 +315,10 @@ export class ViewportContainer extends EventEmitter<ViewportEvents> {
   ): Promise<ViewPortAction> {
     const { rpcName, type, vpId } = request;
     const viewport = this.#viewports.get(vpId);
-    if (viewport === undefined || viewport.sessionId !== ctx.session.sessionId) {
+    if (
+      viewport === undefined ||
+      viewport.sessionId !== ctx.session.sessionId
+    ) {
       throw new MenuRpcDispatchError(`viewport ${vpId} not found`);
     }
     const menuItem = viewport.viewPortDef.service.menuMap.get(rpcName);

@@ -67,6 +67,7 @@ import {
   isClientRequestError,
   TableNotFoundError,
 } from "../net/ClientRequestError";
+import type { WithTree } from "../viewport/ViewportTree";
 
 const log = getLogger("vuu.core");
 const rpcLog = getLogger("vuu.rpc");
@@ -296,7 +297,7 @@ export class CoreServerApiHandler implements ServerApi {
   }
 
   private processCreateViewPortRequest(
-    msg: VuuViewportCreateRequest,
+    msg: WithTree<VuuViewportCreateRequest>,
     ctx: RequestContext,
   ) {
     const tableName = msg.table.table;
@@ -322,9 +323,7 @@ export class CoreServerApiHandler implements ServerApi {
     );
 
     if (viewport) {
-      log.debug(
-        `created viewport ${viewport.id} on table ${tableName}`,
-      );
+      log.debug(`created viewport ${viewport.id} on table ${tableName}`);
 
       // This diverges from the originasl;
       viewport.postDataForCurrentRange();
@@ -342,7 +341,7 @@ export class CoreServerApiHandler implements ServerApi {
   }
 
   private processChangeViewPortRequest(
-    { viewPortId, ...options }: VuuViewportChangeRequest,
+    { viewPortId, ...options }: WithTree<VuuViewportChangeRequest>,
     ctx: RequestContext,
   ) {
     try {
@@ -408,14 +407,10 @@ export class CoreServerApiHandler implements ServerApi {
     ctx: RequestContext,
   ) {
     if (hasViewPortContext(msg)) {
-      rpcLog.debug(
-        `RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`,
-      );
+      rpcLog.debug(`RPC ${msg.rpcName} on vp ${msg.context.viewPortId}`);
       return this.handleViewportRpcRequest(msg, msg.context.viewPortId, ctx);
     } else {
-      rpcLog.warn(
-        `Invalid context on request ${ctx.requestId}`,
-      );
+      rpcLog.warn(`Invalid context on request ${ctx.requestId}`);
       return vsMsg(
         createErrorRpcResponse(
           msg,
