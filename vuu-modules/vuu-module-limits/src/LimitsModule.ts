@@ -1,11 +1,11 @@
 import {
-  CreateSessionTableRpcHandler,
   ModuleFactory,
   ViewPortDef,
   type DataTable,
 } from "@heswell/vuu-server";
 import type { Table } from "@heswell/vuu-table";
 import { EntitiesProvider, EntityLimitsProvider } from "./EntityLimitsProvider";
+import { EntityLimitsService } from "./EntityLimitsService";
 import { EntityLimitsSessionService } from "./EntityLimitsSessionService";
 import { LimitsProvider } from "./LimitsProvider";
 import { LimitsService } from "./LimitsService";
@@ -85,7 +85,7 @@ export const LimitsModule = ({
       (table, _provider, _providerContainer, tableContainer) =>
         ViewPortDef(
           table.tableDef.columns,
-          new CreateSessionTableRpcHandler(tableContainer),
+          new EntityLimitsService(tableContainer),
         ),
     )
     .addSessionTable(

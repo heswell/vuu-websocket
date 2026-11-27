@@ -173,3 +173,47 @@ export const resolveEntityLimits = (
   }
   return breaches;
 };
+
+export interface OwnValue {
+  key: string;
+  value: number;
+}
+
+/**
+ * The rows below a row, at any depth, that set their own value in a
+ * column, in tree order.
+ */
+export const ownValuesBelow = (
+  table: DataTable,
+  key: string,
+  column: string,
+): OwnValue[] => {
+  const { columnMap, indexOfKeyField } = table;
+  const parentIndex = columnMap.parent_id;
+  const childrenByParent = new Map<string, VuuDataRow[]>();
+  for (const row of table.rows) {
+    const parentKey = String(row[parentIndex] ?? "");
+    const children = childrenByParent.get(parentKey);
+    if (children) {
+      children.push(row);
+    } else {
+      childrenByParent.set(parentKey, [row]);
+    }
+  }
+  const ownValues: OwnValue[] = [];
+  const visited = new Set([key]);
+  const visit = (parentKey: string) => {
+    for (const row of childrenByParent.get(parentKey) ?? []) {
+      const childKey = String(row[indexOfKeyField]);
+      if (visited.has(childKey)) continue;
+      visited.add(childKey);
+      const value = ownValue(row[columnMap[column]]);
+      if (value !== null) {
+        ownValues.push({ key: childKey, value });
+      }
+      visit(childKey);
+    }
+  };
+  visit(key);
+  return ownValues;
+};

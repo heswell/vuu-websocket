@@ -90,12 +90,15 @@ const setup = async () => {
     return {
       editCell: (key: string, column: string, value: number | null) =>
         call(session, "editCell", { column, data: value, key }),
+      ownValuesBelow: (key: string, column: string) =>
+        call(session, "getOwnValuesBelow", { column, key }),
       save: () => call(session, "endEditSession", { save: true }),
       sessionRow: (key: string) => valuesOf(session, key),
     };
   };
 
   return {
+    call,
     editSession,
     entities: tableContainer.getTable<DataTable>(ENTITIES),
     entityLimits,
@@ -217,5 +220,57 @@ describe("entities and entityLimits", () => {
     expect(sessionRow("TRD-JSMITH").vuuMsg).toBe(
       "Drawdown 250000 is above 200000, the limit of DESK-EQD",
     );
+  });
+});
+
+describe("getOwnValuesBelow", () => {
+  test("lists the rows below, at any depth, that set their own value", async () => {
+    const { call, entityLimits } = await setup();
+    expect(
+      await call(entityLimits, "getOwnValuesBelow", {
+        column: "max_order_qty",
+        key: "LE-UK",
+      }),
+    ).toEqual({
+      data: [
+        { key: "DESK-EQD", value: 250_000 },
+        { key: "BOOK-EQD-02", value: 50_000 },
+      ],
+      type: "SUCCESS_RESULT",
+    });
+    expect(
+      await call(entityLimits, "getOwnValuesBelow", {
+        column: "max_order_qty",
+        key: "DESK-CASH",
+      }),
+    ).toEqual({ data: [], type: "SUCCESS_RESULT" });
+  });
+
+  test("an edit session lists its own values", async () => {
+    const { editSession } = await setup();
+    const { editCell, ownValuesBelow } = await editSession();
+    await editCell("BOOK-CASH-01", "var", 1_000_000);
+    await editCell("DESK-EQD", "max_order_qty", null);
+    expect(await ownValuesBelow("LE-UK", "var")).toEqual({
+      data: [{ key: "BOOK-CASH-01", value: 1_000_000 }],
+      type: "SUCCESS_RESULT",
+    });
+    expect(await ownValuesBelow("LE-UK", "max_order_qty")).toEqual({
+      data: [{ key: "BOOK-EQD-02", value: 50_000 }],
+      type: "SUCCESS_RESULT",
+    });
+  });
+
+  test("needs a known column", async () => {
+    const { call, entityLimits } = await setup();
+    expect(
+      await call(entityLimits, "getOwnValuesBelow", {
+        column: "nope",
+        key: "LE-UK",
+      }),
+    ).toEqual({
+      errorMessage: "getOwnValuesBelow: no column nope",
+      type: "ERROR_RESULT",
+    });
   });
 });

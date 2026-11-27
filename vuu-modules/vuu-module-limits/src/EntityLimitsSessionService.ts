@@ -1,5 +1,4 @@
 import {
-  CreateSessionTableRpcHandler,
   RpcNames,
   type CellEdit,
   type InMemSessionDataTable,
@@ -12,6 +11,7 @@ import {
   resolveEntityLimits,
   validateEntityLimitValue,
 } from "./entityLimits";
+import { EntityLimitsService } from "./EntityLimitsService";
 
 /** The requests that change the rows of a session. */
 const SESSION_CHANGES: readonly string[] = [
@@ -25,7 +25,7 @@ const SESSION_CHANGES: readonly string[] = [
  * of the session are resolved, and vuuMsg names the cap a row breaks, if
  * any. Nothing is saved while any cap is broken.
  */
-export class EntityLimitsSessionService extends CreateSessionTableRpcHandler {
+export class EntityLimitsSessionService extends EntityLimitsService {
   async processRpcRequest(
     rpcName: string,
     rpcParams: RpcParams,
