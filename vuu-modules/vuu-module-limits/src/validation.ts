@@ -25,7 +25,7 @@ const isNumber = (value: unknown) =>
  */
 export const validateLimitValue = (
   column: string,
-  value: VuuRowDataItemType | undefined,
+  value: VuuRowDataItemType | null | undefined,
 ): string | undefined => {
   if (isBlank(value)) {
     return undefined;

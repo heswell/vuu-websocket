@@ -303,6 +303,20 @@ describe("editCell column and type validation", () => {
     ]);
   });
 
+  test("null clears a cell, whatever its type", () => {
+    const { call, sessionTable, sessionVp } = sessionSetup();
+    for (const column of ["price", "qty", "active"]) {
+      expect(
+        call("editCell", sessionVp, { key: "o1", column, data: null }),
+      ).toEqual(ok);
+    }
+    expect(sessionTable.getRowAtKey("o1").slice(2, 5)).toEqual([
+      null,
+      null,
+      null,
+    ]);
+  });
+
   test("isEditableColumn and validateCellEdit can be overridden", () => {
     const seen: Array<{ ctx: RequestContext; column: string }> = [];
     class Restricted extends CreateSessionTableRpcHandler {

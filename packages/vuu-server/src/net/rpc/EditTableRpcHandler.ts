@@ -37,7 +37,8 @@ export type CellEdit = {
   row: VuuDataRow;
   /** the table being edited, a session table unless canEditSource allowed a direct edit */
   table: DataTable;
-  value: VuuRowDataItemType;
+  /** the new value, null when the cell is cleared */
+  value: VuuRowDataItemType | null;
   viewport: Viewport;
 };
 
@@ -175,9 +176,10 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
     const dataType = table.schema.columns.find(
       ({ name }) => name === column,
     )?.serverDataType;
-    let value: VuuRowDataItemType;
+    // null clears the cell
+    let value: VuuRowDataItemType | null;
     try {
-      value = coerceCellValue(data, dataType, column);
+      value = data === null ? null : coerceCellValue(data, dataType, column);
     } catch (error) {
       throw Error(`editCell: ${(error as Error).message}`);
     }
@@ -189,7 +191,7 @@ export class EditTableRpcHandler extends DefaultRpcHandler {
     }
 
     const newRow = (pendingRow ?? row).slice();
-    newRow[columnIndex] = value;
+    newRow[columnIndex] = value as VuuRowDataItemType;
 
     if (!isSessionTable) {
       // a direct edit must not move the row out of the user's permissions

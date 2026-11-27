@@ -4,6 +4,7 @@ import {
   VUU_DEFAULT_COLUMNS,
   type ColumnDef,
 } from "@heswell/vuu-server";
+import { ENTITY_LIMIT_METRICS } from "./entityLimits";
 
 export const LIMIT_DEFINITIONS = "limitDefinitions";
 
@@ -100,4 +101,51 @@ export const exportLimitDefinitions = SessionTableDef({
   columns: limitDefinitions.columns,
   keyField: "limit_key",
   name: `export-${LIMIT_DEFINITIONS}`,
+});
+
+export const ENTITIES = "entities";
+export const ENTITY_LIMITS = "entityLimits";
+
+const entityIdColumn: ColumnDef = { name: "entity_id", dataType: "string" };
+
+/** The entities limits attach to, as a tree: parent_id names the parent. */
+export const entities = TableDef({
+  columns: [
+    entityIdColumn,
+    { name: "parent_id", dataType: "string" },
+    { name: "entity_type", dataType: "string" },
+    { name: "name", dataType: "string" },
+  ],
+  keyField: "entity_id",
+  name: ENTITIES,
+});
+
+/**
+ * Limits by entity, one row per entity. Each metric has the entity's own
+ * value, blank when not set, and `<metric>_eff`, the value that applies,
+ * resolved down the tree by the server.
+ */
+const entityLimitColumns: ColumnDef[] = [
+  entityIdColumn,
+  { name: "parent_id", dataType: "string" },
+  { name: "name", dataType: "string" },
+  { name: "entity_type", dataType: "string" },
+  ...ENTITY_LIMIT_METRICS.flatMap<ColumnDef>(({ column, effectiveColumn }) => [
+    { name: column, dataType: "double" },
+    { name: effectiveColumn, dataType: "double" },
+  ]),
+];
+
+export const entityLimits = TableDef({
+  columns: [...entityLimitColumns, ...VUU_DEFAULT_COLUMNS],
+  editable: true,
+  keyField: "entity_id",
+  name: ENTITY_LIMITS,
+});
+
+/** Edit session: every column. The server keeps the effective values. */
+export const editEntityLimits = SessionTableDef({
+  columns: entityLimitColumns,
+  keyField: "entity_id",
+  name: `edit-${ENTITY_LIMITS}`,
 });

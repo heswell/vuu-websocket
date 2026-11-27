@@ -14,7 +14,11 @@ import {
   type ViewPortSelection,
   type Viewport,
 } from "@heswell/vuu-server";
-import type { RpcResult, VuuDataRow } from "@vuu-ui/vuu-protocol-types";
+import type {
+  RpcResult,
+  VuuDataRow,
+  VuuRowDataItemType,
+} from "@vuu-ui/vuu-protocol-types";
 import { createTradingConstituent } from "./trading-rows";
 
 export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
@@ -70,7 +74,7 @@ export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
   protected applyCellEdit({ key, column, value }: CellEdit): void {
     const table = this.constituentTable;
     const row = table.getRowAtKey(key).slice();
-    row[table.columnMap[column]] = value;
+    row[table.columnMap[column]] = value as VuuRowDataItemType;
     table.update(table.rowIndexAtKey(key), row, column);
   }
 
@@ -126,7 +130,7 @@ export class BasketTradingConstituentJoinService extends EditTableRpcHandler {
       const table = this.constituentTable;
       const row = table.getRowAtKey(edits[0].key).slice();
       for (const { column, value } of edits) {
-        row[table.columnMap[column]] = value;
+        row[table.columnMap[column]] = value as VuuRowDataItemType;
       }
       table.update(table.rowIndexAtKey(edits[0].key), row);
       return { type: "SUCCESS_RESULT", data: undefined };
